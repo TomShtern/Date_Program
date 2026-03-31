@@ -67,6 +67,12 @@ public class ViewModelFactory {
     // Generic cache for ViewModels (lazy-initialized singletons within UI context)
     private final Map<Class<?>, Object> viewModelCache = new HashMap<>();
 
+    // Cached UI adapter singletons — created once per factory lifecycle
+    private UiUserStore cachedUiUserStore;
+    private UiMatchDataAccess cachedUiMatchDataAccess;
+    private UiProfileNoteDataAccess cachedUiProfileNoteDataAccess;
+    private UiDataAdapters.UiPresenceDataAccess cachedUiPresenceDataAccess;
+
     private final Map<Class<?>, Supplier<Object>> controllerFactories;
 
     public ViewModelFactory(ServiceRegistry services) {
@@ -257,7 +263,7 @@ public class ViewModelFactory {
                         services.getAchievementService(),
                         services.getActivityMetricsService(),
                         services.getConnectionService(),
-                        services.getProfileUseCases(),
+                        services.getProfileInsightsUseCases(),
                         session,
                         datingapp.core.AppClock.clock(),
                         uiDispatcher));
@@ -268,6 +274,7 @@ public class ViewModelFactory {
                 PreferencesViewModel.class,
                 () -> new PreferencesViewModel(
                         createUiUserStore(),
+                        services.getProfileMutationUseCases(),
                         services.getProfileUseCases(),
                         new UiThemeService(uiPreferencesStore, NavigationService.getInstance()),
                         services.getConfig(),
@@ -298,13 +305,18 @@ public class ViewModelFactory {
         return getViewModel(
                 SafetyViewModel.class,
                 () -> new SafetyViewModel(
-                        services.getTrustSafetyService(), services.getProfileUseCases(), session, uiDispatcher));
+                        services.getTrustSafetyService(),
+                        services.getProfileMutationUseCases(),
+                        services.getProfileUseCases(),
+                        session,
+                        uiDispatcher));
     }
 
     public NotesViewModel getNotesViewModel() {
         return getViewModel(
                 NotesViewModel.class,
-                () -> new NotesViewModel(services.getProfileUseCases(), createUiUserStore(), session, uiDispatcher));
+                () -> new NotesViewModel(
+                        services.getProfileNotesUseCases(), createUiUserStore(), session, uiDispatcher));
     }
 
     /**
@@ -350,22 +362,40 @@ public class ViewModelFactory {
         });
 
         viewModelCache.clear();
+        cachedUiUserStore = null;
+        cachedUiMatchDataAccess = null;
+        cachedUiProfileNoteDataAccess = null;
+        cachedUiPresenceDataAccess = null;
     }
 
     private UiUserStore createUiUserStore() {
-        return new StorageUiUserStore(services.getUserStorage());
+        if (cachedUiUserStore == null) {
+            cachedUiUserStore = new StorageUiUserStore(services.getUserStorage());
+        }
+        return cachedUiUserStore;
     }
 
     private UiMatchDataAccess createUiMatchDataAccess() {
-        return new StorageUiMatchDataAccess(services.getInteractionStorage(), services.getTrustSafetyStorage());
+        if (cachedUiMatchDataAccess == null) {
+            cachedUiMatchDataAccess =
+                    new StorageUiMatchDataAccess(services.getInteractionStorage(), services.getTrustSafetyStorage());
+        }
+        return cachedUiMatchDataAccess;
     }
 
     private UiProfileNoteDataAccess createUiProfileNoteDataAccess() {
-        return new UseCaseUiProfileNoteDataAccess(services.getProfileUseCases());
+        if (cachedUiProfileNoteDataAccess == null) {
+            cachedUiProfileNoteDataAccess = new UseCaseUiProfileNoteDataAccess(services.getProfileNotesUseCases());
+        }
+        return cachedUiProfileNoteDataAccess;
     }
 
     private UiDataAdapters.UiPresenceDataAccess createUiPresenceDataAccess() {
-        return new MetricsUiPresenceDataAccess(services.getActivityMetricsService(), services.getConfig());
+        if (cachedUiPresenceDataAccess == null) {
+            cachedUiPresenceDataAccess =
+                    new MetricsUiPresenceDataAccess(services.getActivityMetricsService(), services.getConfig());
+        }
+        return cachedUiPresenceDataAccess;
     }
 
     private void logDebug(String message, Object... args) {

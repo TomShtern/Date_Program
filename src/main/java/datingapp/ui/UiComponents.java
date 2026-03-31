@@ -65,6 +65,8 @@ public final class UiComponents {
      */
     public static final class TypingIndicator extends HBox {
 
+        private final java.util.List<TranslateTransition> animations = new java.util.ArrayList<>();
+
         /** Creates a new typing indicator with 3 bouncing dots. */
         public TypingIndicator() {
             setSpacing(UiConstants.TYPING_DOT_SPACING);
@@ -84,7 +86,7 @@ public final class UiComponents {
                 bounce.setAutoReverse(true);
                 bounce.setCycleCount(Animation.INDEFINITE);
                 bounce.setDelay(UiConstants.TYPING_BOUNCE_DELAY_STEP.multiply(i));
-                Platform.runLater(bounce::play);
+                animations.add(bounce);
             }
 
             // Start hidden
@@ -96,10 +98,12 @@ public final class UiComponents {
         public void show() {
             setVisible(true);
             setManaged(true);
+            animations.forEach(TranslateTransition::play);
         }
 
         /** Hides the typing indicator. */
         public void hide() {
+            animations.forEach(TranslateTransition::stop);
             setVisible(false);
             setManaged(false);
         }

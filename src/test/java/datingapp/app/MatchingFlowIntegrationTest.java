@@ -39,6 +39,7 @@ import datingapp.core.metrics.DefaultAchievementService;
 import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
 import datingapp.core.model.User.UserState;
+import datingapp.core.profile.LocationService;
 import datingapp.core.profile.ProfileService;
 import datingapp.core.profile.ValidationService;
 import datingapp.core.storage.CommunicationStorage;
@@ -192,13 +193,11 @@ class MatchingFlowIntegrationTest {
                 new CandidateFinder(userStorage, interactionStorage, trustSafetyStorage, ZoneId.of("UTC"));
         ActivityMetricsService activityMetricsService =
                 new ActivityMetricsService(interactionStorage, trustSafetyStorage, analyticsStorage, config);
-        ProfileService profileService =
-                new ProfileService(config, analyticsStorage, interactionStorage, trustSafetyStorage, userStorage);
+        ProfileService profileService = new ProfileService(userStorage);
 
         CompatibilityCalculator compatibilityCalculator = new DefaultCompatibilityCalculator(config);
         DailyLimitService dailyLimitService = new DefaultDailyLimitService(interactionStorage, config);
-        DailyPickService dailyPickService =
-                new DefaultDailyPickService(userStorage, interactionStorage, analyticsStorage, candidateFinder, config);
+        DailyPickService dailyPickService = new DefaultDailyPickService(analyticsStorage, candidateFinder, config);
         StandoutService standoutService = new DefaultStandoutService(
                 compatibilityCalculator, userStorage, candidateFinder, standoutStorage, profileService, config);
         RecommendationService recommendationService =
@@ -222,6 +221,7 @@ class MatchingFlowIntegrationTest {
         MatchQualityService matchQualityService =
                 new MatchQualityService(userStorage, interactionStorage, config, compatibilityCalculator);
         ValidationService validationService = new ValidationService(config);
+        LocationService locationService = new LocationService(validationService);
         AchievementService achievementService = new DefaultAchievementService(
                 config, analyticsStorage, interactionStorage, trustSafetyStorage, userStorage, profileService);
 
@@ -247,6 +247,7 @@ class MatchingFlowIntegrationTest {
                 .achievementService(achievementService)
                 .connectionService(connectionService)
                 .validationService(validationService)
+                .locationService(locationService)
                 .eventBus(new InProcessAppEventBus())
                 .build();
     }

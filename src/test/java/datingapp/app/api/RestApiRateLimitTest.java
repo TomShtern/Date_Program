@@ -4,6 +4,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import datingapp.core.AppClock;
 import datingapp.core.ServiceRegistry;
 import datingapp.core.model.User;
@@ -27,6 +29,8 @@ import org.junit.jupiter.api.Test;
 
 @DisplayName("REST API rate limit headers")
 class RestApiRateLimitTest {
+
+    private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private RestApiServer server;
 
@@ -68,6 +72,8 @@ class RestApiRateLimitTest {
         assertFalse(response.headers().firstValue("Retry-After").orElse("").isBlank());
         assertEquals("240", response.headers().firstValue("X-RateLimit-Limit").orElseThrow());
         assertEquals("241", response.headers().firstValue("X-RateLimit-Used").orElseThrow());
+        JsonNode json = MAPPER.readTree(response.body());
+        assertEquals("TOO_MANY_REQUESTS", json.get("code").asText());
     }
 
     private static ServiceRegistry createServices(

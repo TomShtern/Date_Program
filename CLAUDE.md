@@ -1,4 +1,4 @@
-> 🚀 **VERIFIED & UPDATED: 2026-03-30**
+> 🚀 **VERIFIED & UPDATED: 2026-03-31**
 > This document has been refreshed against the current codebase and build output as of this date.
 
 <!--AGENT-DOCSYNC:ON-->
@@ -27,10 +27,10 @@ Second-level guidance for AI coding agents working in this repository.
 - Java 25 + JavaFX 25.0.2
 - Maven
 
-## Verified Source Snapshot (2026-03-30)
+## Verified Source Snapshot (2026-03-31)
 
-- Java files: **320 total** (`147` main / `173` test)
-- Java LOC (`tokei src`, Java only): **93,412 total / 75,136 code / 13,289 blank / 4,987 comments**
+- Java files: **326 total** (`152` main / `174` test)
+- Java LOC (`tokei src`, Java only): **96,157 total / 77,493 code / 13,642 blank / 5,022 comments**
 
 ## Architecture (code-verified)
 
@@ -38,7 +38,7 @@ Second-level guidance for AI coding agents working in this repository.
 datingapp/
   Main.java
   app/
-    api/{RestApiDtos,RestApiServer}.java
+    api/{RestApiDtos,RestApiIdentityPolicy,RestApiRequestGuards,RestApiServer}.java
     bootstrap/{ApplicationStartup,CleanupScheduler}.java
     cli/{CliTextAndInput,MainMenuRegistry,MatchingCliPresenter,MatchingHandler,MessagingHandler,ProfileHandler,SafetyHandler,StatsHandler}.java
     error/{AppError,AppResult}.java
@@ -48,7 +48,7 @@ datingapp/
       common/{UseCaseError,UseCaseResult,UserContext}.java
       matching/MatchingUseCases.java
       messaging/MessagingUseCases.java
-      profile/{ProfileUseCases,VerificationUseCases}.java
+      profile/{ProfileInsightsUseCases,ProfileMutationUseCases,ProfileNotesUseCases,ProfileUseCases,VerificationUseCases}.java
       social/SocialUseCases.java
   core/
     {AppClock,AppConfig,AppConfigValidator,AppSession,EnumSetUtil,LoggingSupport,ServiceRegistry,TextUtil}.java
@@ -88,6 +88,8 @@ datingapp/
 | UI paging boundary      | expose `core.storage.PageData` to ViewModels                           | use `UiDataAdapters.UiPage<T>`                                                                                             |
 | REST binding            | assume external host access                                            | loopback-only binding in `RestApiServer`                                                                                   |
 | Location availability   | treat all listed countries as available                                | only `IL` is currently selectable/fully supported                                                                          |
+| Profile use-case wiring | `ProfileUseCases` directly for notes/stats/mutation                    | use `ProfileNotesUseCases`, `ProfileInsightsUseCases`, or `ProfileMutationUseCases` from `ServiceRegistry`                 |
+| REST guard logic        | inline guard logic in `RestApiServer`                                  | delegate to `RestApiRequestGuards` and `RestApiIdentityPolicy`                                                             |
 
 ## Entrypoints and wiring
 
@@ -126,11 +128,14 @@ nav.initialize(primaryStage);
 
 - `getMatchingUseCases()`
 - `getMessagingUseCases()`
-- `getProfileUseCases()`
+- `getProfileUseCases()` — compatibility façade; prefer dedicated slices below
+- `getProfileMutationUseCases()` — profile save/update/delete account
+- `getProfileNotesUseCases()` — note CRUD
+- `getProfileInsightsUseCases()` — stats, achievements, session summary (read-only)
 - `getVerificationUseCases()`
 - `getSocialUseCases()`
 
-Callers should obtain use cases from the registry rather than constructing them directly.
+Callers should obtain use cases from the registry rather than constructing them directly. For profile operations, prefer the dedicated slices over the `ProfileUseCases` compatibility façade.
 
 `AppEventBus` / `InProcessAppEventBus` provides in-process domain event dispatching. Event handlers in `app/event/handlers/` own cross-cutting concerns like achievements, metrics, and notifications.
 
@@ -138,6 +143,13 @@ The current deliberate direct-read exception remains the candidates route in `Re
 
 ## Current architecture notes
 
+- `ProfileUseCases` is a thin compatibility façade delegating to `ProfileMutationUseCases`, `ProfileNotesUseCases`, and `ProfileInsightsUseCases`. New consumers should use the dedicated slices directly.
+- `RestApiRequestGuards` and `RestApiIdentityPolicy` own REST request-guard and identity-resolution logic; `RestApiServer` delegates to them. The rate limiter auto-evicts stale windows every 256 calls.
+- `ViewModelFactory` lazily caches four shared UI adapters (`UiUserStore`, `UiMatchDataAccess`, `UiProfileNoteDataAccess`, `UiPresenceDataAccess`) and clears them on reset/dispose.
+- `ConnectionService.getConversationPreview()` provides direct single-conversation lookup without page scanning.
+- `ProfileService` has a narrow `ProfileService(UserStorage)` constructor (truthful) and a wide compatibility overload.
+- `StorageFactory` is split into explicit private assembly stages and internal records.
+- `ServiceRegistry.Builder` supports an explicit `locationService(...)` setter with a compatibility fallback.
 - `VerificationUseCases` owns email/phone verification flows so adapters do not mutate verification state directly.
 - All current production ViewModels extend `BaseViewModel`.
 - `UiThemeService` is the ViewModel-facing theme facade.
@@ -145,6 +157,11 @@ The current deliberate direct-read exception remains the candidates route in `Re
 - `RestApiTestFixture` is the shared `ServiceRegistry` builder for targeted REST/API tests.
 - `UiAsyncTestSupport` complements `JavaFxTestSupport` for shared async ViewModel test helpers.
 - `DevDataSeeder` remains environment-gated (`DATING_APP_SEED_DATA=true`) and idempotent.
+- `CandidateFinder` caches candidates per user with TTL; cache hits return directly without re-fetching.
+- `ViewModelAsyncScope` evicts `latestVersions` keys when tasks complete to prevent unbounded growth.
+- `DatabaseManager.shutdown()` resets its `initialized` flag; `resetInstance()` calls `shutdown()` first.
+- `DefaultDailyPickService` requires only `DailyLimitService`, `MatchingService`, and `AppConfig` — no storage dependencies.
+- ViewModel `setErrorHandler` methods delegate to `BaseViewModel.setErrorSink()` via the `notifyError(msg, throwable)` dispatch path.
 
 ## Build & Quality Commands
 
@@ -177,6 +194,7 @@ When selecting multiple tests from PowerShell, prefer `mvn --% ...` so comma-sep
 - `src/main/java/datingapp/ui/viewmodel/UiDataAdapters.java` — UI boundary adapters
 - `src/test/java/datingapp/ui/JavaFxTestSupport.java` and `src/test/java/datingapp/ui/async/UiAsyncTestSupport.java` — shared UI test helpers
 - `src/test/java/datingapp/app/api/RestApiTestFixture.java` — shared REST/API test graph builder
+- `src/test/java/datingapp/ui/viewmodel/ViewModelFactoryTest.java` — factory caching, lifecycle, and session-binding contracts
 
 ## Keep these out of new work
 
@@ -215,4 +233,6 @@ Use `.github/copilot-instructions.md` for the shortest always-on rules. Use this
 30|2026-03-11 00:00:00|agent:claude_code|scope:architecture-corrections|Removed non-existent PerformanceMonitor and CompatibilityScoring; fixed popup package (MatchPopupController removed, MilestonePopupController moved to screen); added SafetyController and NotesController to screen list; added MatchingCliPresenter to cli list; added Default* matching impls, AchievementService, ProfileCompletionSupport; corrected false RestApiServer claim; added 2 new gotchas (AchievementType enum split, sessionTimeout scope)|CLAUDE.md
 31|2026-03-13 00:00:00|agent:claude_code|scope:code-verified-sync|Updated snapshot (267 files, 73830 LOC via tokei/fd); added LocationModels+LocationService to arch; added DevDataSeeder to storage; added 4 new gotchas (@BindMethods, Locale.ENGLISH, LocationService scope, RestApiServer localhost-only); documented 33 REST endpoints, rate limiter, localhost bind; added ProfileUseCases new commands; added Recent Updates section|CLAUDE.md
 32|2026-03-30 15:15:00|agent:github_copilot|scope:docs-hierarchy-refresh|Refreshed CLAUDE.md to current source snapshot, clarified instruction hierarchy, and updated repo-specific gotchas, patterns, and verification notes|CLAUDE.md
+33|2026-03-31 22:00:00|agent:github_copilot|scope:cast-remediation-sync|Updated architecture tree, file counts, LOC stats, gotchas, and architecture notes after CAST structural remediation implementation (REST helper extraction, profile boundary decomposition, composition spine cleanup, storage/messaging optimization, ViewModelFactory simplification)|CLAUDE.md
+34|2026-03-31 23:15:00|agent:github_copilot|scope:code-quality-sweep|16-fix code quality pass: rate limiter eviction, dead candidate cache fix, unused param cleanup (ProfileMutationUseCases, DefaultDailyPickService, MessagingUseCases), ProfileNotesUseCases author-check dedup, ViewModelAsyncScope key eviction, TypingIndicator animation lifecycle, DatabaseManager shutdown lifecycle, ViewModel errorSink dedup (Social/Standouts/Dashboard/Notes/Safety), dead field removal. Updated LOC and architecture notes.|CLAUDE.md
 ---AGENT-LOG-END---

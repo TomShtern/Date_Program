@@ -3,6 +3,8 @@ package datingapp.app.cli;
 import datingapp.app.cli.CliTextAndInput.EnumMenu;
 import datingapp.app.cli.CliTextAndInput.InputReader;
 import datingapp.app.usecase.common.UserContext;
+import datingapp.app.usecase.profile.ProfileMutationUseCases;
+import datingapp.app.usecase.profile.ProfileNotesUseCases;
 import datingapp.app.usecase.profile.ProfileUseCases;
 import datingapp.app.usecase.profile.ProfileUseCases.SaveProfileCommand;
 import datingapp.core.AppConfig;
@@ -65,7 +67,9 @@ public class ProfileHandler implements LoggingSupport {
     private final ValidationService validationService;
     private final LocationService locationService;
     private final AppConfig config;
+    private final ProfileMutationUseCases profileMutationUseCases;
     private final ProfileUseCases profileUseCases;
+    private final ProfileNotesUseCases profileNotesUseCases;
     private final AppSession session;
     private final InputReader inputReader;
 
@@ -83,6 +87,8 @@ public class ProfileHandler implements LoggingSupport {
         this.validationService = Objects.requireNonNull(validationService, "validationService cannot be null");
         this.locationService = Objects.requireNonNull(locationService, "locationService cannot be null");
         this.profileUseCases = Objects.requireNonNull(profileUseCases, "profileUseCases cannot be null");
+        this.profileMutationUseCases = this.profileUseCases.getProfileMutationUseCases();
+        this.profileNotesUseCases = this.profileUseCases.getProfileNotesUseCases();
         this.config = Objects.requireNonNull(config, "config cannot be null");
         this.session = session;
         this.inputReader = inputReader;
@@ -145,8 +151,8 @@ public class ProfileHandler implements LoggingSupport {
             promptLifestyle(draft);
             promptPacePreferences(draft);
 
-            var saveResult =
-                    profileUseCases.saveProfile(new SaveProfileCommand(UserContext.cli(currentUser.getId()), draft));
+            var saveResult = profileMutationUseCases.saveProfile(
+                    new SaveProfileCommand(UserContext.cli(currentUser.getId()), draft));
             if (!saveResult.success()) {
                 logInfo(ERROR_WITH_GAP_FORMAT, saveResult.error().message());
                 return;
@@ -945,7 +951,10 @@ public class ProfileHandler implements LoggingSupport {
             logInfo("       📝 NOTES ABOUT {}", subjectName.toUpperCase(Locale.ROOT));
             logInfo(CliTextAndInput.MENU_DIVIDER);
 
-            Optional<ProfileNote> existingNote = userStorage.getProfileNote(currentUser.getId(), subjectId);
+            var existingNoteResult = profileNotesUseCases.getProfileNote(
+                    new ProfileNotesUseCases.ProfileNoteQuery(UserContext.cli(currentUser.getId()), subjectId));
+            Optional<ProfileNote> existingNote =
+                    existingNoteResult.success() ? Optional.of(existingNoteResult.data()) : Optional.empty();
 
             if (existingNote.isPresent()) {
                 logInfo("\nCurrent note:");
@@ -983,7 +992,7 @@ public class ProfileHandler implements LoggingSupport {
             logInfo("         📝 MY PROFILE NOTES");
             logInfo(CliTextAndInput.MENU_DIVIDER + "\n");
 
-            List<ProfileNote> notes = userStorage.getProfileNotesByAuthor(currentUser.getId());
+            List<ProfileNote> notes = loadAllNotes(currentUser.getId());
 
             if (notes.isEmpty()) {
                 logInfo("You haven't added any notes yet.");
@@ -992,30 +1001,10 @@ public class ProfileHandler implements LoggingSupport {
             }
 
             logInfo("You have {} note(s):\n", notes.size());
-
-            for (int i = 0; i < notes.size(); i++) {
-                ProfileNote note = notes.get(i);
-                User subject = userStorage.get(note.subjectId()).orElse(null);
-                String subjectName = subject != null ? subject.getName() : "(deleted user)";
-
-                logInfo("  {}. {} - \"{}\"", i + 1, subjectName, note.getPreview());
-            }
+            renderNotes(notes);
 
             logInfo("\nEnter number to view/edit, or 0 to go back:");
-            String input = inputReader.readLine("Choice: ");
-
-            try {
-                int idx = Integer.parseInt(input) - 1;
-                if (idx >= 0 && idx < notes.size()) {
-                    ProfileNote note = notes.get(idx);
-                    User subject = userStorage.get(note.subjectId()).orElse(null);
-                    String subjectName = subject != null ? subject.getName() : "this user";
-                    manageNoteFor(note.subjectId(), subjectName);
-                }
-            } catch (NumberFormatException e) {
-                logTrace("Non-numeric input for note selection: {}", e.getMessage());
-                // Back to menu - user entered non-numeric input
-            }
+            handleNoteSelection(notes);
         });
     }
 
@@ -1027,15 +1016,53 @@ public class ProfileHandler implements LoggingSupport {
      * @return the note preview, or empty string if no note exists
      */
     public String getNotePreview(UUID authorId, UUID subjectId) {
-        return userStorage
-                .getProfileNote(authorId, subjectId)
-                .map(n -> "📝 " + n.getPreview())
-                .orElse("");
+        var result = profileNotesUseCases.getProfileNote(
+                new ProfileNotesUseCases.ProfileNoteQuery(UserContext.cli(authorId), subjectId));
+        return result.success() ? "📝 " + result.data().getPreview() : "";
     }
 
     /** Checks if a note exists for the given subject. */
     public boolean hasNote(UUID authorId, UUID subjectId) {
-        return userStorage.getProfileNote(authorId, subjectId).isPresent();
+        return profileNotesUseCases
+                .getProfileNote(new ProfileNotesUseCases.ProfileNoteQuery(UserContext.cli(authorId), subjectId))
+                .success();
+    }
+
+    private List<ProfileNote> loadAllNotes(UUID authorId) {
+        var result = profileNotesUseCases.listProfileNotes(
+                new ProfileNotesUseCases.ProfileNotesQuery(UserContext.cli(authorId)));
+        if (!result.success()) {
+            logInfo(ERROR_MESSAGE_FORMAT, result.error().message());
+            return List.of();
+        }
+        return result.data();
+    }
+
+    private void renderNotes(List<ProfileNote> notes) {
+        for (int i = 0; i < notes.size(); i++) {
+            ProfileNote note = notes.get(i);
+            User subject = userStorage.get(note.subjectId()).orElse(null);
+            String subjectName = subject != null ? subject.getName() : "(deleted user)";
+
+            logInfo("  {}. {} - \"{}\"", i + 1, subjectName, note.getPreview());
+        }
+    }
+
+    private void handleNoteSelection(List<ProfileNote> notes) {
+        String input = inputReader.readLine("Choice: ");
+
+        try {
+            int idx = Integer.parseInt(input) - 1;
+            if (idx >= 0 && idx < notes.size()) {
+                ProfileNote note = notes.get(idx);
+                User subject = userStorage.get(note.subjectId()).orElse(null);
+                String subjectName = subject != null ? subject.getName() : "this user";
+                manageNoteFor(note.subjectId(), subjectName);
+            }
+        } catch (NumberFormatException e) {
+            logTrace("Non-numeric input for note selection: {}", e.getMessage());
+            // Back to menu - user entered non-numeric input
+        }
     }
 
     private void addNote(UUID authorId, UUID subjectId, String subjectName) {
@@ -1054,8 +1081,8 @@ public class ProfileHandler implements LoggingSupport {
             return;
         }
 
-        var result = profileUseCases.upsertProfileNote(
-                new ProfileUseCases.UpsertProfileNoteCommand(UserContext.cli(authorId), subjectId, content));
+        var result = profileNotesUseCases.upsertProfileNote(
+                new ProfileNotesUseCases.UpsertProfileNoteCommand(UserContext.cli(authorId), subjectId, content));
         if (result.success()) {
             logInfo("✅ Note saved!\n");
         } else {
@@ -1079,7 +1106,7 @@ public class ProfileHandler implements LoggingSupport {
             return;
         }
 
-        var result = profileUseCases.upsertProfileNote(new ProfileUseCases.UpsertProfileNoteCommand(
+        var result = profileNotesUseCases.upsertProfileNote(new ProfileNotesUseCases.UpsertProfileNoteCommand(
                 UserContext.cli(existing.authorId()), existing.subjectId(), content));
         if (result.success()) {
             logInfo("✅ Note updated!\n");
@@ -1091,8 +1118,8 @@ public class ProfileHandler implements LoggingSupport {
     private void deleteNote(UUID authorId, UUID subjectId, String subjectName) {
         String confirm = inputReader.readLine("Delete note about " + subjectName + "? (y/n): ");
         if ("y".equalsIgnoreCase(confirm)) {
-            var result = profileUseCases.deleteProfileNote(
-                    new ProfileUseCases.DeleteProfileNoteCommand(UserContext.cli(authorId), subjectId));
+            var result = profileNotesUseCases.deleteProfileNote(
+                    new ProfileNotesUseCases.DeleteProfileNoteCommand(UserContext.cli(authorId), subjectId));
             if (result.success()) {
                 logInfo("✅ Note deleted.\n");
             } else if (result.error().code() == datingapp.app.usecase.common.UseCaseError.Code.NOT_FOUND) {

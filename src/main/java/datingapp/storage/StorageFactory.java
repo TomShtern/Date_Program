@@ -27,6 +27,7 @@ import datingapp.core.metrics.AchievementService;
 import datingapp.core.metrics.ActivityMetricsService;
 import datingapp.core.metrics.DefaultAchievementService;
 import datingapp.core.metrics.SwipeState.Undo;
+import datingapp.core.profile.LocationService;
 import datingapp.core.profile.ProfileService;
 import datingapp.core.profile.ValidationService;
 import datingapp.core.storage.AccountCleanupStorage;
@@ -61,7 +62,19 @@ public final class StorageFactory {
         Objects.requireNonNull(config, "config cannot be null");
         dbManager.configureQueryTimeoutSeconds(config.storage().queryTimeoutSeconds());
 
-        Jdbi jdbi = Jdbi.create(() -> {
+        Jdbi jdbi = createJdbi(dbManager);
+        registerTypeCodecs(jdbi);
+
+        PersistenceComponents persistence = createPersistenceComponents(jdbi);
+        DomainServices domain = createDomainServices(config, persistence);
+
+        registerEventHandlers(persistence, domain);
+
+        return assembleRegistry(config, persistence, domain);
+    }
+
+    private static Jdbi createJdbi(DatabaseManager dbManager) {
+        return Jdbi.create(() -> {
                     try {
                         return dbManager.getConnection();
                     } catch (java.sql.SQLException e) {
@@ -69,112 +82,187 @@ public final class StorageFactory {
                     }
                 })
                 .installPlugin(new SqlObjectPlugin());
+    }
 
+    private static void registerTypeCodecs(Jdbi jdbi) {
         jdbi.registerArgument(new JdbiTypeCodecs.EnumSetSqlCodec.EnumSetArgumentFactory());
         jdbi.registerColumnMapper(new JdbiTypeCodecs.EnumSetSqlCodec.InterestColumnMapper());
         jdbi.registerColumnMapper(Instant.class, (rs, col, ctx) -> {
             Timestamp ts = rs.getTimestamp(col);
             return ts != null ? ts.toInstant() : null;
         });
+    }
 
+    private static PersistenceComponents createPersistenceComponents(Jdbi jdbi) {
         UserStorage userStorage = new JdbiUserStorage(jdbi);
         JdbiMatchmakingStorage matchmakingStorage = new JdbiMatchmakingStorage(jdbi);
-        InteractionStorage interactionStorage = matchmakingStorage;
         CommunicationStorage communicationStorage = new JdbiConnectionStorage(jdbi);
         JdbiMetricsStorage metricsStorage = new JdbiMetricsStorage(jdbi);
-        AnalyticsStorage analyticsStorage = metricsStorage;
         TrustSafetyStorage trustSafetyStorage = jdbi.onDemand(JdbiTrustSafetyStorage.class);
         AccountCleanupStorage accountCleanupStorage = new JdbiAccountCleanupStorage(jdbi);
 
-        Undo.Storage undoStorage = matchmakingStorage.undoStorage();
-        Standout.Storage standoutStorage = metricsStorage;
-
-        CompatibilityCalculator compatibilityCalculator = new DefaultCompatibilityCalculator(config);
-
-        CandidateFinder candidateFinder = new CandidateFinder(
+        return new PersistenceComponents(
                 userStorage,
-                interactionStorage,
+                matchmakingStorage,
+                communicationStorage,
+                metricsStorage,
                 trustSafetyStorage,
+                accountCleanupStorage,
+                matchmakingStorage.undoStorage(),
+                metricsStorage);
+    }
+
+    private static DomainServices createDomainServices(AppConfig config, PersistenceComponents persistence) {
+        CompatibilityCalculator compatibilityCalculator = new DefaultCompatibilityCalculator(config);
+        CandidateFinder candidateFinder = new CandidateFinder(
+                persistence.userStorage(),
+                persistence.interactionStorage(),
+                persistence.trustSafetyStorage(),
                 config.safety().userTimeZone(),
                 Duration.ofHours(config.matching().rematchCooldownHours()));
-        ProfileService profileService =
-                new ProfileService(config, analyticsStorage, interactionStorage, trustSafetyStorage, userStorage);
 
+        ProfileService profileService = new ProfileService(persistence.userStorage());
         AchievementService achievementService = new DefaultAchievementService(
-                config, analyticsStorage, interactionStorage, trustSafetyStorage, userStorage, profileService);
-
-        DailyLimitService dailyLimitService = new DefaultDailyLimitService(interactionStorage, config);
+                config,
+                persistence.analyticsStorage(),
+                persistence.interactionStorage(),
+                persistence.trustSafetyStorage(),
+                persistence.userStorage(),
+                profileService);
+        DailyLimitService dailyLimitService = new DefaultDailyLimitService(persistence.interactionStorage(), config);
         DailyPickService dailyPickService =
-                new DefaultDailyPickService(userStorage, interactionStorage, analyticsStorage, candidateFinder, config);
+                new DefaultDailyPickService(persistence.analyticsStorage(), candidateFinder, config);
         StandoutService standoutService = new DefaultStandoutService(
-                compatibilityCalculator, userStorage, candidateFinder, standoutStorage, profileService, config);
-
+                compatibilityCalculator,
+                persistence.userStorage(),
+                candidateFinder,
+                persistence.standoutStorage(),
+                profileService,
+                config);
         RecommendationService recommendationService =
                 new RecommendationService(dailyLimitService, dailyPickService, standoutService);
-        UndoService undoService = new UndoService(interactionStorage, undoStorage, config);
+        UndoService undoService = new UndoService(persistence.interactionStorage(), persistence.undoStorage(), config);
         ActivityMetricsService activityMetricsService = new ActivityMetricsService(
-                userStorage, interactionStorage, trustSafetyStorage, analyticsStorage, config);
-
+                persistence.userStorage(),
+                persistence.interactionStorage(),
+                persistence.trustSafetyStorage(),
+                persistence.analyticsStorage(),
+                config);
         MatchingService matchingService = MatchingService.builder()
-                .interactionStorage(interactionStorage)
-                .trustSafetyStorage(trustSafetyStorage)
-                .userStorage(userStorage)
+                .interactionStorage(persistence.interactionStorage())
+                .trustSafetyStorage(persistence.trustSafetyStorage())
+                .userStorage(persistence.userStorage())
                 .activityMetricsService(activityMetricsService)
                 .undoService(undoService)
                 .dailyService(recommendationService)
                 .candidateFinder(candidateFinder)
                 .build();
-
-        MatchQualityService matchQualityService =
-                new MatchQualityService(userStorage, interactionStorage, config, compatibilityCalculator);
-
-        ConnectionService connectionService =
-                new ConnectionService(config, communicationStorage, interactionStorage, userStorage);
-
+        MatchQualityService matchQualityService = new MatchQualityService(
+                persistence.userStorage(), persistence.interactionStorage(), config, compatibilityCalculator);
+        ConnectionService connectionService = new ConnectionService(
+                config,
+                persistence.communicationStorage(),
+                persistence.interactionStorage(),
+                persistence.userStorage());
         TrustSafetyService trustSafetyService = TrustSafetyService.builder(
-                        trustSafetyStorage, interactionStorage, userStorage, config, communicationStorage)
+                        persistence.trustSafetyStorage(),
+                        persistence.interactionStorage(),
+                        persistence.userStorage(),
+                        config,
+                        persistence.communicationStorage())
                 .build();
         trustSafetyService.setCandidateFinder(candidateFinder);
 
         ValidationService validationService = new ValidationService(config);
-
+        LocationService locationService = new LocationService(validationService);
         AppEventBus eventBus = new InProcessAppEventBus();
 
-        new AchievementEventHandler(achievementService).register(eventBus);
-        new MetricsEventHandler(activityMetricsService).register(eventBus);
-        new NotificationEventHandler(communicationStorage).register(eventBus);
+        return new DomainServices(
+                candidateFinder,
+                compatibilityCalculator,
+                profileService,
+                achievementService,
+                dailyLimitService,
+                dailyPickService,
+                standoutService,
+                recommendationService,
+                undoService,
+                activityMetricsService,
+                matchingService,
+                matchQualityService,
+                connectionService,
+                trustSafetyService,
+                validationService,
+                locationService,
+                eventBus);
+    }
 
-        ProfileActivationPolicy activationPolicy = new ProfileActivationPolicy();
-        RelationshipWorkflowPolicy workflowPolicy = new RelationshipWorkflowPolicy();
+    private static void registerEventHandlers(PersistenceComponents persistence, DomainServices domain) {
+        new AchievementEventHandler(domain.achievementService()).register(domain.eventBus());
+        new MetricsEventHandler(domain.activityMetricsService()).register(domain.eventBus());
+        new NotificationEventHandler(persistence.communicationStorage()).register(domain.eventBus());
+    }
 
+    private static ServiceRegistry assembleRegistry(
+            AppConfig config, PersistenceComponents persistence, DomainServices domain) {
         return ServiceRegistry.builder()
                 .config(config)
-                .userStorage(userStorage)
-                .interactionStorage(interactionStorage)
-                .communicationStorage(communicationStorage)
-                .analyticsStorage(analyticsStorage)
-                .trustSafetyStorage(trustSafetyStorage)
-                .accountCleanupStorage(accountCleanupStorage)
-                .candidateFinder(candidateFinder)
-                .matchingService(matchingService)
-                .trustSafetyService(trustSafetyService)
-                .activityMetricsService(activityMetricsService)
-                .matchQualityService(matchQualityService)
-                .profileService(profileService)
-                .recommendationService(recommendationService)
-                .dailyLimitService(dailyLimitService)
-                .dailyPickService(dailyPickService)
-                .standoutService(standoutService)
-                .undoService(undoService)
-                .compatibilityCalculator(compatibilityCalculator)
-                .achievementService(achievementService)
-                .connectionService(connectionService)
-                .validationService(validationService)
-                .eventBus(eventBus)
-                .activationPolicy(activationPolicy)
-                .workflowPolicy(workflowPolicy)
+                .userStorage(persistence.userStorage())
+                .interactionStorage(persistence.interactionStorage())
+                .communicationStorage(persistence.communicationStorage())
+                .analyticsStorage(persistence.analyticsStorage())
+                .trustSafetyStorage(persistence.trustSafetyStorage())
+                .accountCleanupStorage(persistence.accountCleanupStorage())
+                .candidateFinder(domain.candidateFinder())
+                .matchingService(domain.matchingService())
+                .trustSafetyService(domain.trustSafetyService())
+                .activityMetricsService(domain.activityMetricsService())
+                .matchQualityService(domain.matchQualityService())
+                .profileService(domain.profileService())
+                .recommendationService(domain.recommendationService())
+                .dailyLimitService(domain.dailyLimitService())
+                .dailyPickService(domain.dailyPickService())
+                .standoutService(domain.standoutService())
+                .undoService(domain.undoService())
+                .compatibilityCalculator(domain.compatibilityCalculator())
+                .achievementService(domain.achievementService())
+                .connectionService(domain.connectionService())
+                .validationService(domain.validationService())
+                .locationService(domain.locationService())
+                .eventBus(domain.eventBus())
+                .activationPolicy(new ProfileActivationPolicy())
+                .workflowPolicy(new RelationshipWorkflowPolicy())
                 .build();
     }
+
+    private record PersistenceComponents(
+            UserStorage userStorage,
+            InteractionStorage interactionStorage,
+            CommunicationStorage communicationStorage,
+            AnalyticsStorage analyticsStorage,
+            TrustSafetyStorage trustSafetyStorage,
+            AccountCleanupStorage accountCleanupStorage,
+            Undo.Storage undoStorage,
+            Standout.Storage standoutStorage) {}
+
+    private record DomainServices(
+            CandidateFinder candidateFinder,
+            CompatibilityCalculator compatibilityCalculator,
+            ProfileService profileService,
+            AchievementService achievementService,
+            DailyLimitService dailyLimitService,
+            DailyPickService dailyPickService,
+            StandoutService standoutService,
+            RecommendationService recommendationService,
+            UndoService undoService,
+            ActivityMetricsService activityMetricsService,
+            MatchingService matchingService,
+            MatchQualityService matchQualityService,
+            ConnectionService connectionService,
+            TrustSafetyService trustSafetyService,
+            ValidationService validationService,
+            LocationService locationService,
+            AppEventBus eventBus) {}
 
     public static ServiceRegistry buildInMemory(AppConfig config) {
         return buildH2(DatabaseManager.getInstance(), config);

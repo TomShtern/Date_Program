@@ -1,10 +1,11 @@
 package datingapp.ui.viewmodel;
 
 import datingapp.app.usecase.common.UserContext;
+import datingapp.app.usecase.profile.ProfileNotesUseCases;
+import datingapp.app.usecase.profile.ProfileNotesUseCases.DeleteProfileNoteCommand;
+import datingapp.app.usecase.profile.ProfileNotesUseCases.ProfileNotesQuery;
+import datingapp.app.usecase.profile.ProfileNotesUseCases.UpsertProfileNoteCommand;
 import datingapp.app.usecase.profile.ProfileUseCases;
-import datingapp.app.usecase.profile.ProfileUseCases.DeleteProfileNoteCommand;
-import datingapp.app.usecase.profile.ProfileUseCases.ProfileNotesQuery;
-import datingapp.app.usecase.profile.ProfileUseCases.UpsertProfileNoteCommand;
 import datingapp.core.AppSession;
 import datingapp.core.model.ProfileNote;
 import datingapp.core.model.User;
@@ -34,16 +35,30 @@ public final class NotesViewModel extends BaseViewModel {
     private static final DateTimeFormatter DATE_FORMATTER =
             DateTimeFormatter.ofPattern("MMM d, yyyy").withZone(ZoneId.systemDefault());
 
-    private final ProfileUseCases profileUseCases;
+    private final ProfileNotesUseCases profileNotesUseCases;
     private final UiUserStore userStore;
     private final AppSession session;
     private final ObservableList<NoteEntry> notes = FXCollections.observableArrayList();
     private final ObjectProperty<NoteEntry> selectedNote = new SimpleObjectProperty<>();
     private final StringProperty selectedNoteContent = new SimpleStringProperty("");
     private final BooleanProperty selectedNoteBusy = new SimpleBooleanProperty(false);
-    private ViewModelErrorSink errorHandler;
 
     public record NoteEntry(UUID userId, String userName, String content, Instant updatedAt, String lastModified) {}
+
+    public NotesViewModel(ProfileNotesUseCases profileNotesUseCases, UiUserStore userStore, AppSession session) {
+        this(profileNotesUseCases, userStore, session, new JavaFxUiThreadDispatcher());
+    }
+
+    public NotesViewModel(
+            ProfileNotesUseCases profileNotesUseCases,
+            UiUserStore userStore,
+            AppSession session,
+            UiThreadDispatcher uiDispatcher) {
+        super("notes", uiDispatcher);
+        this.profileNotesUseCases = Objects.requireNonNull(profileNotesUseCases, "profileNotesUseCases cannot be null");
+        this.userStore = Objects.requireNonNull(userStore, "userStore cannot be null");
+        this.session = Objects.requireNonNull(session, "session cannot be null");
+    }
 
     public NotesViewModel(ProfileUseCases profileUseCases, UiUserStore userStore, AppSession session) {
         this(profileUseCases, userStore, session, new JavaFxUiThreadDispatcher());
@@ -54,10 +69,12 @@ public final class NotesViewModel extends BaseViewModel {
             UiUserStore userStore,
             AppSession session,
             UiThreadDispatcher uiDispatcher) {
-        super("notes", uiDispatcher);
-        this.profileUseCases = Objects.requireNonNull(profileUseCases, "profileUseCases cannot be null");
-        this.userStore = Objects.requireNonNull(userStore, "userStore cannot be null");
-        this.session = Objects.requireNonNull(session, "session cannot be null");
+        this(
+                Objects.requireNonNull(profileUseCases, "profileUseCases cannot be null")
+                        .getProfileNotesUseCases(),
+                userStore,
+                session,
+                uiDispatcher);
     }
 
     public void initialize() {
@@ -65,7 +82,7 @@ public final class NotesViewModel extends BaseViewModel {
     }
 
     public void setErrorHandler(ViewModelErrorSink errorHandler) {
-        this.errorHandler = errorHandler;
+        setErrorSink(errorHandler);
     }
 
     public ObservableList<NoteEntry> getNotes() {
@@ -138,7 +155,7 @@ public final class NotesViewModel extends BaseViewModel {
         UUID subjectId = note.userId();
         asyncScope.runFireAndForget("save selected note", () -> {
             try {
-                var result = profileUseCases.upsertProfileNote(
+                var result = profileNotesUseCases.upsertProfileNote(
                         new UpsertProfileNoteCommand(UserContext.ui(authorId), subjectId, content));
                 if (!result.success()) {
                     reportError(result.error().message());
@@ -173,7 +190,7 @@ public final class NotesViewModel extends BaseViewModel {
         UUID subjectId = note.userId();
         asyncScope.runFireAndForget("delete selected note", () -> {
             try {
-                var result = profileUseCases.deleteProfileNote(
+                var result = profileNotesUseCases.deleteProfileNote(
                         new DeleteProfileNoteCommand(UserContext.ui(authorId), subjectId));
                 if (!result.success()) {
                     reportError(result.error().message());
@@ -196,7 +213,7 @@ public final class NotesViewModel extends BaseViewModel {
     }
 
     private List<NoteEntry> loadNotes(UUID currentUserId) {
-        var result = profileUseCases.listProfileNotes(new ProfileNotesQuery(UserContext.ui(currentUserId)));
+        var result = profileNotesUseCases.listProfileNotes(new ProfileNotesQuery(UserContext.ui(currentUserId)));
         if (!result.success()) {
             throw new IllegalStateException(result.error().message());
         }
@@ -280,8 +297,8 @@ public final class NotesViewModel extends BaseViewModel {
     }
 
     private void reportError(String message) {
-        if (errorHandler != null && message != null && !message.isBlank()) {
-            asyncScope.dispatchToUi(() -> errorHandler.onError(message));
+        if (message != null && !message.isBlank()) {
+            notifyError(message, null);
         }
     }
 }

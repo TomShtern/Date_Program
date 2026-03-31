@@ -54,7 +54,6 @@ public class SocialViewModel extends BaseViewModel {
     private final ObservableList<FriendRequestEntry> pendingRequests = FXCollections.observableArrayList();
 
     private User currentUser;
-    private ViewModelErrorSink errorSink;
 
     public SocialViewModel(
             ConnectionService connectionService,
@@ -81,7 +80,6 @@ public class SocialViewModel extends BaseViewModel {
     }
 
     public final void setErrorHandler(ViewModelErrorSink handler) {
-        this.errorSink = handler;
         setErrorSink(handler);
     }
 
@@ -216,9 +214,7 @@ public class SocialViewModel extends BaseViewModel {
     }
 
     private void notifyError(String message) {
-        if (errorSink != null) {
-            asyncScope.dispatchToUi(() -> errorSink.onError(message));
-        }
+        notifyError(message, null);
     }
 
     // --- Properties ---

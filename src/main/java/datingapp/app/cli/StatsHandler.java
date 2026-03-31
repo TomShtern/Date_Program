@@ -1,10 +1,12 @@
 package datingapp.app.cli;
 
 import datingapp.app.cli.CliTextAndInput.InputReader;
+import datingapp.app.usecase.common.UseCaseResult;
 import datingapp.app.usecase.common.UserContext;
+import datingapp.app.usecase.profile.ProfileInsightsUseCases;
+import datingapp.app.usecase.profile.ProfileInsightsUseCases.AchievementsQuery;
+import datingapp.app.usecase.profile.ProfileInsightsUseCases.StatsQuery;
 import datingapp.app.usecase.profile.ProfileUseCases;
-import datingapp.app.usecase.profile.ProfileUseCases.AchievementsQuery;
-import datingapp.app.usecase.profile.ProfileUseCases.StatsQuery;
 import datingapp.core.AppSession;
 import datingapp.core.LoggingSupport;
 import datingapp.core.ServiceRegistry;
@@ -28,18 +30,28 @@ public class StatsHandler implements LoggingSupport {
             DateTimeFormatter.ofPattern("yyyy-MM-dd").withZone(ZoneId.systemDefault());
 
     private final ProfileUseCases profileUseCases;
+    private final ProfileInsightsUseCases profileInsightsUseCases;
     private final AppSession session;
     private final InputReader inputReader;
 
+    public StatsHandler(ProfileInsightsUseCases profileInsightsUseCases, AppSession session, InputReader inputReader) {
+        this.profileInsightsUseCases =
+                java.util.Objects.requireNonNull(profileInsightsUseCases, "profileInsightsUseCases cannot be null");
+        this.profileUseCases = null;
+        this.session = java.util.Objects.requireNonNull(session, "session cannot be null");
+        this.inputReader = java.util.Objects.requireNonNull(inputReader, "inputReader cannot be null");
+    }
+
     public StatsHandler(ProfileUseCases profileUseCases, AppSession session, InputReader inputReader) {
         this.profileUseCases = java.util.Objects.requireNonNull(profileUseCases, "profileUseCases cannot be null");
+        this.profileInsightsUseCases = null;
         this.session = java.util.Objects.requireNonNull(session, "session cannot be null");
         this.inputReader = java.util.Objects.requireNonNull(inputReader, "inputReader cannot be null");
     }
 
     public static StatsHandler fromServices(ServiceRegistry services, AppSession session, InputReader inputReader) {
         java.util.Objects.requireNonNull(services, "services cannot be null");
-        return new StatsHandler(services.getProfileUseCases(), session, inputReader);
+        return new StatsHandler(services.getProfileInsightsUseCases(), session, inputReader);
     }
 
     @Override
@@ -58,7 +70,7 @@ public class StatsHandler implements LoggingSupport {
             logInfo(CliTextAndInput.HEADER_YOUR_STATISTICS);
             logInfo(CliTextAndInput.SEPARATOR_LINE + "\n");
 
-            var statsResult = profileUseCases.getOrComputeStats(new StatsQuery(UserContext.cli(currentUser.getId())));
+            var statsResult = loadStats(currentUser.getId());
             if (!statsResult.success()) {
                 logInfo("❌ {}\n", statsResult.error().message());
                 inputReader.readLine(PRESS_ENTER_PROMPT);
@@ -82,8 +94,7 @@ public class StatsHandler implements LoggingSupport {
     public void viewAchievements() {
         CliTextAndInput.requireLogin(session, () -> {
             User currentUser = session.getCurrentUser();
-            var achievementsResult =
-                    profileUseCases.getAchievements(new AchievementsQuery(UserContext.cli(currentUser.getId()), true));
+            var achievementsResult = loadAchievements(currentUser.getId(), true);
             if (!achievementsResult.success()) {
                 logInfo("\n❌ {}\n", achievementsResult.error().message());
                 inputReader.readLine(PRESS_ENTER_PROMPT);
@@ -217,5 +228,26 @@ public class StatsHandler implements LoggingSupport {
             return "Below average";
         }
         return "Average";
+    }
+
+    private UseCaseResult<UserStats> loadStats(java.util.UUID userId) {
+        if (profileInsightsUseCases != null) {
+            return profileInsightsUseCases.getOrComputeStats(new StatsQuery(UserContext.cli(userId)));
+        }
+        return profileUseCases.getOrComputeStats(new ProfileUseCases.StatsQuery(UserContext.cli(userId)));
+    }
+
+    private UseCaseResult<ProfileInsightsUseCases.AchievementSnapshot> loadAchievements(
+            java.util.UUID userId, boolean checkForNew) {
+        if (profileInsightsUseCases != null) {
+            return profileInsightsUseCases.getAchievements(new AchievementsQuery(UserContext.cli(userId), checkForNew));
+        }
+        var legacyResult = profileUseCases.getAchievements(
+                new ProfileUseCases.AchievementsQuery(UserContext.cli(userId), checkForNew));
+        if (!legacyResult.success()) {
+            return UseCaseResult.failure(legacyResult.error());
+        }
+        return UseCaseResult.success(new ProfileInsightsUseCases.AchievementSnapshot(
+                legacyResult.data().unlocked(), legacyResult.data().newlyUnlocked()));
     }
 }

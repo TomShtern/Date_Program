@@ -59,15 +59,14 @@ import datingapp.app.usecase.messaging.MessagingUseCases.DeleteMessageCommand;
 import datingapp.app.usecase.messaging.MessagingUseCases.ListConversationsQuery;
 import datingapp.app.usecase.messaging.MessagingUseCases.LoadConversationQuery;
 import datingapp.app.usecase.messaging.MessagingUseCases.SendMessageCommand;
+import datingapp.app.usecase.profile.ProfileInsightsUseCases;
+import datingapp.app.usecase.profile.ProfileInsightsUseCases.AchievementsQuery;
+import datingapp.app.usecase.profile.ProfileInsightsUseCases.StatsQuery;
+import datingapp.app.usecase.profile.ProfileMutationUseCases;
+import datingapp.app.usecase.profile.ProfileNotesUseCases;
 import datingapp.app.usecase.profile.ProfileUseCases;
-import datingapp.app.usecase.profile.ProfileUseCases.AchievementsQuery;
 import datingapp.app.usecase.profile.ProfileUseCases.DeleteAccountCommand;
-import datingapp.app.usecase.profile.ProfileUseCases.DeleteProfileNoteCommand;
-import datingapp.app.usecase.profile.ProfileUseCases.ProfileNoteQuery;
-import datingapp.app.usecase.profile.ProfileUseCases.ProfileNotesQuery;
-import datingapp.app.usecase.profile.ProfileUseCases.StatsQuery;
 import datingapp.app.usecase.profile.ProfileUseCases.UpdateProfileCommand;
-import datingapp.app.usecase.profile.ProfileUseCases.UpsertProfileNoteCommand;
 import datingapp.app.usecase.social.SocialUseCases;
 import datingapp.app.usecase.social.SocialUseCases.FriendRequestAction;
 import datingapp.app.usecase.social.SocialUseCases.FriendRequestsQuery;
@@ -90,7 +89,6 @@ import io.javalin.http.Context;
 import io.javalin.http.NotFoundResponse;
 import io.javalin.json.JavalinJackson;
 import java.net.InetAddress;
-import java.net.UnknownHostException;
 import java.time.Duration;
 import java.time.ZoneId;
 import java.util.List;
@@ -98,7 +96,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -150,7 +147,6 @@ public class RestApiServer {
     private static final String NOTES_COLLECTION_ROUTE = "/api/users/{authorId}/notes";
     private static final String NOTE_ITEM_ROUTE = "/api/users/{authorId}/notes/{subjectId}";
     private static final String HEALTH_ROUTE = "/api/health";
-    private static final String HEADER_ACTING_USER_ID = "X-User-Id";
     private static final Duration DEFAULT_RATE_LIMIT_WINDOW = Duration.ofMinutes(1);
     private static final int DEFAULT_RATE_LIMIT_REQUESTS = 240;
     /**
@@ -164,10 +160,14 @@ public class RestApiServer {
     private final MatchingUseCases matchingUseCases;
     private final MessagingUseCases messagingUseCases;
     private final ProfileUseCases profileUseCases;
+    private final ProfileMutationUseCases profileMutationUseCases;
+    private final ProfileInsightsUseCases profileInsightsUseCases;
+    private final ProfileNotesUseCases profileNotesUseCases;
     private final SocialUseCases socialUseCases;
     private final LocationService locationService;
     private final ZoneId userTimeZone;
-    private final LocalRateLimiter rateLimiter;
+    private final RestApiIdentityPolicy identityPolicy;
+    private final RestApiRequestGuards requestGuards;
     private final int port;
     private Javalin app;
 
@@ -182,10 +182,15 @@ public class RestApiServer {
         this.matchingUseCases = services.getMatchingUseCases();
         this.messagingUseCases = services.getMessagingUseCases();
         this.profileUseCases = services.getProfileUseCases();
+        this.profileMutationUseCases = services.getProfileMutationUseCases();
+        this.profileInsightsUseCases = services.getProfileInsightsUseCases();
+        this.profileNotesUseCases = services.getProfileNotesUseCases();
         this.socialUseCases = services.getSocialUseCases();
         this.locationService = services.getLocationService();
         this.userTimeZone = services.getConfig().safety().userTimeZone();
-        this.rateLimiter = new LocalRateLimiter(DEFAULT_RATE_LIMIT_WINDOW, DEFAULT_RATE_LIMIT_REQUESTS);
+        this.identityPolicy = new RestApiIdentityPolicy();
+        this.requestGuards =
+                new RestApiRequestGuards(identityPolicy, DEFAULT_RATE_LIMIT_WINDOW, DEFAULT_RATE_LIMIT_REQUESTS);
         this.port = port;
     }
 
@@ -245,15 +250,7 @@ public class RestApiServer {
     }
 
     private void registerRequestGuards() {
-        app.beforeMatched(ctx -> {
-            if (!ctx.path().startsWith("/api/")) {
-                return;
-            }
-            enforceLocalhostOnly(ctx);
-            enforceRateLimit(ctx);
-            enforceMutatingRouteIdentity(ctx);
-            enforceScopedIdentity(ctx);
-        });
+        requestGuards.registerRequestGuards(app, this::enforceLocalhostOnly);
     }
 
     // ── User Handlers ───────────────────────────────────────────────────
@@ -350,7 +347,7 @@ public class RestApiServer {
         Double longitude =
                 resolvedLocation.map(ResolvedProfileLocation::longitude).orElse(request.longitude());
 
-        var result = profileUseCases.updateProfile(new UpdateProfileCommand(
+        var result = profileMutationUseCases.updateProfile(new UpdateProfileCommand(
                 UserContext.api(userId),
                 request.bio(),
                 request.birthDate(),
@@ -386,7 +383,7 @@ public class RestApiServer {
             return;
         }
 
-        var result = profileUseCases.deleteAccount(
+        var result = profileMutationUseCases.deleteAccount(
                 new DeleteAccountCommand(UserContext.api(userId), AppEvent.DeletionReason.USER_REQUEST));
         if (!result.success()) {
             handleUseCaseFailure(ctx, result.error());
@@ -619,7 +616,7 @@ public class RestApiServer {
             return;
         }
 
-        var result = profileUseCases.getOrComputeStats(new StatsQuery(UserContext.api(userId)));
+        var result = profileInsightsUseCases.getOrComputeStats(new StatsQuery(UserContext.api(userId)));
         if (!result.success()) {
             handleUseCaseFailure(ctx, result.error());
             return;
@@ -635,12 +632,14 @@ public class RestApiServer {
         boolean checkForNew =
                 ctx.queryParamAsClass("checkForNew", Boolean.class).getOrDefault(false);
 
-        var result = profileUseCases.getAchievements(new AchievementsQuery(UserContext.api(userId), checkForNew));
+        var result =
+                profileInsightsUseCases.getAchievements(new AchievementsQuery(UserContext.api(userId), checkForNew));
         if (!result.success()) {
             handleUseCaseFailure(ctx, result.error());
             return;
         }
-        ctx.json(AchievementSnapshotDto.from(result.data()));
+        ctx.json(AchievementSnapshotDto.from(new ProfileUseCases.AchievementSnapshot(
+                result.data().unlocked(), result.data().newlyUnlocked())));
     }
 
     private void getNotifications(Context ctx) {
@@ -886,7 +885,7 @@ public class RestApiServer {
             throw new IllegalArgumentException("offset must be non-negative");
         }
 
-        ConversationParticipants participants = parseConversationParticipants(conversationId);
+        RestApiIdentityPolicy.ConversationParticipants participants = parseConversationParticipants(conversationId);
         Optional<UUID> actingUserId = resolveActingUserId(ctx);
         actingUserId.ifPresent(participants::requireParticipant);
         UUID requestUserId = actingUserId.orElse(participants.firstUserId());
@@ -927,7 +926,7 @@ public class RestApiServer {
 
         resolveActingUserId(ctx).ifPresent(actingUserId -> {
             if (!actingUserId.equals(request.senderId())) {
-                throw new ApiForbiddenException("Acting user does not match message sender");
+                throw new RestApiRequestGuards.ApiForbiddenException("Acting user does not match message sender");
             }
         });
         UUID recipientId = extractRecipientFromConversation(conversationId, request.senderId());
@@ -947,7 +946,8 @@ public class RestApiServer {
         if (loadUser(ctx, authorId) == null) {
             return;
         }
-        var result = profileUseCases.listProfileNotes(new ProfileNotesQuery(UserContext.api(authorId)));
+        var result = profileNotesUseCases.listProfileNotes(
+                new ProfileNotesUseCases.ProfileNotesQuery(UserContext.api(authorId)));
         if (!result.success()) {
             handleUseCaseFailure(ctx, result.error());
             return;
@@ -961,7 +961,8 @@ public class RestApiServer {
         if (loadUser(ctx, authorId) == null) {
             return;
         }
-        var result = profileUseCases.getProfileNote(new ProfileNoteQuery(UserContext.api(authorId), subjectId));
+        var result = profileNotesUseCases.getProfileNote(
+                new ProfileNotesUseCases.ProfileNoteQuery(UserContext.api(authorId), subjectId));
         if (!result.success()) {
             handleUseCaseFailure(ctx, result.error());
             return;
@@ -980,8 +981,8 @@ public class RestApiServer {
             throw new IllegalArgumentException("content is required");
         }
 
-        var result = profileUseCases.upsertProfileNote(
-                new UpsertProfileNoteCommand(UserContext.api(authorId), subjectId, request.content()));
+        var result = profileNotesUseCases.upsertProfileNote(new ProfileNotesUseCases.UpsertProfileNoteCommand(
+                UserContext.api(authorId), subjectId, request.content()));
         if (!result.success()) {
             handleUseCaseFailure(ctx, result.error());
             return;
@@ -995,8 +996,8 @@ public class RestApiServer {
         if (loadUser(ctx, authorId) == null || loadUser(ctx, subjectId) == null) {
             return;
         }
-        var result =
-                profileUseCases.deleteProfileNote(new DeleteProfileNoteCommand(UserContext.api(authorId), subjectId));
+        var result = profileNotesUseCases.deleteProfileNote(
+                new ProfileNotesUseCases.DeleteProfileNoteCommand(UserContext.api(authorId), subjectId));
         if (!result.success()) {
             handleUseCaseFailure(ctx, result.error());
             return;
@@ -1048,26 +1049,11 @@ public class RestApiServer {
     }
 
     private UUID extractRecipientFromConversation(String conversationId, UUID senderId) {
-        return parseConversationParticipants(conversationId).otherParticipant(senderId);
+        return identityPolicy.extractRecipientFromConversation(conversationId, senderId);
     }
 
     private void enforceLocalhostOnly(Context ctx) {
-        if (isLoopbackAddress(ctx.ip())) {
-            return;
-        }
-        throw new ApiForbiddenException("REST API is restricted to localhost requests");
-    }
-
-    private void enforceRateLimit(Context ctx) {
-        if (HEALTH_ROUTE.equals(ctx.path())) {
-            return;
-        }
-        String key = ctx.ip() + '|' + ctx.method();
-        RateLimitDecision decision = rateLimiter.tryAcquire(key);
-        if (decision.allowed()) {
-            return;
-        }
-        throw new ApiTooManyRequestsException("Local API rate limit exceeded", decision.status());
+        requestGuards.enforceLocalhostOnly(ctx);
     }
 
     private void ensureActiveCandidateBrowser(User user) {
@@ -1076,79 +1062,16 @@ public class RestApiServer {
         }
     }
 
-    private void enforceScopedIdentity(Context ctx) {
-        validateActingUserMatchesPathParam(ctx, "id");
-        validateActingUserMatchesPathParam(ctx, PATH_AUTHOR_ID);
-
-        if (ctx.path().startsWith("/api/conversations/")) {
-            resolveActingUserId(ctx)
-                    .ifPresent(actingUserId -> parseConversationParticipants(ctx.pathParam(PATH_CONVERSATION_ID))
-                            .requireParticipant(actingUserId));
-        }
-    }
-
-    private void enforceMutatingRouteIdentity(Context ctx) {
-        if (!requiresActingUserIdentity(ctx)) {
-            return;
-        }
-        requireActingUserId(ctx);
-    }
-
-    private boolean requiresActingUserIdentity(Context ctx) {
-        return switch (ctx.method()) {
-            case POST, PUT, DELETE -> !HEALTH_ROUTE.equals(ctx.path()) && !"/api/location/resolve".equals(ctx.path());
-            default -> false;
-        };
-    }
-
-    private void validateActingUserMatchesPathParam(Context ctx, String paramName) {
-        if (!ctx.pathParamMap().containsKey(paramName)) {
-            return;
-        }
-        Optional<UUID> actingUserId = resolveActingUserId(ctx);
-        if (actingUserId.isEmpty()) {
-            return;
-        }
-        UUID routeUserId = parseUuid(ctx.pathParam(paramName));
-        if (!routeUserId.equals(actingUserId.get())) {
-            throw new ApiForbiddenException("Acting user does not match requested user route");
-        }
-    }
-
     private Optional<UUID> resolveActingUserId(Context ctx) {
-        String rawUserId = Optional.ofNullable(ctx.header(HEADER_ACTING_USER_ID))
-                .filter(value -> !value.isBlank())
-                .orElse(null);
-        if (rawUserId == null) {
-            return Optional.empty();
-        }
-        return Optional.of(parseUuid(rawUserId));
+        return identityPolicy.resolveActingUserId(ctx);
     }
 
     private UUID requireActingUserId(Context ctx) {
-        return resolveActingUserId(ctx)
-                .orElseThrow(() -> new IllegalArgumentException(
-                        HEADER_ACTING_USER_ID + " header is required for mutating API routes"));
+        return identityPolicy.requireActingUserId(ctx);
     }
 
-    private boolean isLoopbackAddress(String host) {
-        try {
-            return InetAddress.getByName(host).isLoopbackAddress();
-        } catch (UnknownHostException _) {
-            return false;
-        }
-    }
-
-    private ConversationParticipants parseConversationParticipants(String conversationId) {
-        String[] parts = conversationId.split("_");
-        if (parts.length != 2) {
-            throw new IllegalArgumentException("Invalid conversation ID format");
-        }
-        try {
-            return new ConversationParticipants(UUID.fromString(parts[0]), UUID.fromString(parts[1]));
-        } catch (IllegalArgumentException ex) {
-            throw new IllegalArgumentException("Invalid conversation ID format", ex);
-        }
+    private RestApiIdentityPolicy.ConversationParticipants parseConversationParticipants(String conversationId) {
+        return identityPolicy.parseConversationParticipants(conversationId);
     }
 
     private void handleUseCaseFailure(Context ctx, datingapp.app.usecase.common.UseCaseError error) {
@@ -1197,13 +1120,13 @@ public class RestApiServer {
             ctx.json(new ErrorResponse(BAD_REQUEST, e.getMessage()));
         });
 
-        app.exception(ApiForbiddenException.class, (e, ctx) -> {
+        app.exception(RestApiRequestGuards.ApiForbiddenException.class, (e, ctx) -> {
             ctx.status(403);
             ctx.json(new ErrorResponse(FORBIDDEN, e.getMessage()));
         });
 
-        app.exception(ApiTooManyRequestsException.class, (e, ctx) -> {
-            RateLimitStatus status = e.status();
+        app.exception(RestApiRequestGuards.ApiTooManyRequestsException.class, (e, ctx) -> {
+            RestApiRequestGuards.RateLimitStatus status = e.status();
             ctx.header("Retry-After", String.valueOf(status.retryAfterSeconds()));
             ctx.header("X-RateLimit-Limit", String.valueOf(status.limit()));
             ctx.header("X-RateLimit-Used", String.valueOf(status.used()));
@@ -1233,79 +1156,6 @@ public class RestApiServer {
             ctx.status(500);
             ctx.json(new ErrorResponse(INTERNAL_ERROR, "An unexpected error occurred"));
         });
-    }
-
-    private record ConversationParticipants(UUID firstUserId, UUID secondUserId) {
-        private boolean involves(UUID userId) {
-            return firstUserId.equals(userId) || secondUserId.equals(userId);
-        }
-
-        private UUID otherParticipant(UUID userId) {
-            if (firstUserId.equals(userId)) {
-                return secondUserId;
-            }
-            if (secondUserId.equals(userId)) {
-                return firstUserId;
-            }
-            throw new ApiForbiddenException("User is not part of this conversation");
-        }
-
-        private void requireParticipant(UUID userId) {
-            if (!involves(userId)) {
-                throw new ApiForbiddenException("User is not part of this conversation");
-            }
-        }
-    }
-
-    private static final class LocalRateLimiter {
-        private final long windowMillis;
-        private final int maxRequests;
-        private final ConcurrentHashMap<String, Window> windows = new ConcurrentHashMap<>();
-
-        private LocalRateLimiter(Duration window, int maxRequests) {
-            this.windowMillis = window.toMillis();
-            this.maxRequests = maxRequests;
-        }
-
-        private RateLimitDecision tryAcquire(String key) {
-            long now = System.currentTimeMillis();
-            Window window = windows.compute(key, (ignored, current) -> {
-                if (current == null || now - current.windowStartedAtMillis >= windowMillis) {
-                    return new Window(now, 1);
-                }
-                return new Window(current.windowStartedAtMillis, current.requestCount + 1);
-            });
-            long retryAfterMillis = Math.max(0L, windowMillis - (now - window.windowStartedAtMillis));
-            long retryAfterSeconds = Math.max(1L, (retryAfterMillis + 999L) / 1000L);
-            return new RateLimitDecision(
-                    window.requestCount <= maxRequests,
-                    new RateLimitStatus(maxRequests, window.requestCount, retryAfterSeconds));
-        }
-
-        private record Window(long windowStartedAtMillis, int requestCount) {}
-    }
-
-    private record RateLimitDecision(boolean allowed, RateLimitStatus status) {}
-
-    private record RateLimitStatus(int limit, int used, long retryAfterSeconds) implements java.io.Serializable {}
-
-    private static final class ApiForbiddenException extends RuntimeException {
-        private ApiForbiddenException(String message) {
-            super(message);
-        }
-    }
-
-    private static final class ApiTooManyRequestsException extends RuntimeException {
-        private final RateLimitStatus status;
-
-        private ApiTooManyRequestsException(String message, RateLimitStatus status) {
-            super(message);
-            this.status = status;
-        }
-
-        private RateLimitStatus status() {
-            return status;
-        }
     }
 
     private interface RouteModule {

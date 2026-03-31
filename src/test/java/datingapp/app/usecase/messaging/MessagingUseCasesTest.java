@@ -127,8 +127,8 @@ class MessagingUseCasesTest {
                 new SendMessageCommand(UserContext.cli(sender.getId()), otherRecipient.getId(), "More recent"));
         assertTrue(otherSend.success());
 
-        var result = useCases.openConversation(new MessagingUseCases.OpenConversationCommand(
-                UserContext.cli(sender.getId()), recipient.getId(), 1, 0));
+        var result = useCases.openConversation(
+                new MessagingUseCases.OpenConversationCommand(UserContext.cli(sender.getId()), recipient.getId()));
 
         assertTrue(result.success());
         assertEquals(

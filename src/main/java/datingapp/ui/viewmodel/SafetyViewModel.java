@@ -2,6 +2,7 @@ package datingapp.ui.viewmodel;
 
 import datingapp.app.event.AppEvent;
 import datingapp.app.usecase.common.UserContext;
+import datingapp.app.usecase.profile.ProfileMutationUseCases;
 import datingapp.app.usecase.profile.ProfileUseCases;
 import datingapp.app.usecase.profile.ProfileUseCases.DeleteAccountCommand;
 import datingapp.app.usecase.profile.ProfileUseCases.SaveProfileCommand;
@@ -30,7 +31,11 @@ import javafx.collections.ObservableList;
  */
 public final class SafetyViewModel extends BaseViewModel {
 
+    private static final String PROFILE_VERIFICATION_UNAVAILABLE = "Profile verification is unavailable right now.";
+    private static final String ACCOUNT_DELETION_UNAVAILABLE = "Account deletion is unavailable right now.";
+
     private final TrustSafetyService trustSafetyService;
+    private ProfileMutationUseCases profileMutationUseCases;
     private final ProfileUseCases profileUseCases;
     private final AppSession session;
     private final ObservableList<BlockedUserEntry> blockedUsers = FXCollections.observableArrayList();
@@ -40,7 +45,6 @@ public final class SafetyViewModel extends BaseViewModel {
     private final StringProperty verificationContact = new SimpleStringProperty("");
     private final StringProperty verificationCode = new SimpleStringProperty("");
     private final SimpleBooleanProperty accountDeleted = new SimpleBooleanProperty(false);
-    private ViewModelErrorSink errorHandler;
 
     public record BlockedUserEntry(UUID userId, String name, String blockedAtLabel) {}
 
@@ -57,8 +61,23 @@ public final class SafetyViewModel extends BaseViewModel {
             ProfileUseCases profileUseCases,
             AppSession session,
             UiThreadDispatcher uiDispatcher) {
+        this(
+                trustSafetyService,
+                profileUseCases != null ? profileUseCases.getProfileMutationUseCases() : null,
+                profileUseCases,
+                session,
+                uiDispatcher);
+    }
+
+    public SafetyViewModel(
+            TrustSafetyService trustSafetyService,
+            ProfileMutationUseCases profileMutationUseCases,
+            ProfileUseCases profileUseCases,
+            AppSession session,
+            UiThreadDispatcher uiDispatcher) {
         super("safety", uiDispatcher);
         this.trustSafetyService = Objects.requireNonNull(trustSafetyService, "trustSafetyService cannot be null");
+        this.profileMutationUseCases = profileMutationUseCases;
         this.profileUseCases = profileUseCases;
         this.session = Objects.requireNonNull(session, "session cannot be null");
     }
@@ -69,7 +88,7 @@ public final class SafetyViewModel extends BaseViewModel {
     }
 
     public void setErrorHandler(ViewModelErrorSink errorHandler) {
-        this.errorHandler = errorHandler;
+        setErrorSink(errorHandler);
     }
 
     public ObservableList<BlockedUserEntry> getBlockedUsers() {
@@ -169,8 +188,8 @@ public final class SafetyViewModel extends BaseViewModel {
             return;
         }
         User currentUser = session.getCurrentUser();
-        if (currentUser == null || profileUseCases == null) {
-            reportError("Profile verification is unavailable right now.");
+        if (currentUser == null) {
+            reportError(PROFILE_VERIFICATION_UNAVAILABLE);
             return;
         }
 
@@ -178,7 +197,12 @@ public final class SafetyViewModel extends BaseViewModel {
             applyVerificationContact(currentUser);
             String generatedCode = trustSafetyService.generateVerificationCode();
             currentUser.startVerification(verificationMethod.get(), generatedCode);
-            var result = profileUseCases.saveProfile(
+            ProfileMutationUseCases mutationUseCases = mutationUseCases();
+            if (mutationUseCases == null) {
+                reportError(PROFILE_VERIFICATION_UNAVAILABLE);
+                return;
+            }
+            var result = mutationUseCases.saveProfile(
                     new SaveProfileCommand(UserContext.ui(currentUser.getId()), currentUser));
             if (!result.success()) {
                 reportError(result.error().message());
@@ -197,8 +221,8 @@ public final class SafetyViewModel extends BaseViewModel {
             return;
         }
         User currentUser = session.getCurrentUser();
-        if (currentUser == null || profileUseCases == null) {
-            reportError("Profile verification is unavailable right now.");
+        if (currentUser == null) {
+            reportError(PROFILE_VERIFICATION_UNAVAILABLE);
             return;
         }
         if (!trustSafetyService.verifyCode(currentUser, verificationCode.get())) {
@@ -207,8 +231,13 @@ public final class SafetyViewModel extends BaseViewModel {
         }
 
         currentUser.markVerified();
+        ProfileMutationUseCases mutationUseCases = mutationUseCases();
+        if (mutationUseCases == null) {
+            reportError(PROFILE_VERIFICATION_UNAVAILABLE);
+            return;
+        }
         var result =
-                profileUseCases.saveProfile(new SaveProfileCommand(UserContext.ui(currentUser.getId()), currentUser));
+                mutationUseCases.saveProfile(new SaveProfileCommand(UserContext.ui(currentUser.getId()), currentUser));
         if (!result.success()) {
             reportError(result.error().message());
             return;
@@ -224,12 +253,17 @@ public final class SafetyViewModel extends BaseViewModel {
             return;
         }
         User currentUser = session.getCurrentUser();
-        if (currentUser == null || profileUseCases == null) {
-            reportError("Account deletion is unavailable right now.");
+        if (currentUser == null) {
+            reportError(ACCOUNT_DELETION_UNAVAILABLE);
             return;
         }
 
-        var result = profileUseCases.deleteAccount(
+        ProfileMutationUseCases mutationUseCases = mutationUseCases();
+        if (mutationUseCases == null) {
+            reportError(ACCOUNT_DELETION_UNAVAILABLE);
+            return;
+        }
+        var result = mutationUseCases.deleteAccount(
                 new DeleteAccountCommand(UserContext.ui(currentUser.getId()), AppEvent.DeletionReason.USER_REQUEST));
         if (!result.success()) {
             reportError(result.error().message());
@@ -279,6 +313,16 @@ public final class SafetyViewModel extends BaseViewModel {
                 : Objects.toString(currentUser.getEmail(), "");
     }
 
+    private ProfileMutationUseCases mutationUseCases() {
+        if (profileMutationUseCases != null) {
+            return profileMutationUseCases;
+        }
+        if (profileUseCases != null) {
+            return profileUseCases.getProfileMutationUseCases();
+        }
+        return null;
+    }
+
     private List<BlockedUserEntry> mapBlockedUsers(List<User> blocked) {
         return blocked.stream()
                 .map(user -> new BlockedUserEntry(user.getId(), user.getName(), "Blocked profile"))
@@ -286,8 +330,8 @@ public final class SafetyViewModel extends BaseViewModel {
     }
 
     private void reportError(String message) {
-        if (errorHandler != null && message != null && !message.isBlank()) {
-            asyncScope.dispatchToUi(() -> errorHandler.onError(message));
+        if (message != null && !message.isBlank()) {
+            notifyError(message, null);
         }
     }
 

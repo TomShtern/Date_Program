@@ -63,12 +63,11 @@ public class MessagingUseCases {
         if (command == null || command.context() == null || command.otherUserId() == null) {
             return UseCaseResult.failure(UseCaseError.validation("Context and target user are required"));
         }
-        int limit = command.listLimit() > 0 ? command.listLimit() : DEFAULT_LIMIT;
         try {
             Conversation conversation =
                     connectionService.getOrCreateConversation(command.context().userId(), command.otherUserId());
-            ConversationPreview preview = findConversationPreview(
-                    command.context().userId(), conversation.getId(), Math.min(limit, DEFAULT_LIMIT));
+            ConversationPreview preview =
+                    connectionService.getConversationPreview(command.context().userId(), conversation.getId());
             if (preview == null) {
                 return UseCaseResult.failure(UseCaseError.notFound("Conversation preview not found"));
             }
@@ -113,30 +112,6 @@ public class MessagingUseCases {
                         userId,
                         markReadError.getMessage());
             }
-        }
-    }
-
-    private ConversationPreview findConversationPreview(UUID userId, String conversationId, int pageSize) {
-        int safePageSize = pageSize > 0 ? pageSize : DEFAULT_LIMIT;
-        int offset = 0;
-
-        while (true) {
-            List<ConversationPreview> previews = connectionService.getConversations(userId, safePageSize, offset);
-            if (previews.isEmpty()) {
-                return null;
-            }
-
-            for (ConversationPreview preview : previews) {
-                if (preview.conversation().getId().equals(conversationId)) {
-                    return preview;
-                }
-            }
-
-            if (previews.size() < safePageSize) {
-                return null;
-            }
-
-            offset += safePageSize;
         }
     }
 
@@ -287,8 +262,7 @@ public class MessagingUseCases {
 
     public static record ConversationListResult(List<ConversationPreview> conversations, int totalUnreadCount) {}
 
-    public static record OpenConversationCommand(
-            UserContext context, UUID otherUserId, int listLimit, int listOffset) {}
+    public static record OpenConversationCommand(UserContext context, UUID otherUserId) {}
 
     public static record OpenConversationResult(Conversation conversation, ConversationPreview preview) {}
 

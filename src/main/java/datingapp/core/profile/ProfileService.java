@@ -18,7 +18,22 @@ public final class ProfileService {
     private final UserStorage userStorage;
     private final ProfileCompletionSupport completionSupport;
 
+    public ProfileService(UserStorage userStorage) {
+        this.userStorage = Objects.requireNonNull(userStorage, "userStorage cannot be null");
+        this.completionSupport = new ProfileCompletionSupport();
+    }
+
     public ProfileService(
+            AppConfig config,
+            AnalyticsStorage analyticsStorage,
+            InteractionStorage interactionStorage,
+            TrustSafetyStorage trustSafetyStorage,
+            UserStorage userStorage) {
+        this(requireWideConstructorUserStorage(
+                config, analyticsStorage, interactionStorage, trustSafetyStorage, userStorage));
+    }
+
+    private static UserStorage requireWideConstructorUserStorage(
             AppConfig config,
             AnalyticsStorage analyticsStorage,
             InteractionStorage interactionStorage,
@@ -28,8 +43,7 @@ public final class ProfileService {
         Objects.requireNonNull(analyticsStorage, "analyticsStorage cannot be null");
         Objects.requireNonNull(interactionStorage, "interactionStorage cannot be null");
         Objects.requireNonNull(trustSafetyStorage, "trustSafetyStorage cannot be null");
-        this.userStorage = Objects.requireNonNull(userStorage, "userStorage cannot be null");
-        this.completionSupport = new ProfileCompletionSupport();
+        return Objects.requireNonNull(userStorage, "userStorage cannot be null");
     }
 
     public List<User> listUsers() {

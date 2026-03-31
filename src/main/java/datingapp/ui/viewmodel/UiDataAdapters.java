@@ -2,6 +2,7 @@ package datingapp.ui.viewmodel;
 
 import datingapp.app.usecase.common.UseCaseError;
 import datingapp.app.usecase.common.UserContext;
+import datingapp.app.usecase.profile.ProfileNotesUseCases;
 import datingapp.app.usecase.profile.ProfileUseCases;
 import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
@@ -276,16 +277,22 @@ public final class UiDataAdapters {
     /** Bridges the UI layer to profile-note use-cases. */
     public static final class UseCaseUiProfileNoteDataAccess implements UiProfileNoteDataAccess {
 
-        private final ProfileUseCases profileUseCases;
+        private final ProfileNotesUseCases profileNotesUseCases;
+
+        public UseCaseUiProfileNoteDataAccess(ProfileNotesUseCases profileNotesUseCases) {
+            this.profileNotesUseCases =
+                    Objects.requireNonNull(profileNotesUseCases, "profileNotesUseCases cannot be null");
+        }
 
         public UseCaseUiProfileNoteDataAccess(ProfileUseCases profileUseCases) {
-            this.profileUseCases = Objects.requireNonNull(profileUseCases, "profileUseCases cannot be null");
+            this(Objects.requireNonNull(profileUseCases, "profileUseCases cannot be null")
+                    .getProfileNotesUseCases());
         }
 
         @Override
         public Optional<ProfileNote> getProfileNote(UUID authorId, UUID subjectId) {
-            var result = profileUseCases.getProfileNote(
-                    new ProfileUseCases.ProfileNoteQuery(UserContext.ui(authorId), subjectId));
+            var result = profileNotesUseCases.getProfileNote(
+                    new ProfileNotesUseCases.ProfileNoteQuery(UserContext.ui(authorId), subjectId));
             if (result.success()) {
                 return Optional.of(result.data());
             }
@@ -297,8 +304,8 @@ public final class UiDataAdapters {
 
         @Override
         public ProfileNote upsertProfileNote(UUID authorId, UUID subjectId, String content) {
-            var result = profileUseCases.upsertProfileNote(
-                    new ProfileUseCases.UpsertProfileNoteCommand(UserContext.ui(authorId), subjectId, content));
+            var result = profileNotesUseCases.upsertProfileNote(
+                    new ProfileNotesUseCases.UpsertProfileNoteCommand(UserContext.ui(authorId), subjectId, content));
             if (!result.success()) {
                 throw new IllegalStateException(result.error().message());
             }
@@ -307,8 +314,8 @@ public final class UiDataAdapters {
 
         @Override
         public boolean deleteProfileNote(UUID authorId, UUID subjectId) {
-            var result = profileUseCases.deleteProfileNote(
-                    new ProfileUseCases.DeleteProfileNoteCommand(UserContext.ui(authorId), subjectId));
+            var result = profileNotesUseCases.deleteProfileNote(
+                    new ProfileNotesUseCases.DeleteProfileNoteCommand(UserContext.ui(authorId), subjectId));
             if (result.success()) {
                 return true;
             }

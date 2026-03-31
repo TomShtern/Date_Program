@@ -222,6 +222,30 @@ public class ConnectionService {
         return previews;
     }
 
+    public ConversationPreview getConversationPreview(UUID userId, String conversationId) {
+        Objects.requireNonNull(userId, USER_ID_REQUIRED);
+        Objects.requireNonNull(conversationId, CONVERSATION_ID_REQUIRED);
+
+        Optional<Conversation> conversationOpt = communicationStorage.getConversation(conversationId);
+        if (conversationOpt.isEmpty()) {
+            return null;
+        }
+
+        Conversation conversation = conversationOpt.get();
+        if (!conversation.involves(userId)) {
+            return null;
+        }
+
+        User otherUser = userStorage.get(conversation.getOtherUser(userId)).orElse(null);
+        if (otherUser == null) {
+            return null;
+        }
+
+        Optional<Message> lastMessage = communicationStorage.getLatestMessage(conversationId);
+        int unreadCount = calculateUnreadCount(userId, conversation);
+        return new ConversationPreview(conversation, otherUser, lastMessage, unreadCount);
+    }
+
     public void markAsRead(UUID userId, String conversationId) {
         Optional<Conversation> convoOpt = communicationStorage.getConversation(conversationId);
         if (convoOpt.isEmpty() || !convoOpt.get().involves(userId)) {

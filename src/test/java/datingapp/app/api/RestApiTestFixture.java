@@ -23,6 +23,7 @@ import datingapp.core.metrics.AchievementService;
 import datingapp.core.metrics.ActivityMetricsService;
 import datingapp.core.metrics.DefaultAchievementService;
 import datingapp.core.metrics.SwipeState.Undo;
+import datingapp.core.profile.LocationService;
 import datingapp.core.profile.ProfileService;
 import datingapp.core.profile.ValidationService;
 import datingapp.core.storage.CommunicationStorage;
@@ -100,12 +101,10 @@ final class RestApiTestFixture {
                     new CandidateFinder(userStorage, interactionStorage, trustSafetyStorage, ZoneId.of("UTC"));
             ActivityMetricsService activityMetricsService =
                     new ActivityMetricsService(interactionStorage, trustSafetyStorage, analyticsStorage, config);
-            ProfileService profileService =
-                    new ProfileService(config, analyticsStorage, interactionStorage, trustSafetyStorage, userStorage);
+            ProfileService profileService = new ProfileService(userStorage);
             CompatibilityCalculator compatibilityCalculator = new DefaultCompatibilityCalculator(config);
             DailyLimitService dailyLimitService = new DefaultDailyLimitService(interactionStorage, config);
-            DailyPickService dailyPickService = new DefaultDailyPickService(
-                    userStorage, interactionStorage, analyticsStorage, candidateFinder, config);
+            DailyPickService dailyPickService = new DefaultDailyPickService(analyticsStorage, candidateFinder, config);
             StandoutService standoutService = new DefaultStandoutService(
                     compatibilityCalculator, userStorage, candidateFinder, standoutStorage, profileService, config);
             RecommendationService recommendationService =
@@ -128,6 +127,7 @@ final class RestApiTestFixture {
             MatchQualityService matchQualityService =
                     new MatchQualityService(userStorage, interactionStorage, config, compatibilityCalculator);
             ValidationService validationService = new ValidationService(config);
+            LocationService locationService = new LocationService(validationService);
             AchievementService achievementService = new DefaultAchievementService(
                     config, analyticsStorage, interactionStorage, trustSafetyStorage, userStorage, profileService);
 
@@ -153,6 +153,7 @@ final class RestApiTestFixture {
                     .achievementService(achievementService)
                     .connectionService(connectionService)
                     .validationService(validationService)
+                    .locationService(locationService)
                     .eventBus(new InProcessAppEventBus())
                     .build();
         }

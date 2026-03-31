@@ -1,6 +1,7 @@
 package datingapp.ui.viewmodel;
 
 import datingapp.app.usecase.common.UserContext;
+import datingapp.app.usecase.profile.ProfileMutationUseCases;
 import datingapp.app.usecase.profile.ProfileUseCases;
 import datingapp.app.usecase.profile.ProfileUseCases.SaveProfileCommand;
 import datingapp.core.AppClock;
@@ -65,6 +66,7 @@ public class ProfileViewModel extends BaseViewModel {
 
     private final UiUserStore userStore;
     private final ProfileService profileCompletionService;
+    private ProfileMutationUseCases profileMutationUseCases;
     private final ProfileUseCases profileUseCases;
     private final AppSession session;
     private final ProfileActivationPolicy activationPolicy;
@@ -142,6 +144,8 @@ public class ProfileViewModel extends BaseViewModel {
         this.profileCompletionService = Objects.requireNonNull(
                 dependencies.profileCompletionService(), "profileCompletionService cannot be null");
         this.profileUseCases = dependencies.profileUseCases();
+        this.profileMutationUseCases =
+                this.profileUseCases != null ? this.profileUseCases.getProfileMutationUseCases() : null;
         this.config = Objects.requireNonNull(dependencies.config(), "config cannot be null");
         this.session = Objects.requireNonNull(dependencies.session(), "session cannot be null");
         this.validationService =
@@ -405,13 +409,15 @@ public class ProfileViewModel extends BaseViewModel {
         try {
             if (isDisposed()) {
                 result = SaveOperationResult.failure(new IllegalStateException(PROFILE_EDITOR_INACTIVE));
+            } else if (profileMutationUseCases != null) {
+                result = persistProfileViaMutationUseCase(draftUser);
             } else if (profileUseCases != null) {
                 result = persistProfileViaUseCase(draftUser);
             } else {
                 result = persistProfileLegacy(draftUser);
             }
         } catch (Exception e) {
-            logError("Failed to save profile", e);
+            logError(SAVE_PROFILE_ERROR, e);
             result = SaveOperationResult.failure(e);
         }
 
@@ -421,6 +427,18 @@ public class ProfileViewModel extends BaseViewModel {
 
     private SaveOperationResult persistProfileViaUseCase(User user) {
         var saveResult = profileUseCases.saveProfile(new SaveProfileCommand(UserContext.ui(user.getId()), user));
+        if (!saveResult.success()) {
+            return SaveOperationResult.failure(
+                    new IllegalStateException(saveResult.error().message()));
+        }
+
+        User savedUser = saveResult.data().user();
+        return SaveOperationResult.success(savedUser);
+    }
+
+    private SaveOperationResult persistProfileViaMutationUseCase(User user) {
+        var saveResult =
+                profileMutationUseCases.saveProfile(new SaveProfileCommand(UserContext.ui(user.getId()), user));
         if (!saveResult.success()) {
             return SaveOperationResult.failure(
                     new IllegalStateException(saveResult.error().message()));

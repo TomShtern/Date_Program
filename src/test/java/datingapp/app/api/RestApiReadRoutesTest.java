@@ -22,6 +22,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.UUID;
@@ -86,6 +87,16 @@ class RestApiReadRoutesTest {
         assertEquals(
                 "Tel Aviv, Tel Aviv District",
                 userJson.get("approximateLocation").asText());
+
+        HttpResponse<String> forbiddenUserResponse = client.send(
+                HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/users/" + aliceId))
+                        .header("X-User-Id", bobId.toString())
+                        .GET()
+                        .build(),
+                HttpResponse.BodyHandlers.ofString());
+        assertEquals(403, forbiddenUserResponse.statusCode());
+        JsonNode forbiddenUserJson = MAPPER.readTree(forbiddenUserResponse.body());
+        assertEquals("FORBIDDEN", forbiddenUserJson.get("code").asText());
 
         HttpResponse<String> candidatesResponse = client.send(
                 HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/users/" + aliceId + "/candidates"))
@@ -372,12 +383,16 @@ class RestApiReadRoutesTest {
         JsonNode candidatesJson = MAPPER.readTree(candidatesResponse.body());
 
         assertTrue(candidatesJson.isArray());
+        List<String> candidateIds = new ArrayList<>();
         for (JsonNode candidate : candidatesJson) {
-            String id = candidate.get("id").asText();
-            assertEquals(eligibleId.toString(), id, "Eligible candidate should remain visible");
-            assertNotEquals(blockedId.toString(), id, "Blocked user should not appear in /candidates");
-            assertNotEquals(unmatchedId.toString(), id, "Recently unmatched user should not appear in /candidates");
+            candidateIds.add(candidate.get("id").asText());
         }
+        assertTrue(!candidateIds.isEmpty(), "Eligible candidate should remain visible");
+        assertTrue(candidateIds.contains(eligibleId.toString()), "Eligible candidate should remain visible");
+        assertTrue(!candidateIds.contains(blockedId.toString()), "Blocked user should not appear in /candidates");
+        assertTrue(
+                !candidateIds.contains(unmatchedId.toString()),
+                "Recently unmatched user should not appear in /candidates");
     }
 
     @Test

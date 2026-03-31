@@ -1,6 +1,8 @@
 package datingapp.ui.viewmodel;
 
+import datingapp.app.usecase.common.UseCaseResult;
 import datingapp.app.usecase.common.UserContext;
+import datingapp.app.usecase.profile.ProfileMutationUseCases;
 import datingapp.app.usecase.profile.ProfileUseCases;
 import datingapp.app.usecase.profile.ProfileUseCases.UpdateDiscoveryPreferencesCommand;
 import datingapp.core.AppConfig;
@@ -28,6 +30,7 @@ public class PreferencesViewModel extends BaseViewModel {
     private final AppConfig config;
     private final AppSession session;
     private final UiUserStore userStore;
+    private ProfileMutationUseCases profileMutationUseCases;
     private final ProfileUseCases profileUseCases;
     private final UiThemeService uiThemeService;
     private User currentUser;
@@ -51,8 +54,27 @@ public class PreferencesViewModel extends BaseViewModel {
             AppConfig config,
             AppSession session,
             UiThreadDispatcher uiDispatcher) {
+        this(
+                userStore,
+                profileUseCases != null ? profileUseCases.getProfileMutationUseCases() : null,
+                profileUseCases,
+                uiThemeService,
+                config,
+                session,
+                uiDispatcher);
+    }
+
+    public PreferencesViewModel(
+            UiUserStore userStore,
+            ProfileMutationUseCases profileMutationUseCases,
+            ProfileUseCases profileUseCases,
+            UiThemeService uiThemeService,
+            AppConfig config,
+            AppSession session,
+            UiThreadDispatcher uiDispatcher) {
         super("preferences", uiDispatcher);
         this.userStore = Objects.requireNonNull(userStore, "userStore cannot be null");
+        this.profileMutationUseCases = profileMutationUseCases;
         this.profileUseCases = profileUseCases;
         this.uiThemeService = Objects.requireNonNull(uiThemeService, "uiThemeService cannot be null");
         this.config = Objects.requireNonNull(config, "config cannot be null");
@@ -200,9 +222,15 @@ public class PreferencesViewModel extends BaseViewModel {
 
     private ThemeMode persistDiscoveryPreferences(
             int minAgeVal, int maxAgeVal, int maxDistVal, Set<Gender> newInterests) {
-        if (profileUseCases != null) {
-            var result = profileUseCases.updateDiscoveryPreferences(new UpdateDiscoveryPreferencesCommand(
-                    UserContext.ui(currentUser.getId()), minAgeVal, maxAgeVal, maxDistVal, newInterests));
+        if (profileMutationUseCases != null || profileUseCases != null) {
+            UseCaseResult<User> result;
+            if (profileMutationUseCases != null) {
+                result = profileMutationUseCases.updateDiscoveryPreferences(new UpdateDiscoveryPreferencesCommand(
+                        UserContext.ui(currentUser.getId()), minAgeVal, maxAgeVal, maxDistVal, newInterests));
+            } else {
+                result = profileUseCases.updateDiscoveryPreferences(new UpdateDiscoveryPreferencesCommand(
+                        UserContext.ui(currentUser.getId()), minAgeVal, maxAgeVal, maxDistVal, newInterests));
+            }
             if (!result.success()) {
                 logWarn(
                         "Failed to save preferences via use-case: {}",

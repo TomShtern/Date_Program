@@ -18,12 +18,7 @@ class ProfileServiceBatchLookupTest {
     @DisplayName("getUsersByIds returns matching users and skips missing IDs")
     void getUsersByIdsReturnsMatchingUsersOnly() {
         TestStorages.Users userStorage = new TestStorages.Users();
-        var service = new ProfileService(
-                AppConfig.defaults(),
-                new TestStorages.Analytics(),
-                new TestStorages.Interactions(),
-                new TestStorages.TrustSafety(),
-                userStorage);
+        var service = new ProfileService(userStorage);
 
         User alice = new User(UUID.randomUUID(), "Alice");
         User bob = new User(UUID.randomUUID(), "Bob");
@@ -43,12 +38,7 @@ class ProfileServiceBatchLookupTest {
     @DisplayName("getUsersByIds returns empty map for empty input")
     void getUsersByIdsReturnsEmptyForEmptyInput() {
         TestStorages.Users userStorage = new TestStorages.Users();
-        var service = new ProfileService(
-                AppConfig.defaults(),
-                new TestStorages.Analytics(),
-                new TestStorages.Interactions(),
-                new TestStorages.TrustSafety(),
-                userStorage);
+        var service = new ProfileService(userStorage);
 
         var found = service.getUsersByIds(Set.of());
 

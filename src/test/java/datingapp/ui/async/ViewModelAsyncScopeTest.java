@@ -165,6 +165,49 @@ class ViewModelAsyncScopeTest {
     }
 
     @Test
+    @DisplayName("runPolling cancels superseded polling tasks and records cancellation diagnostics")
+    void runPollingCancelsSupersededTasksAndRecordsCancellationDiagnostics() throws InterruptedException {
+        UiAsyncTestSupport.TestUiThreadDispatcher dispatcher = new UiAsyncTestSupport.TestUiThreadDispatcher();
+        ViewModelAsyncScope scope = createScope(dispatcher, message -> {
+            throw new AssertionError("Unexpected error: " + message);
+        });
+
+        AtomicInteger firstRuns = new AtomicInteger(0);
+        AtomicInteger secondRuns = new AtomicInteger(0);
+        CountDownLatch firstTick = new CountDownLatch(1);
+        CountDownLatch secondTick = new CountDownLatch(1);
+
+        TaskHandle first = scope.runPolling("refresh", "first poll", Duration.ofMillis(25), () -> {
+            if (firstRuns.incrementAndGet() == 1) {
+                firstTick.countDown();
+            }
+            UiAsyncTestSupport.pauseMillis(20);
+        });
+
+        assertTrue(firstTick.await(2, TimeUnit.SECONDS));
+
+        TaskHandle second = scope.runPolling("refresh", "second poll", Duration.ofMillis(25), () -> {
+            if (secondRuns.incrementAndGet() == 1) {
+                secondTick.countDown();
+            }
+            UiAsyncTestSupport.pauseMillis(20);
+        });
+
+        assertTrue(secondTick.await(2, TimeUnit.SECONDS));
+        assertTrue(UiAsyncTestSupport.waitUntil(() -> first.isCancelled() && first.isDone(), Duration.ofSeconds(2)));
+
+        ViewModelAsyncScope.DiagnosticsSnapshot diagnostics = scope.diagnosticsSnapshot();
+        assertEquals(1L, diagnostics.supersededTaskCount());
+        assertEquals(1L, diagnostics.cancelledBeforeDeliveryCount());
+        assertEquals(0L, diagnostics.callbackSuppressedCount());
+        assertEquals(0L, diagnostics.routedErrorCount());
+
+        second.cancel();
+        assertTrue(UiAsyncTestSupport.waitUntil(second::isDone, Duration.ofSeconds(2)));
+        scope.dispose();
+    }
+
+    @Test
     @DisplayName("dispose cancels in-flight tasks and suppresses callbacks")
     void disposeCancelsInflightTasksAndSuppressesCallbacks() throws InterruptedException {
         UiAsyncTestSupport.TestUiThreadDispatcher dispatcher = new UiAsyncTestSupport.TestUiThreadDispatcher();

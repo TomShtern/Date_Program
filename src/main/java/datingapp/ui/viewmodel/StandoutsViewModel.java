@@ -34,7 +34,6 @@ public class StandoutsViewModel extends BaseViewModel {
     private final StringProperty statusMessage = new SimpleStringProperty("");
 
     private User currentUser;
-    private ViewModelErrorSink errorSink;
 
     /** Combines a {@link Standout} with its resolved {@link User} for display. */
     public record StandoutEntry(Standout standout, User user) {
@@ -82,7 +81,6 @@ public class StandoutsViewModel extends BaseViewModel {
     }
 
     public final void setErrorHandler(ViewModelErrorSink handler) {
-        this.errorSink = handler;
         setErrorSink(handler);
     }
 
@@ -189,9 +187,7 @@ public class StandoutsViewModel extends BaseViewModel {
     }
 
     private void notifyError(String message) {
-        if (errorSink != null) {
-            asyncScope.dispatchToUi(() -> errorSink.onError(message));
-        }
+        notifyError(message, null);
     }
 
     // --- Properties ---

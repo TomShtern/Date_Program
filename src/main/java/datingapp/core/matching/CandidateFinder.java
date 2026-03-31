@@ -232,7 +232,7 @@ public class CandidateFinder implements LoggingSupport {
         int fingerprint = candidateFingerprint(currentUser, excluded);
         CacheEntry cached = candidateCache.get(currentUser.getId());
         if (cached != null && !cached.isExpired(clock.instant()) && cached.fingerprint() == fingerprint) {
-            return refreshCachedCandidates(currentUser, excluded, fingerprint);
+            return cached.candidates();
         }
 
         return refreshCachedCandidates(currentUser, excluded, fingerprint);

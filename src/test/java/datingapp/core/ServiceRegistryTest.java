@@ -1,11 +1,19 @@
 package datingapp.core;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import datingapp.core.model.User;
+import datingapp.core.model.User.Gender;
+import datingapp.core.model.User.UserState;
 import datingapp.storage.DatabaseManager;
 import datingapp.storage.StorageFactory;
+import java.time.LocalDate;
+import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterAll;
@@ -173,6 +181,42 @@ class ServiceRegistryTest {
         @DisplayName("getConnectionService returns non-null")
         void getConnectionService() {
             assertNotNull(registry.getConnectionService());
+        }
+    }
+
+    @Nested
+    @DisplayName("Shared Graph Usability")
+    class SharedGraphUsability {
+
+        @Test
+        @DisplayName("getProfileUseCases can read users saved through the registry storage")
+        void getProfileUseCasesCanReadUsersSavedThroughRegistryStorage() {
+            UUID userId = UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+            User user = User.StorageBuilder.create(userId, "RegistryUser", AppClock.now())
+                    .state(UserState.ACTIVE)
+                    .birthDate(LocalDate.of(1998, 1, 1))
+                    .gender(Gender.FEMALE)
+                    .interestedIn(Set.of(Gender.MALE))
+                    .location(32.0853, 34.7818)
+                    .photoUrls(List.of("https://example.com/registry-user.jpg"))
+                    .build();
+
+            registry.getUserStorage().save(user);
+
+            var result = registry.getProfileUseCases().listUsers();
+
+            assertTrue(result.success());
+            assertEquals(1, result.data().size());
+            assertEquals(userId, result.data().get(0).getId());
+        }
+
+        @Test
+        @DisplayName("getLocationService can resolve a supported city")
+        void getLocationServiceCanResolveASupportedCity() {
+            var locationService = registry.getLocationService();
+
+            assertTrue(locationService.findCountry("IL").isPresent());
+            assertTrue(locationService.findCityByName("IL", "Tel Aviv").isPresent());
         }
     }
 

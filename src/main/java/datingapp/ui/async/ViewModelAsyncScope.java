@@ -246,8 +246,8 @@ public final class ViewModelAsyncScope {
         } finally {
             handle.markDone();
             activeHandles.remove(handle);
-            if (taskKey != null) {
-                latestHandles.remove(taskKey, handle);
+            if (taskKey != null && latestHandles.remove(taskKey, handle)) {
+                latestVersions.remove(taskKey);
             }
             if (policy.trackLoading() && handle.releaseLoading()) {
                 endLoading();
@@ -257,10 +257,8 @@ public final class ViewModelAsyncScope {
 
     private void executePollingTask(
             PollingTaskHandle handle, String taskKey, long version, String taskName, ThrowingRunnable backgroundWork) {
-        boolean executedAtLeastOnce = false;
         try {
             while (canDeliver(handle, taskKey, version)) {
-                executedAtLeastOnce = true;
                 try {
                     backgroundWork.run();
                 } catch (RuntimeException error) {
@@ -279,12 +277,14 @@ public final class ViewModelAsyncScope {
                 }
             }
         } finally {
-            if (!executedAtLeastOnce) {
+            if (!canDeliver(handle, taskKey, version)) {
                 diagnostics.recordCancelledBeforeDelivery();
             }
             handle.markDone();
             activeHandles.remove(handle);
-            latestHandles.remove(taskKey, handle);
+            if (latestHandles.remove(taskKey, handle)) {
+                latestVersions.remove(taskKey);
+            }
         }
     }
 

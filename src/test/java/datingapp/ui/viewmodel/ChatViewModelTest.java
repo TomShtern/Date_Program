@@ -34,6 +34,7 @@ import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.LockSupport;
 import java.util.function.BooleanSupplier;
@@ -391,6 +392,89 @@ class ChatViewModelTest {
         assertEquals(
                 preview.conversation().getId(),
                 viewModel.selectedConversationProperty().get().conversation().getId());
+    }
+
+    @Test
+    @DisplayName("openConversationWithUser reuses openConversation result without reloading conversation list")
+    void openConversationWithUserReusesOpenConversationResultWithoutReloadingConversationList()
+            throws InterruptedException {
+        AtomicInteger listCalls = new AtomicInteger();
+        AtomicInteger openCalls = new AtomicInteger();
+        var eventBus = new InProcessAppEventBus();
+        var countingMessagingUseCases =
+                new datingapp.app.usecase.messaging.MessagingUseCases(connectionService, eventBus) {
+                    @Override
+                    public UseCaseResult<ConversationListResult> listConversations(ListConversationsQuery query) {
+                        listCalls.incrementAndGet();
+                        return super.listConversations(query);
+                    }
+
+                    @Override
+                    public UseCaseResult<OpenConversationResult> openConversation(OpenConversationCommand command) {
+                        openCalls.incrementAndGet();
+                        return super.openConversation(command);
+                    }
+                };
+        var socialUseCases = new datingapp.app.usecase.social.SocialUseCases(
+                connectionService,
+                TrustSafetyService.builder(trustSafety, interactions, users, AppConfig.defaults())
+                        .build());
+        ProfileService profileService =
+                new ProfileService(AppConfig.defaults(), analytics, interactions, trustSafety, users);
+        var noteUseCases = new datingapp.app.usecase.profile.ProfileUseCases(
+                users,
+                profileService,
+                null,
+                null,
+                TestAchievementService.empty(),
+                AppConfig.defaults(),
+                new datingapp.core.workflow.ProfileActivationPolicy(),
+                eventBus);
+        ChatViewModel localViewModel = new ChatViewModel(
+                countingMessagingUseCases,
+                socialUseCases,
+                AppSession.getInstance(),
+                new datingapp.ui.async.JavaFxUiThreadDispatcher(),
+                Duration.ofMillis(75),
+                Duration.ofMillis(75),
+                new ChatViewModel.ChatUiDependencies(
+                        new UseCaseUiProfileNoteDataAccess(noteUseCases), new UiPresenceDataAccess() {
+                            @Override
+                            public PresenceStatus getPresence(UUID userId) {
+                                return presenceStatus.get();
+                            }
+
+                            @Override
+                            public boolean isTyping(UUID userId) {
+                                return remoteTyping.get();
+                            }
+                        }));
+
+        try {
+            localViewModel.setCurrentUser(currentUser);
+            assertTrue(waitUntil(() -> !localViewModel.loadingProperty().get(), 5000));
+            listCalls.set(0);
+
+            CountDownLatch ready = new CountDownLatch(1);
+            AtomicReference<ConversationPreview> opened = new AtomicReference<>();
+
+            localViewModel.openConversationWithUser(otherUser.getId(), preview -> {
+                opened.set(preview);
+                ready.countDown();
+            });
+
+            assertTrue(ready.await(5, TimeUnit.SECONDS));
+            assertTrue(waitUntil(() -> localViewModel.getConversations().size() == 1, 5000));
+
+            assertEquals(1, openCalls.get());
+            assertEquals(0, listCalls.get());
+            assertNotNull(opened.get());
+            assertEquals(
+                    opened.get().conversation().getId(),
+                    localViewModel.getConversations().getFirst().conversation().getId());
+        } finally {
+            localViewModel.dispose();
+        }
     }
 
     @Test

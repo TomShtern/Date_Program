@@ -58,6 +58,10 @@ public final class JdbiUserStorage implements UserStorage {
     private static final String USER_DB_WANTS_KIDS = "user_db_wants_kids";
     private static final String USER_DB_LOOKING_FOR = "user_db_looking_for";
     private static final String USER_DB_EDUCATION = "user_db_education";
+    private static final String NORMALIZED_GROUP_PHOTOS = "photos";
+    private static final String NORMALIZED_GROUP_INTERESTS = "interests";
+    private static final String NORMALIZED_GROUP_INTERESTED_IN = "interested_in";
+    private static final String NORMALIZED_GROUP_DEALBREAKER = "dealbreaker";
 
     private final Jdbi jdbi;
     private final Dao dao;
@@ -524,124 +528,143 @@ public final class JdbiUserStorage implements UserStorage {
         }
 
         List<UUID> userIds = users.stream().map(User::getId).toList();
-        Map<UUID, List<String>> photoUrlsByUserId = loadUserValues(
-                handle,
-                "SELECT user_id, url FROM user_photos WHERE user_id IN (<userIds>) ORDER BY user_id, position",
-                "url",
-                userIds);
-        Map<UUID, List<String>> interestsByUserId = loadUserValues(
-                handle,
-                "SELECT user_id, interest FROM user_interests WHERE user_id IN (<userIds>) ORDER BY user_id, interest",
-                "interest",
-                userIds);
-        Map<UUID, List<String>> interestedInByUserId = loadUserValues(
-                handle,
-                "SELECT user_id, gender FROM user_interested_in WHERE user_id IN (<userIds>) ORDER BY user_id, gender",
-                GENDER_COLUMN,
-                userIds);
-        Map<UUID, List<String>> smokingByUserId = loadUserValues(
-                handle,
-                "SELECT user_id, \"value\" FROM user_db_smoking WHERE user_id IN (<userIds>) ORDER BY user_id, \"value\"",
-                NORMALIZED_VALUE_COLUMN,
-                userIds);
-        Map<UUID, List<String>> drinkingByUserId = loadUserValues(
-                handle,
-                "SELECT user_id, \"value\" FROM user_db_drinking WHERE user_id IN (<userIds>) ORDER BY user_id, \"value\"",
-                NORMALIZED_VALUE_COLUMN,
-                userIds);
-        Map<UUID, List<String>> wantsKidsByUserId = loadUserValues(
-                handle,
-                "SELECT user_id, \"value\" FROM user_db_wants_kids WHERE user_id IN (<userIds>) ORDER BY user_id, \"value\"",
-                NORMALIZED_VALUE_COLUMN,
-                userIds);
-        Map<UUID, List<String>> lookingForByUserId = loadUserValues(
-                handle,
-                "SELECT user_id, \"value\" FROM user_db_looking_for WHERE user_id IN (<userIds>) ORDER BY user_id, \"value\"",
-                NORMALIZED_VALUE_COLUMN,
-                userIds);
-        Map<UUID, List<String>> educationByUserId = loadUserValues(
-                handle,
-                "SELECT user_id, \"value\" FROM user_db_education WHERE user_id IN (<userIds>) ORDER BY user_id, \"value\"",
-                NORMALIZED_VALUE_COLUMN,
-                userIds);
+        NormalizedProfileData normalizedProfileData = loadNormalizedProfileData(handle, userIds);
 
         for (User user : users) {
             UUID userId = user.getId();
-            user.setPhotoUrls(photoUrlsByUserId.getOrDefault(userId, List.of()));
-            user.setInterests(
-                    parseEnumNames(new HashSet<>(interestsByUserId.getOrDefault(userId, List.of())), Interest.class));
-            user.setInterestedIn(
-                    parseEnumNames(new HashSet<>(interestedInByUserId.getOrDefault(userId, List.of())), Gender.class));
-            user.setDealbreakers(buildDealbreakers(
-                    user,
-                    userId,
-                    smokingByUserId,
-                    drinkingByUserId,
-                    wantsKidsByUserId,
-                    lookingForByUserId,
-                    educationByUserId));
+            user.setPhotoUrls(normalizedProfileData.photoUrlsByUserId().getOrDefault(userId, List.of()));
+            user.setInterests(parseEnumNames(
+                    normalizedProfileData.interestsByUserId().getOrDefault(userId, Set.of()), Interest.class));
+            user.setInterestedIn(parseEnumNames(
+                    normalizedProfileData.interestedInByUserId().getOrDefault(userId, Set.of()), Gender.class));
+            user.setDealbreakers(buildDealbreakers(user, userId, normalizedProfileData.dealbreakerValuesByUserId()));
         }
 
         return users;
     }
 
-    private Map<UUID, List<String>> loadUserValues(
-            Handle handle, String sql, String valueColumn, Collection<UUID> userIds) {
+    private NormalizedProfileData loadNormalizedProfileData(Handle handle, Collection<UUID> userIds) {
         if (userIds == null || userIds.isEmpty()) {
-            return Map.of();
+            return NormalizedProfileData.empty();
         }
 
+        String sql = """
+            SELECT user_id, group_name, group_key, item_value
+            FROM (
+            SELECT user_id, 'photos' AS group_name, NULL AS group_key, url AS item_value, position AS sort_order
+            FROM user_photos
+            WHERE user_id IN (<userIds>)
+            UNION ALL
+            SELECT user_id, 'interests' AS group_name, NULL AS group_key, interest AS item_value, NULL AS sort_order
+            FROM user_interests
+            WHERE user_id IN (<userIds>)
+            UNION ALL
+            SELECT user_id, 'interested_in' AS group_name, NULL AS group_key, gender AS item_value, NULL AS sort_order
+            FROM user_interested_in
+            WHERE user_id IN (<userIds>)
+            UNION ALL
+            SELECT user_id, 'dealbreaker' AS group_name, 'user_db_smoking' AS group_key, "value" AS item_value, NULL AS sort_order
+                FROM user_db_smoking
+                WHERE user_id IN (<userIds>)
+                UNION ALL
+            SELECT user_id, 'dealbreaker' AS group_name, 'user_db_drinking' AS group_key, "value" AS item_value, NULL AS sort_order
+                FROM user_db_drinking
+                WHERE user_id IN (<userIds>)
+                UNION ALL
+            SELECT user_id, 'dealbreaker' AS group_name, 'user_db_wants_kids' AS group_key, "value" AS item_value, NULL AS sort_order
+                FROM user_db_wants_kids
+                WHERE user_id IN (<userIds>)
+                UNION ALL
+            SELECT user_id, 'dealbreaker' AS group_name, 'user_db_looking_for' AS group_key, "value" AS item_value, NULL AS sort_order
+                FROM user_db_looking_for
+                WHERE user_id IN (<userIds>)
+                UNION ALL
+            SELECT user_id, 'dealbreaker' AS group_name, 'user_db_education' AS group_key, "value" AS item_value, NULL AS sort_order
+                FROM user_db_education
+                WHERE user_id IN (<userIds>)
+            ) AS normalized_profile_data
+            ORDER BY user_id, group_name, group_key, sort_order, item_value
+            """;
+
         try (var query = handle.createQuery(sql)) {
-            List<UserValueRow> rows = query.bindList("userIds", new ArrayList<>(userIds))
-                    .map((rs, ctx) -> new UserValueRow(
-                            JdbiTypeCodecs.SqlRowReaders.readUuid(rs, "user_id"), rs.getString(valueColumn)))
+            List<NormalizedProfileRow> rows = query.bindList("userIds", new ArrayList<>(userIds))
+                    .map((rs, ctx) -> new NormalizedProfileRow(
+                            JdbiTypeCodecs.SqlRowReaders.readUuid(rs, "user_id"),
+                            rs.getString("group_name"),
+                            rs.getString("group_key"),
+                            rs.getString("item_value")))
                     .list();
 
-            Map<UUID, List<String>> valuesByUserId = new HashMap<>();
-            for (UserValueRow row : rows) {
-                valuesByUserId
-                        .computeIfAbsent(row.userId(), key -> new ArrayList<>())
-                        .add(row.value());
+            Map<UUID, List<String>> photoUrlsByUserId = new HashMap<>();
+            Map<UUID, Set<String>> interestsByUserId = new HashMap<>();
+            Map<UUID, Set<String>> interestedInByUserId = new HashMap<>();
+            Map<UUID, Map<String, Set<String>>> dealbreakerValuesByUserId = new HashMap<>();
+            for (NormalizedProfileRow row : rows) {
+                if (NORMALIZED_GROUP_PHOTOS.equals(row.groupName())) {
+                    photoUrlsByUserId
+                            .computeIfAbsent(row.userId(), key -> new ArrayList<>())
+                            .add(row.itemValue());
+                } else if (NORMALIZED_GROUP_INTERESTS.equals(row.groupName())) {
+                    interestsByUserId
+                            .computeIfAbsent(row.userId(), key -> new HashSet<>())
+                            .add(row.itemValue());
+                } else if (NORMALIZED_GROUP_INTERESTED_IN.equals(row.groupName())) {
+                    interestedInByUserId
+                            .computeIfAbsent(row.userId(), key -> new HashSet<>())
+                            .add(row.itemValue());
+                } else if (NORMALIZED_GROUP_DEALBREAKER.equals(row.groupName()) && row.groupKey() != null) {
+                    dealbreakerValuesByUserId
+                            .computeIfAbsent(row.userId(), key -> new HashMap<>())
+                            .computeIfAbsent(row.groupKey(), key -> new HashSet<>())
+                            .add(row.itemValue());
+                }
             }
-            return valuesByUserId;
+            return new NormalizedProfileData(
+                    photoUrlsByUserId, interestsByUserId, interestedInByUserId, dealbreakerValuesByUserId);
         }
     }
 
-    private record UserValueRow(UUID userId, String value) {}
+    private record NormalizedProfileRow(UUID userId, String groupName, String groupKey, String itemValue) {}
+
+    private record NormalizedProfileData(
+            Map<UUID, List<String>> photoUrlsByUserId,
+            Map<UUID, Set<String>> interestsByUserId,
+            Map<UUID, Set<String>> interestedInByUserId,
+            Map<UUID, Map<String, Set<String>>> dealbreakerValuesByUserId) {
+
+        private static NormalizedProfileData empty() {
+            return new NormalizedProfileData(Map.of(), Map.of(), Map.of(), Map.of());
+        }
+    }
 
     private static Dealbreakers buildDealbreakers(
-            User user,
-            UUID userId,
-            Map<UUID, List<String>> smokingByUserId,
-            Map<UUID, List<String>> drinkingByUserId,
-            Map<UUID, List<String>> wantsKidsByUserId,
-            Map<UUID, List<String>> lookingForByUserId,
-            Map<UUID, List<String>> educationByUserId) {
+            User user, UUID userId, Map<UUID, Map<String, Set<String>>> dealbreakerValuesByUserId) {
         Dealbreakers existing = user != null ? user.getDealbreakers() : null;
         Dealbreakers.Builder builder = (existing != null ? existing : Dealbreakers.none()).toBuilder();
+        Map<String, Set<String>> valuesByTable = dealbreakerValuesByUserId.getOrDefault(userId, Map.of());
 
         Set<Lifestyle.Smoking> smoking =
-                parseEnumNames(new HashSet<>(smokingByUserId.getOrDefault(userId, List.of())), Lifestyle.Smoking.class);
+                parseEnumNames(valuesByTable.getOrDefault(USER_DB_SMOKING, Set.of()), Lifestyle.Smoking.class);
         builder.clearSmoking();
         builder.acceptSmoking(smoking.toArray(Lifestyle.Smoking[]::new));
 
-        Set<Lifestyle.Drinking> drinking = parseEnumNames(
-                new HashSet<>(drinkingByUserId.getOrDefault(userId, List.of())), Lifestyle.Drinking.class);
+        Set<Lifestyle.Drinking> drinking =
+                parseEnumNames(valuesByTable.getOrDefault(USER_DB_DRINKING, Set.of()), Lifestyle.Drinking.class);
         builder.clearDrinking();
         builder.acceptDrinking(drinking.toArray(Lifestyle.Drinking[]::new));
 
-        Set<Lifestyle.WantsKids> kids = parseEnumNames(
-                new HashSet<>(wantsKidsByUserId.getOrDefault(userId, List.of())), Lifestyle.WantsKids.class);
+        Set<Lifestyle.WantsKids> kids =
+                parseEnumNames(valuesByTable.getOrDefault(USER_DB_WANTS_KIDS, Set.of()), Lifestyle.WantsKids.class);
         builder.clearKids();
         builder.acceptKidsStance(kids.toArray(Lifestyle.WantsKids[]::new));
 
-        Set<Lifestyle.LookingFor> lookingFor = parseEnumNames(
-                new HashSet<>(lookingForByUserId.getOrDefault(userId, List.of())), Lifestyle.LookingFor.class);
+        Set<Lifestyle.LookingFor> lookingFor =
+                parseEnumNames(valuesByTable.getOrDefault(USER_DB_LOOKING_FOR, Set.of()), Lifestyle.LookingFor.class);
         builder.clearLookingFor();
         builder.acceptLookingFor(lookingFor.toArray(Lifestyle.LookingFor[]::new));
 
-        Set<Lifestyle.Education> education = parseEnumNames(
-                new HashSet<>(educationByUserId.getOrDefault(userId, List.of())), Lifestyle.Education.class);
+        Set<Lifestyle.Education> education =
+                parseEnumNames(valuesByTable.getOrDefault(USER_DB_EDUCATION, Set.of()), Lifestyle.Education.class);
         builder.clearEducation();
         builder.requireEducation(education.toArray(Lifestyle.Education[]::new));
 
@@ -664,7 +687,7 @@ public final class JdbiUserStorage implements UserStorage {
         }
     }
 
-    private static <E extends Enum<E>> Set<E> parseEnumNames(Set<String> values, Class<E> enumType) {
+    private static <E extends Enum<E>> Set<E> parseEnumNames(Collection<String> values, Class<E> enumType) {
         if (values == null || values.isEmpty()) {
             return EnumSet.noneOf(enumType);
         }

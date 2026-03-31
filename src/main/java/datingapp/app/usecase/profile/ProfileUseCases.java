@@ -1,13 +1,10 @@
 package datingapp.app.usecase.profile;
 
-import datingapp.app.event.AppEvent;
 import datingapp.app.event.AppEventBus;
 import datingapp.app.usecase.common.UseCaseError;
 import datingapp.app.usecase.common.UseCaseResult;
 import datingapp.app.usecase.common.UserContext;
-import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
-import datingapp.core.metrics.AchievementService;
 import datingapp.core.metrics.ActivityMetricsService;
 import datingapp.core.metrics.EngagementDomain.Achievement.UserAchievement;
 import datingapp.core.metrics.EngagementDomain.UserStats;
@@ -18,41 +15,27 @@ import datingapp.core.profile.MatchPreferences.Dealbreakers;
 import datingapp.core.profile.MatchPreferences.Interest;
 import datingapp.core.profile.MatchPreferences.Lifestyle;
 import datingapp.core.profile.ProfileService;
-import datingapp.core.profile.SanitizerUtils;
 import datingapp.core.profile.ValidationService;
 import datingapp.core.storage.AccountCleanupStorage;
 import datingapp.core.storage.UserStorage;
 import datingapp.core.workflow.ProfileActivationPolicy;
-import java.time.Instant;
 import java.util.List;
-import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /** Profile and user-progress application use-cases shared across adapters. */
 @SuppressWarnings("java:S107")
 public class ProfileUseCases {
-
-    private static final Logger logger = LoggerFactory.getLogger(ProfileUseCases.class);
-    private static final String CONTEXT_REQUIRED = "Context is required";
-    private static final String PROFILE_SERVICE_REQUIRED = "ProfileService is required";
     private static final String USER_STORAGE_REQUIRED = "UserStorage is required";
+    private static final String PROFILE_SERVICE_REQUIRED = "ProfileService is required";
     private static final String USER_NOT_FOUND = "User not found";
-    private static final String AUTHOR_NOT_FOUND = "Author not found";
-    private static final String CONTEXT_AND_SUBJECT_REQUIRED = "Context and subjectId are required";
-    private static final String PROFILE_NOTE_TOO_LONG = "Note content exceeds maximum length of %d characters";
 
     private final UserStorage userStorage;
     private final ProfileService profileService;
     private final ValidationService validationService;
-    private final ActivityMetricsService activityMetricsService;
-    private final AchievementService achievementService;
-    private final AccountCleanupStorage accountCleanupStorage;
-    private final AppConfig config;
-    private final ProfileActivationPolicy activationPolicy;
-    private final AppEventBus eventBus;
+    private final ProfileMutationUseCases profileMutationUseCases;
+    private final ProfileNotesUseCases profileNotesUseCases;
+    private final ProfileInsightsUseCases profileInsightsUseCases;
 
     public static Builder builder() {
         return new Builder();
@@ -64,7 +47,7 @@ public class ProfileUseCases {
             ProfileService profileService,
             ValidationService validationService,
             ActivityMetricsService activityMetricsService,
-            AchievementService achievementService,
+            datingapp.core.metrics.AchievementService achievementService,
             AppConfig config,
             ProfileActivationPolicy activationPolicy,
             AppEventBus eventBus) {
@@ -77,6 +60,9 @@ public class ProfileUseCases {
                 config,
                 activationPolicy,
                 eventBus,
+                null,
+                null,
+                null,
                 null);
     }
 
@@ -86,20 +72,60 @@ public class ProfileUseCases {
             ProfileService profileService,
             ValidationService validationService,
             ActivityMetricsService activityMetricsService,
-            AchievementService achievementService,
+            datingapp.core.metrics.AchievementService achievementService,
             AppConfig config,
             ProfileActivationPolicy activationPolicy,
             AppEventBus eventBus,
             AccountCleanupStorage accountCleanupStorage) {
+        this(
+                userStorage,
+                profileService,
+                validationService,
+                activityMetricsService,
+                achievementService,
+                config,
+                activationPolicy,
+                eventBus,
+                null,
+                accountCleanupStorage,
+                null,
+                null);
+    }
+
+    @SuppressWarnings("java:S107")
+    public ProfileUseCases(
+            UserStorage userStorage,
+            ProfileService profileService,
+            ValidationService validationService,
+            ActivityMetricsService activityMetricsService,
+            datingapp.core.metrics.AchievementService achievementService,
+            AppConfig config,
+            ProfileActivationPolicy activationPolicy,
+            AppEventBus eventBus,
+            ProfileMutationUseCases profileMutationUseCases,
+            AccountCleanupStorage accountCleanupStorage,
+            ProfileNotesUseCases profileNotesUseCases,
+            ProfileInsightsUseCases profileInsightsUseCases) {
         this.userStorage = userStorage;
         this.profileService = profileService;
         this.validationService = validationService;
-        this.activityMetricsService = activityMetricsService;
-        this.achievementService = achievementService;
-        this.accountCleanupStorage = accountCleanupStorage;
-        this.config = Objects.requireNonNull(config, "config cannot be null");
-        this.activationPolicy = Objects.requireNonNull(activationPolicy, "activationPolicy cannot be null");
-        this.eventBus = Objects.requireNonNull(eventBus, "eventBus cannot be null");
+        this.profileMutationUseCases = profileMutationUseCases != null
+                ? profileMutationUseCases
+                : new ProfileMutationUseCases(
+                        userStorage,
+                        profileService,
+                        validationService,
+                        achievementService,
+                        config,
+                        activationPolicy,
+                        eventBus,
+                        accountCleanupStorage);
+        this.profileNotesUseCases = profileNotesUseCases != null
+                ? profileNotesUseCases
+                : new ProfileNotesUseCases(userStorage, validationService, config, eventBus);
+        this.profileInsightsUseCases = profileInsightsUseCases != null
+                ? profileInsightsUseCases
+                : new ProfileInsightsUseCases(achievementService, activityMetricsService);
     }
 
     public static final class Builder {
@@ -107,8 +133,11 @@ public class ProfileUseCases {
         private ProfileService profileService;
         private ValidationService validationService;
         private ActivityMetricsService activityMetricsService;
-        private AchievementService achievementService;
+        private datingapp.core.metrics.AchievementService achievementService;
         private AccountCleanupStorage accountCleanupStorage;
+        private ProfileMutationUseCases profileMutationUseCases;
+        private ProfileNotesUseCases profileNotesUseCases;
+        private ProfileInsightsUseCases profileInsightsUseCases;
         private AppConfig config;
         private ProfileActivationPolicy activationPolicy = new ProfileActivationPolicy();
         private AppEventBus eventBus;
@@ -135,13 +164,28 @@ public class ProfileUseCases {
             return this;
         }
 
-        public Builder achievementService(AchievementService achievementService) {
+        public Builder achievementService(datingapp.core.metrics.AchievementService achievementService) {
             this.achievementService = achievementService;
             return this;
         }
 
         public Builder accountCleanupStorage(AccountCleanupStorage accountCleanupStorage) {
             this.accountCleanupStorage = accountCleanupStorage;
+            return this;
+        }
+
+        public Builder profileMutationUseCases(ProfileMutationUseCases profileMutationUseCases) {
+            this.profileMutationUseCases = profileMutationUseCases;
+            return this;
+        }
+
+        public Builder profileNotesUseCases(ProfileNotesUseCases profileNotesUseCases) {
+            this.profileNotesUseCases = profileNotesUseCases;
+            return this;
+        }
+
+        public Builder profileInsightsUseCases(ProfileInsightsUseCases profileInsightsUseCases) {
+            this.profileInsightsUseCases = profileInsightsUseCases;
             return this;
         }
 
@@ -170,138 +214,23 @@ public class ProfileUseCases {
                     config,
                     activationPolicy,
                     eventBus,
-                    accountCleanupStorage);
+                    profileMutationUseCases,
+                    accountCleanupStorage,
+                    profileNotesUseCases,
+                    profileInsightsUseCases);
         }
     }
 
     public UseCaseResult<ProfileSaveResult> saveProfile(SaveProfileCommand command) {
-        if (command == null || command.context() == null || command.user() == null) {
-            return UseCaseResult.failure(UseCaseError.validation("Context and user are required"));
-        }
-        if (userStorage == null || profileService == null) {
-            return UseCaseResult.failure(UseCaseError.dependency("UserStorage and ProfileService are required"));
-        }
-        if (!command.context().userId().equals(command.user().getId())) {
-            return UseCaseResult.failure(UseCaseError.forbidden("User context does not match profile user"));
-        }
-
-        User user = command.user();
-        sanitizeProfileText(user);
-        var activation = activationPolicy.tryActivate(user);
-        boolean activated = activation.activated();
-        try {
-            userStorage.save(user);
-        } catch (Exception e) {
-            return UseCaseResult.failure(UseCaseError.internal("Failed to save profile: " + e.getMessage()));
-        }
-
-        List<UserAchievement> newAchievements = List.of();
-        try {
-            newAchievements = unlockAchievements(user.getId());
-        } catch (Exception e) {
-            if (logger.isWarnEnabled()) {
-                logger.warn("Post-save achievement update failed for user {}: {}", user.getId(), e.getMessage(), e);
-            }
-        }
-
-        publishEvent(
-                new AppEvent.ProfileSaved(user.getId(), activated, AppClock.now()),
-                "Post-save event publication failed for user " + user.getId());
-        if (activated) {
-            publishEvent(
-                    new AppEvent.ProfileCompleted(user.getId(), AppClock.now()),
-                    "Post-profile-completed event failed for user " + user.getId());
-        }
-
-        return UseCaseResult.success(new ProfileSaveResult(user, activated, newAchievements));
+        return profileMutationUseCases.saveProfile(command);
     }
 
     public UseCaseResult<User> updateDiscoveryPreferences(UpdateDiscoveryPreferencesCommand command) {
-        if (command == null || command.context() == null) {
-            return UseCaseResult.failure(UseCaseError.validation(CONTEXT_REQUIRED));
-        }
-        if (userStorage == null) {
-            return UseCaseResult.failure(UseCaseError.dependency(USER_STORAGE_REQUIRED));
-        }
-
-        User user = userStorage.get(command.context().userId()).orElse(null);
-        if (user == null) {
-            return UseCaseResult.failure(UseCaseError.notFound(USER_NOT_FOUND));
-        }
-
-        try {
-            int minAge = Math.clamp(
-                    command.minAge(),
-                    config.validation().minAge(),
-                    config.validation().maxAge());
-            int maxAge = Math.clamp(
-                    command.maxAge(),
-                    config.validation().minAge(),
-                    config.validation().maxAge());
-            if (minAge > maxAge) {
-                int swap = minAge;
-                minAge = maxAge;
-                maxAge = swap;
-            }
-
-            int maxDistance =
-                    Math.clamp(command.maxDistanceKm(), 1, config.matching().maxDistanceKm());
-            user.setAgeRange(
-                    minAge,
-                    maxAge,
-                    config.validation().minAge(),
-                    config.validation().maxAge());
-            user.setMaxDistanceKm(maxDistance, config.matching().maxDistanceKm());
-
-            if (command.interestedIn() != null) {
-                user.setInterestedIn(command.interestedIn());
-            }
-
-            userStorage.save(user);
-            return UseCaseResult.success(user);
-        } catch (Exception e) {
-            return UseCaseResult.failure(UseCaseError.internal("Failed to update preferences: " + e.getMessage()));
-        }
+        return profileMutationUseCases.updateDiscoveryPreferences(command);
     }
 
     public UseCaseResult<ProfileSaveResult> updateProfile(UpdateProfileCommand command) {
-        if (command == null || command.context() == null) {
-            return UseCaseResult.failure(UseCaseError.validation(CONTEXT_REQUIRED));
-        }
-        if (userStorage == null || validationService == null) {
-            return UseCaseResult.failure(UseCaseError.dependency("UserStorage and ValidationService are required"));
-        }
-
-        User user = userStorage.get(command.context().userId()).orElse(null);
-        if (user == null) {
-            return UseCaseResult.failure(UseCaseError.notFound(USER_NOT_FOUND));
-        }
-
-        boolean locationWasSet = user.hasLocationSet();
-        double previousLatitude = user.getLat();
-        double previousLongitude = user.getLon();
-
-        try {
-            applyProfileTextAndIdentityFields(user, command);
-            applyProfileLocationFields(user, command);
-            applyProfilePreferenceFields(user, command);
-            applyProfileLifestyleFields(user, command);
-        } catch (IllegalArgumentException | IllegalStateException e) {
-            return UseCaseResult.failure(UseCaseError.validation(e.getMessage()));
-        }
-
-        UseCaseResult<ProfileSaveResult> saveResult = saveProfile(new SaveProfileCommand(command.context(), user));
-        if (saveResult.success()
-                && command.latitude() != null
-                && command.longitude() != null
-                && (!locationWasSet
-                        || Double.compare(previousLatitude, command.latitude()) != 0
-                        || Double.compare(previousLongitude, command.longitude()) != 0)) {
-            publishEvent(
-                    new AppEvent.LocationUpdated(user.getId(), command.latitude(), command.longitude(), AppClock.now()),
-                    "Post-location-updated event failed for user " + user.getId());
-        }
-        return saveResult;
+        return profileMutationUseCases.updateProfile(command);
     }
 
     public UseCaseResult<List<User>> listUsers() {
@@ -333,53 +262,31 @@ public class ProfileUseCases {
     }
 
     public UseCaseResult<AchievementSnapshot> getAchievements(AchievementsQuery query) {
-        if (query == null || query.context() == null) {
-            return UseCaseResult.failure(UseCaseError.validation(CONTEXT_REQUIRED));
+        var result = profileInsightsUseCases.getAchievements(toInsightsQuery(query));
+        if (!result.success()) {
+            return UseCaseResult.failure(result.error());
         }
-        if (achievementService == null) {
-            return UseCaseResult.failure(UseCaseError.dependency("AchievementService is required"));
-        }
-
-        try {
-            List<UserAchievement> newlyUnlocked =
-                    query.checkForNew() ? unlockAchievements(query.context().userId()) : List.of();
-            List<UserAchievement> unlocked =
-                    getUnlockedAchievements(query.context().userId());
-            return UseCaseResult.success(new AchievementSnapshot(unlocked, newlyUnlocked));
-        } catch (Exception e) {
-            return UseCaseResult.failure(UseCaseError.internal("Failed to load achievements: " + e.getMessage()));
-        }
+        return UseCaseResult.success(
+                new AchievementSnapshot(result.data().unlocked(), result.data().newlyUnlocked()));
     }
 
     public UseCaseResult<UserStats> getOrComputeStats(StatsQuery query) {
-        if (query == null || query.context() == null) {
-            return UseCaseResult.failure(UseCaseError.validation(CONTEXT_REQUIRED));
+        var result = profileInsightsUseCases.getOrComputeStats(toInsightsQuery(query));
+        if (!result.success()) {
+            return UseCaseResult.failure(result.error());
         }
-        if (activityMetricsService == null) {
-            return UseCaseResult.failure(UseCaseError.dependency("ActivityMetricsService is required"));
-        }
-        try {
-            return UseCaseResult.success(
-                    activityMetricsService.getOrComputeStats(query.context().userId()));
-        } catch (Exception e) {
-            return UseCaseResult.failure(UseCaseError.internal("Failed to load user statistics: " + e.getMessage()));
-        }
+        return UseCaseResult.success(result.data());
     }
 
     public UseCaseResult<SessionSummaryResult> getSessionSummary(SessionSummaryQuery query) {
-        if (query == null || query.context() == null) {
-            return UseCaseResult.failure(UseCaseError.validation(CONTEXT_REQUIRED));
+        var result = profileInsightsUseCases.getSessionSummary(toInsightsQuery(query));
+        if (!result.success()) {
+            return UseCaseResult.failure(result.error());
         }
-        if (activityMetricsService == null) {
-            return UseCaseResult.failure(UseCaseError.dependency("ActivityMetricsService is required"));
-        }
-        try {
-            return UseCaseResult.success(new SessionSummaryResult(activityMetricsService
-                    .getCurrentSession(query.context().userId())
-                    .map(ProfileUseCases::toCurrentSessionSnapshot)));
-        } catch (Exception e) {
-            return UseCaseResult.failure(UseCaseError.internal("Failed to load session summary: " + e.getMessage()));
-        }
+        return UseCaseResult.success(new SessionSummaryResult(result.data()
+                .currentSession()
+                .map(session -> new CurrentSessionSnapshot(
+                        session.swipeCount(), session.likeCount(), session.passCount(), session.formattedDuration()))));
     }
 
     public UseCaseResult<ProfileService.CompletionResult> calculateCompletion(User user) {
@@ -413,153 +320,44 @@ public class ProfileUseCases {
     }
 
     public UseCaseResult<Void> deleteAccount(DeleteAccountCommand command) {
-        if (command == null || command.context() == null) {
-            return UseCaseResult.failure(UseCaseError.validation(CONTEXT_REQUIRED));
-        }
-        if (command.reason() == null) {
-            return UseCaseResult.failure(UseCaseError.validation("Deletion reason is required"));
-        }
-        if (userStorage == null) {
-            return UseCaseResult.failure(UseCaseError.dependency(USER_STORAGE_REQUIRED));
-        }
-
-        User user = userStorage.get(command.context().userId()).orElse(null);
-        if (user == null) {
-            return UseCaseResult.failure(UseCaseError.notFound(USER_NOT_FOUND));
-        }
-
-        try {
-            var deletedAt = AppClock.now();
-            User deletedUser = user.copy();
-            applyDeletionState(deletedUser, deletedAt);
-            if (accountCleanupStorage != null) {
-                accountCleanupStorage.softDeleteAccount(deletedUser, deletedAt);
-            } else {
-                userStorage.save(deletedUser);
-            }
-            applyDeletionState(user, deletedAt);
-            if (logger.isInfoEnabled()) {
-                logger.info("Account soft-deleted for user {} (reasonCode={})", user.getId(), command.reason());
-            }
-            publishEvent(
-                    new AppEvent.AccountDeleted(user.getId(), command.reason(), deletedAt),
-                    "Post-account-delete event publication failed for user " + user.getId());
-            return UseCaseResult.success(null);
-        } catch (Exception e) {
-            return UseCaseResult.failure(UseCaseError.internal("Failed to delete account: " + e.getMessage()));
-        }
+        return profileMutationUseCases.deleteAccount(command);
     }
 
     public UseCaseResult<List<ProfileNote>> listProfileNotes(ProfileNotesQuery query) {
-        if (query == null || query.context() == null) {
-            return UseCaseResult.failure(UseCaseError.validation(CONTEXT_REQUIRED));
-        }
-        if (userStorage == null) {
-            return UseCaseResult.failure(UseCaseError.dependency(USER_STORAGE_REQUIRED));
-        }
-        if (userStorage.get(query.context().userId()).isEmpty()) {
-            return UseCaseResult.failure(UseCaseError.notFound(AUTHOR_NOT_FOUND));
-        }
-        try {
-            return UseCaseResult.success(
-                    userStorage.getProfileNotesByAuthor(query.context().userId()));
-        } catch (Exception e) {
-            return UseCaseResult.failure(UseCaseError.internal("Failed to load profile notes: " + e.getMessage()));
-        }
+        return profileNotesUseCases.listProfileNotes(
+                query == null ? null : new ProfileNotesUseCases.ProfileNotesQuery(query.context()));
     }
 
     public UseCaseResult<ProfileNote> getProfileNote(ProfileNoteQuery query) {
-        if (query == null || query.context() == null || query.subjectId() == null) {
-            return UseCaseResult.failure(UseCaseError.validation(CONTEXT_AND_SUBJECT_REQUIRED));
-        }
-        if (userStorage == null) {
-            return UseCaseResult.failure(UseCaseError.dependency(USER_STORAGE_REQUIRED));
-        }
-        if (userStorage.get(query.context().userId()).isEmpty()) {
-            return UseCaseResult.failure(UseCaseError.notFound(AUTHOR_NOT_FOUND));
-        }
-        try {
-            return userStorage
-                    .getProfileNote(query.context().userId(), query.subjectId())
-                    .map(UseCaseResult::success)
-                    .orElseGet(() -> UseCaseResult.failure(UseCaseError.notFound("Profile note not found")));
-        } catch (Exception e) {
-            return UseCaseResult.failure(UseCaseError.internal("Failed to load profile note: " + e.getMessage()));
-        }
+        return profileNotesUseCases.getProfileNote(
+                query == null ? null : new ProfileNotesUseCases.ProfileNoteQuery(query.context(), query.subjectId()));
     }
 
     public UseCaseResult<ProfileNote> upsertProfileNote(UpsertProfileNoteCommand command) {
-        if (command == null || command.context() == null || command.subjectId() == null) {
-            return UseCaseResult.failure(UseCaseError.validation(CONTEXT_AND_SUBJECT_REQUIRED));
-        }
-        if (userStorage == null) {
-            return UseCaseResult.failure(UseCaseError.dependency(USER_STORAGE_REQUIRED));
-        }
-        if (userStorage.get(command.context().userId()).isEmpty()) {
-            return UseCaseResult.failure(UseCaseError.notFound(AUTHOR_NOT_FOUND));
-        }
-        if (userStorage.get(command.subjectId()).isEmpty()) {
-            return UseCaseResult.failure(UseCaseError.notFound("Subject user not found"));
-        }
-
-        try {
-            String sanitizedContent = SanitizerUtils.sanitize(command.content());
-            if (validationService != null) {
-                var validationResult = validationService.validateProfileNoteContent(sanitizedContent);
-                if (!validationResult.valid()) {
-                    return UseCaseResult.failure(
-                            UseCaseError.validation(validationResult.errors().getFirst()));
-                }
-            } else {
-                int maxProfileNoteLength = config.validation().maxProfileNoteLength();
-                if (sanitizedContent != null && sanitizedContent.length() > maxProfileNoteLength) {
-                    return UseCaseResult.failure(
-                            UseCaseError.validation(PROFILE_NOTE_TOO_LONG.formatted(maxProfileNoteLength)));
-                }
-            }
-            ProfileNote note = userStorage
-                    .getProfileNote(command.context().userId(), command.subjectId())
-                    .map(existing -> existing.withContent(sanitizedContent))
-                    .orElseGet(() ->
-                            ProfileNote.create(command.context().userId(), command.subjectId(), sanitizedContent));
-            userStorage.saveProfileNote(note);
-            int safeContentLength = sanitizedContent == null ? 0 : sanitizedContent.length();
-            publishEvent(
-                    new AppEvent.ProfileNoteSaved(
-                            command.context().userId(), command.subjectId(), safeContentLength, AppClock.now()),
-                    "Post-profile-note-save event publication failed for author "
-                            + command.context().userId());
-            return UseCaseResult.success(note);
-        } catch (IllegalArgumentException | NullPointerException e) {
-            return UseCaseResult.failure(UseCaseError.validation(e.getMessage()));
-        } catch (Exception e) {
-            return UseCaseResult.failure(UseCaseError.internal("Failed to save profile note: " + e.getMessage()));
-        }
+        return profileNotesUseCases.upsertProfileNote(
+                command == null
+                        ? null
+                        : new ProfileNotesUseCases.UpsertProfileNoteCommand(
+                                command.context(), command.subjectId(), command.content()));
     }
 
     public UseCaseResult<Void> deleteProfileNote(DeleteProfileNoteCommand command) {
-        if (command == null || command.context() == null || command.subjectId() == null) {
-            return UseCaseResult.failure(UseCaseError.validation(CONTEXT_AND_SUBJECT_REQUIRED));
-        }
-        if (userStorage == null) {
-            return UseCaseResult.failure(UseCaseError.dependency(USER_STORAGE_REQUIRED));
-        }
-        if (userStorage.get(command.context().userId()).isEmpty()) {
-            return UseCaseResult.failure(UseCaseError.notFound(AUTHOR_NOT_FOUND));
-        }
-        try {
-            boolean deleted = userStorage.deleteProfileNote(command.context().userId(), command.subjectId());
-            if (!deleted) {
-                return UseCaseResult.failure(UseCaseError.notFound("Profile note not found"));
-            }
-            publishEvent(
-                    new AppEvent.ProfileNoteDeleted(command.context().userId(), command.subjectId(), AppClock.now()),
-                    "Post-profile-note-delete event publication failed for author "
-                            + command.context().userId());
-            return UseCaseResult.success(null);
-        } catch (Exception e) {
-            return UseCaseResult.failure(UseCaseError.internal("Failed to delete profile note: " + e.getMessage()));
-        }
+        return profileNotesUseCases.deleteProfileNote(
+                command == null
+                        ? null
+                        : new ProfileNotesUseCases.DeleteProfileNoteCommand(command.context(), command.subjectId()));
+    }
+
+    public ProfileNotesUseCases getProfileNotesUseCases() {
+        return profileNotesUseCases;
+    }
+
+    public ProfileMutationUseCases getProfileMutationUseCases() {
+        return profileMutationUseCases;
+    }
+
+    public ProfileInsightsUseCases getProfileInsightsUseCases() {
+        return profileInsightsUseCases;
     }
 
     public ValidationService validationService() {
@@ -606,7 +404,8 @@ public class ProfileUseCases {
 
     public static record SessionSummaryResult(java.util.Optional<CurrentSessionSnapshot> currentSession) {}
 
-    public static record DeleteAccountCommand(UserContext context, AppEvent.DeletionReason reason) {}
+    public static record DeleteAccountCommand(
+            UserContext context, datingapp.app.event.AppEvent.DeletionReason reason) {}
 
     public static record ProfileNotesQuery(UserContext context) {}
 
@@ -616,139 +415,16 @@ public class ProfileUseCases {
 
     public static record DeleteProfileNoteCommand(UserContext context, UUID subjectId) {}
 
-    private static void sanitizeProfileText(User user) {
-        user.setName(SanitizerUtils.sanitize(user.getName()));
-        user.setBio(SanitizerUtils.sanitize(user.getBio()));
+    private static ProfileInsightsUseCases.AchievementsQuery toInsightsQuery(AchievementsQuery query) {
+        return new ProfileInsightsUseCases.AchievementsQuery(
+                query == null ? null : query.context(), query != null && query.checkForNew());
     }
 
-    private static void applyDeletionState(User user, Instant deletedAt) {
-        user.markDeleted(deletedAt);
-        if (user.getState() == User.UserState.ACTIVE) {
-            user.pause();
-        }
+    private static ProfileInsightsUseCases.StatsQuery toInsightsQuery(StatsQuery query) {
+        return new ProfileInsightsUseCases.StatsQuery(query == null ? null : query.context());
     }
 
-    private void publishEvent(AppEvent event, String failureMessage) {
-        try {
-            eventBus.publish(event);
-        } catch (Exception e) {
-            if (logger.isWarnEnabled()) {
-                logger.warn("{}: {}", failureMessage, e.getMessage(), e);
-            }
-        }
-    }
-
-    private List<UserAchievement> unlockAchievements(UUID userId) {
-        if (achievementService != null) {
-            return achievementService.checkAndUnlock(userId);
-        }
-        return List.of();
-    }
-
-    private List<UserAchievement> getUnlockedAchievements(UUID userId) {
-        if (achievementService != null) {
-            return achievementService.getUnlocked(userId);
-        }
-        return List.of();
-    }
-
-    private static CurrentSessionSnapshot toCurrentSessionSnapshot(datingapp.core.metrics.SwipeState.Session session) {
-        return new CurrentSessionSnapshot(
-                session.getSwipeCount(),
-                session.getLikeCount(),
-                session.getPassCount(),
-                session.getFormattedDuration());
-    }
-
-    private void applyProfileTextAndIdentityFields(User user, UpdateProfileCommand command) {
-        if (command.bio() != null) {
-            assertValid(validationService.validateBio(command.bio()));
-            user.setBio(SanitizerUtils.sanitize(command.bio()));
-        }
-        if (command.birthDate() != null) {
-            assertValid(validationService.validateBirthDate(command.birthDate()));
-            user.setBirthDate(command.birthDate());
-        }
-        if (command.gender() != null) {
-            user.setGender(command.gender());
-        }
-        if (command.interestedIn() != null) {
-            user.setInterestedIn(command.interestedIn());
-        }
-    }
-
-    private void applyProfileLocationFields(User user, UpdateProfileCommand command) {
-        if (command.latitude() == null && command.longitude() == null) {
-            return;
-        }
-        if (command.latitude() == null || command.longitude() == null) {
-            throw new IllegalArgumentException("Both latitude and longitude are required");
-        }
-        assertValid(validationService.validateLocation(command.latitude(), command.longitude()));
-        user.setLocation(command.latitude(), command.longitude());
-
-        if (command.maxDistanceKm() != null) {
-            assertValid(validationService.validateDistance(command.maxDistanceKm()));
-            user.setMaxDistanceKm(command.maxDistanceKm(), config.matching().maxDistanceKm());
-        }
-    }
-
-    private void applyProfilePreferenceFields(User user, UpdateProfileCommand command) {
-        if (command.maxDistanceKm() != null && command.latitude() == null && command.longitude() == null) {
-            assertValid(validationService.validateDistance(command.maxDistanceKm()));
-            user.setMaxDistanceKm(command.maxDistanceKm(), config.matching().maxDistanceKm());
-        }
-
-        if (command.minAge() == null && command.maxAge() == null) {
-            return;
-        }
-
-        int minAge = command.minAge() != null ? command.minAge() : user.getMinAge();
-        int maxAge = command.maxAge() != null ? command.maxAge() : user.getMaxAge();
-        if (minAge > maxAge) {
-            int swap = minAge;
-            minAge = maxAge;
-            maxAge = swap;
-        }
-        assertValid(validationService.validateAgeRange(minAge, maxAge));
-        user.setAgeRange(
-                minAge,
-                maxAge,
-                config.validation().minAge(),
-                config.validation().maxAge());
-    }
-
-    private void applyProfileLifestyleFields(User user, UpdateProfileCommand command) {
-        if (command.heightCm() != null) {
-            assertValid(validationService.validateHeight(command.heightCm()));
-            user.setHeightCm(command.heightCm());
-        }
-        if (command.smoking() != null) {
-            user.setSmoking(command.smoking());
-        }
-        if (command.drinking() != null) {
-            user.setDrinking(command.drinking());
-        }
-        if (command.wantsKids() != null) {
-            user.setWantsKids(command.wantsKids());
-        }
-        if (command.lookingFor() != null) {
-            user.setLookingFor(command.lookingFor());
-        }
-        if (command.education() != null) {
-            user.setEducation(command.education());
-        }
-        if (command.interests() != null) {
-            user.setInterests(command.interests());
-        }
-        if (command.dealbreakers() != null) {
-            user.setDealbreakers(command.dealbreakers());
-        }
-    }
-
-    private static void assertValid(ValidationService.ValidationResult validationResult) {
-        if (!validationResult.valid()) {
-            throw new IllegalArgumentException(validationResult.errors().getFirst());
-        }
+    private static ProfileInsightsUseCases.SessionSummaryQuery toInsightsQuery(SessionSummaryQuery query) {
+        return new ProfileInsightsUseCases.SessionSummaryQuery(query == null ? null : query.context());
     }
 }

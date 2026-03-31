@@ -371,6 +371,58 @@ class RestApiPhaseTwoRoutesTest {
     }
 
     @Test
+    @DisplayName("mutating user routes reject mismatched acting user even with valid payloads")
+    void mutatingUserRoutesRejectMismatchedActingUserEvenWithValidPayloads() throws Exception {
+        TestStorages.Users userStorage = new TestStorages.Users();
+        TestStorages.Communications communicationStorage = new TestStorages.Communications();
+        TestStorages.Interactions interactionStorage = new TestStorages.Interactions(communicationStorage);
+        SeededStandoutStorage standoutStorage = new SeededStandoutStorage();
+        ServiceRegistry services =
+                createServices(userStorage, interactionStorage, communicationStorage, standoutStorage);
+
+        UUID aliceId = UUID.randomUUID();
+        UUID bobId = UUID.randomUUID();
+        User alice = activeUser(aliceId, "Alice");
+        User bob = activeUser(bobId, "Bob");
+        userStorage.save(alice);
+        userStorage.save(bob);
+
+        server = new RestApiServer(services, 0);
+        server.start();
+        int port = server.getApp().port();
+        HttpClient client = HttpClient.newHttpClient();
+
+        HttpResponse<String> updateProfileResponse = client.send(
+                HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/users/" + aliceId + "/profile"))
+                        .header("X-User-Id", bobId.toString())
+                        .header("Content-Type", "application/json")
+                        .PUT(HttpRequest.BodyPublishers.ofString("""
+                                {
+                                  "bio":"Updated bio",
+                                  "maxDistanceKm":60,
+                                  "minAge":21,
+                                  "maxAge":32,
+                                  "heightCm":170,
+                                  "smoking":"NEVER",
+                                  "drinking":"SOCIALLY",
+                                  "wantsKids":"OPEN",
+                                  "lookingFor":"LONG_TERM",
+                                  "education":"BACHELORS",
+                                  "interests":["MUSIC","TRAVEL"]
+                                }
+                                """))
+                        .build(),
+                HttpResponse.BodyHandlers.ofString());
+
+        assertEquals(403, updateProfileResponse.statusCode(), updateProfileResponse.body());
+        JsonNode errorJson = MAPPER.readTree(updateProfileResponse.body());
+        assertEquals("FORBIDDEN", errorJson.get("code").asText());
+        assertEquals(
+                "Acting user does not match requested user route",
+                errorJson.get("message").asText());
+    }
+
+    @Test
     @DisplayName("mutating conversation routes require X-User-Id and do not accept query fallback")
     void mutatingConversationRoutesRequireHeaderAndDoNotAcceptQueryFallback() throws Exception {
         TestStorages.Users userStorage = new TestStorages.Users();

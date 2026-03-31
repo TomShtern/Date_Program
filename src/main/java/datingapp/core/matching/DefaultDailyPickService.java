@@ -5,8 +5,6 @@ import datingapp.core.AppConfig;
 import datingapp.core.matching.CandidateFinder.GeoUtils;
 import datingapp.core.model.User;
 import datingapp.core.storage.AnalyticsStorage;
-import datingapp.core.storage.InteractionStorage;
-import datingapp.core.storage.UserStorage;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -28,23 +26,12 @@ public final class DefaultDailyPickService implements DailyPickService {
     private final Clock clock;
 
     public DefaultDailyPickService(
-            UserStorage userStorage,
-            InteractionStorage interactionStorage,
-            AnalyticsStorage analyticsStorage,
-            CandidateFinder candidateFinder,
-            AppConfig config) {
-        this(userStorage, interactionStorage, analyticsStorage, candidateFinder, config, AppClock.clock());
+            AnalyticsStorage analyticsStorage, CandidateFinder candidateFinder, AppConfig config) {
+        this(analyticsStorage, candidateFinder, config, AppClock.clock());
     }
 
     public DefaultDailyPickService(
-            UserStorage userStorage,
-            InteractionStorage interactionStorage,
-            AnalyticsStorage analyticsStorage,
-            CandidateFinder candidateFinder,
-            AppConfig config,
-            Clock clock) {
-        Objects.requireNonNull(userStorage, "userStorage cannot be null");
-        Objects.requireNonNull(interactionStorage, "interactionStorage cannot be null");
+            AnalyticsStorage analyticsStorage, CandidateFinder candidateFinder, AppConfig config, Clock clock) {
         this.analyticsStorage = Objects.requireNonNull(analyticsStorage, "analyticsStorage cannot be null");
         this.candidateFinder = Objects.requireNonNull(candidateFinder, "candidateFinder cannot be null");
         this.config = Objects.requireNonNull(config, "config cannot be null");

@@ -3,6 +3,9 @@ package datingapp.core;
 import datingapp.app.event.AppEventBus;
 import datingapp.app.usecase.matching.MatchingUseCases;
 import datingapp.app.usecase.messaging.MessagingUseCases;
+import datingapp.app.usecase.profile.ProfileInsightsUseCases;
+import datingapp.app.usecase.profile.ProfileMutationUseCases;
+import datingapp.app.usecase.profile.ProfileNotesUseCases;
 import datingapp.app.usecase.profile.ProfileUseCases;
 import datingapp.app.usecase.profile.VerificationUseCases;
 import datingapp.app.usecase.social.SocialUseCases;
@@ -60,6 +63,9 @@ public final class ServiceRegistry {
     private final ValidationService validationService;
     private final LocationService locationService;
     private final AchievementService achievementService;
+    private final ProfileMutationUseCases profileMutationUseCases;
+    private final ProfileInsightsUseCases profileInsightsUseCases;
+    private final ProfileNotesUseCases profileNotesUseCases;
 
     private final ConnectionService connectionService;
     private final AppEventBus eventBus;
@@ -106,12 +112,31 @@ public final class ServiceRegistry {
                 Objects.requireNonNull(builder.compatibilityCalculator, "compatibilityCalculator cannot be null");
         this.connectionService = Objects.requireNonNull(builder.connectionService, "connectionService cannot be null");
         this.validationService = Objects.requireNonNull(builder.validationService, "validationService cannot be null");
-        this.locationService = new LocationService(this.validationService);
+        this.locationService = builder.locationService != null
+                ? Objects.requireNonNull(builder.locationService, "locationService cannot be null")
+                : new LocationService(this.validationService);
         this.achievementService =
                 Objects.requireNonNull(builder.achievementService, "achievementService cannot be null");
         this.eventBus = Objects.requireNonNull(builder.eventBus, "eventBus cannot be null");
         this.activationPolicy = Objects.requireNonNull(builder.activationPolicy, "activationPolicy cannot be null");
         this.workflowPolicy = Objects.requireNonNull(builder.workflowPolicy, "workflowPolicy cannot be null");
+        this.profileMutationUseCases = builder.profileMutationUseCases != null
+                ? Objects.requireNonNull(builder.profileMutationUseCases, "profileMutationUseCases cannot be null")
+                : new ProfileMutationUseCases(
+                        this.userStorage,
+                        this.profileService,
+                        this.validationService,
+                        this.achievementService,
+                        this.config,
+                        this.activationPolicy,
+                        this.eventBus,
+                        this.accountCleanupStorage);
+        this.profileInsightsUseCases = builder.profileInsightsUseCases != null
+                ? Objects.requireNonNull(builder.profileInsightsUseCases, "profileInsightsUseCases cannot be null")
+                : new ProfileInsightsUseCases(this.achievementService, this.activityMetricsService);
+        this.profileNotesUseCases = builder.profileNotesUseCases != null
+                ? Objects.requireNonNull(builder.profileNotesUseCases, "profileNotesUseCases cannot be null")
+                : new ProfileNotesUseCases(this.userStorage, this.validationService, this.config, this.eventBus);
 
         this.messagingUseCases = new MessagingUseCases(this.connectionService, this.validationService, this.eventBus);
         this.matchingUseCases = MatchingUseCases.builder()
@@ -130,7 +155,10 @@ public final class ServiceRegistry {
                 .validationService(this.validationService)
                 .activityMetricsService(this.activityMetricsService)
                 .achievementService(this.achievementService)
+                .profileMutationUseCases(this.profileMutationUseCases)
+                .profileInsightsUseCases(this.profileInsightsUseCases)
                 .accountCleanupStorage(this.accountCleanupStorage)
+                .profileNotesUseCases(this.profileNotesUseCases)
                 .config(this.config)
                 .activationPolicy(this.activationPolicy)
                 .eventBus(this.eventBus)
@@ -161,7 +189,11 @@ public final class ServiceRegistry {
         private TrustSafetyService trustSafetyService;
         private ProfileService profileService;
         private ValidationService validationService;
+        private LocationService locationService;
         private AchievementService achievementService;
+        private ProfileMutationUseCases profileMutationUseCases;
+        private ProfileInsightsUseCases profileInsightsUseCases;
+        private ProfileNotesUseCases profileNotesUseCases;
         private ConnectionService connectionService;
         private AppEventBus eventBus;
         private ProfileActivationPolicy activationPolicy = new ProfileActivationPolicy();
@@ -269,8 +301,28 @@ public final class ServiceRegistry {
             return this;
         }
 
+        public Builder locationService(LocationService locationService) {
+            this.locationService = locationService;
+            return this;
+        }
+
         public Builder achievementService(AchievementService achievementService) {
             this.achievementService = achievementService;
+            return this;
+        }
+
+        public Builder profileMutationUseCases(ProfileMutationUseCases profileMutationUseCases) {
+            this.profileMutationUseCases = profileMutationUseCases;
+            return this;
+        }
+
+        public Builder profileInsightsUseCases(ProfileInsightsUseCases profileInsightsUseCases) {
+            this.profileInsightsUseCases = profileInsightsUseCases;
+            return this;
+        }
+
+        public Builder profileNotesUseCases(ProfileNotesUseCases profileNotesUseCases) {
+            this.profileNotesUseCases = profileNotesUseCases;
             return this;
         }
 
@@ -385,6 +437,18 @@ public final class ServiceRegistry {
 
     public AchievementService getAchievementService() {
         return achievementService;
+    }
+
+    public ProfileMutationUseCases getProfileMutationUseCases() {
+        return profileMutationUseCases;
+    }
+
+    public ProfileNotesUseCases getProfileNotesUseCases() {
+        return profileNotesUseCases;
+    }
+
+    public ProfileInsightsUseCases getProfileInsightsUseCases() {
+        return profileInsightsUseCases;
     }
 
     public MessagingUseCases getMessagingUseCases() {

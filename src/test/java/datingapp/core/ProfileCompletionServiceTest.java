@@ -40,12 +40,7 @@ class ProfileCompletionServiceTest {
     @BeforeEach
     void setUp() {
         TestClock.setFixed(FIXED_INSTANT);
-        service = new ProfileService(
-                AppConfig.defaults(),
-                new TestStorages.Analytics(),
-                new TestStorages.Interactions(),
-                new TestStorages.TrustSafety(),
-                new TestStorages.Users());
+        service = new ProfileService(new TestStorages.Users());
         user = new User(UUID.randomUUID(), "TestUser");
     }
 

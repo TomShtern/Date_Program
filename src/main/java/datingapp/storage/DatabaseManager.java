@@ -36,7 +36,10 @@ public final class DatabaseManager {
     }
 
     public static synchronized void resetInstance() {
-        instance = null;
+        if (instance != null) {
+            instance.shutdown();
+            instance = null;
+        }
     }
 
     private DatabaseManager() {
@@ -106,6 +109,7 @@ public final class DatabaseManager {
         if (existingDataSource != null) {
             existingDataSource.close();
         }
+        initialized = false;
     }
 
     // ═══════════════════════════════════════════════════════════════

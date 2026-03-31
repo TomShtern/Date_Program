@@ -65,15 +65,12 @@ public class DashboardViewModel extends BaseViewModel {
     private final StringProperty profileCompletion = new SimpleStringProperty("0% Starter");
     private final IntegerProperty notificationCount = new SimpleIntegerProperty(0);
     private final IntegerProperty unreadMessages = new SimpleIntegerProperty(0);
-    private final IntegerProperty friendRequestsCount = new SimpleIntegerProperty(0);
     private final ObservableList<String> recentAchievements = FXCollections.observableArrayList();
     private final BooleanProperty newAchievementsAvailable = new SimpleBooleanProperty(false);
     private final StringProperty profileNudgeMessage = new SimpleStringProperty("");
 
     private Set<String> latestAchievementIds = Set.of();
     private List<Achievement> newlyUnlockedAchievements = List.of();
-
-    private ViewModelErrorSink errorHandler;
 
     public record Dependencies(
             RecommendationService dailyService,
@@ -131,7 +128,7 @@ public class DashboardViewModel extends BaseViewModel {
     }
 
     public void setErrorHandler(ViewModelErrorSink handler) {
-        this.errorHandler = handler;
+        setErrorSink(handler);
     }
 
     public void logout() {
@@ -154,9 +151,7 @@ public class DashboardViewModel extends BaseViewModel {
                 asyncScope.dispatchToUi(() -> dailyPickSeen.set(true));
             } catch (Exception e) {
                 logError("Failed to mark daily pick viewed", e);
-                if (errorHandler != null) {
-                    asyncScope.dispatchToUi(() -> errorHandler.onError("Failed to update daily pick status"));
-                }
+                notifyError("Failed to update daily pick status", e);
             }
         });
     }
@@ -301,7 +296,6 @@ public class DashboardViewModel extends BaseViewModel {
         totalMatches.set(data.matchCount());
         profileCompletion.set(data.completionText());
         unreadMessages.set(data.unreadCount());
-        friendRequestsCount.set(data.pendingRequests());
         notificationCount.set(data.unreadCount() + data.pendingRequests() + data.unreadNotifications());
         profileNudgeMessage.set(data.profileNudgeMessage());
 
@@ -322,9 +316,10 @@ public class DashboardViewModel extends BaseViewModel {
                 .toList();
         newAchievementsAvailable.set(!newlyUnlockedAchievements.isEmpty());
 
-        if (data.error() != null && errorHandler != null) {
+        if (data.error() != null) {
             String detail = data.error().getMessage();
-            errorHandler.onError(detail == null || detail.isBlank() ? "Some dashboard data failed to load" : detail);
+            notifyError(
+                    detail == null || detail.isBlank() ? "Some dashboard data failed to load" : detail, data.error());
         }
     }
 

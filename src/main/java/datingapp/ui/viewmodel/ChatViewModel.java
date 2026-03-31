@@ -28,6 +28,7 @@ import datingapp.ui.viewmodel.UiDataAdapters.PresenceStatus;
 import datingapp.ui.viewmodel.UiDataAdapters.UiPresenceDataAccess;
 import datingapp.ui.viewmodel.UiDataAdapters.UiProfileNoteDataAccess;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -488,8 +489,8 @@ public class ChatViewModel extends BaseViewModel {
         }
 
         asyncScope.runLatest("chat-open", "open conversation", () -> loadOpenConversation(user, otherUserId), data -> {
-            if (data.loaded()) {
-                updateConversations(data.previews(), computeUnreadCount(data.previews()));
+            if (data.loaded() && data.preview() != null) {
+                upsertConversationPreview(data.preview());
             }
             if (onReady != null) {
                 onReady.accept(data.preview());
@@ -498,17 +499,12 @@ public class ChatViewModel extends BaseViewModel {
     }
 
     private OpenConversationData loadOpenConversation(User user, UUID otherUserId) {
-        List<ConversationPreview> previews = List.of();
         ConversationPreview preview = null;
         boolean loaded = false;
         try {
             var result = messagingUseCases.openConversation(
-                    new OpenConversationCommand(UserContext.ui(user.getId()), otherUserId, 50, 0));
+                    new OpenConversationCommand(UserContext.ui(user.getId()), otherUserId));
             if (result.success()) {
-                previews = messagingUseCases
-                        .listConversations(new ListConversationsQuery(UserContext.ui(user.getId()), 50, 0))
-                        .data()
-                        .conversations();
                 preview = result.data().preview();
                 loaded = true;
             }
@@ -516,7 +512,34 @@ public class ChatViewModel extends BaseViewModel {
             logError("Failed to open conversation", e);
             asyncScope.onError("open conversation", e);
         }
-        return new OpenConversationData(loaded, preview, previews);
+        return new OpenConversationData(loaded, preview);
+    }
+
+    private void upsertConversationPreview(ConversationPreview preview) {
+        if (asyncScope.isDisposed() || preview == null) {
+            return;
+        }
+
+        List<ConversationPreview> updatedPreviews = new ArrayList<>(conversations);
+        int existingIndex = -1;
+        for (int index = 0; index < updatedPreviews.size(); index++) {
+            if (updatedPreviews
+                    .get(index)
+                    .conversation()
+                    .getId()
+                    .equals(preview.conversation().getId())) {
+                existingIndex = index;
+                break;
+            }
+        }
+
+        if (existingIndex >= 0) {
+            updatedPreviews.set(existingIndex, preview);
+        } else {
+            updatedPreviews.addFirst(preview);
+        }
+
+        updateConversations(updatedPreviews, computeUnreadCount(updatedPreviews));
     }
 
     /**
@@ -992,8 +1015,7 @@ public class ChatViewModel extends BaseViewModel {
 
     private record ConversationRefreshData(@Nullable List<ConversationPreview> previews, int unreadCount) {}
 
-    private record OpenConversationData(
-            boolean loaded, ConversationPreview preview, List<ConversationPreview> previews) {}
+    private record OpenConversationData(boolean loaded, ConversationPreview preview) {}
 
     private record MessageLoadData(
             String conversationId, List<Message> messages, Integer unreadCount, List<ConversationPreview> previews) {}

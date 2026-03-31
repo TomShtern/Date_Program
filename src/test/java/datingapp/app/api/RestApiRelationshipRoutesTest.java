@@ -249,6 +249,8 @@ class RestApiRelationshipRoutesTest {
         userStorage.save(activeUser(userA, "Alice"));
         userStorage.save(activeUser(userB, "Bob"));
         interactionStorage.save(Match.create(userA, userB));
+        interactionStorage.save(ConnectionModels.Like.create(userA, userB, ConnectionModels.Like.Direction.LIKE));
+        interactionStorage.save(ConnectionModels.Like.create(userB, userA, ConnectionModels.Like.Direction.LIKE));
         communicationStorage.saveConversation(ConnectionModels.Conversation.create(userA, userB));
 
         server = new RestApiServer(services, 0);
@@ -375,6 +377,48 @@ class RestApiRelationshipRoutesTest {
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
         assertEquals(403, forbiddenResponse.statusCode());
+    }
+
+    @Test
+    @DisplayName("non-participants cannot mutate conversation messages")
+    void nonParticipantsCannotMutateConversationMessages() throws Exception {
+        TestStorages.Users userStorage = new TestStorages.Users();
+        TestStorages.Communications communicationStorage = new TestStorages.Communications();
+        TestStorages.Interactions interactionStorage = new TestStorages.Interactions(communicationStorage);
+        ServiceRegistry services = createServices(userStorage, interactionStorage, communicationStorage);
+
+        UUID userA = UUID.randomUUID();
+        UUID userB = UUID.randomUUID();
+        UUID outsiderId = UUID.randomUUID();
+        userStorage.save(activeUser(userA, "Alice"));
+        userStorage.save(activeUser(userB, "Bob"));
+        userStorage.save(activeUser(outsiderId, "Mallory"));
+        interactionStorage.save(Match.create(userA, userB));
+
+        ConnectionModels.Conversation conversation = ConnectionModels.Conversation.create(userA, userB);
+        communicationStorage.saveConversation(conversation);
+
+        server = new RestApiServer(services, 0);
+        server.start();
+        int port = server.getApp().port();
+        HttpClient client = HttpClient.newHttpClient();
+
+        HttpResponse<String> sendMessageResponse = client.send(
+                HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/conversations/"
+                                + conversation.getId() + "/messages"))
+                        .header("X-User-Id", outsiderId.toString())
+                        .header("Content-Type", "application/json")
+                        .POST(HttpRequest.BodyPublishers.ofString(
+                                "{\"senderId\":\"" + outsiderId + "\",\"content\":\"hello\"}"))
+                        .build(),
+                HttpResponse.BodyHandlers.ofString());
+
+        assertEquals(403, sendMessageResponse.statusCode(), sendMessageResponse.body());
+        JsonNode errorJson = MAPPER.readTree(sendMessageResponse.body());
+        assertEquals("FORBIDDEN", errorJson.get("code").asText());
+        assertEquals(
+                "User is not part of this conversation",
+                errorJson.get("message").asText());
     }
 
     private static void connectionStorageSeedFriendRequest(

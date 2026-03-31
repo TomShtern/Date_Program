@@ -94,6 +94,16 @@ Use PowerShell-friendly commands. When Maven test selection uses a comma-separat
 
 `mvn --% ...`
 
+## Patch and direct-edit policy
+
+- Prefer direct, exact-match edit tools for tiny localized changes such as a single import, one method call, or one small block replacement.
+- Reserve `apply_patch` for multi-line structural edits, multi-hunk changes, coordinated multi-file changes, or explicit file add/delete/rename work.
+- Keep patches as small and local as possible; avoid broad whole-file rewrites when a narrower edit will do.
+- If a patch fails, re-read the file and retry once with narrower context; if it still fails, switch to a more precise edit strategy instead of looping.
+- Avoid delete-plus-add of the same path in one patch unless there is no safer alternative.
+- Treat the tool result payload as the source of truth for patch/edit success; do not rely on top-level tool status alone.
+- After any meaningful patch or direct edit, re-read the touched region and run the appropriate error/test validation for the scope of the change.
+
 ## Always-on repo rules
 
 - Keep `core/` framework-agnostic. No UI, database, REST, or Jackson annotations in domain/core types.

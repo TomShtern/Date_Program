@@ -106,12 +106,7 @@ public final class RecommendationService {
             DailyLimitService dailyLimitService =
                     new DefaultDailyLimitService(interactionStorage, resolvedConfig, resolvedClock);
             DailyPickService dailyPickService = new DefaultDailyPickService(
-                    userStorage,
-                    interactionStorage,
-                    analyticsStorage,
-                    resolvedCandidateFinder,
-                    resolvedConfig,
-                    resolvedClock);
+                    analyticsStorage, resolvedCandidateFinder, resolvedConfig, resolvedClock);
             StandoutService standoutService = new DefaultStandoutService(
                     calculator,
                     userStorage,

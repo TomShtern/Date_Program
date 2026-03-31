@@ -249,7 +249,7 @@ class JdbiUserStorageNormalizationTest {
 
         Map<UUID, User> loaded = storage.findByIds(Set.of(first.getId(), second.getId()));
 
-        assertEquals(9, connectionFactory.statementCount());
+        assertEquals(2, connectionFactory.statementCount());
         assertEquals(2, loaded.size());
 
         User loadedFirst = loaded.get(first.getId());
@@ -268,6 +268,41 @@ class JdbiUserStorageNormalizationTest {
         assertEquals(second.getInterestedIn(), loadedSecond.getInterestedIn());
         assertEquals(4, loadedSecond.getDealbreakers().maxAgeDifference());
         assertTrue(loadedSecond.getDealbreakers().acceptableKidsStance().contains(Lifestyle.WantsKids.OPEN));
+    }
+
+    @Test
+    @DisplayName("findCandidates hydrates normalized profile data for matching results")
+    void findCandidatesHydratesNormalizedProfileDataForMatchingResults() {
+        UUID seekerId = UUID.randomUUID();
+        User seeker = createActiveUser(seekerId, "Seeker", Gender.MALE, Set.of(Gender.FEMALE), true);
+
+        User candidate = createActiveUser(UUID.randomUUID(), "Candidate", Gender.FEMALE, Set.of(Gender.MALE), true);
+        candidate.setPhotoUrls(List.of("https://example.com/candidate-a.jpg", "https://example.com/candidate-b.jpg"));
+        candidate.setInterests(Set.of(Interest.MUSIC, Interest.TRAVEL));
+        candidate.setDealbreakers(Dealbreakers.builder()
+                .acceptSmoking(Lifestyle.Smoking.NEVER)
+                .acceptDrinking(Lifestyle.Drinking.SOCIALLY)
+                .requireEducation(Lifestyle.Education.BACHELORS)
+                .build());
+
+        User wrongGender = createActiveUser(UUID.randomUUID(), "WrongGender", Gender.MALE, Set.of(Gender.FEMALE), true);
+        wrongGender.setPhotoUrls(List.of("https://example.com/wrong-gender.jpg"));
+
+        storage.save(seeker);
+        storage.save(candidate);
+        storage.save(wrongGender);
+
+        List<User> candidates = storage.findCandidates(seekerId, Set.of(Gender.FEMALE), 18, 99, 32.0853, 34.7818, 10);
+
+        assertEquals(1, candidates.size());
+        User loadedCandidate = candidates.getFirst();
+        assertEquals(candidate.getId(), loadedCandidate.getId());
+        assertEquals(candidate.getPhotoUrls(), loadedCandidate.getPhotoUrls());
+        assertEquals(candidate.getInterests(), loadedCandidate.getInterests());
+        assertEquals(candidate.getInterestedIn(), loadedCandidate.getInterestedIn());
+        assertTrue(loadedCandidate.getDealbreakers().acceptableSmoking().contains(Lifestyle.Smoking.NEVER));
+        assertTrue(loadedCandidate.getDealbreakers().acceptableDrinking().contains(Lifestyle.Drinking.SOCIALLY));
+        assertTrue(loadedCandidate.getDealbreakers().acceptableEducation().contains(Lifestyle.Education.BACHELORS));
     }
 
     @Test

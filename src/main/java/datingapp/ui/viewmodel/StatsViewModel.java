@@ -1,9 +1,10 @@
 package datingapp.ui.viewmodel;
 
 import datingapp.app.usecase.common.UserContext;
+import datingapp.app.usecase.profile.ProfileInsightsUseCases;
+import datingapp.app.usecase.profile.ProfileInsightsUseCases.AchievementsQuery;
+import datingapp.app.usecase.profile.ProfileInsightsUseCases.StatsQuery;
 import datingapp.app.usecase.profile.ProfileUseCases;
-import datingapp.app.usecase.profile.ProfileUseCases.AchievementsQuery;
-import datingapp.app.usecase.profile.ProfileUseCases.StatsQuery;
 import datingapp.core.AppClock;
 import datingapp.core.AppSession;
 import datingapp.core.connection.ConnectionService;
@@ -41,6 +42,7 @@ public class StatsViewModel extends BaseViewModel {
     private final AchievementService achievementService;
     private final ActivityMetricsService statsService;
     private final ConnectionService connectionService;
+    private final ProfileInsightsUseCases profileInsightsUseCases;
     private final ProfileUseCases profileUseCases;
     private final AppSession session;
     private final Clock clock;
@@ -73,6 +75,24 @@ public class StatsViewModel extends BaseViewModel {
                 achievementService,
                 statsService,
                 connectionService,
+                (ProfileInsightsUseCases) null,
+                null,
+                session,
+                AppClock.clock(),
+                new JavaFxUiThreadDispatcher());
+    }
+
+    public StatsViewModel(
+            AchievementService achievementService,
+            ActivityMetricsService statsService,
+            ConnectionService connectionService,
+            ProfileInsightsUseCases profileInsightsUseCases,
+            AppSession session) {
+        this(
+                achievementService,
+                statsService,
+                connectionService,
+                profileInsightsUseCases,
                 null,
                 session,
                 AppClock.clock(),
@@ -89,10 +109,49 @@ public class StatsViewModel extends BaseViewModel {
                 achievementService,
                 statsService,
                 connectionService,
+                null,
                 profileUseCases,
                 session,
                 AppClock.clock(),
                 new JavaFxUiThreadDispatcher());
+    }
+
+    public StatsViewModel(
+            AchievementService achievementService,
+            ActivityMetricsService statsService,
+            ConnectionService connectionService,
+            ProfileInsightsUseCases profileInsightsUseCases,
+            ProfileUseCases profileUseCases,
+            AppSession session,
+            Clock clock) {
+        this(
+                achievementService,
+                statsService,
+                connectionService,
+                profileInsightsUseCases,
+                profileUseCases,
+                session,
+                clock,
+                new JavaFxUiThreadDispatcher());
+    }
+
+    public StatsViewModel(
+            AchievementService achievementService,
+            ActivityMetricsService statsService,
+            ConnectionService connectionService,
+            ProfileInsightsUseCases profileInsightsUseCases,
+            AppSession session,
+            Clock clock,
+            UiThreadDispatcher uiDispatcher) {
+        this(
+                achievementService,
+                statsService,
+                connectionService,
+                profileInsightsUseCases,
+                null,
+                session,
+                clock,
+                uiDispatcher);
     }
 
     public StatsViewModel(
@@ -106,10 +165,30 @@ public class StatsViewModel extends BaseViewModel {
                 achievementService,
                 statsService,
                 connectionService,
+                null,
                 profileUseCases,
                 session,
                 clock,
                 new JavaFxUiThreadDispatcher());
+    }
+
+    public StatsViewModel(
+            AchievementService achievementService,
+            ActivityMetricsService statsService,
+            ConnectionService connectionService,
+            ProfileInsightsUseCases profileInsightsUseCases,
+            ProfileUseCases profileUseCases,
+            AppSession session,
+            Clock clock,
+            UiThreadDispatcher uiDispatcher) {
+        super("stats", uiDispatcher);
+        this.achievementService = Objects.requireNonNull(achievementService, "achievementService cannot be null");
+        this.statsService = Objects.requireNonNull(statsService, "statsService cannot be null");
+        this.connectionService = Objects.requireNonNull(connectionService, "connectionService cannot be null");
+        this.profileInsightsUseCases = profileInsightsUseCases;
+        this.profileUseCases = profileUseCases;
+        this.session = Objects.requireNonNull(session, "session cannot be null");
+        this.clock = Objects.requireNonNull(clock, "clock cannot be null");
     }
 
     public StatsViewModel(
@@ -124,6 +203,7 @@ public class StatsViewModel extends BaseViewModel {
         this.achievementService = Objects.requireNonNull(achievementService, "achievementService cannot be null");
         this.statsService = Objects.requireNonNull(statsService, "statsService cannot be null");
         this.connectionService = Objects.requireNonNull(connectionService, "connectionService cannot be null");
+        this.profileInsightsUseCases = null;
         this.profileUseCases = profileUseCases;
         this.session = Objects.requireNonNull(session, "session cannot be null");
         this.clock = Objects.requireNonNull(clock, "clock cannot be null");
@@ -196,8 +276,16 @@ public class StatsViewModel extends BaseViewModel {
 
     private List<Achievement> fetchAchievements(java.util.UUID userId) {
         List<UserAchievement> earned;
-        if (profileUseCases != null) {
-            var result = profileUseCases.getAchievements(new AchievementsQuery(UserContext.ui(userId), false));
+        if (profileInsightsUseCases != null) {
+            var result = profileInsightsUseCases.getAchievements(new AchievementsQuery(UserContext.ui(userId), false));
+            if (!result.success()) {
+                throw new IllegalStateException(
+                        result.error() != null ? result.error().message() : "Failed to load achievements");
+            }
+            earned = result.data().unlocked();
+        } else if (profileUseCases != null) {
+            var result = profileUseCases.getAchievements(
+                    new ProfileUseCases.AchievementsQuery(UserContext.ui(userId), false));
             if (!result.success()) {
                 throw new IllegalStateException(
                         result.error() != null ? result.error().message() : "Failed to load achievements");
@@ -211,8 +299,11 @@ public class StatsViewModel extends BaseViewModel {
 
     private StatsData fetchStats(java.util.UUID userId) {
         UserStats stats;
-        if (profileUseCases != null) {
-            var result = profileUseCases.getOrComputeStats(new StatsQuery(UserContext.ui(userId)));
+        if (profileInsightsUseCases != null) {
+            var result = profileInsightsUseCases.getOrComputeStats(new StatsQuery(UserContext.ui(userId)));
+            stats = result.success() ? result.data() : statsService.getOrComputeStats(userId);
+        } else if (profileUseCases != null) {
+            var result = profileUseCases.getOrComputeStats(new ProfileUseCases.StatsQuery(UserContext.ui(userId)));
             stats = result.success() ? result.data() : statsService.getOrComputeStats(userId);
         } else {
             stats = statsService.getOrComputeStats(userId);

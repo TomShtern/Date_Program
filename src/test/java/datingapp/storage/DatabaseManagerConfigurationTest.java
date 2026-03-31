@@ -1,9 +1,12 @@
 package datingapp.storage;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.lang.reflect.Method;
+import java.sql.Connection;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -53,6 +56,18 @@ class DatabaseManagerConfigurationTest {
         System.setProperty(PROFILE_PROPERTY, "test");
 
         assertEquals("", invokeConfiguredPassword());
+    }
+
+    @Test
+    @DisplayName("dev profile should allow in-memory databases without an explicit password")
+    void devProfileAllowsInMemoryDatabaseWithoutExplicitPassword() throws Exception {
+        DatabaseManager.setJdbcUrl("jdbc:h2:mem:dbmanager-config-dev-" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1");
+        System.setProperty(PROFILE_PROPERTY, "dev");
+
+        try (Connection connection = DatabaseManager.getInstance().getConnection()) {
+            assertNotNull(connection);
+            assertFalse(connection.isClosed());
+        }
     }
 
     private static String invokeConfiguredPassword() throws Exception {
