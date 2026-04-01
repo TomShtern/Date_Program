@@ -214,6 +214,11 @@ public final class TestStorages {
         }
 
         @Override
+        public Optional<Like> getLikeById(UUID likeId) {
+            return Optional.ofNullable(likes.get(likeId));
+        }
+
+        @Override
         public void save(Like like) {
             likes.put(like.id(), like);
         }
@@ -329,6 +334,16 @@ public final class TestStorages {
         @Override
         public void delete(UUID likeId) {
             likes.remove(likeId);
+        }
+
+        @Override
+        public boolean deleteLikeOwnedBy(UUID ownerUserId, UUID likeId) {
+            Like like = likes.get(likeId);
+            if (like == null || !like.whoLikes().equals(ownerUserId)) {
+                return false;
+            }
+            likes.remove(likeId);
+            return true;
         }
 
         @Override
@@ -507,6 +522,9 @@ public final class TestStorages {
         public boolean gracefulExitTransition(
                 Match updatedMatch, Optional<Conversation> archivedConversation, Notification notification) {
             update(updatedMatch);
+            if (communicationStorage != null) {
+                archivedConversation.ifPresent(communicationStorage::saveConversation);
+            }
             if (communicationStorage != null && notification != null) {
                 communicationStorage.saveNotification(notification);
             }
@@ -517,6 +535,9 @@ public final class TestStorages {
         public boolean unmatchTransition(Match updatedMatch, Optional<Conversation> archivedConversation) {
             deletePairLikes(updatedMatch.getUserA(), updatedMatch.getUserB());
             update(updatedMatch);
+            if (communicationStorage != null) {
+                archivedConversation.ifPresent(communicationStorage::saveConversation);
+            }
             return true;
         }
 

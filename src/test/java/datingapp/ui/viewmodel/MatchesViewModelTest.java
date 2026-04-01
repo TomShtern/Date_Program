@@ -266,7 +266,7 @@ class MatchesViewModelTest {
             }
 
             @Override
-            public void deleteLike(UUID likeId) {
+            public boolean deleteLike(UUID ownerUserId, UUID likeId) {
                 throw new IllegalStateException("match load failed");
             }
 
@@ -321,7 +321,7 @@ class MatchesViewModelTest {
             }
 
             @Override
-            public void deleteLike(UUID likeId) {
+            public boolean deleteLike(UUID ownerUserId, UUID likeId) {
                 throw new IllegalStateException("match load failed");
             }
 
@@ -544,8 +544,8 @@ class MatchesViewModelTest {
             }
 
             @Override
-            public void deleteLike(UUID likeId) {
-                matchData.deleteLike(likeId);
+            public boolean deleteLike(UUID ownerUserId, UUID likeId) {
+                return matchData.deleteLike(ownerUserId, likeId);
             }
 
             @Override

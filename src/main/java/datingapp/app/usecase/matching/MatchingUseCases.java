@@ -471,7 +471,16 @@ public class MatchingUseCases {
             return UseCaseResult.failure(UseCaseError.validation("Context and likeId are required"));
         }
         try {
-            interactionStorage.delete(command.likeId());
+            Like like = interactionStorage.getLikeById(command.likeId()).orElse(null);
+            if (like == null) {
+                return UseCaseResult.failure(UseCaseError.notFound("Like not found"));
+            }
+            if (!Objects.equals(like.whoLikes(), command.context().userId())) {
+                return UseCaseResult.failure(UseCaseError.forbidden("Like does not belong to current user"));
+            }
+            if (!interactionStorage.deleteLikeOwnedBy(command.context().userId(), command.likeId())) {
+                return UseCaseResult.failure(UseCaseError.notFound("Like not found"));
+            }
             return UseCaseResult.success(null);
         } catch (Exception e) {
             return UseCaseResult.failure(UseCaseError.internal("Failed to remove like: " + e.getMessage()));

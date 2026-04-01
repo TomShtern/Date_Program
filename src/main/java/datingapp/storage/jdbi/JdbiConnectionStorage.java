@@ -22,6 +22,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
 import org.jdbi.v3.core.Jdbi;
 import org.jdbi.v3.core.mapper.RowMapper;
 import org.jdbi.v3.core.statement.StatementContext;
@@ -36,6 +37,55 @@ import org.jdbi.v3.sqlobject.statement.SqlUpdate;
  * notifications.
  */
 public final class JdbiConnectionStorage implements CommunicationStorage {
+
+    private static final String ERR_CONVERSATION_IDS_NULL = "conversationIds cannot be null";
+    private static final String ERR_USER_ID_NULL = "userId cannot be null";
+    private static final String PARAM_CONVERSATION_IDS = "conversationIds";
+    private static final String COLUMN_CONVERSATION_ID = "conversation_id";
+    private static final String SQL_LATEST_MESSAGES_BY_CONVERSATION_IDS = """
+                        SELECT ranked.id, ranked.conversation_id, ranked.sender_id, ranked.content, ranked.created_at
+                        FROM (
+                                SELECT m.id, m.conversation_id, m.sender_id, m.content, m.created_at,
+                                             ROW_NUMBER() OVER (
+                                                     PARTITION BY m.conversation_id
+                                                     ORDER BY m.created_at DESC, m.id DESC
+                                             ) AS rn
+                                FROM messages m
+                                JOIN conversations c ON c.id = m.conversation_id
+                                WHERE m.conversation_id IN (<conversationIds>)
+                                    AND m.deleted_at IS NULL
+                                    AND c.deleted_at IS NULL
+                                    AND (c.visible_to_user_a = TRUE OR c.visible_to_user_b = TRUE)
+                        ) ranked
+                        WHERE ranked.rn = 1
+                        """;
+    private static final String SQL_UNREAD_COUNTS_BY_CONVERSATION_IDS = """
+                        SELECT c.id AS conversation_id, COUNT(m.id) AS unread_count
+                        FROM conversations c
+                        LEFT JOIN messages m
+                            ON m.conversation_id = c.id
+                         AND m.deleted_at IS NULL
+                         AND m.sender_id <> :userId
+                         AND (
+                                 CASE
+                                         WHEN c.user_a = :userId THEN c.user_a_last_read_at
+                                         WHEN c.user_b = :userId THEN c.user_b_last_read_at
+                                         ELSE NULL
+                                 END IS NULL
+                                 OR m.created_at > CASE
+                                         WHEN c.user_a = :userId THEN c.user_a_last_read_at
+                                         WHEN c.user_b = :userId THEN c.user_b_last_read_at
+                                         ELSE NULL
+                                 END
+                         )
+                        WHERE c.id IN (<conversationIds>)
+                            AND c.deleted_at IS NULL
+                            AND (
+                                (c.user_a = :userId AND c.visible_to_user_a = TRUE) OR
+                                (c.user_b = :userId AND c.visible_to_user_b = TRUE)
+                            )
+                        GROUP BY c.id
+                        """;
 
     private final Jdbi jdbi;
     private final MessagingDao messagingDao;
@@ -130,39 +180,22 @@ public final class JdbiConnectionStorage implements CommunicationStorage {
 
     @Override
     public Map<String, Optional<Message>> getLatestMessagesByConversationIds(Set<String> conversationIds) {
-        Objects.requireNonNull(conversationIds, "conversationIds cannot be null");
+        Objects.requireNonNull(conversationIds, ERR_CONVERSATION_IDS_NULL);
         if (conversationIds.isEmpty()) {
             return Map.of();
         }
 
-        return jdbi.withHandle(handle -> {
-            Map<String, Optional<Message>> latestMessages = new java.util.HashMap<>();
-            conversationIds.forEach(id -> latestMessages.put(id, Optional.empty()));
-
-            handle.createQuery("""
-                    SELECT ranked.id, ranked.conversation_id, ranked.sender_id, ranked.content, ranked.created_at
-                    FROM (
-                        SELECT m.id, m.conversation_id, m.sender_id, m.content, m.created_at,
-                               ROW_NUMBER() OVER (
-                                   PARTITION BY m.conversation_id
-                                   ORDER BY m.created_at DESC, m.id DESC
-                               ) AS rn
-                        FROM messages m
-                        JOIN conversations c ON c.id = m.conversation_id
-                        WHERE m.conversation_id IN (<conversationIds>)
-                          AND m.deleted_at IS NULL
-                          AND c.deleted_at IS NULL
-                          AND (c.visible_to_user_a = TRUE OR c.visible_to_user_b = TRUE)
-                    ) ranked
-                    WHERE ranked.rn = 1
-                    """)
-                    .bindList("conversationIds", conversationIds)
-                    .map(new MessageMapper())
-                    .list()
-                    .forEach(message -> latestMessages.put(message.conversationId(), Optional.of(message)));
-
-            return Map.copyOf(latestMessages);
-        });
+        return mapConversationBatchResults(
+                conversationIds,
+                handle -> handle
+                        .createQuery(SQL_LATEST_MESSAGES_BY_CONVERSATION_IDS)
+                        .bindList(PARAM_CONVERSATION_IDS, conversationIds)
+                        .map(new MessageMapper())
+                        .list()
+                        .stream()
+                        .map(message -> Map.entry(message.conversationId(), Optional.of(message)))
+                        .toList(),
+                ignored -> Optional.<Message>empty());
     }
 
     @Override
@@ -172,28 +205,24 @@ public final class JdbiConnectionStorage implements CommunicationStorage {
 
     @Override
     public Map<String, Integer> countMessagesByConversationIds(Set<String> conversationIds) {
-        Objects.requireNonNull(conversationIds, "conversationIds cannot be null");
+        Objects.requireNonNull(conversationIds, ERR_CONVERSATION_IDS_NULL);
         if (conversationIds.isEmpty()) {
             return Map.of();
         }
 
-        return jdbi.withHandle(handle -> {
-            Map<String, Integer> counts = new java.util.HashMap<>();
-            handle.createQuery("SELECT m.conversation_id, COUNT(*) AS message_count FROM messages m "
-                            + "JOIN conversations c ON c.id = m.conversation_id "
-                            + "WHERE m.conversation_id IN (<conversationIds>) "
-                            + "AND m.deleted_at IS NULL "
-                            + "AND c.deleted_at IS NULL "
-                            + "AND (c.visible_to_user_a = TRUE OR c.visible_to_user_b = TRUE) "
-                            + "GROUP BY m.conversation_id")
-                    .bindList("conversationIds", conversationIds)
-                    .map((rs, ctx) -> Map.entry(rs.getString("conversation_id"), rs.getInt("message_count")))
-                    .list()
-                    .forEach(entry -> counts.put(entry.getKey(), entry.getValue()));
-
-            conversationIds.forEach(id -> counts.putIfAbsent(id, 0));
-            return Map.copyOf(counts);
-        });
+        return mapConversationBatchResults(
+                conversationIds,
+                handle -> handle.createQuery("SELECT m.conversation_id, COUNT(*) AS message_count FROM messages m "
+                                + "JOIN conversations c ON c.id = m.conversation_id "
+                                + "WHERE m.conversation_id IN (<conversationIds>) "
+                                + "AND m.deleted_at IS NULL "
+                                + "AND c.deleted_at IS NULL "
+                                + "AND (c.visible_to_user_a = TRUE OR c.visible_to_user_b = TRUE) "
+                                + "GROUP BY m.conversation_id")
+                        .bindList(PARAM_CONVERSATION_IDS, conversationIds)
+                        .map((rs, ctx) -> Map.entry(rs.getString(COLUMN_CONVERSATION_ID), rs.getInt("message_count")))
+                        .list(),
+                ignored -> 0);
     }
 
     @Override
@@ -213,51 +242,20 @@ public final class JdbiConnectionStorage implements CommunicationStorage {
 
     @Override
     public Map<String, Integer> countUnreadMessagesByConversationIds(UUID userId, Set<String> conversationIds) {
-        Objects.requireNonNull(userId, "userId cannot be null");
-        Objects.requireNonNull(conversationIds, "conversationIds cannot be null");
+        Objects.requireNonNull(userId, ERR_USER_ID_NULL);
+        Objects.requireNonNull(conversationIds, ERR_CONVERSATION_IDS_NULL);
         if (conversationIds.isEmpty()) {
             return Map.of();
         }
 
-        return jdbi.withHandle(handle -> {
-            Map<String, Integer> unreadCounts = new java.util.HashMap<>();
-            conversationIds.forEach(id -> unreadCounts.put(id, 0));
-
-            handle.createQuery("""
-                    SELECT c.id AS conversation_id, COUNT(m.id) AS unread_count
-                    FROM conversations c
-                    LEFT JOIN messages m
-                      ON m.conversation_id = c.id
-                     AND m.deleted_at IS NULL
-                     AND m.sender_id <> :userId
-                     AND (
-                         CASE
-                             WHEN c.user_a = :userId THEN c.user_a_last_read_at
-                             WHEN c.user_b = :userId THEN c.user_b_last_read_at
-                             ELSE NULL
-                         END IS NULL
-                         OR m.created_at > CASE
-                             WHEN c.user_a = :userId THEN c.user_a_last_read_at
-                             WHEN c.user_b = :userId THEN c.user_b_last_read_at
-                             ELSE NULL
-                         END
-                     )
-                    WHERE c.id IN (<conversationIds>)
-                      AND c.deleted_at IS NULL
-                      AND (
-                        (c.user_a = :userId AND c.visible_to_user_a = TRUE) OR
-                        (c.user_b = :userId AND c.visible_to_user_b = TRUE)
-                      )
-                    GROUP BY c.id
-                    """)
-                    .bind("userId", userId)
-                    .bindList("conversationIds", conversationIds)
-                    .map((rs, ctx) -> Map.entry(rs.getString("conversation_id"), rs.getInt("unread_count")))
-                    .list()
-                    .forEach(entry -> unreadCounts.put(entry.getKey(), entry.getValue()));
-
-            return Map.copyOf(unreadCounts);
-        });
+        return mapConversationBatchResults(
+                conversationIds,
+                handle -> handle.createQuery(SQL_UNREAD_COUNTS_BY_CONVERSATION_IDS)
+                        .bind("userId", userId)
+                        .bindList(PARAM_CONVERSATION_IDS, conversationIds)
+                        .map((rs, ctx) -> Map.entry(rs.getString(COLUMN_CONVERSATION_ID), rs.getInt("unread_count")))
+                        .list(),
+                ignored -> 0);
     }
 
     @Override
@@ -374,6 +372,18 @@ public final class JdbiConnectionStorage implements CommunicationStorage {
     @Override
     public void deleteOldNotifications(Instant before) {
         socialDao.deleteOldNotifications(before);
+    }
+
+    private <T> Map<String, T> mapConversationBatchResults(
+            Set<String> conversationIds,
+            Function<org.jdbi.v3.core.Handle, List<Map.Entry<String, T>>> fetchEntries,
+            Function<String, T> defaultValueFactory) {
+        return jdbi.withHandle(handle -> {
+            Map<String, T> results = new java.util.HashMap<>();
+            conversationIds.forEach(id -> results.put(id, defaultValueFactory.apply(id)));
+            fetchEntries.apply(handle).forEach(entry -> results.put(entry.getKey(), entry.getValue()));
+            return Map.copyOf(results);
+        });
     }
 
     @RegisterRowMapper(ConversationMapper.class)

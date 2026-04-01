@@ -1,10 +1,6 @@
 package datingapp.core.profile;
 
-import datingapp.core.AppConfig;
 import datingapp.core.model.User;
-import datingapp.core.storage.AnalyticsStorage;
-import datingapp.core.storage.InteractionStorage;
-import datingapp.core.storage.TrustSafetyStorage;
 import datingapp.core.storage.UserStorage;
 import java.util.List;
 import java.util.Map;
@@ -21,38 +17,6 @@ public final class ProfileService {
     public ProfileService(UserStorage userStorage) {
         this.userStorage = Objects.requireNonNull(userStorage, "userStorage cannot be null");
         this.completionSupport = new ProfileCompletionSupport();
-    }
-
-    /**
-     * Compatibility overload for callers that still construct {@link ProfileService}
-     * with the wider dependency set. The extra parameters are validated but not used;
-     * prefer {@link #ProfileService(UserStorage)} for new code.
-     *
-     * @deprecated Use {@link #ProfileService(UserStorage)} instead. This constructor
-     *     validates but discards all parameters except {@code userStorage}.
-     */
-    @Deprecated(since = "2026-04-01", forRemoval = true)
-    public ProfileService(
-            AppConfig config,
-            AnalyticsStorage analyticsStorage,
-            InteractionStorage interactionStorage,
-            TrustSafetyStorage trustSafetyStorage,
-            UserStorage userStorage) {
-        this(requireWideConstructorUserStorage(
-                config, analyticsStorage, interactionStorage, trustSafetyStorage, userStorage));
-    }
-
-    private static UserStorage requireWideConstructorUserStorage(
-            AppConfig config,
-            AnalyticsStorage analyticsStorage,
-            InteractionStorage interactionStorage,
-            TrustSafetyStorage trustSafetyStorage,
-            UserStorage userStorage) {
-        Objects.requireNonNull(config, "config cannot be null");
-        Objects.requireNonNull(analyticsStorage, "analyticsStorage cannot be null");
-        Objects.requireNonNull(interactionStorage, "interactionStorage cannot be null");
-        Objects.requireNonNull(trustSafetyStorage, "trustSafetyStorage cannot be null");
-        return Objects.requireNonNull(userStorage, "userStorage cannot be null");
     }
 
     public List<User> listUsers() {

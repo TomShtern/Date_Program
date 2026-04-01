@@ -63,6 +63,21 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
             )
             """;
 
+    private static final String SQL_ACTIVE_LIKE_BY_ID = """
+                        SELECT id, who_likes, who_got_liked, direction, created_at
+                        FROM likes
+                        WHERE id = :likeId
+                            AND deleted_at IS NULL
+                        """;
+
+    private static final String SQL_SOFT_DELETE_OWNED_LIKE = """
+                        UPDATE likes
+                        SET deleted_at = CURRENT_TIMESTAMP
+                        WHERE id = :likeId
+                            AND who_likes = :ownerUserId
+                            AND deleted_at IS NULL
+                        """;
+
     private static final String SQL_UPSERT_LIKE = """
             MERGE INTO likes (id, who_likes, who_got_liked, direction, created_at, deleted_at)
             KEY (who_likes, who_got_liked)
@@ -173,6 +188,12 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
     @Override
     public Optional<Like> getLike(UUID fromUserId, UUID toUserId) {
         return likeDao.getLike(fromUserId, toUserId);
+    }
+
+    @Override
+    public Optional<Like> getLikeById(UUID likeId) {
+        Objects.requireNonNull(likeId, "likeId cannot be null");
+        return likeDao.getLikeById(likeId);
     }
 
     @Override
@@ -356,6 +377,13 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
     @Override
     public void delete(UUID likeId) {
         likeDao.delete(likeId);
+    }
+
+    @Override
+    public boolean deleteLikeOwnedBy(UUID ownerUserId, UUID likeId) {
+        Objects.requireNonNull(ownerUserId, "ownerUserId cannot be null");
+        Objects.requireNonNull(likeId, "likeId cannot be null");
+        return likeDao.deleteLikeOwnedBy(ownerUserId, likeId) == 1;
     }
 
     @Override
@@ -778,6 +806,9 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
                     """)
         Optional<Like> getLike(@Bind("fromUserId") UUID fromUserId, @Bind("toUserId") UUID toUserId);
 
+        @SqlQuery(SQL_ACTIVE_LIKE_BY_ID)
+        Optional<Like> getLikeById(@Bind("likeId") UUID likeId);
+
         @SqlUpdate("""
                 MERGE INTO likes (id, who_likes, who_got_liked, direction, created_at, deleted_at)
                 KEY (who_likes, who_got_liked)
@@ -886,6 +917,9 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
 
         @SqlUpdate("UPDATE likes SET deleted_at = CURRENT_TIMESTAMP WHERE id = :likeId AND deleted_at IS NULL")
         void delete(@Bind("likeId") UUID likeId);
+
+        @SqlUpdate(SQL_SOFT_DELETE_OWNED_LIKE)
+        int deleteLikeOwnedBy(@Bind("ownerUserId") UUID ownerUserId, @Bind("likeId") UUID likeId);
     }
 
     @RegisterRowMapper(MatchMapper.class)

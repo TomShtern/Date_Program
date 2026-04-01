@@ -12,6 +12,7 @@ import datingapp.app.usecase.matching.MatchingUseCases.BrowseCandidatesCommand;
 import datingapp.app.usecase.matching.MatchingUseCases.ListActiveMatchesQuery;
 import datingapp.app.usecase.matching.MatchingUseCases.ListPagedMatchesQuery;
 import datingapp.app.usecase.matching.MatchingUseCases.ProcessSwipeCommand;
+import datingapp.app.usecase.matching.MatchingUseCases.RemoveLikeCommand;
 import datingapp.app.usecase.matching.MatchingUseCases.UndoSwipeCommand;
 import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
@@ -189,6 +190,40 @@ class MatchingUseCasesTest {
         assertNotNull(result.data().compatibilityLabel());
         assertNotNull(result.data().starDisplay());
         assertNotNull(result.data().shortSummary());
+    }
+
+    @Test
+    @DisplayName("removeLike deletes a like owned by the current user")
+    void removeLikeDeletesLikeOwnedByCurrentUser() {
+        Like like = Like.create(currentUser.getId(), candidate.getId(), Like.Direction.LIKE);
+        interactionStorage.save(like);
+
+        var result = useCases.removeLike(new RemoveLikeCommand(UserContext.cli(currentUser.getId()), like.id()));
+
+        assertTrue(result.success());
+        assertTrue(interactionStorage
+                .getLike(currentUser.getId(), candidate.getId())
+                .isEmpty());
+    }
+
+    @Test
+    @DisplayName("removeLike rejects deleting likes owned by a different user")
+    void removeLikeRejectsDeletingLikesOwnedByDifferentUser() {
+        User otherLiker = TestUserFactory.createActiveUser(UUID.randomUUID(), "OtherLiker");
+        otherLiker.setGender(User.Gender.MALE);
+        otherLiker.setInterestedIn(Set.of(User.Gender.FEMALE));
+        userStorage.save(otherLiker);
+
+        Like like = Like.create(otherLiker.getId(), candidate.getId(), Like.Direction.LIKE);
+        interactionStorage.save(like);
+
+        var result = useCases.removeLike(new RemoveLikeCommand(UserContext.cli(currentUser.getId()), like.id()));
+
+        assertFalse(result.success());
+        assertEquals("Like does not belong to current user", result.error().message());
+        assertTrue(interactionStorage
+                .getLike(otherLiker.getId(), candidate.getId())
+                .isPresent());
     }
 
     @Test

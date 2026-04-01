@@ -420,7 +420,7 @@ public class ConnectionService {
         if (matchOpt.isEmpty()) {
             return TransitionResult.failure("Could not find the associated match.");
         }
-        Match match = matchOpt.get();
+        Match updatedMatch = copyMatch(matchOpt.get());
 
         FriendRequest updated = new FriendRequest(
                 request.id(),
@@ -435,8 +435,8 @@ public class ConnectionService {
         }
 
         try {
-            match.transitionToFriends(request.fromUserId());
-            boolean transitioned = interactionStorage.acceptFriendZoneTransition(match, updated, null);
+            updatedMatch.transitionToFriends(request.fromUserId());
+            boolean transitioned = interactionStorage.acceptFriendZoneTransition(updatedMatch, updated, null);
             if (!transitioned) {
                 return TransitionResult.failure("Failed to persist friend-zone acceptance.");
             }
@@ -489,16 +489,17 @@ public class ConnectionService {
             return TransitionResult.failure(ATOMIC_TRANSITIONS_REQUIRED);
         }
 
-        match.gracefulExit(initiatorId);
-
         Optional<Conversation> convoOpt = communicationStorage.getConversationByUsers(initiatorId, targetUserId);
-        convoOpt.ifPresent(convo -> {
+        Optional<Conversation> archivedConversation = convoOpt.map(ConnectionService::copyConversation);
+        archivedConversation.ifPresent(convo -> {
             convo.archive(convo.getUserA(), MatchArchiveReason.GRACEFUL_EXIT);
             convo.archive(convo.getUserB(), MatchArchiveReason.GRACEFUL_EXIT);
         });
+        Match updatedMatch = copyMatch(match);
 
         try {
-            boolean transitioned = interactionStorage.gracefulExitTransition(match, convoOpt, null);
+            updatedMatch.gracefulExit(initiatorId);
+            boolean transitioned = interactionStorage.gracefulExitTransition(updatedMatch, archivedConversation, null);
             if (!transitioned) {
                 return TransitionResult.failure("Failed to persist graceful exit transition.");
             }
@@ -535,17 +536,18 @@ public class ConnectionService {
             return TransitionResult.failure(ATOMIC_TRANSITIONS_REQUIRED);
         }
 
-        match.unmatch(initiatorId);
-
         // Archive the conversation for both participants, if one exists.
         Optional<Conversation> convoOpt = communicationStorage.getConversationByUsers(initiatorId, targetId);
-        convoOpt.ifPresent(convo -> {
+        Optional<Conversation> archivedConversation = convoOpt.map(ConnectionService::copyConversation);
+        archivedConversation.ifPresent(convo -> {
             convo.archive(convo.getUserA(), MatchArchiveReason.UNMATCH);
             convo.archive(convo.getUserB(), MatchArchiveReason.UNMATCH);
         });
+        Match updatedMatch = copyMatch(match);
 
         try {
-            boolean transitioned = interactionStorage.unmatchTransition(match, convoOpt);
+            updatedMatch.unmatch(initiatorId);
+            boolean transitioned = interactionStorage.unmatchTransition(updatedMatch, archivedConversation);
             if (!transitioned) {
                 return TransitionResult.failure("Failed to persist unmatch transition.");
             }
@@ -553,6 +555,37 @@ public class ConnectionService {
         } catch (Exception e) {
             return TransitionResult.failure("Failed to persist unmatch transition: " + e.getMessage());
         }
+    }
+
+    private static Match copyMatch(Match match) {
+        return new Match(
+                match.getId(),
+                match.getUserA(),
+                match.getUserB(),
+                match.getCreatedAt(),
+                match.getUpdatedAt(),
+                match.getState(),
+                match.getEndedAt(),
+                match.getEndedBy(),
+                match.getEndReason(),
+                match.getDeletedAt());
+    }
+
+    private static Conversation copyConversation(Conversation conversation) {
+        return Conversation.fromStorage(
+                conversation.getId(),
+                conversation.getUserA(),
+                conversation.getUserB(),
+                conversation.getCreatedAt(),
+                conversation.getLastMessageAt(),
+                conversation.getUserAReadAt(),
+                conversation.getUserBReadAt(),
+                conversation.getUserAArchivedAt(),
+                conversation.getUserAArchiveReason(),
+                conversation.getUserBArchivedAt(),
+                conversation.getUserBArchiveReason(),
+                conversation.isVisibleToUserA(),
+                conversation.isVisibleToUserB());
     }
 
     public List<FriendRequest> getPendingRequestsFor(UUID userId) {

@@ -25,6 +25,12 @@ public interface InteractionStorage {
 
     Optional<Like> getLike(UUID fromUserId, UUID toUserId);
 
+    default Optional<Like> getLikeById(UUID likeId) {
+        Objects.requireNonNull(likeId, "likeId cannot be null");
+        throw new UnsupportedOperationException(
+                "InteractionStorage implementation must override getLikeById(UUID) to support ownership-aware deletion");
+    }
+
     void save(Like like);
 
     boolean exists(UUID from, UUID to);
@@ -50,6 +56,19 @@ public interface InteractionStorage {
     int countPassesToday(UUID userId, Instant startOfDay);
 
     void delete(UUID likeId);
+
+    default boolean deleteLikeOwnedBy(UUID ownerUserId, UUID likeId) {
+        Objects.requireNonNull(ownerUserId, "ownerUserId cannot be null");
+        Objects.requireNonNull(likeId, "likeId cannot be null");
+
+        Optional<Like> like = getLikeById(likeId);
+        if (like.isEmpty() || !like.get().whoLikes().equals(ownerUserId)) {
+            return false;
+        }
+
+        delete(likeId);
+        return true;
+    }
 
     /** Result of persisting a like and optionally creating a match. */
     record LikeMatchWriteResult(boolean likePersisted, Optional<Match> createdMatch) {

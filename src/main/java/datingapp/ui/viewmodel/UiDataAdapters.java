@@ -86,8 +86,8 @@ public final class UiDataAdapters {
         /** Returns the like between two users, if any. */
         Optional<Like> getLike(UUID fromUserId, UUID toUserId);
 
-        /** Deletes a like by its ID (used for undo/withdraw). */
-        void deleteLike(UUID likeId);
+        /** Deletes a like by its ID only when it belongs to the specified owner. */
+        boolean deleteLike(UUID ownerUserId, UUID likeId);
     }
 
     /** UI-layer adapter interface for social and notification data access. */
@@ -268,8 +268,8 @@ public final class UiDataAdapters {
         }
 
         @Override
-        public void deleteLike(UUID likeId) {
-            interactionStorage.delete(likeId);
+        public boolean deleteLike(UUID ownerUserId, UUID likeId) {
+            return interactionStorage.deleteLikeOwnedBy(ownerUserId, likeId);
         }
     }
 

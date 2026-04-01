@@ -104,7 +104,7 @@ class MessagingServiceTest {
     void setUp() {
         TestClock.setFixed(FIXED_INSTANT);
         messagingStorage = new TestStorages.Communications();
-        matchStorage = new TestStorages.Interactions();
+        matchStorage = new TestStorages.Interactions(messagingStorage);
         userStorage = new InMemoryUserStorage();
         messagingService = new ConnectionService(AppConfig.defaults(), messagingStorage, matchStorage, userStorage);
 

@@ -1,14 +1,6 @@
 > 🚀 **VERIFIED & UPDATED: 2026-03-31**
 > This document has been refreshed against the current codebase and build output as of this date.
 
-<!--AGENT-DOCSYNC:ON-->
-# ChangeStamp format: SEQ|YYYY-MM-DD HH:MM:SS|agent:<id>|scope:<tag>|summary|files
-# SEQ: file-local increasing int. If collision after 3 retries append "<SEQ>:CONFLICT".
-# Agents MAY NOT use git. After code changes they MUST:
-# 1) pick SEQ = highestSEQ+1, 2) locate affected doc fragment, 3) archive with <!--ARCHIVE:SEQ:agent:scope-->,
-# 4) apply minimal edits, 5) append ChangeStamp to file-end changelog and edited fragment.
-<!--/AGENT-DOCSYNC-->
-
 # CLAUDE.md
 
 Second-level guidance for AI coding agents working in this repository.
@@ -205,36 +197,3 @@ When selecting multiple tests from PowerShell, prefer `mvn --% ...` so comma-sep
 ## Instruction-stack note
 
 Use `.github/copilot-instructions.md` for the shortest always-on rules. Use this file for the verified repo map and current gotchas. Use `AGENTS.md` for execution workflow and validation discipline.
-
-## Agent Changelog (append-only)
----AGENT-LOG-START---
-# Format: SEQ|TS|agent|scope|summary|files
-# Entries 1-9 archived.
-10|2026-02-03 20:30:00|agent:claude_code|docs-optimize|Added critical gotchas and condensed architecture guidance|CLAUDE.md
-11|2026-02-05 00:00:00|agent:claude_code|docs-ui-patterns|Added ViewModel error-handling and navigation context patterns|CLAUDE.md
-12|2026-02-07 22:25:00|agent:claude_code|docs-audit|Refreshed stale stats and utility class references|CLAUDE.md
-13|2026-02-08 11:15:00|agent:claude_code|config-audit|Synced quality-gate and command documentation|CLAUDE.md
-14|2026-02-08 12:30:00|agent:claude_code|docs-pmd-gotcha|Added PMD+Spotless gotcha guidance|CLAUDE.md
-15|2026-02-08 18:00:00|agent:claude_code|build-discipline|Added single-run output filtering discipline|CLAUDE.md
-16|2026-02-10 00:00:00|agent:claude_code|docs-major-refactor|Updated package structure and model/type guidance|CLAUDE.md
-17|2026-02-11 12:00:00|agent:github_copilot|scope:codebase-consolidation|Documented codebase consolidation changes|CLAUDE.md
-18|2026-02-11 22:52:00|agent:codex|scope:docs-stats-sync|Synced documentation to verified baseline|CLAUDE.md
-19|2026-02-13 10:15:00|agent:github_copilot|scope:test-output-workflow|Documented regular-first test flow and verbose reruns|CLAUDE.md
-20|2026-02-14 00:00:00|agent:claude_code|scope:docs-domain-reorg|Updated domain-driven package references|CLAUDE.md
-21|2026-02-18 00:00:00|agent:claude_code|scope:docs-full-sync|Performed broad source-verified synchronization|CLAUDE.md
-22|2026-02-19 00:00:00|agent:github_copilot|scope:renesting-implementation|Documented nested enum/type ownership changes|CLAUDE.md
-23|2026-02-21 00:00:00|agent:claude_code|scope:code-verified-sync|Fixed stale package and count references|CLAUDE.md
-24|2026-02-21 16:30:00|agent:github_copilot|scope:docs-source-truth-refresh|Refreshed stats and wiring snippets|CLAUDE.md
-25|2026-02-22 04:08:00|agent:gemini|scope:config-jackson-databinding|Documented AppConfig Jackson databinding strategy|CLAUDE.md
-26|2026-02-28 13:35:00|agent:github_copilot|scope:source-truth-doc-sync|Rewrote CLAUDE.md from current code snapshot including app/usecase and ui/async architecture|CLAUDE.md
-27|2026-03-01 01:20:00|agent:github_copilot|scope:source-truth-doc-sync|Updated counts, package tree, and CLI wiring callback from current source|CLAUDE.md
-28|2026-03-01 03:20:00|agent:github_copilot|scope:docs-metrics-refresh|Updated LOC snapshot values to current tokei output|CLAUDE.md
-29|2026-03-07 00:00:00|agent:claude_code|scope:source-truth-sync|Added event handlers subpackage, InterestMatcher, use-case wiring docs, config access gotcha, updated LOC|CLAUDE.md
-30|2026-03-11 00:00:00|agent:claude_code|scope:architecture-corrections|Removed non-existent PerformanceMonitor and CompatibilityScoring; fixed popup package (MatchPopupController removed, MilestonePopupController moved to screen); added SafetyController and NotesController to screen list; added MatchingCliPresenter to cli list; added Default* matching impls, AchievementService, ProfileCompletionSupport; corrected false RestApiServer claim; added 2 new gotchas (AchievementType enum split, sessionTimeout scope)|CLAUDE.md
-31|2026-03-13 00:00:00|agent:claude_code|scope:code-verified-sync|Updated snapshot (267 files, 73830 LOC via tokei/fd); added LocationModels+LocationService to arch; added DevDataSeeder to storage; added 4 new gotchas (@BindMethods, Locale.ENGLISH, LocationService scope, RestApiServer localhost-only); documented 33 REST endpoints, rate limiter, localhost bind; added ProfileUseCases new commands; added Recent Updates section|CLAUDE.md
-32|2026-03-30 15:15:00|agent:github_copilot|scope:docs-hierarchy-refresh|Refreshed CLAUDE.md to current source snapshot, clarified instruction hierarchy, and updated repo-specific gotchas, patterns, and verification notes|CLAUDE.md
-33|2026-03-31 22:00:00|agent:github_copilot|scope:cast-remediation-sync|Updated architecture tree, file counts, LOC stats, gotchas, and architecture notes after CAST structural remediation implementation (REST helper extraction, profile boundary decomposition, composition spine cleanup, storage/messaging optimization, ViewModelFactory simplification)|CLAUDE.md
-34|2026-03-31 23:15:00|agent:github_copilot|scope:code-quality-sweep|16-fix code quality pass: rate limiter eviction, dead candidate cache fix, unused param cleanup (ProfileMutationUseCases, DefaultDailyPickService, MessagingUseCases), ProfileNotesUseCases author-check dedup, ViewModelAsyncScope key eviction, TypingIndicator animation lifecycle, DatabaseManager shutdown lifecycle, ViewModel errorSink dedup (Social/Standouts/Dashboard/Notes/Safety), dead field removal. Updated LOC and architecture notes.|CLAUDE.md
-35|2026-03-31 23:59:00|agent:github_copilot|scope:code-quality-sweep-2|19-fix code quality sweep: 6 bugs (ConnectionService mutation order, MatchPreferences null age, ProfileViewModel save marker, MatchesViewModel NPE guard, ProfileReadOnlyViewModel null photos, LoginViewModel error handler); 7 dead code removals (ConnectionModels formatConversationId+isTerminalStatus, DailyLimitService formatDuration interface+impl+6 test fakes, MatchQualityService getLowPaceCompatibilityWarning, LoginViewModel dead fields, UiDataAdapters compat constructor, ProfileMutationUseCases dead profileService field+3 call sites); 4 dedup fixes (SocialViewModel accept/decline unification, TrustSafetyService 4 redundant null checks, EnumSetUtil Set overload delegation, DailyLimitService formatDuration via D3); 2 intent drift fixes (SafetyViewModel persistent javadoc, StorageFactory buildInMemory javadoc). 22 files modified.|CLAUDE.md
-36|2026-04-01 00:30:00|agent:github_copilot|scope:code-quality-sweep-3|6-fix sweep 2: 3 bugs (JdbiMatchmakingStorage unmatchTransition atomicity, ActivityMetricsService endSession race condition, DefaultCompatibilityCalculator negative duration); 1 test seam fix (ProfileHandlerTest wrong override target); 1 compile fix (MatchingUseCases leftover formatDuration overrides); 1 build fix (pom.xml forkedProcessExitTimeoutInSeconds=120 for Surefire hang). 5 production + 1 test file + pom.xml modified.|CLAUDE.md
----AGENT-LOG-END---

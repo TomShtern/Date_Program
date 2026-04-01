@@ -132,3 +132,58 @@
 - `src/test/java/datingapp/ui/viewmodel/ChatViewModelTest.java` (D6)
 - `src/test/java/datingapp/ui/viewmodel/MatchingViewModelTest.java` (D6)
 - `src/test/java/datingapp/app/cli/ProfileHandlerTest.java` (T1)
+
+---
+
+## Follow-up sweep — 2026-04-01
+
+### Deferred items closed
+
+- **B7 — `ConnectionService.acceptFriendZone`**: fixed by switching relationship transitions to copy-on-write for `Match` and `Conversation` aggregates before atomic persistence, preventing in-memory state leaks on failed persistence.
+- **B8 — `MatchingUseCases.removeLike`**: fixed with end-to-end ownership enforcement via `InteractionStorage.getLikeById(...)` and `deleteLikeOwnedBy(...)`; unauthorized deletion attempts now fail instead of deleting arbitrary likes by ID.
+- **D8 — `ProfileService` wide compatibility constructor**: removed after confirming no remaining call sites.
+- **C8 — `MatchQualityService.addInterestHighlight()`**: fixed by reusing precomputed shared-interest data instead of recomputing `InterestMatcher.compare(...)`, and by reusing previously computed age information during highlight generation.
+- **C9 — `JdbiConnectionStorage` repeated batch query/fill pattern**: fixed by extracting a shared `mapConversationBatchResults(...)` helper used by latest-message, message-count, and unread-count batch queries.
+
+### Additional integration closure
+
+- `TestStorages.Interactions` now persists copied archived conversations during graceful-exit and unmatch transitions when wired with `CommunicationStorage`, keeping the in-memory path aligned with the JDBI path.
+- `MessagingServiceTest` now wires `TestStorages.Interactions` with `TestStorages.Communications` so relationship-transition tests exercise the fully integrated in-memory seam.
+
+### Verification
+
+- Targeted verification suite: **165 passed / 0 failed**
+	- `MatchingUseCasesTest`
+	- `ConnectionServiceTransitionTest`
+	- `RecordBindingTest`
+	- `MatchQualityServiceTest`
+	- `MessagingServiceTest`
+	- `JdbiCommunicationStorageSocialTest`
+	- `JdbiMatchmakingStorageTransitionAtomicityTest`
+	- `StorageContractTest`
+	- `LikerBrowserServiceTest`
+- Full quality gate: **`mvn spotless:apply verify` → BUILD SUCCESS**
+	- **Tests run:** 1610
+	- **Failures:** 0
+	- **Errors:** 0
+	- **Skipped:** 1
+
+### Files modified in follow-up
+
+#### Production
+- `src/main/java/datingapp/core/storage/InteractionStorage.java`
+- `src/main/java/datingapp/app/usecase/matching/MatchingUseCases.java`
+- `src/main/java/datingapp/storage/jdbi/JdbiMatchmakingStorage.java`
+- `src/main/java/datingapp/core/connection/ConnectionService.java`
+- `src/main/java/datingapp/core/profile/ProfileService.java`
+- `src/main/java/datingapp/core/matching/MatchQualityService.java`
+- `src/main/java/datingapp/storage/jdbi/JdbiConnectionStorage.java`
+- `src/main/java/datingapp/ui/viewmodel/UiDataAdapters.java`
+
+#### Test/support
+- `src/test/java/datingapp/core/testutil/TestStorages.java`
+- `src/test/java/datingapp/app/usecase/matching/MatchingUseCasesTest.java`
+- `src/test/java/datingapp/core/ConnectionServiceTransitionTest.java`
+- `src/test/java/datingapp/storage/jdbi/RecordBindingTest.java`
+- `src/test/java/datingapp/ui/viewmodel/MatchesViewModelTest.java`
+- `src/test/java/datingapp/core/MessagingServiceTest.java`

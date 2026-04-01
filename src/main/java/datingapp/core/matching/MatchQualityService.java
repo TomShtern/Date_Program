@@ -237,13 +237,18 @@ public class MatchQualityService {
         // Age Score
         Optional<Integer> meAge = me.getAge(config.safety().userTimeZone());
         Optional<Integer> themAge = them.getAge(config.safety().userTimeZone());
-        int ageDiff = meAge.isPresent() && themAge.isPresent() ? Math.abs(meAge.get() - themAge.get()) : 0;
-        double ageScore = meAge.isPresent() && themAge.isPresent() ? calculator.calculateAgeScore(me, them) : 0.5;
+        boolean comparableAge = meAge.isPresent() && themAge.isPresent();
+        int ageDiff = comparableAge ? Math.abs(meAge.get() - themAge.get()) : 0;
+        double ageScore = comparableAge ? calculator.calculateAgeScore(me, them) : 0.5;
 
         // Interest Score
         InterestMatcher.MatchResult interestMatch = InterestMatcher.compare(me.getInterests(), them.getInterests());
         double interestScore = calculator.calculateInterestScore(me, them);
         List<String> sharedInterests = InterestMatcher.formatAsList(interestMatch.shared());
+        String sharedInterestSummary = sharedInterests.size() > 1
+                ? InterestMatcher.formatSharedInterests(
+                        interestMatch.shared(), config.matching().sharedInterestsPreviewCount())
+                : null;
 
         // Lifestyle Score
         List<String> lifestyleMatches = findLifestyleMatches(me, them);
@@ -277,7 +282,14 @@ public class MatchQualityService {
 
         // === Generate Highlights ===
         List<String> highlights = generateHighlights(
-                me, them, distanceKm, sharedInterests, lifestyleMatches, paceScore, timeBetweenLikes);
+                distanceKm,
+                sharedInterests,
+                sharedInterestSummary,
+                lifestyleMatches,
+                paceScore,
+                timeBetweenLikes,
+                comparableAge,
+                ageDiff);
 
         return Optional.of(new MatchQuality(
                 match.getId(),
@@ -397,25 +409,22 @@ public class MatchQualityService {
     // === Highlight Generation ===
 
     private List<String> generateHighlights(
-            User me,
-            User them,
             double distanceKm,
             List<String> sharedInterests,
+            String sharedInterestSummary,
             List<String> lifestyleMatches,
             double paceScore,
-            Duration timeBetween) {
+            Duration timeBetween,
+            boolean comparableAge,
+            int ageDiff) {
         List<String> highlights = new ArrayList<>();
         addDistanceHighlight(highlights, distanceKm);
-        addInterestHighlight(highlights, me, them, sharedInterests);
+        addInterestHighlight(highlights, sharedInterests, sharedInterestSummary);
         highlights.addAll(lifestyleMatches);
         addPaceHighlight(highlights, paceScore);
         addResponseHighlight(highlights, timeBetween);
-        if (me.getAge(config.safety().userTimeZone()).isPresent()
-                && them.getAge(config.safety().userTimeZone()).isPresent()) {
-            addAgeHighlight(
-                    highlights,
-                    Math.abs(me.getAge(config.safety().userTimeZone()).orElseThrow()
-                            - them.getAge(config.safety().userTimeZone()).orElseThrow()));
+        if (comparableAge) {
+            addAgeHighlight(highlights, ageDiff);
         }
         if (highlights.size() > HIGHLIGHT_MAX_COUNT) {
             highlights = new ArrayList<>(highlights.subList(0, HIGHLIGHT_MAX_COUNT));
@@ -431,19 +440,18 @@ public class MatchQualityService {
         }
     }
 
-    private void addInterestHighlight(List<String> highlights, User me, User them, List<String> sharedInterests) {
+    private void addInterestHighlight(
+            List<String> highlights, List<String> sharedInterests, String sharedInterestSummary) {
         if (sharedInterests.isEmpty()) {
             return;
         }
         if (sharedInterests.size() == 1) {
             highlights.add("You both enjoy " + sharedInterests.getFirst());
         } else {
-            InterestMatcher.MatchResult result = InterestMatcher.compare(me.getInterests(), them.getInterests());
             highlights.add("You share "
                     + sharedInterests.size()
                     + " interests: "
-                    + InterestMatcher.formatSharedInterests(
-                            result.shared(), config.matching().sharedInterestsPreviewCount()));
+                    + Objects.requireNonNull(sharedInterestSummary, "sharedInterestSummary cannot be null"));
         }
     }
 

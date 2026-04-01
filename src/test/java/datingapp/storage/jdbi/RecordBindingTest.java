@@ -1,5 +1,6 @@
 package datingapp.storage.jdbi;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.core.connection.ConnectionModels.Block;
@@ -104,6 +105,22 @@ class RecordBindingTest {
         // Verify the like was persisted by checking existence
         boolean exists = matchmakingStorage.exists(user1, user2);
         assertTrue(exists, "Like should exist in database");
+    }
+
+    @Test
+    @DisplayName("Like deletion enforces the owner when soft-deleting by ID")
+    void likeDeletionEnforcesOwnerWhenDeletingById() {
+        UUID user1 = UUID.fromString("00000000-0000-0000-0000-000000000001");
+        UUID user2 = UUID.fromString("00000000-0000-0000-0000-000000000002");
+
+        Like like = Like.create(user1, user2, Like.Direction.LIKE);
+        matchmakingStorage.save(like);
+
+        assertFalse(matchmakingStorage.deleteLikeOwnedBy(user2, like.id()));
+        assertTrue(matchmakingStorage.exists(user1, user2), "Like should remain when owner does not match");
+
+        assertTrue(matchmakingStorage.deleteLikeOwnedBy(user1, like.id()));
+        assertFalse(matchmakingStorage.exists(user1, user2), "Like should be soft-deleted for the owning user");
     }
 
     @Test
