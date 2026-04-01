@@ -129,7 +129,10 @@ class PreferencesControllerTest {
         ToggleButton menToggle = JavaFxTestSupport.lookup(root, "#menToggle", ToggleButton.class);
 
         JavaFxTestSupport.runOnFxAndWait(() -> {
-            themeToggle.fire();
+            themeToggle.setSelected(false);
+            if (themeToggle.getOnAction() != null) {
+                themeToggle.getOnAction().handle(new javafx.event.ActionEvent(themeToggle, themeToggle));
+            }
             menToggle.setSelected(true);
         });
 

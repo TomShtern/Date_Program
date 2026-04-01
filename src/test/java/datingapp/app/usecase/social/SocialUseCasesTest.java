@@ -122,8 +122,8 @@ class SocialUseCasesTest {
                 Match.generateId(userA.getId(), userB.getId()),
                 userA.getId(),
                 userB.getId(),
-                "MATCHED",
-                "FRIEND_ZONE_REQUESTED");
+                AppEvent.RelationshipTransitionState.MATCHED,
+                AppEvent.RelationshipTransitionState.FRIEND_ZONE_REQUESTED);
     }
 
     @Test
@@ -146,8 +146,8 @@ class SocialUseCasesTest {
                 Match.generateId(userA.getId(), userB.getId()),
                 userA.getId(),
                 userB.getId(),
-                "MATCHED",
-                "UNMATCHED");
+                AppEvent.RelationshipTransitionState.MATCHED,
+                AppEvent.RelationshipTransitionState.UNMATCHED);
     }
 
     @Test
@@ -203,8 +203,8 @@ class SocialUseCasesTest {
                 Match.generateId(userA.getId(), userB.getId()),
                 userA.getId(),
                 userB.getId(),
-                "ACTIVE",
-                "GRACEFUL_EXIT");
+                AppEvent.RelationshipTransitionState.ACTIVE,
+                AppEvent.RelationshipTransitionState.GRACEFUL_EXIT);
     }
 
     @Test
@@ -351,8 +351,8 @@ class SocialUseCasesTest {
             String matchId,
             UUID initiatorId,
             UUID targetId,
-            String fromState,
-            String toState) {
+            AppEvent.RelationshipTransitionState fromState,
+            AppEvent.RelationshipTransitionState toState) {
         assertNotNull(event);
         assertEquals(matchId, event.matchId());
         assertEquals(initiatorId, event.initiatorId());

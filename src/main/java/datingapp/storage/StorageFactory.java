@@ -49,6 +49,7 @@ import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Objects;
+import java.util.UUID;
 import org.jdbi.v3.core.Jdbi;
 import org.jdbi.v3.sqlobject.SqlObjectPlugin;
 
@@ -270,6 +271,8 @@ public final class StorageFactory {
      * in-memory mode, not a pure in-memory data structure.
      */
     public static ServiceRegistry buildInMemory(AppConfig config) {
-        return buildH2(DatabaseManager.getInstance(), config);
+        DatabaseManager isolatedManager = DatabaseManager.createIsolated(
+                "jdbc:h2:mem:datingapp-inmemory-" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1");
+        return buildH2(isolatedManager, config);
     }
 }

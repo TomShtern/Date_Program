@@ -74,6 +74,7 @@ public class MilestonePopupController implements Initializable {
 
     private ConfettiAnimation confetti;
     private Timeline glowPulse;
+    private PauseTransition autoDismissTransition;
     private Runnable onCloseCallback;
     private Runnable onMessageCallback;
     private Runnable onContinueCallback;
@@ -104,12 +105,7 @@ public class MilestonePopupController implements Initializable {
 
         logger.info("Showing achievement: {} (+{} XP)", name, xpAmount);
         playAchievementEntranceAnimation();
-
-        if (autoDismiss) {
-            PauseTransition delay = new PauseTransition(Duration.seconds(AUTO_DISMISS_SECONDS));
-            delay.setOnFinished(event -> close());
-            delay.play();
-        }
+        scheduleAutoDismiss();
     }
 
     public void showAchievement(Achievement achievement) {
@@ -282,6 +278,7 @@ public class MilestonePopupController implements Initializable {
     }
 
     private void close() {
+        cancelAutoDismiss();
         if (confetti != null) {
             confetti.stop();
         }
@@ -308,6 +305,31 @@ public class MilestonePopupController implements Initializable {
             }
         });
         fadeOut.play();
+    }
+
+    private void scheduleAutoDismiss() {
+        cancelAutoDismiss();
+        if (!autoDismiss) {
+            return;
+        }
+
+        PauseTransition delay = new PauseTransition(Duration.seconds(AUTO_DISMISS_SECONDS));
+        autoDismissTransition = delay;
+        delay.setOnFinished(event -> {
+            if (!java.util.Objects.equals(delay, autoDismissTransition)) {
+                return;
+            }
+            autoDismissTransition = null;
+            close();
+        });
+        delay.play();
+    }
+
+    private void cancelAutoDismiss() {
+        if (autoDismissTransition != null) {
+            autoDismissTransition.stop();
+            autoDismissTransition = null;
+        }
     }
 
     public void setOnClose(Runnable callback) {

@@ -226,20 +226,9 @@ public final class MatchingService {
         Objects.requireNonNull(currentUser, "currentUser cannot be null");
         Objects.requireNonNull(candidate, "candidate cannot be null");
 
-        if (currentUser.getState() != UserState.ACTIVE) {
-            return SwipeResult.configError("Current user must be ACTIVE to swipe.");
-        }
-
-        if (candidate.getState() != UserState.ACTIVE) {
-            return SwipeResult.configError("Candidate must be ACTIVE to receive swipes.");
-        }
-
-        if (currentUser.getId().equals(candidate.getId())) {
-            return SwipeResult.configError("Cannot swipe on yourself.");
-        }
-
-        if (trustSafetyStorage.isBlocked(currentUser.getId(), candidate.getId())) {
-            return SwipeResult.configError(BLOCKED_SWIPE_MESSAGE);
+        Optional<String> eligibilityError = evaluateSwipeEligibility(currentUser, candidate);
+        if (eligibilityError.isPresent()) {
+            return SwipeResult.configError(eligibilityError.orElseThrow());
         }
 
         if (superLike && !liked) {
@@ -321,7 +310,23 @@ public final class MatchingService {
             return Optional.of("Candidate must be ACTIVE to receive swipes.");
         }
 
-        if (trustSafetyStorage.isBlocked(currentUserId, candidateId)) {
+        return evaluateSwipeEligibility(persistedCurrentUser.orElseThrow(), persistedCandidate.orElseThrow());
+    }
+
+    private Optional<String> evaluateSwipeEligibility(User currentUser, User candidate) {
+        if (currentUser.getState() != UserState.ACTIVE) {
+            return Optional.of("Current user must be ACTIVE to swipe.");
+        }
+
+        if (candidate.getState() != UserState.ACTIVE) {
+            return Optional.of("Candidate must be ACTIVE to receive swipes.");
+        }
+
+        if (currentUser.getId().equals(candidate.getId())) {
+            return Optional.of("Cannot swipe on yourself.");
+        }
+
+        if (trustSafetyStorage.isBlocked(currentUser.getId(), candidate.getId())) {
             return Optional.of(BLOCKED_SWIPE_MESSAGE);
         }
 

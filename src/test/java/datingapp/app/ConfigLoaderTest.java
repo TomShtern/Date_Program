@@ -63,14 +63,15 @@ class ConfigLoaderTest {
         }
 
         @Test
-        @DisplayName("Should handle malformed JSON gracefully")
-        void handlesMalformedJson(@TempDir Path tempDir) throws IOException {
+        @DisplayName("Should fail fast on malformed JSON")
+        void failsFastOnMalformedJson(@TempDir Path tempDir) throws IOException {
             Path configFile = tempDir.resolve("bad.json");
             Files.writeString(configFile, "{ invalid json }}}");
 
-            // Should not throw, should return defaults
-            AppConfig config = ApplicationStartup.load(configFile);
-            assertNotNull(config);
+            IllegalStateException error =
+                    assertThrows(IllegalStateException.class, () -> ApplicationStartup.load(configFile));
+
+            assertTrue(error.getMessage().contains("failed to load"));
         }
     }
 
@@ -224,19 +225,18 @@ class ConfigLoaderTest {
         }
 
         @Test
-        @DisplayName("Should fall back to defaults for invalid timezone values")
-        void fallsBackToDefaultsForInvalidTimezone() {
+        @DisplayName("Should fail fast on invalid timezone values")
+        void failsFastOnInvalidTimezone() {
             String json = """
           {
             "userTimeZone": "Not/A_Real_Zone"
           }
           """;
 
-            AppConfig config = ApplicationStartup.fromJson(json);
+            IllegalStateException error =
+                    assertThrows(IllegalStateException.class, () -> ApplicationStartup.fromJson(json));
 
-            assertEquals(
-                    AppConfig.defaults().safety().userTimeZone(),
-                    config.safety().userTimeZone());
+            assertTrue(error.getMessage().contains("Failed to parse JSON config"));
         }
 
         @Test

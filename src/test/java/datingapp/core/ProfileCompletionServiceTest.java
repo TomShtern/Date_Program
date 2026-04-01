@@ -267,9 +267,9 @@ class ProfileCompletionServiceTest {
             int score2 = service.calculateCompleteness(progressUser).percentage();
             assertTrue(score2 > score1, "Adding photo should increase score");
 
-            progressUser.setHeightCm(180);
+            progressUser.setLocation(32.0853, 34.7818);
             int score3 = service.calculateCompleteness(progressUser).percentage();
-            assertTrue(score3 > score2, "Adding height should increase score");
+            assertTrue(score3 > score2, "Adding location should increase score");
         }
 
         @Test
@@ -404,6 +404,11 @@ class ProfileCompletionServiceTest {
         full.setLookingFor(Lifestyle.LookingFor.LONG_TERM);
         full.setInterests(EnumSet.of(Interest.HIKING, Interest.COFFEE, Interest.TRAVEL));
         full.setLocation(40.7128, -74.0060);
+        full.setPacePreferences(new datingapp.core.profile.MatchPreferences.PacePreferences(
+                datingapp.core.profile.MatchPreferences.PacePreferences.MessagingFrequency.OFTEN,
+                datingapp.core.profile.MatchPreferences.PacePreferences.TimeToFirstDate.FEW_DAYS,
+                datingapp.core.profile.MatchPreferences.PacePreferences.CommunicationStyle.TEXT_ONLY,
+                datingapp.core.profile.MatchPreferences.PacePreferences.DepthPreference.DEEP_CHAT));
         return full;
     }
 }

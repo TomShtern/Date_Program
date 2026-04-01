@@ -4,6 +4,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.ui.NavigationService.ViewType;
+import java.lang.reflect.Field;
+import java.util.Deque;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -43,5 +45,27 @@ class NavigationServiceTest {
                 navigationService
                         .consumeNavigationContext(ViewType.PROFILE, String.class)
                         .orElseThrow());
+    }
+
+    @Test
+    @DisplayName("resetNavigationState clears history and pending navigation context")
+    void resetNavigationStateClearsHistoryAndPendingNavigationContext() throws Exception {
+        navigationService.setNavigationContext(ViewType.CHAT, UUID.randomUUID());
+        navigationHistory().push(ViewType.DASHBOARD);
+        navigationHistory().push(ViewType.CHAT);
+
+        navigationService.resetNavigationState();
+
+        assertTrue(navigationHistory().isEmpty());
+        assertTrue(navigationService
+                .consumeNavigationContext(ViewType.CHAT, UUID.class)
+                .isEmpty());
+    }
+
+    @SuppressWarnings("unchecked")
+    private Deque<ViewType> navigationHistory() throws Exception {
+        Field field = NavigationService.class.getDeclaredField("navigationHistory");
+        field.setAccessible(true);
+        return (Deque<ViewType>) field.get(navigationService);
     }
 }

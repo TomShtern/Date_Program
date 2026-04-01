@@ -168,8 +168,8 @@ class CandidateFinderTest {
     }
 
     @Test
-    @DisplayName("findCandidatesForUser caches by seeker and invalidates on demand")
-    void findCandidatesForUserCachesAndInvalidates() {
+    @DisplayName("findCandidatesForUser re-queries each time to preserve truthfulness")
+    void findCandidatesForUserAlwaysRefreshes() {
         User cachedSeeker = createUser("CachedSeeker", Gender.MALE, EnumSet.of(Gender.FEMALE), 30, 32.0853, 34.7818);
         User candidate = createUser("Candidate", Gender.FEMALE, EnumSet.of(Gender.MALE), 28, 32.1, 34.8);
         userStorage.save(cachedSeeker);
@@ -177,24 +177,22 @@ class CandidateFinderTest {
 
         finder.findCandidatesForUser(cachedSeeker);
         finder.findCandidatesForUser(cachedSeeker);
-        assertEquals(1, userStorage.findCandidatesCallCount(), "second call should be a cache hit and skip storage");
-
-        finder.invalidateCacheFor(cachedSeeker.getId());
-        finder.findCandidatesForUser(cachedSeeker);
-        assertEquals(2, userStorage.findCandidatesCallCount(), "invalidation forces a fresh storage query");
+        assertEquals(
+                2,
+                userStorage.findCandidatesCallCount(),
+                "freshness-first browsing should not serve cached candidates");
     }
 
     @Test
-    @DisplayName("findCandidatesForUser cache fingerprint includes pace/lifestyle/dealbreakers/interests")
-    void findCandidatesForUserCacheFingerprintIncludesPreferenceState() {
+    @DisplayName("findCandidatesForUser reflects seeker preference changes immediately")
+    void findCandidatesForUserReflectsPreferenceChangesImmediately() {
         User cachedSeeker = createUser("CachedSeeker", Gender.MALE, EnumSet.of(Gender.FEMALE), 30, 32.0853, 34.7818);
         User candidate = createUser("Candidate", Gender.FEMALE, EnumSet.of(Gender.MALE), 28, 32.1, 34.8);
         userStorage.save(cachedSeeker);
         userStorage.save(candidate);
 
-        finder.findCandidatesForUser(cachedSeeker);
-        finder.findCandidatesForUser(cachedSeeker);
-        assertEquals(1, userStorage.findCandidatesCallCount(), "second call should be a cache hit and skip storage");
+        List<User> firstResult = finder.findCandidatesForUser(cachedSeeker);
+        assertEquals(1, firstResult.size());
 
         cachedSeeker.setDealbreakers(
                 Dealbreakers.builder().acceptSmoking(Lifestyle.Smoking.NEVER).build());
@@ -205,11 +203,13 @@ class CandidateFinderTest {
                 DepthPreference.SMALL_TALK));
         cachedSeeker.setInterests(EnumSet.of(datingapp.core.profile.MatchPreferences.Interest.TRAVEL));
 
-        finder.findCandidatesForUser(cachedSeeker);
+        List<User> secondResult = finder.findCandidatesForUser(cachedSeeker);
+
         assertEquals(
                 2,
                 userStorage.findCandidatesCallCount(),
-                "preference changes must invalidate fingerprint-equivalent cache entries");
+                "preference changes should be visible on the next browse call");
+        assertTrue(secondResult.isEmpty(), "candidate should disappear once updated dealbreakers reject them");
     }
 
     // =========================================================================
@@ -329,8 +329,8 @@ class CandidateFinderTest {
     }
 
     @Test
-    @DisplayName("Phase 1a: explicit cache invalidation detects candidate state changes")
-    void phase1aStaleCacheTruthWithDetachedSnapshots() {
+    @DisplayName("Phase 1a: candidate state changes are reflected without explicit invalidation")
+    void phase1aStateChangesStayFreshWithoutExplicitInvalidation() {
         User browsingSeeker = createUser("Seeker", Gender.MALE, EnumSet.of(Gender.FEMALE), 30, 32.09, 34.79);
         User candidate = createUser("Candidate", Gender.FEMALE, EnumSet.of(Gender.MALE), 28, 32.09, 34.79);
 
@@ -348,16 +348,33 @@ class CandidateFinderTest {
         // Modify live candidate to PAUSED state
         candidate.pause();
 
-        // Second call returns cached result (fingerprint unchanged, TTL valid)
-        List<User> cachedResult = filterFinder.findCandidatesForUser(browsingSeeker);
-        assertEquals(1, cachedResult.size(), "Cache hit returns stale snapshot within TTL");
-
-        // After explicit invalidation, fresh query drops the paused candidate
-        filterFinder.invalidateCacheFor(browsingSeeker.getId());
         List<User> secondResult = filterFinder.findCandidatesForUser(browsingSeeker);
         assertTrue(
                 secondResult.isEmpty(),
-                "After invalidation, fresh query should drop a candidate that paused after the snapshot was cached");
+                "fresh browsing should drop a candidate that paused after an earlier result was returned");
+    }
+
+    @Test
+    @DisplayName("Phase 1a: reverse-direction blocks are reflected without explicit invalidation")
+    void phase1aBlockChangesStayFreshWithoutExplicitInvalidation() {
+        User browsingSeeker = createUser("Seeker", Gender.MALE, EnumSet.of(Gender.FEMALE), 30, 32.09, 34.79);
+        User candidate = createUser("Candidate", Gender.FEMALE, EnumSet.of(Gender.MALE), 28, 32.09, 34.79);
+
+        SnapshotingUsers snapshotUsers = new SnapshotingUsers();
+        snapshotUsers.save(browsingSeeker);
+        snapshotUsers.save(candidate);
+
+        CandidateFinder filterFinder = new CandidateFinder(snapshotUsers, interactionStorage, trustSafetyStorage, ZONE);
+
+        List<User> firstResult = filterFinder.findCandidatesForUser(browsingSeeker);
+        assertEquals(1, firstResult.size());
+
+        trustSafetyStorage.save(
+                datingapp.core.connection.ConnectionModels.Block.create(candidate.getId(), browsingSeeker.getId()));
+
+        List<User> secondResult = filterFinder.findCandidatesForUser(browsingSeeker);
+
+        assertTrue(secondResult.isEmpty(), "fresh browsing should drop a candidate that blocked the seeker");
     }
 
     private User createUser(String name, Gender gender, Set<Gender> interestedIn, int age, double lat, double lon) {
@@ -395,7 +412,6 @@ class CandidateFinderTest {
                 TimeToFirstDate.FEW_DAYS,
                 CommunicationStyle.TEXT_ONLY,
                 DepthPreference.DEEP_CHAT));
-        user.activate();
         return user;
     }
 

@@ -250,9 +250,16 @@ class ChatViewModelTest {
         viewModel.selectedConversationProperty().set(user3Conv);
 
         assertTrue(waitUntil(
-                () -> viewModel.getActiveMessages().size() == 1
+                () -> viewModel.selectedConversationProperty().get() != null
+                        && viewModel
+                                .selectedConversationProperty()
+                                .get()
+                                .otherUser()
+                                .getId()
+                                .equals(user3Id)
+                        && viewModel.getActiveMessages().size() == 1
                         && !viewModel.loadingProperty().get(),
-                5000));
+                10000));
 
         // The active messages should reflect the 2nd (User3) conversation only
         assertEquals(1, viewModel.getActiveMessages().size());

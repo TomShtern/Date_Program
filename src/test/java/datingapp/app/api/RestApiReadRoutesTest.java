@@ -421,6 +421,71 @@ class RestApiReadRoutesTest {
         assertTrue(userStorage.get(userId).orElseThrow().isDeleted());
     }
 
+    @Test
+    @DisplayName("conversation message reads require an acting user header")
+    void conversationMessageReadsRequireActingUserHeader() throws Exception {
+        TestStorages.Users userStorage = new TestStorages.Users();
+        TestStorages.Communications communicationStorage = new TestStorages.Communications();
+        TestStorages.Interactions interactionStorage = new TestStorages.Interactions(communicationStorage);
+        ServiceRegistry services = createServices(userStorage, interactionStorage, communicationStorage);
+
+        UUID aliceId = UUID.randomUUID();
+        UUID bobId = UUID.randomUUID();
+        userStorage.save(activeUser(aliceId, "Alice", Gender.FEMALE, EnumSet.of(Gender.MALE)));
+        userStorage.save(activeUser(bobId, "Bob", Gender.MALE, EnumSet.of(Gender.FEMALE)));
+        interactionStorage.save(Match.create(aliceId, bobId));
+        services.getConnectionService().sendMessage(aliceId, bobId, "Hello Bob");
+
+        server = new RestApiServer(services, 0);
+        server.start();
+        int port = server.getApp().port();
+        String conversationId = ConnectionModels.Conversation.generateId(aliceId, bobId);
+
+        HttpResponse<String> response = HttpClient.newHttpClient()
+                .send(
+                        HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/conversations/"
+                                        + conversationId + "/messages"))
+                                .GET()
+                                .build(),
+                        HttpResponse.BodyHandlers.ofString());
+
+        assertEquals(400, response.statusCode(), response.body());
+    }
+
+    @Test
+    @DisplayName("conversation message reads reject acting users outside the conversation")
+    void conversationMessageReadsRejectUsersOutsideTheConversation() throws Exception {
+        TestStorages.Users userStorage = new TestStorages.Users();
+        TestStorages.Communications communicationStorage = new TestStorages.Communications();
+        TestStorages.Interactions interactionStorage = new TestStorages.Interactions(communicationStorage);
+        ServiceRegistry services = createServices(userStorage, interactionStorage, communicationStorage);
+
+        UUID aliceId = UUID.randomUUID();
+        UUID bobId = UUID.randomUUID();
+        UUID malloryId = UUID.randomUUID();
+        userStorage.save(activeUser(aliceId, "Alice", Gender.FEMALE, EnumSet.of(Gender.MALE)));
+        userStorage.save(activeUser(bobId, "Bob", Gender.MALE, EnumSet.of(Gender.FEMALE)));
+        userStorage.save(activeUser(malloryId, "Mallory", Gender.OTHER, EnumSet.of(Gender.FEMALE)));
+        interactionStorage.save(Match.create(aliceId, bobId));
+        services.getConnectionService().sendMessage(aliceId, bobId, "Secret hello");
+
+        server = new RestApiServer(services, 0);
+        server.start();
+        int port = server.getApp().port();
+        String conversationId = ConnectionModels.Conversation.generateId(aliceId, bobId);
+
+        HttpResponse<String> response = HttpClient.newHttpClient()
+                .send(
+                        HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/conversations/"
+                                        + conversationId + "/messages"))
+                                .header("X-User-Id", malloryId.toString())
+                                .GET()
+                                .build(),
+                        HttpResponse.BodyHandlers.ofString());
+
+        assertEquals(403, response.statusCode(), response.body());
+    }
+
     private static ServiceRegistry createServices(
             UserStorage userStorage, InteractionStorage interactionStorage, CommunicationStorage communicationStorage) {
         return RestApiTestFixture.builder(userStorage, interactionStorage, communicationStorage)

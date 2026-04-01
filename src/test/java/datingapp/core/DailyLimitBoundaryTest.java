@@ -81,11 +81,32 @@ class DailyLimitBoundaryTest {
         assertNotEquals(utcStatus.resetsAt(), tokyoStatus.resetsAt());
     }
 
+    @Test
+    void configuredTimezoneOverridesClockZoneForDailyBoundaries() {
+        TestStorages.Interactions interactions = new TestStorages.Interactions();
+        saveLike(interactions, Instant.parse("2026-03-25T14:30:00Z"));
+
+        DefaultDailyLimitService service =
+                createService(interactions, Instant.parse("2026-03-25T15:30:00Z"), UTC, TOKYO);
+        DailyLimitService.DailyStatus status = service.getStatus(USER_ID);
+
+        assertEquals(0, status.likesUsed());
+        assertEquals(LocalDate.of(2026, 3, 26), status.date());
+        assertEquals(Instant.parse("2026-03-26T15:00:00Z"), status.resetsAt());
+    }
+
     private static DefaultDailyLimitService createService(
             TestStorages.Interactions interactions, Instant now, ZoneId zone) {
-        AppConfig config =
-                AppConfig.builder().dailyLikeLimit(1).userTimeZone(zone).build();
-        Clock clock = Clock.fixed(now, zone);
+        return createService(interactions, now, zone, zone);
+    }
+
+    private static DefaultDailyLimitService createService(
+            TestStorages.Interactions interactions, Instant now, ZoneId clockZone, ZoneId configuredZone) {
+        AppConfig config = AppConfig.builder()
+                .dailyLikeLimit(1)
+                .userTimeZone(configuredZone)
+                .build();
+        Clock clock = Clock.fixed(now, clockZone);
         return new DefaultDailyLimitService(interactions, config, clock);
     }
 

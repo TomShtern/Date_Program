@@ -5,6 +5,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.RejectedExecutionException;
@@ -53,6 +54,8 @@ public final class ImageCache {
     /** Tracks in-flight preload requests so repeated calls for the same image stay cheap. */
     private static final Set<String> IN_FLIGHT_PRELOADS = ConcurrentHashMap.newKeySet();
 
+    private static final Map<String, CompletableFuture<Image>> IN_FLIGHT_LOADS = new ConcurrentHashMap<>();
+
     /**
      * Thread-safe LRU cache using LinkedHashMap with access-order.
      * Access-order (true) means get() operations move entries to the end,
@@ -99,17 +102,7 @@ public final class ImageCache {
 
         String key = cacheKey(path, width, height);
 
-        // Synchronized access for thread safety with LinkedHashMap
-        synchronized (CACHE) {
-            Image image = CACHE.get(key);
-            if (image != null) {
-                return image;
-            }
-            image = loadImage(path, width, height);
-            CACHE.put(key, image);
-            // LRU eviction handled automatically by removeEldestEntry
-            return image;
-        }
+        return getOrLoadCachedImage(key, () -> loadImage(path, width, height));
     }
 
     /** Loads an image with error handling. */
@@ -134,15 +127,40 @@ public final class ImageCache {
     /** Returns the default avatar placeholder image. */
     private static Image getDefaultAvatar(double width, double height) {
         String key = cacheKey("default", width, height);
+        return getOrLoadCachedImage(key, () -> loadDefaultAvatarImage(width, height));
+    }
 
+    private static Image getOrLoadCachedImage(String key, java.util.function.Supplier<Image> loader) {
         synchronized (CACHE) {
             Image cached = CACHE.get(key);
             if (cached != null) {
                 return cached;
             }
-            Image avatar = loadDefaultAvatarImage(width, height);
-            CACHE.put(key, avatar);
-            return avatar;
+        }
+
+        CompletableFuture<Image> newLoad = new CompletableFuture<>();
+        CompletableFuture<Image> inFlight = IN_FLIGHT_LOADS.putIfAbsent(key, newLoad);
+        if (inFlight != null) {
+            return inFlight.join();
+        }
+
+        try {
+            Image loaded = loader.get();
+            synchronized (CACHE) {
+                Image cached = CACHE.get(key);
+                if (cached != null) {
+                    newLoad.complete(cached);
+                    return cached;
+                }
+                CACHE.put(key, loaded);
+            }
+            newLoad.complete(loaded);
+            return loaded;
+        } catch (RuntimeException exception) {
+            newLoad.completeExceptionally(exception);
+            throw exception;
+        } finally {
+            IN_FLIGHT_LOADS.remove(key, newLoad);
         }
     }
 

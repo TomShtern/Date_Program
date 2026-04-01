@@ -18,6 +18,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Predicate;
 
 /**
  * Represents a user in the dating app. Mutable entity - state can change over
@@ -29,6 +30,27 @@ public class User {
     private static final String PLACEHOLDER_PHOTO_URL = "placeholder://default-avatar";
     private static final Set<Gender> MATCHABLE_GENDERS =
             Collections.unmodifiableSet(EnumSet.of(Gender.MALE, Gender.FEMALE, Gender.OTHER));
+    private static final List<RequiredProfileField> REQUIRED_PROFILE_FIELDS = List.of(
+            new RequiredProfileField(
+                    "name",
+                    "Name",
+                    user -> user.getName() != null && !user.getName().isBlank()),
+            new RequiredProfileField(
+                    "bio",
+                    "Bio",
+                    user -> user.getBio() != null && !user.getBio().isBlank()),
+            new RequiredProfileField("birthDate", "Birth Date", user -> user.getBirthDate() != null),
+            new RequiredProfileField("gender", "Gender", user -> user.getGender() != null),
+            new RequiredProfileField(
+                    "interestedIn",
+                    "Interested In",
+                    user -> user.getInterestedIn() != null
+                            && !user.getInterestedIn().isEmpty()),
+            new RequiredProfileField("location", "Location", User::hasLocation),
+            new RequiredProfileField("photoUrls", "Photo", User::hasRealPhoto),
+            new RequiredProfileField("pacePreferences", "Pace Preferences", User::hasCompletePace));
+
+    private record RequiredProfileField(String key, String displayName, Predicate<User> isComplete) {}
 
     // ── Nested domain types ────────────────────────────────────────────
 
@@ -157,6 +179,7 @@ public class User {
      */
     public static final class StorageBuilder {
         private final User user;
+        private boolean locationProvided;
 
         private StorageBuilder(UUID id, String name, Instant createdAt) {
             this.user = new User(id, name, createdAt);
@@ -190,11 +213,22 @@ public class User {
         public StorageBuilder location(double lat, double lon) {
             user.lat = lat;
             user.lon = lon;
+            user.hasLocationSet = true;
+            locationProvided = true;
             return this;
         }
 
         public StorageBuilder hasLocationSet(boolean hasLocationSet) {
-            user.hasLocationSet = hasLocationSet;
+            if (hasLocationSet) {
+                if (!locationProvided) {
+                    throw new IllegalStateException("Cannot mark location as set without coordinates");
+                }
+                user.hasLocationSet = true;
+                return this;
+            }
+            user.lat = 0.0;
+            user.lon = 0.0;
+            user.hasLocationSet = false;
             return this;
         }
 
@@ -802,38 +836,28 @@ public class User {
      * <p>This is the single source of truth for profile completeness rules.
      */
     public List<String> getMissingProfileFields() {
-        List<String> missing = new ArrayList<>();
-        if (name == null || name.isBlank()) {
-            missing.add("name");
-        }
-        if (bio == null || bio.isBlank()) {
-            missing.add("bio");
-        }
-        if (birthDate == null) {
-            missing.add("birthDate");
-        }
-        if (gender == null) {
-            missing.add("gender");
-        }
-        if (interestedIn == null || interestedIn.isEmpty()) {
-            missing.add("interestedIn");
-        }
-        if (maxDistanceKm <= 0) {
-            missing.add("maxDistanceKm");
-        }
-        if (minAge <= 0) {
-            missing.add("minAge");
-        }
-        if (maxAge < minAge) {
-            missing.add("maxAge");
-        }
-        if (photoUrls == null || photoUrls.isEmpty()) {
-            missing.add("photoUrls");
-        }
-        if (!hasCompletePace()) {
-            missing.add("pacePreferences");
-        }
-        return List.copyOf(missing);
+        return REQUIRED_PROFILE_FIELDS.stream()
+                .filter(field -> !field.isComplete().test(this))
+                .map(RequiredProfileField::key)
+                .toList();
+    }
+
+    public List<String> getFilledProfileFieldDisplayNames() {
+        return REQUIRED_PROFILE_FIELDS.stream()
+                .filter(field -> field.isComplete().test(this))
+                .map(RequiredProfileField::displayName)
+                .toList();
+    }
+
+    public List<String> getMissingProfileFieldDisplayNames() {
+        return REQUIRED_PROFILE_FIELDS.stream()
+                .filter(field -> !field.isComplete().test(this))
+                .map(RequiredProfileField::displayName)
+                .toList();
+    }
+
+    public int getRequiredProfileFieldCount() {
+        return REQUIRED_PROFILE_FIELDS.size();
     }
 
     /** Checks if the user has completed their pace MatchPreferences. */

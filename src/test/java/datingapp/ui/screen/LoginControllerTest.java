@@ -1,6 +1,8 @@
 package datingapp.ui.screen;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.core.AppClock;
@@ -20,8 +22,10 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import javafx.scene.Parent;
 import javafx.scene.control.Button;
+import javafx.scene.control.Dialog;
 import javafx.scene.control.ListView;
 import javafx.scene.control.TextField;
+import javafx.scene.layout.StackPane;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
@@ -140,6 +144,51 @@ class LoginControllerTest {
         assertEquals(true, JavaFxTestSupport.callOnFxAndWait(loginButton::isDisabled));
 
         viewModel.dispose();
+    }
+
+    @Test
+    @DisplayName("create account dialog factory keeps create disabled until a name is entered")
+    void createAccountDialogFactoryKeepsCreateDisabledUntilNameIsEntered() throws Exception {
+        TestStorages.Users users = new TestStorages.Users();
+        LoginViewModel viewModel = new LoginViewModel(
+                new StorageUiUserStore(users),
+                AppConfig.defaults(),
+                AppSession.getInstance(),
+                JavaFxTestSupport.blockingUiDispatcher());
+
+        Dialog<User> dialog =
+                JavaFxTestSupport.callOnFxAndWait(() -> CreateAccountDialogFactory.create(new StackPane(), viewModel));
+        Button createButton = JavaFxTestSupport.callOnFxAndWait(() -> (Button) dialog.getDialogPane()
+                .lookupButton(dialog.getDialogPane().getButtonTypes().getFirst()));
+        TextField nameField = JavaFxTestSupport.callOnFxAndWait(
+                () -> findFirstTextField((Parent) dialog.getDialogPane().getContent()));
+
+        assertNotNull(nameField);
+        assertTrue(JavaFxTestSupport.callOnFxAndWait(createButton::isDisabled));
+
+        JavaFxTestSupport.runOnFxAndWait(() -> nameField.setText("Taylor"));
+
+        assertFalse(JavaFxTestSupport.callOnFxAndWait(createButton::isDisabled));
+
+        viewModel.dispose();
+    }
+
+    private static TextField findFirstTextField(Parent root) {
+        if (root instanceof TextField textField) {
+            return textField;
+        }
+        for (javafx.scene.Node child : root.getChildrenUnmodifiable()) {
+            if (child instanceof TextField textField) {
+                return textField;
+            }
+            if (child instanceof Parent parent) {
+                TextField nested = findFirstTextField(parent);
+                if (nested != null) {
+                    return nested;
+                }
+            }
+        }
+        return null;
     }
 
     private static User createActiveUser(String name, Gender gender, EnumSet<Gender> interestedIn) {

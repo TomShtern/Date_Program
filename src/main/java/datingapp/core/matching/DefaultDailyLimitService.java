@@ -80,7 +80,7 @@ public final class DefaultDailyLimitService implements DailyLimitService {
 
     @Override
     public Duration getTimeUntilReset() {
-        Instant now = Instant.now(clock);
+        Instant now = clock.instant();
         Instant resetTime = getResetTime();
         return Duration.between(now, resetTime);
     }
@@ -94,16 +94,20 @@ public final class DefaultDailyLimitService implements DailyLimitService {
     }
 
     private Instant getStartOfToday() {
-        ZoneId zone = clock.getZone();
-        return LocalDate.now(clock).atStartOfDay(zone).toInstant();
+        ZoneId zone = configuredZone();
+        return getToday().atStartOfDay(zone).toInstant();
     }
 
     private Instant getResetTime() {
-        ZoneId zone = clock.getZone();
-        return LocalDate.now(clock).plusDays(1).atStartOfDay(zone).toInstant();
+        ZoneId zone = configuredZone();
+        return getToday().plusDays(1).atStartOfDay(zone).toInstant();
     }
 
     private LocalDate getToday() {
-        return LocalDate.now(clock);
+        return LocalDate.ofInstant(clock.instant(), configuredZone());
+    }
+
+    private ZoneId configuredZone() {
+        return config.safety().userTimeZone();
     }
 }

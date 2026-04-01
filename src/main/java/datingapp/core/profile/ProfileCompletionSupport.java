@@ -130,30 +130,9 @@ final class ProfileCompletionSupport {
     }
 
     ProfileService.ProfileCompleteness calculateCompleteness(User user) {
-        List<String> filled = new ArrayList<>();
-        List<String> missing = new ArrayList<>();
-        Set<Interest> interests = user.getInterests() != null ? user.getInterests() : Set.of();
-
-        checkField("Name", user.getName() != null && !user.getName().isBlank(), filled, missing);
-        checkField("Bio", user.getBio() != null && !user.getBio().isBlank(), filled, missing);
-        checkField("Birth Date", user.getBirthDate() != null, filled, missing);
-        checkField("Gender", user.getGender() != null, filled, missing);
-        checkField(
-                "Interested In",
-                user.getInterestedIn() != null && !user.getInterestedIn().isEmpty(),
-                filled,
-                missing);
-        checkField(FIELD_LOCATION, user.hasLocation(), filled, missing);
-        checkField("Photo", user.hasRealPhoto(), filled, missing);
-
-        checkField("Height", user.getHeightCm() != null, filled, missing);
-        checkField("Smoking", user.getSmoking() != null, filled, missing);
-        checkField("Drinking", user.getDrinking() != null, filled, missing);
-        checkField("Kids Stance", user.getWantsKids() != null, filled, missing);
-        checkField("Looking For", user.getLookingFor() != null, filled, missing);
-        checkField("Interests", interests.size() >= Interest.MIN_FOR_COMPLETE, filled, missing);
-
-        int total = filled.size() + missing.size();
+        List<String> filled = user.getFilledProfileFieldDisplayNames();
+        List<String> missing = user.getMissingProfileFieldDisplayNames();
+        int total = user.getRequiredProfileFieldCount();
         int percentage = total > 0 ? filled.size() * 100 / total : 0;
 
         return new ProfileService.ProfileCompleteness(percentage, filled, missing);
@@ -327,13 +306,5 @@ final class ProfileCompletionSupport {
             return TIER_BRONZE;
         }
         return TIER_STARTER;
-    }
-
-    private static void checkField(String fieldName, boolean isFilled, List<String> filled, List<String> missing) {
-        if (isFilled) {
-            filled.add(fieldName);
-        } else {
-            missing.add(fieldName);
-        }
     }
 }

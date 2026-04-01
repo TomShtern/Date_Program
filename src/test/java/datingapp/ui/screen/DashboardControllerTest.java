@@ -22,14 +22,20 @@ import datingapp.ui.JavaFxTestSupport;
 import datingapp.ui.NavigationService;
 import datingapp.ui.viewmodel.DashboardViewModel;
 import datingapp.ui.viewmodel.UiDataAdapters.StorageUiMatchDataAccess;
+import java.lang.reflect.Field;
 import java.time.Instant;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.EnumSet;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import javafx.animation.Animation;
+import javafx.animation.PauseTransition;
 import javafx.scene.Parent;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
+import javafx.util.Duration;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
@@ -292,6 +298,51 @@ class DashboardControllerTest {
                 () -> totalMatchesLabel.getParent().isManaged()));
 
         viewModel.dispose();
+    }
+
+    @Test
+    @DisplayName("cleanup stops pending achievement celebration timers")
+    void cleanupStopsPendingAchievementCelebrationTimers() throws Exception {
+        DashboardController controller = new DashboardController(null);
+        PauseTransition removalDelay = new PauseTransition(Duration.seconds(5));
+        PauseTransition firstStagger = new PauseTransition(Duration.seconds(5));
+        PauseTransition secondStagger = new PauseTransition(Duration.seconds(5));
+
+        JavaFxTestSupport.runOnFxAndWait(() -> {
+            removalDelay.play();
+            firstStagger.play();
+            secondStagger.play();
+        });
+
+        setPrivateField(controller, "achievementRemovalDelay", removalDelay);
+        setPrivateField(controller, "achievementPopupStaggers", new ArrayList<>(List.of(firstStagger, secondStagger)));
+
+        JavaFxTestSupport.runOnFxAndWait(controller::cleanup);
+
+        assertEquals(Animation.Status.STOPPED, JavaFxTestSupport.callOnFxAndWait(removalDelay::getStatus));
+        assertEquals(Animation.Status.STOPPED, JavaFxTestSupport.callOnFxAndWait(firstStagger::getStatus));
+        assertEquals(Animation.Status.STOPPED, JavaFxTestSupport.callOnFxAndWait(secondStagger::getStatus));
+        assertTrue(getPrivateList(controller, "achievementPopupStaggers").isEmpty());
+        assertEquals(null, getPrivateField(controller, "achievementRemovalDelay"));
+    }
+
+    private static void setPrivateField(Object target, String fieldName, Object value) throws Exception {
+        Field field = DashboardController.class.getDeclaredField(fieldName);
+        field.setAccessible(true);
+        field.set(target, value);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static List<PauseTransition> getPrivateList(Object target, String fieldName) throws Exception {
+        Field field = DashboardController.class.getDeclaredField(fieldName);
+        field.setAccessible(true);
+        return (List<PauseTransition>) field.get(target);
+    }
+
+    private static Object getPrivateField(Object target, String fieldName) throws Exception {
+        Field field = DashboardController.class.getDeclaredField(fieldName);
+        field.setAccessible(true);
+        return field.get(target);
     }
 
     private static User createActiveUser(String name, Gender gender, EnumSet<Gender> interestedIn) {

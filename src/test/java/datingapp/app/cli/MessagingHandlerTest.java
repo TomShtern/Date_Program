@@ -39,6 +39,7 @@ import java.util.Scanner;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -53,9 +54,9 @@ import org.junit.jupiter.api.Timeout;
 @Timeout(value = 10, unit = TimeUnit.SECONDS)
 class MessagingHandlerTest {
 
-    private static DatabaseManager dbManager;
-    private static ServiceRegistry registry;
     private AppSession session;
+    private DatabaseManager dbManager;
+    private ServiceRegistry registry;
     private User testUser;
     private UserStorage userStorage;
     private InteractionStorage interactionStorage;
@@ -65,10 +66,6 @@ class MessagingHandlerTest {
     static void setUpDatabase() {
         System.setProperty("datingapp.db.password", "test");
         System.setProperty("datingapp.db.profile", "test");
-        DatabaseManager.setJdbcUrl("jdbc:h2:mem:messagingtest_" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1");
-        DatabaseManager.resetInstance();
-        dbManager = DatabaseManager.getInstance();
-        registry = StorageFactory.buildH2(dbManager, AppConfig.defaults());
     }
 
     @AfterAll
@@ -81,6 +78,13 @@ class MessagingHandlerTest {
         session = AppSession.getInstance();
         session.reset();
 
+        System.setProperty("datingapp.db.password", "test");
+        System.setProperty("datingapp.db.profile", "test");
+        DatabaseManager.resetInstance();
+        DatabaseManager.setJdbcUrl("jdbc:h2:mem:messagingtest_" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1");
+        dbManager = DatabaseManager.getInstance();
+        registry = StorageFactory.buildH2(dbManager, AppConfig.defaults());
+
         userStorage = registry.getUserStorage();
         interactionStorage = registry.getInteractionStorage();
         communicationStorage = registry.getCommunicationStorage();
@@ -88,6 +92,14 @@ class MessagingHandlerTest {
         testUser = createActiveUser("TestUser");
         userStorage.save(testUser);
         session.setCurrentUser(testUser);
+    }
+
+    @AfterEach
+    void tearDownEach() {
+        session.reset();
+        DatabaseManager.resetInstance();
+        System.clearProperty("datingapp.db.password");
+        System.clearProperty("datingapp.db.profile");
     }
 
     private MessagingHandler createHandler(String input) {
@@ -441,6 +453,7 @@ class MessagingHandlerTest {
         user.setBirthDate(LocalDate.of(1990, 1, 1));
         user.setGender(Gender.OTHER);
         user.setInterestedIn(EnumSet.of(Gender.OTHER));
+        user.setLocation(32.0853, 34.7818);
         user.addPhotoUrl("https://example.com/photo.jpg");
         user.setPacePreferences(new PacePreferences(
                 PacePreferences.MessagingFrequency.OFTEN,

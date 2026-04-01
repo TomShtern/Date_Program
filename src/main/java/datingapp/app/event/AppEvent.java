@@ -1,5 +1,6 @@
 package datingapp.app.event;
 
+import datingapp.core.connection.ConnectionModels.Like;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -34,7 +35,16 @@ public sealed interface AppEvent
         ANONYMIZED_CODE
     }
 
-    record SwipeRecorded(UUID swiperId, UUID targetId, String direction, boolean resultedInMatch, Instant occurredAt)
+    enum RelationshipTransitionState {
+        MATCHED,
+        UNMATCHED,
+        FRIEND_ZONE_REQUESTED,
+        ACTIVE,
+        GRACEFUL_EXIT
+    }
+
+    record SwipeRecorded(
+            UUID swiperId, UUID targetId, Like.Direction direction, boolean resultedInMatch, Instant occurredAt)
             implements AppEvent {}
 
     record MatchCreated(String matchId, UUID userA, UUID userB, Instant occurredAt) implements AppEvent {}
@@ -61,7 +71,12 @@ public sealed interface AppEvent
             implements AppEvent {}
 
     record RelationshipTransitioned(
-            String matchId, UUID initiatorId, UUID targetId, String fromState, String toState, Instant occurredAt)
+            String matchId,
+            UUID initiatorId,
+            UUID targetId,
+            RelationshipTransitionState fromState,
+            RelationshipTransitionState toState,
+            Instant occurredAt)
             implements AppEvent {}
 
     record MessageSent(UUID senderId, UUID recipientId, UUID messageId, Instant occurredAt) implements AppEvent {}

@@ -43,8 +43,8 @@ class ServiceRegistryTest {
     static void setUpOnce() {
         System.setProperty(PROFILE_PROPERTY, "test");
         // Use in-memory H2 database for testing
-        DatabaseManager.setJdbcUrl("jdbc:h2:mem:test_service_registry_" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1");
         DatabaseManager.resetInstance();
+        DatabaseManager.setJdbcUrl("jdbc:h2:mem:test_service_registry_" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1");
         dbManager = DatabaseManager.getInstance();
         registry = StorageFactory.buildH2(dbManager, AppConfig.defaults());
     }

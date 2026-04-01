@@ -130,6 +130,38 @@ class StorageContractTest {
         assertThrows(UnsupportedOperationException.class, () -> storage.countPendingFriendRequestsForUser(userId));
     }
 
+    @Test
+    @DisplayName("UserStorage withUserLock exposes explicit get/save access")
+    void userStorageWithUserLockExposesExplicitGetSaveAccess() {
+        TestStorages.Users storage = new TestStorages.Users();
+        User alpha = user(USER_ALPHA, UserState.ACTIVE);
+
+        boolean foundWithinLock = storage.withUserLock(alpha.getId(), lockedUsers -> {
+            lockedUsers.save(alpha);
+            return lockedUsers.get(alpha.getId()).isPresent();
+        });
+
+        assertTrue(foundWithinLock);
+        assertTrue(storage.get(alpha.getId()).isPresent());
+    }
+
+    @Test
+    @DisplayName("CommunicationStorage unread batch default preserves per-conversation semantics")
+    void communicationStorageUnreadBatchDefaultPreservesPerConversationSemantics() {
+        CommunicationStorage storage = new DefaultUnreadBatchCommunications();
+        UUID alice = UUID.randomUUID();
+        UUID bob = UUID.randomUUID();
+        String conversationId = Conversation.generateId(alice, bob);
+
+        Conversation conversation = Conversation.create(alice, bob);
+        storage.saveConversation(conversation);
+        storage.saveMessage(Message.create(conversationId, bob, "hello"));
+
+        Map<String, Integer> unread = storage.countUnreadMessagesByConversationIds(alice, Set.of(conversationId));
+
+        assertEquals(1, unread.get(conversationId));
+    }
+
     private static User user(String name, UserState state) {
         return User.StorageBuilder.create(UUID.randomUUID(), name, Instant.EPOCH)
                 .state(state)
@@ -661,6 +693,27 @@ class StorageContractTest {
         @Override
         public void deleteOldNotifications(Instant before) {
             throw new UnsupportedOperationException("stub");
+        }
+    }
+
+    private static final class DefaultUnreadBatchCommunications extends TestStorages.Communications {
+        @Override
+        public Map<String, Integer> countUnreadMessagesByConversationIds(UUID userId, Set<String> conversationIds) {
+            Map<String, Integer> unreadCounts = new java.util.HashMap<>();
+            for (String conversationId : conversationIds) {
+                Optional<Conversation> conversation = getConversation(conversationId);
+                if (conversation.isEmpty() || !conversation.get().involves(userId)) {
+                    unreadCounts.put(conversationId, 0);
+                    continue;
+                }
+
+                Instant lastReadAt = conversation.get().getLastReadAt(userId);
+                int unread = lastReadAt == null
+                        ? countMessagesNotFromSender(conversationId, userId)
+                        : countMessagesAfterNotFrom(conversationId, lastReadAt, userId);
+                unreadCounts.put(conversationId, unread);
+            }
+            return Map.copyOf(unreadCounts);
         }
     }
 }

@@ -5,7 +5,6 @@ import datingapp.core.profile.MatchPreferences.Interest;
 import datingapp.ui.async.JavaFxUiThreadDispatcher;
 import datingapp.ui.async.UiThreadDispatcher;
 import datingapp.ui.viewmodel.UiDataAdapters.UiUserStore;
-import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
@@ -29,6 +28,7 @@ public final class ProfileReadOnlyViewModel extends BaseViewModel {
     private final ObservableList<String> photoUrls = FXCollections.observableArrayList();
     private final IntegerProperty currentPhotoIndex = new SimpleIntegerProperty(0);
     private final StringProperty currentPhotoUrl = new SimpleStringProperty("");
+    private final PhotoCarouselState photoCarousel = new PhotoCarouselState();
 
     public ProfileReadOnlyViewModel(UiUserStore userStore, AppConfig config) {
         this(userStore, config, new JavaFxUiThreadDispatcher());
@@ -74,9 +74,8 @@ public final class ProfileReadOnlyViewModel extends BaseViewModel {
                         : "Location not shared");
         lookingFor.set(user.getLookingFor() != null ? user.getLookingFor().getDisplayName() : "Open to meeting people");
         interests.set(formatInterests(user.getInterests()));
-        photoUrls.setAll(user.getPhotoUrls() != null ? user.getPhotoUrls() : List.of());
-        currentPhotoIndex.set(0);
-        currentPhotoUrl.set(photoUrls.isEmpty() ? "" : photoUrls.getFirst());
+        photoCarousel.setPhotos(user.getPhotoUrls());
+        syncPhotoCarousel();
     }
 
     private String formatInterests(Set<Interest> selectedInterests) {
@@ -91,23 +90,19 @@ public final class ProfileReadOnlyViewModel extends BaseViewModel {
     }
 
     public void showNextPhoto() {
-        if (photoUrls.isEmpty()) {
-            return;
-        }
-        currentPhotoIndex.set((currentPhotoIndex.get() + 1) % photoUrls.size());
-        currentPhotoUrl.set(photoUrls.get(currentPhotoIndex.get()));
+        photoCarousel.showNextPhoto();
+        syncPhotoCarousel();
     }
 
     public void showPreviousPhoto() {
-        if (photoUrls.isEmpty()) {
-            return;
-        }
-        int nextIndex = currentPhotoIndex.get() - 1;
-        if (nextIndex < 0) {
-            nextIndex = photoUrls.size() - 1;
-        }
-        currentPhotoIndex.set(nextIndex);
-        currentPhotoUrl.set(photoUrls.get(nextIndex));
+        photoCarousel.showPreviousPhoto();
+        syncPhotoCarousel();
+    }
+
+    private void syncPhotoCarousel() {
+        photoUrls.setAll(photoCarousel.photoUrls());
+        currentPhotoIndex.set(photoCarousel.currentPhotoIndex());
+        currentPhotoUrl.set(photoCarousel.currentPhotoUrl() != null ? photoCarousel.currentPhotoUrl() : "");
     }
 
     public StringProperty nameProperty() {

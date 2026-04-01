@@ -27,8 +27,10 @@ import datingapp.ui.viewmodel.UiDataAdapters.StorageUiUserStore;
 import java.lang.reflect.Field;
 import java.time.ZoneId;
 import java.util.EnumSet;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import javafx.animation.Animation;
 import javafx.scene.Parent;
 import javafx.scene.control.Button;
 import javafx.scene.layout.Pane;
@@ -97,6 +99,33 @@ class MatchesControllerTest {
         });
 
         assertTrue(JavaFxTestSupport.callOnFxAndWait(particleLayer::getChildren).isEmpty());
+
+        fixture.dispose();
+        NavigationService.getInstance().clearHistory();
+        AppSession.getInstance().reset();
+    }
+
+    @Test
+    @DisplayName("new match badge pulse is tracked and stopped on cleanup")
+    void newMatchBadgePulseIsTrackedAndStoppedOnCleanup() throws Exception {
+        Fixture fixture = new Fixture();
+        fixture.seedSingleMatch();
+
+        JavaFxTestSupport.LoadedFxml loaded =
+                JavaFxTestSupport.loadFxml("/fxml/matches.fxml", () -> new MatchesController(fixture.viewModel));
+        MatchesController controller = (MatchesController) loaded.controller();
+
+        assertTrue(JavaFxTestSupport.waitUntil(
+                () -> !fixture.viewModel.getMatches().isEmpty(), 5000));
+
+        List<Animation> trackedAnimations = getTrackedAnimations(controller);
+        assertTrue(!trackedAnimations.isEmpty(), "new match badge animation should be tracked for cleanup");
+
+        JavaFxTestSupport.runOnFxAndWait(controller::cleanup);
+
+        for (Animation animation : trackedAnimations) {
+            assertEquals(Animation.Status.STOPPED, JavaFxTestSupport.callOnFxAndWait(animation::getStatus));
+        }
 
         fixture.dispose();
         NavigationService.getInstance().clearHistory();
@@ -215,5 +244,12 @@ class MatchesControllerTest {
         Field field = MatchesController.class.getDeclaredField(fieldName);
         field.setAccessible(true);
         return (Pane) field.get(controller);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static List<Animation> getTrackedAnimations(MatchesController controller) throws Exception {
+        Field field = BaseController.class.getDeclaredField("animations");
+        field.setAccessible(true);
+        return List.copyOf((List<Animation>) field.get(controller));
     }
 }

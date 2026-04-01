@@ -582,6 +582,7 @@ class SafetyHandlerTest {
         user.setBirthDate(LocalDate.of(1990, 1, 1));
         user.setGender(Gender.OTHER);
         user.setInterestedIn(EnumSet.of(Gender.OTHER));
+        user.setLocation(32.0853, 34.7818);
         user.addPhotoUrl("https://example.com/photo.jpg");
         user.setPacePreferences(new PacePreferences(
                 PacePreferences.MessagingFrequency.OFTEN,

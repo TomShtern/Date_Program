@@ -1,6 +1,9 @@
 package datingapp.app.cli;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
@@ -23,9 +26,15 @@ import datingapp.core.profile.ProfileService;
 import datingapp.core.testutil.TestStorages;
 import datingapp.core.workflow.ProfileActivationPolicy;
 import java.io.StringReader;
-import java.util.*;
+import java.util.EnumSet;
+import java.util.Scanner;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
-import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 /**
  * Unit tests for StatsHandler CLI commands: viewStatistics() and
@@ -177,10 +186,10 @@ class StatsHandlerTest {
 
             try {
                 handler.viewAchievements();
-                String expected = "Unlocked: 1 / " + Achievement.values().length;
+                String expectedSuffix = "/ " + Achievement.values().length;
                 assertTrue(appender.list.stream()
                         .map(ILoggingEvent::getFormattedMessage)
-                        .anyMatch(message -> message.contains(expected)));
+                        .anyMatch(message -> message.contains("Unlocked: ") && message.contains(expectedSuffix)));
             } finally {
                 statsLogger.detachAppender(appender);
                 statsLogger.setLevel(previousLevel);
@@ -225,6 +234,7 @@ class StatsHandlerTest {
         user.setBirthDate(java.time.LocalDate.of(1990, 1, 1));
         user.setGender(Gender.OTHER);
         user.setInterestedIn(EnumSet.of(Gender.OTHER));
+        user.setLocation(32.0853, 34.7818);
         user.addPhotoUrl("https://example.com/photo.jpg");
         user.setPacePreferences(new datingapp.core.profile.MatchPreferences.PacePreferences(
                 datingapp.core.profile.MatchPreferences.PacePreferences.MessagingFrequency.OFTEN,

@@ -359,8 +359,7 @@ public final class TrustSafetyService {
      * reports across multiple instances.
      */
     private boolean applyAutoBanIfThreshold(UUID reportedUserId) {
-        final boolean[] result = {false};
-        userStorage.executeWithUserLock(reportedUserId, () -> {
+        return userStorage.withUserLock(reportedUserId, lockedUsers -> {
             int reportCount = trustSafetyStorage.countReportsAgainst(reportedUserId);
             if (reportCount < config.safety().autoBanThreshold()) {
                 auditModeration(
@@ -375,11 +374,10 @@ public final class TrustSafetyService {
                                 config.safety().autoBanThreshold(),
                                 AUDIT_KEY_MODERATION_REASON_CODE,
                                 "below_threshold"));
-                result[0] = false;
-                return;
+                return false;
             }
 
-            User latestReported = userStorage
+            User latestReported = lockedUsers
                     .get(reportedUserId)
                     .map(TrustSafetyService::copyUser)
                     .orElse(null);
@@ -396,13 +394,12 @@ public final class TrustSafetyService {
                                 config.safety().autoBanThreshold(),
                                 AUDIT_KEY_MODERATION_REASON_CODE,
                                 latestReported == null ? "user_missing" : "already_banned"));
-                result[0] = false;
-                return;
+                return false;
             }
 
             latestReported.ban();
             try {
-                userStorage.save(latestReported);
+                lockedUsers.save(latestReported);
                 auditModeration(
                         ModerationAuditEvent.Action.AUTO_BAN,
                         ModerationAuditEvent.Outcome.SUCCESS,
@@ -415,7 +412,7 @@ public final class TrustSafetyService {
                                 config.safety().autoBanThreshold(),
                                 AUDIT_KEY_BAN_PERSISTED,
                                 true));
-                result[0] = true;
+                return true;
             } catch (RuntimeException exception) {
                 logger.error(
                         "Auto-ban save failed for user {} after {} reports; ban was not persisted",
@@ -434,10 +431,9 @@ public final class TrustSafetyService {
                                 config.safety().autoBanThreshold(),
                                 AUDIT_KEY_MODERATION_REASON_CODE,
                                 "save_failed"));
-                result[0] = false;
+                return false;
             }
         });
-        return result[0];
     }
 
     private static boolean isDuplicateKeyViolation(RuntimeException exception) {

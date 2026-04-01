@@ -220,21 +220,23 @@ class ViewModelAsyncScopeTest {
         });
 
         CountDownLatch started = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
         AtomicBoolean callbackInvoked = new AtomicBoolean(false);
 
         TaskHandle handle = scope.run(
                 "long task",
                 () -> {
                     started.countDown();
-                    UiAsyncTestSupport.sleepQuietly(800);
+                    UiAsyncTestSupport.awaitQuietly(release);
                     return 42;
                 },
                 value -> callbackInvoked.set(true));
 
-        assertTrue(started.await(1, TimeUnit.SECONDS));
+        assertTrue(UiAsyncTestSupport.await(started, Duration.ofSeconds(1)));
         scope.dispose();
+        release.countDown();
 
-        UiAsyncTestSupport.sleepQuietly(200);
+        assertTrue(UiAsyncTestSupport.waitUntil(handle::isDone, Duration.ofSeconds(2)));
 
         assertTrue(handle.isCancelled());
         assertFalse(callbackInvoked.get());

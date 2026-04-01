@@ -441,5 +441,37 @@ class DealbreakersEvaluatorTest {
             assertEquals(1, failures.size());
             assertEquals("Height unavailable (required by dealbreaker)", failures.getFirst());
         }
+
+        @Test
+        @DisplayName("boolean verdict stays aligned with failure explanations")
+        void booleanVerdictStaysAlignedWithFailureExplanations() {
+            seeker.setDealbreakers(Dealbreakers.builder()
+                    .acceptSmoking(Lifestyle.Smoking.NEVER)
+                    .maxAgeDifference(1)
+                    .build());
+            candidate.setSmoking(Lifestyle.Smoking.REGULARLY);
+
+            boolean passes = Dealbreakers.Evaluator.passes(seeker, candidate, ZoneId.of("UTC"));
+            List<String> failures = Dealbreakers.Evaluator.getFailedDealbreakers(seeker, candidate, ZoneId.of("UTC"));
+
+            assertFalse(passes);
+            assertFalse(failures.isEmpty());
+        }
+
+        @Test
+        @DisplayName("successful verdict keeps failure explanations empty")
+        void successfulVerdictKeepsFailureExplanationsEmpty() {
+            seeker.setDealbreakers(Dealbreakers.builder()
+                    .acceptSmoking(Lifestyle.Smoking.NEVER)
+                    .maxAgeDifference(5)
+                    .build());
+            candidate.setSmoking(Lifestyle.Smoking.NEVER);
+
+            boolean passes = Dealbreakers.Evaluator.passes(seeker, candidate, ZoneId.of("UTC"));
+            List<String> failures = Dealbreakers.Evaluator.getFailedDealbreakers(seeker, candidate, ZoneId.of("UTC"));
+
+            assertTrue(passes);
+            assertTrue(failures.isEmpty());
+        }
     }
 }

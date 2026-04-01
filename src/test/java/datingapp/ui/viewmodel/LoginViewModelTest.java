@@ -40,8 +40,8 @@ class LoginViewModelTest {
     }
 
     @Test
-    @DisplayName("createUser builds an active profile and refreshes the user list")
-    void createUserBuildsActiveProfileAndRefreshesUserList() throws InterruptedException {
+    @DisplayName("createUser builds an honest incomplete profile and refreshes the user list")
+    void createUserBuildsHonestIncompleteProfileAndRefreshesUserList() throws InterruptedException {
         TestStorages.Users users = new TestStorages.Users();
         LoginViewModel viewModel = new LoginViewModel(
                 new UiDataAdapters.StorageUiUserStore(users),
@@ -55,8 +55,43 @@ class LoginViewModelTest {
 
         assertNotNull(created);
         assertTrue(waitUntil(() -> viewModel.getUsers().size() == 1, 5000));
-        assertEquals(User.UserState.ACTIVE, created.getState());
+        assertEquals(User.UserState.INCOMPLETE, created.getState());
+        assertTrue(created.getBio() == null || created.getBio().isBlank());
+        assertTrue(created.getPhotoUrls().isEmpty());
+        assertTrue(!created.hasLocation());
+        assertEquals(null, created.getPacePreferences());
         assertEquals("Taylor", viewModel.getUsers().getFirst().getName());
+
+        viewModel.dispose();
+    }
+
+    @Test
+    @DisplayName("login keeps incomplete profiles honest instead of auto-filling and auto-activating")
+    void loginKeepsIncompleteProfilesHonestInsteadOfAutoFillingAndAutoActivating() {
+        TestStorages.Users users = new TestStorages.Users();
+        LoginViewModel viewModel = new LoginViewModel(
+                new UiDataAdapters.StorageUiUserStore(users),
+                AppConfig.defaults(),
+                AppSession.getInstance(),
+                new UiAsyncTestSupport.TestUiThreadDispatcher());
+
+        User incomplete = new User(java.util.UUID.randomUUID(), "Jamie");
+        incomplete.setBirthDate(datingapp.core.AppClock.today().minusYears(28));
+        incomplete.setGender(Gender.OTHER);
+        incomplete.setInterestedIn(java.util.EnumSet.of(Gender.FEMALE));
+        incomplete.setAgeRange(18, 60, 18, 120);
+        incomplete.setMaxDistanceKm(50, AppConfig.defaults().matching().maxDistanceKm());
+        users.save(incomplete);
+
+        viewModel.setSelectedUser(incomplete);
+
+        assertTrue(viewModel.login());
+        assertEquals(incomplete, AppSession.getInstance().getCurrentUser());
+        assertEquals(User.UserState.INCOMPLETE, incomplete.getState());
+        assertTrue(incomplete.getBio() == null || incomplete.getBio().isBlank());
+        assertTrue(incomplete.getPhotoUrls().isEmpty());
+        assertTrue(!incomplete.hasLocation());
+        assertEquals(null, incomplete.getPacePreferences());
 
         viewModel.dispose();
     }
@@ -120,7 +155,7 @@ class LoginViewModelTest {
         user.setMaxDistanceKm(50, AppConfig.defaults().matching().maxDistanceKm());
         user.setLocation(40.7128, -74.0060);
         user.setBio("Existing user");
-        user.setPhotoUrls(java.util.List.of("placeholder://default-avatar"));
+        user.setPhotoUrls(java.util.List.of("http://example.com/" + name + ".jpg"));
         user.setPacePreferences(new datingapp.core.profile.MatchPreferences.PacePreferences(
                 datingapp.core.profile.MatchPreferences.PacePreferences.MessagingFrequency.OFTEN,
                 datingapp.core.profile.MatchPreferences.PacePreferences.TimeToFirstDate.FEW_DAYS,

@@ -367,7 +367,16 @@ class RestApiRelationshipRoutesTest {
                         .GET()
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
-        assertEquals(200, anonymousResponse.statusCode(), anonymousResponse.body());
+        assertEquals(400, anonymousResponse.statusCode(), anonymousResponse.body());
+
+        HttpResponse<String> participantResponse = client.send(
+                HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/conversations/"
+                                + conversation.getId() + "/messages"))
+                        .header("X-User-Id", userA.toString())
+                        .GET()
+                        .build(),
+                HttpResponse.BodyHandlers.ofString());
+        assertEquals(200, participantResponse.statusCode(), participantResponse.body());
 
         HttpResponse<String> forbiddenResponse = client.send(
                 HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/conversations/"

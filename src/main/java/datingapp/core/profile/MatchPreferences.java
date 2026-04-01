@@ -631,6 +631,16 @@ public final class MatchPreferences {
                     BiPredicate<Dealbreakers, User> passes,
                     BiFunction<Dealbreakers, User, String> failureMessage) {}
 
+            private record EvaluationResult(List<String> failures) {
+                private EvaluationResult {
+                    failures = List.copyOf(failures);
+                }
+
+                private boolean passes() {
+                    return failures.isEmpty();
+                }
+            }
+
             private static final List<LifestyleDimension> LIFESTYLE_DIMENSIONS = List.of(
                     new LifestyleDimension(
                             db -> !db.acceptableSmoking().isEmpty(),
@@ -665,20 +675,6 @@ public final class MatchPreferences {
 
             /**
              * Evaluates whether a candidate passes all of a seeker's dealbreakers.
-             * Uses system default timezone for age calculations.
-             *
-             * @param seeker    the user looking for matches
-             * @param candidate the potential match
-             * @return true if candidate passes all dealbreakers
-             * @deprecated Use {@link #passes(User, User, java.time.ZoneId)} for explicit timezone handling
-             */
-            @Deprecated
-            public static boolean passes(User seeker, User candidate) {
-                return passes(seeker, candidate, java.time.ZoneId.systemDefault());
-            }
-
-            /**
-             * Evaluates whether a candidate passes all of a seeker's dealbreakers.
              *
              * @param seeker    the user looking for matches
              * @param candidate the potential match
@@ -686,31 +682,7 @@ public final class MatchPreferences {
              * @return true if candidate passes all dealbreakers
              */
             public static boolean passes(User seeker, User candidate, java.time.ZoneId timezone) {
-                Dealbreakers db = seeker.getDealbreakers();
-                if (!db.hasAnyDealbreaker()) {
-                    return true;
-                }
-
-                for (LifestyleDimension dim : LIFESTYLE_DIMENSIONS) {
-                    if (dim.hasFilter().test(db) && !dim.passes().test(db, candidate)) {
-                        return false;
-                    }
-                }
-                return passesHeight(db, candidate) && passesAgeDifference(db, seeker, candidate, timezone);
-            }
-
-            /**
-             * Get a list of which dealbreakers a candidate fails (for debugging/display).
-             * Uses system default timezone for age calculations.
-             *
-             * @param seeker    The user looking for matches
-             * @param candidate The potential match
-             * @return List of human-readable failure descriptions
-             * @deprecated Use {@link #getFailedDealbreakers(User, User, java.time.ZoneId)} for explicit timezone
-             */
-            @Deprecated
-            public static List<String> getFailedDealbreakers(User seeker, User candidate) {
-                return getFailedDealbreakers(seeker, candidate, java.time.ZoneId.systemDefault());
+                return evaluate(seeker, candidate, timezone).passes();
             }
 
             /**
@@ -722,9 +694,16 @@ public final class MatchPreferences {
              * @return List of human-readable failure descriptions
              */
             public static List<String> getFailedDealbreakers(User seeker, User candidate, java.time.ZoneId timezone) {
-                List<String> failures = new ArrayList<>();
-                Dealbreakers db = seeker.getDealbreakers();
+                return evaluate(seeker, candidate, timezone).failures();
+            }
 
+            private static EvaluationResult evaluate(User seeker, User candidate, java.time.ZoneId timezone) {
+                Dealbreakers db = seeker.getDealbreakers();
+                if (!db.hasAnyDealbreaker()) {
+                    return new EvaluationResult(List.of());
+                }
+
+                List<String> failures = new ArrayList<>();
                 for (LifestyleDimension dim : LIFESTYLE_DIMENSIONS) {
                     if (dim.hasFilter().test(db) && !dim.passes().test(db, candidate)) {
                         failures.add(dim.failureMessage().apply(db, candidate));
@@ -732,37 +711,7 @@ public final class MatchPreferences {
                 }
                 addHeightFailure(db, candidate, failures);
                 addAgeFailure(db, seeker, candidate, timezone, failures);
-
-                return failures;
-            }
-
-            private static boolean passesHeight(Dealbreakers db, User candidate) {
-                if (!db.hasHeightDealbreaker()) {
-                    return true;
-                }
-                Integer candidateHeight = candidate.getHeightCm();
-                if (candidateHeight == null) {
-                    return false;
-                }
-                Integer minHeight = db.minHeightCm();
-                if (minHeight != null && candidateHeight < minHeight) {
-                    return false;
-                }
-                Integer maxHeight = db.maxHeightCm();
-                return maxHeight == null || candidateHeight <= maxHeight;
-            }
-
-            private static boolean passesAgeDifference(
-                    Dealbreakers db, User seeker, User candidate, java.time.ZoneId timezone) {
-                if (!db.hasAgeDealbreaker()) {
-                    return true;
-                }
-                Integer seekerAge = seeker.getAge(timezone).orElse(null);
-                Integer candidateAge = candidate.getAge(timezone).orElse(null);
-                if (seekerAge == null || candidateAge == null) {
-                    return false;
-                }
-                return Math.abs(seekerAge - candidateAge) <= db.maxAgeDifference();
+                return new EvaluationResult(failures);
             }
 
             private static void addHeightFailure(Dealbreakers db, User candidate, List<String> failures) {

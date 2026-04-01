@@ -35,7 +35,7 @@ final class RestApiIdentityPolicy {
     UUID requireActingUserId(Context ctx) {
         return resolveActingUserId(ctx)
                 .orElseThrow(() -> new IllegalArgumentException(
-                        HEADER_ACTING_USER_ID + " header is required for mutating API routes"));
+                        HEADER_ACTING_USER_ID + " header is required for scoped API routes"));
     }
 
     void validateActingUserMatchesPathParam(Context ctx, String paramName) {

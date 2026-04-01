@@ -5,12 +5,8 @@ import datingapp.core.AppConfig;
 import datingapp.core.AppSession;
 import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
-import datingapp.core.model.User.UserState;
 import datingapp.core.profile.MatchPreferences.Dealbreakers;
-import datingapp.core.profile.MatchPreferences.PacePreferences;
 import datingapp.core.workflow.ProfileActivationPolicy;
-import datingapp.core.workflow.ProfileActivationPolicy.ActivationResult;
-import datingapp.core.workflow.WorkflowDecision;
 import datingapp.ui.async.JavaFxUiThreadDispatcher;
 import datingapp.ui.async.UiThreadDispatcher;
 import datingapp.ui.viewmodel.UiDataAdapters.UiUserStore;
@@ -37,7 +33,6 @@ public class LoginViewModel extends BaseViewModel {
     private final AppConfig config;
     private final AppSession session;
     private final UiUserStore userStore;
-    private final ProfileActivationPolicy activationPolicy;
     private final ObservableList<User> users = FXCollections.observableArrayList();
     private final ObservableList<User> filteredUsers = FXCollections.observableArrayList();
     private final ObservableList<User> readOnlyUsers = FXCollections.unmodifiableObservableList(users);
@@ -51,12 +46,18 @@ public class LoginViewModel extends BaseViewModel {
     private User selectedUser;
 
     public LoginViewModel(UiUserStore userStore, AppConfig config, AppSession session) {
-        this(userStore, config, session, new JavaFxUiThreadDispatcher(), new ProfileActivationPolicy());
+        this(userStore, config, session, new JavaFxUiThreadDispatcher());
     }
 
     public LoginViewModel(
             UiUserStore userStore, AppConfig config, AppSession session, UiThreadDispatcher uiDispatcher) {
-        this(userStore, config, session, uiDispatcher, new ProfileActivationPolicy());
+        super("login", uiDispatcher);
+        this.userStore = Objects.requireNonNull(userStore, "userStore cannot be null");
+        this.config = Objects.requireNonNull(config, "config cannot be null");
+        this.session = Objects.requireNonNull(session, "session cannot be null");
+
+        this.filterText.addListener((obs, oldVal, newVal) -> applyFilter(newVal));
+        loadUsers();
     }
 
     public LoginViewModel(
@@ -65,14 +66,7 @@ public class LoginViewModel extends BaseViewModel {
             AppSession session,
             UiThreadDispatcher uiDispatcher,
             ProfileActivationPolicy activationPolicy) {
-        super("login", uiDispatcher);
-        this.userStore = Objects.requireNonNull(userStore, "userStore cannot be null");
-        this.config = Objects.requireNonNull(config, "config cannot be null");
-        this.session = Objects.requireNonNull(session, "session cannot be null");
-        this.activationPolicy = Objects.requireNonNull(activationPolicy, "activationPolicy cannot be null");
-
-        this.filterText.addListener((obs, oldVal, newVal) -> applyFilter(newVal));
-        loadUsers();
+        this(userStore, config, session, uiDispatcher);
     }
 
     public void setErrorHandler(ViewModelErrorSink handler) {
@@ -150,7 +144,6 @@ public class LoginViewModel extends BaseViewModel {
     /**
      * Performs login with the selected user.
      * Sets the user in the global UISession.
-     * If the user is INCOMPLETE but has required fields, attempts activation.
      * Returns true if successful.
      */
     public boolean login() {
@@ -165,70 +158,10 @@ public class LoginViewModel extends BaseViewModel {
                 selectedUser.getState(),
                 selectedUser.isComplete());
 
-        // Attempt to auto-complete incomplete users by filling missing fields
-        if (selectedUser.getState() == UserState.INCOMPLETE) {
-            autoCompleteUserProfile(selectedUser);
-
-            // Try to activate if now complete (delegated to policy)
-            ActivationResult activation = activationPolicy.tryActivate(selectedUser);
-            if (activation.activated()) {
-                userStore.save(selectedUser);
-                logInfo("Auto-activated user {} after completing profile", selectedUser.getName());
-            }
-        }
-
         // Set user in the global UI session
         session.setCurrentUser(selectedUser);
 
         return true;
-    }
-
-    /**
-     * Fills in missing profile fields with defaults to help user become
-     * activatable.
-     */
-    private void autoCompleteUserProfile(User user) {
-        boolean modified = false;
-
-        // Bio default
-        if (user.getBio() == null || user.getBio().isBlank()) {
-            user.setBio("New to the app! 👋");
-            modified = true;
-        }
-
-        // Photo URL default
-        if (user.getPhotoUrls() == null || user.getPhotoUrls().isEmpty()) {
-            user.setPhotoUrls(List.of("placeholder://default-avatar"));
-            modified = true;
-        }
-
-        // Location default (Tel Aviv)
-        if (!user.hasLocation()) {
-            user.setLocation(32.0853, 34.7818);
-            modified = true;
-        }
-
-        // Pace preferences default
-        if (user.getPacePreferences() == null || !user.getPacePreferences().isComplete()) {
-            PacePreferences pacePrefs = new PacePreferences(
-                    PacePreferences.MessagingFrequency.OFTEN,
-                    PacePreferences.TimeToFirstDate.FEW_DAYS,
-                    PacePreferences.CommunicationStyle.MIX_OF_EVERYTHING,
-                    PacePreferences.DepthPreference.DEPENDS_ON_VIBE);
-            user.setPacePreferences(pacePrefs);
-            modified = true;
-        }
-
-        // Dealbreakers default (none) - marks section as reviewed
-        if (user.getDealbreakers() == null) {
-            user.setDealbreakers(Dealbreakers.none());
-            modified = true;
-        }
-
-        if (modified) {
-            userStore.save(user);
-            logInfo("Auto-completed profile fields for user {}", user.getName());
-        }
     }
 
     /**
@@ -246,17 +179,6 @@ public class LoginViewModel extends BaseViewModel {
         try {
             User newUser = new User(UUID.randomUUID(), name.trim());
             applyDefaultCreateProfile(newUser, age, gender, interestedIn);
-
-            ActivationResult activation = activationPolicy.tryActivate(newUser);
-            if (activation.activated()) {
-                logInfo("User {} is complete and activated. MatchState: {}", newUser.getName(), newUser.getState());
-            } else if (activation.decision() instanceof WorkflowDecision.Denied denied) {
-                logWarn(
-                        "User {} created but not activated: {} (isComplete={})",
-                        newUser.getName(),
-                        denied.message(),
-                        newUser.isComplete());
-            }
             userStore.save(newUser);
 
             // Refresh the user list
@@ -306,8 +228,7 @@ public class LoginViewModel extends BaseViewModel {
         user.setBirthDate(birthDate);
         user.setGender(gender);
         user.setInterestedIn(EnumSet.of(interestedIn));
-        user.setLocation(32.0853, 34.7818);
-        user.setBio("New to the app! 👋");
+        user.setBio("");
 
         int minAge = Math.max(config.validation().minAge(), age - 5);
         int maxAge = Math.min(config.validation().maxAge(), age + 5);
@@ -317,17 +238,9 @@ public class LoginViewModel extends BaseViewModel {
                 config.validation().minAge(),
                 config.validation().maxAge());
         user.setMaxDistanceKm(50, config.matching().maxDistanceKm());
-        user.setPhotoUrls(List.of("placeholder://default-avatar"));
-        user.setPacePreferences(defaultPacePreferences());
+        user.setPhotoUrls(List.of());
+        user.setPacePreferences(null);
         user.setDealbreakers(Dealbreakers.none());
-    }
-
-    private static PacePreferences defaultPacePreferences() {
-        return new PacePreferences(
-                PacePreferences.MessagingFrequency.OFTEN,
-                PacePreferences.TimeToFirstDate.FEW_DAYS,
-                PacePreferences.CommunicationStyle.MIX_OF_EVERYTHING,
-                PacePreferences.DepthPreference.DEPENDS_ON_VIBE);
     }
 
     /**

@@ -50,14 +50,6 @@ public class SocialUseCases {
         }
     };
 
-    private enum RelationshipTransitionState {
-        MATCHED,
-        UNMATCHED,
-        FRIEND_ZONE_REQUESTED,
-        ACTIVE,
-        GRACEFUL_EXIT
-    }
-
     private final ConnectionService connectionService;
     private final TrustSafetyService trustSafetyService;
     private final CommunicationStorage communicationStorage;
@@ -191,8 +183,8 @@ public class SocialUseCases {
             publishRelationshipTransitionEvent(
                     command.context().userId(),
                     command.targetUserId(),
-                    RelationshipTransitionState.MATCHED,
-                    RelationshipTransitionState.UNMATCHED);
+                    AppEvent.RelationshipTransitionState.MATCHED,
+                    AppEvent.RelationshipTransitionState.UNMATCHED);
             return UseCaseResult.success(RelationshipTransitionOutcome.from(result));
         } catch (Exception e) {
             return UseCaseResult.failure(UseCaseError.internal("Failed to unmatch users: " + e.getMessage()));
@@ -215,8 +207,8 @@ public class SocialUseCases {
             publishRelationshipTransitionEvent(
                     command.context().userId(),
                     command.targetUserId(),
-                    RelationshipTransitionState.MATCHED,
-                    RelationshipTransitionState.FRIEND_ZONE_REQUESTED);
+                    AppEvent.RelationshipTransitionState.MATCHED,
+                    AppEvent.RelationshipTransitionState.FRIEND_ZONE_REQUESTED);
             return UseCaseResult.success(RelationshipTransitionOutcome.from(result));
         } catch (Exception e) {
             return UseCaseResult.failure(
@@ -240,8 +232,8 @@ public class SocialUseCases {
             publishRelationshipTransitionEvent(
                     command.context().userId(),
                     command.targetUserId(),
-                    RelationshipTransitionState.ACTIVE,
-                    RelationshipTransitionState.GRACEFUL_EXIT);
+                    AppEvent.RelationshipTransitionState.ACTIVE,
+                    AppEvent.RelationshipTransitionState.GRACEFUL_EXIT);
             return UseCaseResult.success(RelationshipTransitionOutcome.from(result));
         } catch (Exception e) {
             return UseCaseResult.failure(
@@ -370,13 +362,13 @@ public class SocialUseCases {
     private void publishRelationshipTransitionEvent(
             UUID initiatorId,
             UUID targetUserId,
-            RelationshipTransitionState fromState,
-            RelationshipTransitionState toState) {
+            AppEvent.RelationshipTransitionState fromState,
+            AppEvent.RelationshipTransitionState toState) {
         String matchId = Match.generateId(initiatorId, targetUserId);
         publishEvent(
                 "relationship transition",
                 new AppEvent.RelationshipTransitioned(
-                        matchId, initiatorId, targetUserId, fromState.name(), toState.name(), AppClock.now()));
+                        matchId, initiatorId, targetUserId, fromState, toState, AppClock.now()));
     }
 
     private void publishEvent(String eventName, AppEvent event) {

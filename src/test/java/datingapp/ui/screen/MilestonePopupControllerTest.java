@@ -2,6 +2,7 @@ package datingapp.ui.screen;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.core.i18n.I18n;
@@ -13,6 +14,8 @@ import java.lang.reflect.Method;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import javafx.animation.Animation;
+import javafx.animation.PauseTransition;
 import javafx.scene.control.Label;
 import javafx.scene.layout.StackPane;
 import org.junit.jupiter.api.BeforeAll;
@@ -118,10 +121,41 @@ class MilestonePopupControllerTest {
         assertEquals(1, continueCount.get());
     }
 
+    @Test
+    @DisplayName("manual close cancels auto-dismiss timer")
+    void manualCloseCancelsAutoDismissTimer() throws Exception {
+        JavaFxTestSupport.LoadedFxml loaded =
+                JavaFxTestSupport.loadFxml("/fxml/achievement_popup.fxml", MilestonePopupController::new);
+        MilestonePopupController controller = (MilestonePopupController) loaded.controller();
+
+        JavaFxTestSupport.runOnFxAndWait(
+                () -> controller.showAchievement("mdi2n-note-text-outline", "Badge", "Description", 10));
+
+        PauseTransition autoDismiss = (PauseTransition) getField(controller, "autoDismissTransition");
+        assertNotNull(autoDismiss);
+        assertEquals(Animation.Status.RUNNING, JavaFxTestSupport.callOnFxAndWait(autoDismiss::getStatus));
+
+        JavaFxTestSupport.runOnFxAndWait(() -> {
+            try {
+                invokeNoArgMethod(controller, "handleClose");
+            } catch (Exception ex) {
+                throw new IllegalStateException(ex);
+            }
+        });
+
+        assertEquals(null, getField(controller, "autoDismissTransition"));
+    }
+
     private static void setField(Object target, String fieldName, Object value) throws Exception {
         Field field = MilestonePopupController.class.getDeclaredField(fieldName);
         field.setAccessible(true);
         field.set(target, value);
+    }
+
+    private static Object getField(Object target, String fieldName) throws Exception {
+        Field field = MilestonePopupController.class.getDeclaredField(fieldName);
+        field.setAccessible(true);
+        return field.get(target);
     }
 
     private static void invokeNoArgMethod(Object target, String methodName) throws Exception {

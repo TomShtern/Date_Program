@@ -112,7 +112,7 @@ public final class DefaultAchievementService implements AchievementService {
             case LEGEND -> getMatchCount(userId) >= config.safety().achievementMatchTier5();
             case SELECTIVE -> isSelective(userId);
             case OPEN_MINDED -> isOpenMinded(userId);
-            case COMPLETE_PACKAGE -> profileService.calculateCompleteness(user).percentage() == 100;
+            case COMPLETE_PACKAGE -> user.isComplete();
             case STORYTELLER -> getBioLength(user) > config.safety().bioAchievementLength();
             case LIFESTYLE_GURU ->
                 profileService.countLifestyleFields(user) >= config.safety().lifestyleFieldTarget();

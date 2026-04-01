@@ -65,6 +65,7 @@ public class MatchingViewModel extends BaseViewModel {
     private final ObjectProperty<List<String>> currentCandidatePhotoUrls = new SimpleObjectProperty<>(List.of());
     private final IntegerProperty currentCandidatePhotoIndex = new SimpleIntegerProperty(0);
     private final StringProperty currentCandidatePhotoUrl = new SimpleStringProperty();
+    private final PhotoCarouselState photoCarousel = new PhotoCarouselState();
     private final StringProperty noteContent = new SimpleStringProperty("");
     private final StringProperty noteStatusMessage = new SimpleStringProperty();
     private final BooleanProperty noteBusy = new SimpleBooleanProperty(false);
@@ -239,14 +240,11 @@ public class MatchingViewModel extends BaseViewModel {
             User next = candidateQueue.poll();
             currentCandidate.set(next);
             if (next != null) {
-                List<String> urls = next.getPhotoUrls();
-                currentCandidatePhotoUrls.set(urls);
-                currentCandidatePhotoIndex.set(0);
-                currentCandidatePhotoUrl.set(urls.isEmpty() ? null : urls.get(0));
+                photoCarousel.setPhotos(next.getPhotoUrls());
+                syncPhotoCarousel();
             } else {
-                currentCandidatePhotoUrls.set(List.of());
-                currentCandidatePhotoIndex.set(0);
-                currentCandidatePhotoUrl.set(null);
+                photoCarousel.setPhotos(List.of());
+                syncPhotoCarousel();
             }
             hasMoreCandidates.set(next != null);
             if (next != null) {
@@ -441,10 +439,8 @@ public class MatchingViewModel extends BaseViewModel {
             // Return last candidate to view
             if (lastSwipedCandidate != null) {
                 currentCandidate.set(lastSwipedCandidate);
-                List<String> urls = lastSwipedCandidate.getPhotoUrls();
-                currentCandidatePhotoUrls.set(urls);
-                currentCandidatePhotoIndex.set(0);
-                currentCandidatePhotoUrl.set(urls.isEmpty() ? null : urls.get(0));
+                photoCarousel.setPhotos(lastSwipedCandidate.getPhotoUrls());
+                syncPhotoCarousel();
                 loadNoteForCandidate(lastSwipedCandidate);
                 lastSwipedCandidate = null;
                 hasMoreCandidates.set(true);
@@ -598,26 +594,19 @@ public class MatchingViewModel extends BaseViewModel {
     }
 
     public void showNextPhoto() {
-        List<String> urls = currentCandidatePhotoUrls.get();
-        if (urls == null || urls.isEmpty()) {
-            return;
-        }
-        int nextIdx = (currentCandidatePhotoIndex.get() + 1) % urls.size();
-        currentCandidatePhotoIndex.set(nextIdx);
-        currentCandidatePhotoUrl.set(urls.get(nextIdx));
+        photoCarousel.showNextPhoto();
+        syncPhotoCarousel();
     }
 
     public void showPreviousPhoto() {
-        List<String> urls = currentCandidatePhotoUrls.get();
-        if (urls == null || urls.isEmpty()) {
-            return;
-        }
-        int prevIdx = currentCandidatePhotoIndex.get() - 1;
-        if (prevIdx < 0) {
-            prevIdx = urls.size() - 1;
-        }
-        currentCandidatePhotoIndex.set(prevIdx);
-        currentCandidatePhotoUrl.set(urls.get(prevIdx));
+        photoCarousel.showPreviousPhoto();
+        syncPhotoCarousel();
+    }
+
+    private void syncPhotoCarousel() {
+        currentCandidatePhotoUrls.set(photoCarousel.photoUrls());
+        currentCandidatePhotoIndex.set(photoCarousel.currentPhotoIndex());
+        currentCandidatePhotoUrl.set(photoCarousel.currentPhotoUrl());
     }
 
     public StringProperty currentCandidatePhotoUrlProperty() {

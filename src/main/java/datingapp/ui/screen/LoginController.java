@@ -2,7 +2,6 @@ package datingapp.ui.screen;
 
 import datingapp.core.AppClock;
 import datingapp.core.model.User;
-import datingapp.core.model.User.Gender;
 import datingapp.core.model.User.UserState;
 import datingapp.core.profile.ProfileService;
 import datingapp.ui.NavigationService;
@@ -19,22 +18,16 @@ import java.util.Optional;
 import java.util.ResourceBundle;
 import javafx.animation.Interpolator;
 import javafx.animation.ScaleTransition;
-import javafx.application.Platform;
 import javafx.beans.InvalidationListener;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
-import javafx.scene.control.ButtonBar;
-import javafx.scene.control.ButtonType;
-import javafx.scene.control.ComboBox;
 import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
-import javafx.scene.control.Spinner;
-import javafx.scene.control.SpinnerValueFactory;
 import javafx.scene.control.TextField;
 import javafx.scene.image.ImageView;
 import javafx.scene.input.KeyCode;
@@ -55,48 +48,19 @@ import org.slf4j.LoggerFactory;
  */
 public class LoginController extends BaseController implements Initializable {
     private static final Logger logger = LoggerFactory.getLogger(LoginController.class);
-    private static final String SECONDARY_TEXT_STYLE = "-fx-text-fill: -fx-text-secondary;";
 
     // CSS Class Names
     private static final String CSS_LOGIN_HINT = "login-hint";
-    private static final String CSS_DIALOG_PANE = "dialog-pane";
 
     // Placeholder Messages
     private static final String MSG_NO_PROFILES_YET = "No profiles yet. Create one to get started.";
     private static final String MSG_NO_PROFILES_MATCH = "No profiles match \"";
     private static final String MSG_NO_PROFILES_TO_SHOW = "No profiles to show.";
 
-    // Dialog Labels
-    private static final String DIALOG_TITLE = "Create New Account";
-    private static final String BUTTON_CREATE = "Create";
-    private static final String LABEL_NAME = "Name:";
-    private static final String LABEL_AGE = "Age:";
-    private static final String LABEL_GENDER = "Gender:";
-    private static final String LABEL_INTERESTED_IN = "Interested In:";
-    private static final String PROMPT_ENTER_NAME = "Enter your name";
-    private static final int AGE_DEFAULT = 25;
-
     // Log Messages
     private static final String LOG_LOGIN_SUCCESS = "Login successful, navigating to Dashboard";
     private static final String LOG_OPENING_DIALOG = "Opening account creation dialog";
     private static final String LOG_USER_CREATED = "Created new user: {}";
-    private static final String LOG_STYLESHEET_NOT_FOUND = "Stylesheet not found: {}";
-
-    // Paths
-    private static final String STYLESHEET_PATH = "/css/theme.css";
-
-    // CSS Styles
-    private static final String STYLE_SURFACE_DARK = "-fx-background-color: -fx-surface-dark;";
-    private static final String STYLE_TITLE =
-            "-fx-font-size: 24px; -fx-font-weight: bold; -fx-text-fill: -fx-text-primary;";
-    private static final String STYLE_FIELD_BACKGROUND =
-            "-fx-background-color: -fx-surface-elevated; -fx-text-fill: white; "
-                    + "-fx-prompt-text-fill: -fx-text-muted; -fx-background-radius: 8;";
-    private static final String STYLE_COMBO_BACKGROUND = "-fx-background-color: #1e293b; -fx-background-radius: 8;";
-    private static final String STYLE_CELL_BACKGROUND = "-fx-background-color: #1e293b;";
-    private static final String STYLE_CELL_WITH_TEXT =
-            "-fx-background-color: #1e293b; -fx-text-fill: white; -fx-padding: 8 12;";
-    private static final String STYLE_ERROR_LABEL = "-fx-text-fill: #ef4444; -fx-font-size: 13px;";
 
     @FXML
     private StackPane rootPane;
@@ -283,134 +247,7 @@ public class LoginController extends BaseController implements Initializable {
     }
 
     private void showCreateAccountDialog() {
-        // Create the dialog
-        Dialog<User> dialog = new Dialog<>();
-        dialog.setTitle(DIALOG_TITLE);
-        dialog.setHeaderText(null); // No header for cleaner look
-
-        // Apply dark styling to dialog
-        String themeStylesheet = resolveStylesheet(STYLESHEET_PATH);
-        if (themeStylesheet != null) {
-            dialog.getDialogPane().getStylesheets().add(themeStylesheet);
-        }
-        dialog.getDialogPane().getStyleClass().add(CSS_DIALOG_PANE);
-
-        // Set the button types
-        ButtonType createButtonType = new ButtonType(BUTTON_CREATE, ButtonBar.ButtonData.OK_DONE);
-        dialog.getDialogPane().getButtonTypes().addAll(createButtonType, ButtonType.CANCEL);
-
-        // Create the form with VBox for better spacing
-        VBox content = new VBox(UiConstants.SPACING_XLARGE);
-        content.setPadding(new Insets(
-                UiConstants.PADDING_DIALOG_TOP,
-                UiConstants.PADDING_DIALOG_HORIZONTAL,
-                UiConstants.PADDING_XLARGE,
-                UiConstants.PADDING_DIALOG_HORIZONTAL));
-        content.setStyle(STYLE_SURFACE_DARK);
-
-        // Title
-        Label titleLabel = new Label(DIALOG_TITLE);
-        titleLabel.setStyle(STYLE_TITLE);
-
-        // Name field
-        VBox nameBox = new VBox(8);
-        Label nameLabel = new Label(LABEL_NAME);
-        nameLabel.setStyle(SECONDARY_TEXT_STYLE);
-        TextField nameField = new TextField();
-        nameField.setPromptText(PROMPT_ENTER_NAME);
-        nameField.setPrefWidth(280);
-        nameField.setStyle(STYLE_FIELD_BACKGROUND);
-        nameBox.getChildren().addAll(nameLabel, nameField);
-
-        // Age spinner
-        VBox ageBox = new VBox(8);
-        Label ageLabel = new Label(LABEL_AGE);
-        ageLabel.setStyle(SECONDARY_TEXT_STYLE);
-        Spinner<Integer> ageSpinner = new Spinner<>();
-        int ageMin = viewModel.getMinAge();
-        int ageMax = viewModel.getMaxAge();
-        SpinnerValueFactory<Integer> ageValueFactory = new SpinnerValueFactory<>() {
-            @Override
-            public void decrement(int steps) {
-                int current = getValue() == null ? AGE_DEFAULT : getValue();
-                int next = Math.max(ageMin, current - steps);
-                setValue(next);
-            }
-
-            @Override
-            public void increment(int steps) {
-                int current = getValue() == null ? AGE_DEFAULT : getValue();
-                int next = Math.min(ageMax, current + steps);
-                setValue(next);
-            }
-        };
-        ageValueFactory.setValue(AGE_DEFAULT);
-        ageSpinner.setValueFactory(ageValueFactory);
-        ageSpinner.setEditable(true);
-        ageSpinner.setPrefWidth(120);
-        ageBox.getChildren().addAll(ageLabel, ageSpinner);
-
-        // Gender combo
-        VBox genderBox = new VBox(8);
-        Label genderLabel = new Label(LABEL_GENDER);
-        genderLabel.setStyle(SECONDARY_TEXT_STYLE);
-        ComboBox<Gender> genderCombo = new ComboBox<>();
-        genderCombo.getItems().addAll(Gender.values());
-        genderCombo.setValue(Gender.OTHER);
-        genderCombo.setPrefWidth(200);
-        genderCombo.setStyle(STYLE_COMBO_BACKGROUND);
-        genderCombo.setCellFactory(lv -> createStyledCell());
-        genderCombo.setButtonCell(createStyledCell());
-        genderBox.getChildren().addAll(genderLabel, genderCombo);
-
-        // Interested In combo
-        VBox interestedBox = new VBox(8);
-        Label interestedLabel = new Label(LABEL_INTERESTED_IN);
-        interestedLabel.setStyle(SECONDARY_TEXT_STYLE);
-        ComboBox<Gender> interestedInCombo = new ComboBox<>();
-        interestedInCombo.getItems().addAll(Gender.values());
-        interestedInCombo.setValue(Gender.OTHER);
-        interestedInCombo.setPrefWidth(200);
-        interestedInCombo.setStyle(STYLE_COMBO_BACKGROUND);
-        interestedInCombo.setCellFactory(lv -> createStyledCell());
-        interestedInCombo.setButtonCell(createStyledCell());
-        interestedBox.getChildren().addAll(interestedLabel, interestedInCombo);
-
-        // Error label
-        Label errorLabel = new Label();
-        errorLabel.setStyle(STYLE_ERROR_LABEL);
-        errorLabel.textProperty().bind(viewModel.errorMessageProperty());
-
-        content.getChildren().addAll(titleLabel, nameBox, ageBox, genderBox, interestedBox, errorLabel);
-
-        dialog.getDialogPane().setContent(content);
-        dialog.getDialogPane().setMinWidth(360);
-        dialog.getDialogPane().setMinHeight(450);
-
-        // Enable/disable create button based on input
-        Button createButton = (Button) dialog.getDialogPane().lookupButton(createButtonType);
-        createButton.setDisable(true);
-
-        nameField
-                .textProperty()
-                .addListener((obs, oldVal, newVal) ->
-                        createButton.setDisable(newVal.trim().isEmpty()));
-
-        // Focus on name field when dialog opens
-        Platform.runLater(nameField::requestFocus);
-
-        // Convert result to User
-        dialog.setResultConverter(dialogButton -> {
-            if (Objects.equals(dialogButton, createButtonType)) {
-                String name = nameField.getText().trim();
-                int age = ageSpinner.getValue();
-                Gender gender = genderCombo.getValue();
-                Gender interestedIn = interestedInCombo.getValue();
-
-                return viewModel.createUser(name, age, gender, interestedIn);
-            }
-            return null;
-        });
+        Dialog<User> dialog = CreateAccountDialogFactory.create(rootPane, viewModel);
 
         Optional<User> result = dialog.showAndWait();
         result.ifPresent(user -> {
@@ -423,43 +260,9 @@ public class LoginController extends BaseController implements Initializable {
         viewModel.clearCreateForm();
     }
 
-    /**
-     * Creates a styled ListCell for ComboBox dropdowns with dark theme colors.
-     */
-    private ListCell<Gender> createStyledCell() {
-        return new ListCell<>() {
-            @Override
-            protected void updateItem(Gender item, boolean empty) {
-                super.updateItem(item, empty);
-                if (empty || item == null) {
-                    setText(null);
-                    setStyle(STYLE_CELL_BACKGROUND);
-                } else {
-                    setText(item.name());
-                    setStyle(STYLE_CELL_WITH_TEXT);
-                }
-            }
-        };
-    }
-
-    private String resolveStylesheet(String path) {
-        URL resource = getClass().getResource(path);
-        if (resource == null) {
-            logWarn(LOG_STYLESHEET_NOT_FOUND, path);
-            return null;
-        }
-        return resource.toExternalForm();
-    }
-
     private void logInfo(String message, Object... args) {
         if (logger.isInfoEnabled()) {
             logger.info(message, args);
-        }
-    }
-
-    private void logWarn(String message, Object... args) {
-        if (logger.isWarnEnabled()) {
-            logger.warn(message, args);
         }
     }
 

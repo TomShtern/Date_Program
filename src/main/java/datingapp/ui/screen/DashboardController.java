@@ -8,6 +8,7 @@ import datingapp.ui.UiFeedbackService;
 import datingapp.ui.viewmodel.DashboardViewModel;
 import java.io.IOException;
 import java.net.URL;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.ResourceBundle;
 import javafx.animation.PauseTransition;
@@ -115,6 +116,8 @@ public class DashboardController extends BaseController
     private Button editProfileNudgeButton;
 
     private final DashboardViewModel viewModel;
+    private PauseTransition achievementRemovalDelay;
+    private final List<PauseTransition> achievementPopupStaggers = new ArrayList<>();
 
     public DashboardController(DashboardViewModel viewModel) {
         this.viewModel = viewModel;
@@ -355,11 +358,19 @@ public class DashboardController extends BaseController
                 "You will need to log in again to continue.",
                 () -> {
                     logger.info("Logging out");
+                    NavigationService navigationService = NavigationService.getInstance();
                     viewModel.logout();
-                    NavigationService.getInstance().getViewModelFactory().reset();
-                    NavigationService.getInstance().navigateTo(NavigationService.ViewType.LOGIN);
+                    navigationService.getViewModelFactory().reset();
+                    navigationService.resetNavigationState();
+                    navigationService.navigateTo(NavigationService.ViewType.LOGIN);
                 },
                 null);
+    }
+
+    @Override
+    public void cleanup() {
+        cancelPendingAchievementTimers();
+        super.cleanup();
     }
 
     @Override
@@ -459,6 +470,9 @@ public class DashboardController extends BaseController
         if (!Boolean.TRUE.equals(shouldCelebrate)) {
             return;
         }
+
+        cancelPendingAchievementTimers();
+
         StackPane rootStack = NavigationService.getInstance().getRootStack();
         if (rootStack == null || rootPane == null) {
             return;
@@ -477,21 +491,43 @@ public class DashboardController extends BaseController
         confettiAnimation.play(canvas);
 
         PauseTransition removalDelay = new PauseTransition(Duration.seconds(3));
+        achievementRemovalDelay = removalDelay;
         removalDelay.setOnFinished(event -> {
+            if (!java.util.Objects.equals(removalDelay, achievementRemovalDelay)) {
+                return;
+            }
+            achievementRemovalDelay = null;
             confettiAnimation.stop();
             rootStack.getChildren().remove(canvas);
             showAchievementPopups(rootStack, toShow);
         });
         removalDelay.play();
+        trackAnimation(removalDelay);
     }
 
     private void showAchievementPopups(StackPane rootStack, List<Achievement> achievements) {
         for (int i = 0; i < achievements.size(); i++) {
             Achievement achievement = achievements.get(i);
             PauseTransition stagger = new PauseTransition(Duration.millis(i * 600.0));
-            stagger.setOnFinished(e -> showSingleAchievementPopup(rootStack, achievement));
+            achievementPopupStaggers.add(stagger);
+            stagger.setOnFinished(e -> {
+                achievementPopupStaggers.remove(stagger);
+                showSingleAchievementPopup(rootStack, achievement);
+            });
             stagger.play();
+            trackAnimation(stagger);
         }
+    }
+
+    private void cancelPendingAchievementTimers() {
+        if (achievementRemovalDelay != null) {
+            achievementRemovalDelay.stop();
+            achievementRemovalDelay = null;
+        }
+        for (PauseTransition stagger : achievementPopupStaggers) {
+            stagger.stop();
+        }
+        achievementPopupStaggers.clear();
     }
 
     private void showSingleAchievementPopup(StackPane rootStack, Achievement achievement) {

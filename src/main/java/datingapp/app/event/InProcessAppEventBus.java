@@ -36,10 +36,7 @@ public final class InProcessAppEventBus implements AppEventBus, LoggingSupport {
                 if (entry.policy() == HandlerPolicy.REQUIRED) {
                     throw e;
                 }
-                logWarn(
-                        "BEST_EFFORT handler failed for {}: {}",
-                        event.getClass().getSimpleName(),
-                        e.getMessage());
+                logWarn("BEST_EFFORT handler failed for {}", event.getClass().getSimpleName(), e);
             }
         }
     }

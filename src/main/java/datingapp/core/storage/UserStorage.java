@@ -13,12 +13,20 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Function;
 
 /**
  * Storage interface for User entities.
  * Defined in core, implemented in storage layer.
  */
 public interface UserStorage {
+
+    interface LockedUserAccess {
+        Optional<User> get(UUID userId);
+
+        void save(User user);
+    }
 
     ZoneId CANONICAL_AGE_ZONE = ZoneOffset.UTC;
 
@@ -256,5 +264,25 @@ public interface UserStorage {
         Objects.requireNonNull(operation, "operation cannot be null");
         throw new UnsupportedOperationException(
                 "executeWithUserLock must be implemented with database-level locking by the storage implementation");
+    }
+
+    default <T> T withUserLock(UUID userId, Function<LockedUserAccess, T> operation) {
+        Objects.requireNonNull(userId, "userId cannot be null");
+        Objects.requireNonNull(operation, "operation cannot be null");
+
+        AtomicReference<T> result = new AtomicReference<>();
+        LockedUserAccess access = new LockedUserAccess() {
+            @Override
+            public Optional<User> get(UUID lockedUserId) {
+                return UserStorage.this.get(lockedUserId);
+            }
+
+            @Override
+            public void save(User user) {
+                UserStorage.this.save(user);
+            }
+        };
+        executeWithUserLock(userId, () -> result.set(operation.apply(access)));
+        return result.get();
     }
 }

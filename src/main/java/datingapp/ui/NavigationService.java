@@ -369,6 +369,15 @@ public final class NavigationService {
     }
 
     /**
+     * Clears navigation history and any pending typed navigation payload.
+     * Useful at authentication/session boundaries such as logout.
+     */
+    public void resetNavigationState() {
+        clearHistory();
+        navigationContext.set(null);
+    }
+
+    /**
      * Checks if there is navigation history to go back to.
      *
      * @return true if back navigation is possible

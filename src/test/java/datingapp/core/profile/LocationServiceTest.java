@@ -36,6 +36,15 @@ class LocationServiceTest {
     }
 
     @Test
+    @DisplayName("available countries advertise only currently supported locations")
+    void availableCountriesAdvertiseOnlyCurrentlySupportedLocations() {
+        List<Country> countries = locationService.getAvailableCountries();
+
+        assertEquals(List.of("IL"), countries.stream().map(Country::code).toList());
+        assertTrue(countries.stream().allMatch(Country::available));
+    }
+
+    @Test
     @DisplayName("city search is case insensitive and priority ordered")
     void citySearchIsCaseInsensitiveAndPriorityOrdered() {
         List<City> results = locationService.searchCities("IL", "tel", 10);

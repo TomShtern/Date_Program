@@ -20,7 +20,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -34,9 +33,6 @@ public class CandidateFinder implements LoggingSupport {
     private final java.time.ZoneId timezone;
     private final Clock clock;
     private final Duration rematchCooldown;
-    private final ConcurrentHashMap<UUID, CacheEntry> candidateCache = new ConcurrentHashMap<>();
-
-    private static final Duration CANDIDATE_CACHE_TTL = Duration.ofMinutes(5);
 
     /**
      * Constructs a CandidateFinder with the required storage dependencies and
@@ -229,19 +225,12 @@ public class CandidateFinder implements LoggingSupport {
 
         Set<UUID> excluded = new HashSet<>(interactionStorage.getLikedOrPassedUserIds(currentUser.getId()));
 
-        int fingerprint = candidateFingerprint(currentUser, excluded);
-        CacheEntry cached = candidateCache.get(currentUser.getId());
-        if (cached != null && !cached.isExpired(clock.instant()) && cached.fingerprint() == fingerprint) {
-            return cached.candidates();
-        }
-
-        return refreshCachedCandidates(currentUser, excluded, fingerprint);
+        return findFreshCandidates(currentUser, excluded);
     }
 
-    private List<User> refreshCachedCandidates(User currentUser, Set<UUID> excluded, int fingerprint) {
+    private List<User> findFreshCandidates(User currentUser, Set<UUID> excluded) {
         List<User> preFiltered = findFreshPrefilteredCandidates(currentUser);
         List<User> candidates = findCandidates(currentUser, preFiltered, excluded);
-        candidateCache.put(currentUser.getId(), new CacheEntry(clock.instant(), fingerprint, List.copyOf(candidates)));
         if (logger.isTraceEnabled()) {
             logger.trace(
                     "CandidateFinder refreshed candidates for {} with {} results",
@@ -269,43 +258,11 @@ public class CandidateFinder implements LoggingSupport {
     }
 
     public void invalidateCacheFor(UUID userId) {
-        if (userId == null) {
-            return;
-        }
-        candidateCache.remove(userId);
+        // No-op: candidate browsing is deliberately freshness-first for Phase 1.
     }
 
     public void clearCache() {
-        candidateCache.clear();
-    }
-
-    private int candidateFingerprint(User currentUser, Set<UUID> excluded) {
-        return Objects.hash(
-                currentUser.getState(),
-                currentUser.getGender(),
-                currentUser.getInterestedIn(),
-                currentUser.getInterests(),
-                currentUser.getSmoking(),
-                currentUser.getDrinking(),
-                currentUser.getWantsKids(),
-                currentUser.getLookingFor(),
-                currentUser.getEducation(),
-                currentUser.getHeightCm(),
-                currentUser.getPacePreferences(),
-                currentUser.getDealbreakers(),
-                currentUser.getMinAge(),
-                currentUser.getMaxAge(),
-                currentUser.hasLocationSet(),
-                currentUser.getLat(),
-                currentUser.getLon(),
-                currentUser.getMaxDistanceKm(),
-                excluded);
-    }
-
-    private record CacheEntry(Instant createdAt, int fingerprint, List<User> candidates) {
-        private boolean isExpired(Instant now) {
-            return createdAt.plus(CANDIDATE_CACHE_TTL).isBefore(now);
-        }
+        // No-op: candidate browsing is deliberately freshness-first for Phase 1.
     }
 
     private boolean isNotSelf(User seeker, User candidate) {

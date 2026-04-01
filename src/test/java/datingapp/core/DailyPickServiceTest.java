@@ -282,6 +282,39 @@ class DailyPickServiceTest {
     }
 
     @Test
+    void dailyPickDateUsesConfiguredTimezoneInsteadOfClockZone() {
+        AppConfig tokyoConfig =
+                AppConfig.builder().userTimeZone(ZoneId.of("Asia/Tokyo")).build();
+        Clock utcClock = Clock.fixed(Instant.parse("2026-02-01T23:30:00Z"), ZoneId.of("UTC"));
+        RecommendationService tokyoService = createService(tokyoConfig, utcClock);
+
+        User seeker = createActiveUser("Alice", 25);
+        User candidate = createActiveUser("Bob", 26);
+        userStorage.save(seeker);
+        userStorage.save(candidate);
+
+        DailyPick pick = tokyoService.getDailyPick(seeker).orElseThrow();
+
+        assertEquals(LocalDate.of(2026, 2, 2), pick.date());
+    }
+
+    @Test
+    void markDailyPickViewedUsesConfiguredTimezoneBoundary() {
+        AppConfig tokyoConfig =
+                AppConfig.builder().userTimeZone(ZoneId.of("Asia/Tokyo")).build();
+        Clock utcClock = Clock.fixed(Instant.parse("2026-02-01T23:30:00Z"), ZoneId.of("UTC"));
+        RecommendationService tokyoService = createService(tokyoConfig, utcClock);
+
+        User seeker = createActiveUser("Alice", 25);
+        userStorage.save(seeker);
+
+        tokyoService.markDailyPickViewed(seeker.getId());
+
+        assertEquals(0, tokyoService.cleanupOldDailyPickViews(LocalDate.of(2026, 2, 2)));
+        assertEquals(1, tokyoService.cleanupOldDailyPickViews(LocalDate.of(2026, 2, 3)));
+    }
+
+    @Test
     void getDailyPick_replacesPersistedPickWhenCachedUserBecomesUnavailable() {
         User seeker = createActiveUser("Seeker", 25);
         User candidate1 = createActiveUser("Candidate1", 26);
@@ -354,6 +387,20 @@ class DailyPickServiceTest {
                 DepthPreference.DEEP_CHAT));
         user.activate();
         return user;
+    }
+
+    private RecommendationService createService(AppConfig serviceConfig, Clock clock) {
+        return RecommendationService.builder()
+                .userStorage(userStorage)
+                .interactionStorage(interactionStorage)
+                .trustSafetyStorage(trustSafetyStorage)
+                .analyticsStorage(analyticsStorage)
+                .candidateFinder(candidateFinder)
+                .standoutStorage(new TestStorages.Standouts())
+                .profileService(new ProfileService(userStorage))
+                .config(serviceConfig)
+                .clock(clock)
+                .build();
     }
 
     // In-memory test storage implementations

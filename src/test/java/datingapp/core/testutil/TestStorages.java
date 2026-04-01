@@ -43,6 +43,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /** In-memory storages for tests. */
@@ -175,6 +176,23 @@ public final class TestStorages {
             Objects.requireNonNull(userId, USER_ID_NULL_MESSAGE);
             Objects.requireNonNull(operation, "operation cannot be null");
             operation.run();
+        }
+
+        @Override
+        public synchronized <T> T withUserLock(UUID userId, Function<LockedUserAccess, T> operation) {
+            Objects.requireNonNull(userId, USER_ID_NULL_MESSAGE);
+            Objects.requireNonNull(operation, "operation cannot be null");
+            return operation.apply(new LockedUserAccess() {
+                @Override
+                public Optional<User> get(UUID lockedUserId) {
+                    return Users.this.get(lockedUserId);
+                }
+
+                @Override
+                public void save(User user) {
+                    Users.this.save(user);
+                }
+            });
         }
 
         public void clear() {

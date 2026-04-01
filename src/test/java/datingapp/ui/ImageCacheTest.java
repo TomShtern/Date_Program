@@ -15,6 +15,7 @@ import java.net.InetSocketAddress;
 import java.net.URI;
 import java.util.Base64;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import javafx.scene.image.Image;
@@ -89,6 +90,29 @@ class ImageCacheTest {
             assertNotNull(first);
             assertSame(first, second, "Cached image lookups should return the same instance");
             assertEquals(1, server.getRequestCount(), "Preload should only fetch the image once");
+        }
+    }
+
+    @Test
+    @DisplayName("slow image loading does not block unrelated fallback avatar reads")
+    void slowImageLoadingDoesNotBlockUnrelatedFallbackAvatarReads() throws Exception {
+        try (BlockingImageServer server = new BlockingImageServer()) {
+            FutureTask<Image> slowLoad = new FutureTask<>(() -> ImageCache.getImage(server.imageUrl(), 64, 64));
+            Thread loader = Thread.ofPlatform().start(slowLoad);
+
+            assertTrue(server.awaitRequestStarted(), "slow image load should reach the blocking image server");
+
+            FutureTask<Image> fallbackLoad = new FutureTask<>(() -> ImageCache.getImage("missing://avatar", 64, 64));
+            Thread.ofPlatform().start(fallbackLoad);
+
+            Image fallback = fallbackLoad.get(1, TimeUnit.SECONDS);
+            assertNotNull(fallback);
+            assertTrue(fallback.getWidth() > 0, "fallback avatar should not wait on unrelated slow image loads");
+
+            server.releaseResponse();
+            Image loaded = slowLoad.get(5, TimeUnit.SECONDS);
+            assertNotNull(loaded);
+            loader.join();
         }
     }
 

@@ -308,7 +308,7 @@ public class MatchingUseCases {
                 eventBus.publish(new AppEvent.SwipeRecorded(
                         command.context().userId(),
                         command.candidate().getId(),
-                        result.like().direction().name(),
+                        result.like().direction(),
                         result.matched(),
                         AppClock.now()));
                 if (result.matched()) {
@@ -454,7 +454,7 @@ public class MatchingUseCases {
             Like like = Like.create(command.context().userId(), command.targetUserId(), command.direction());
             Optional<Match> match = matchingService.recordLike(like);
             eventBus.publish(new AppEvent.SwipeRecorded(
-                    like.whoLikes(), like.whoGotLiked(), like.direction().name(), match.isPresent(), AppClock.now()));
+                    like.whoLikes(), like.whoGotLiked(), like.direction(), match.isPresent(), AppClock.now()));
             if (match.isPresent()) {
                 Match m = match.get();
                 eventBus.publish(

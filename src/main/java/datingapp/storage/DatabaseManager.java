@@ -30,6 +30,7 @@ public final class DatabaseManager {
     private static final String USER = "sa";
 
     private static DatabaseManager instance;
+    private final String configuredJdbcUrlOverride;
     private final AtomicReference<HikariDataSource> dataSource = new AtomicReference<>();
     private volatile boolean initialized = false;
     private volatile int queryTimeoutSeconds = 30;
@@ -43,10 +44,20 @@ public final class DatabaseManager {
             instance.shutdown();
             instance = null;
         }
+        jdbcUrl = DEFAULT_JDBC_URL;
     }
 
     private DatabaseManager() {
+        this(null);
+    }
+
+    private DatabaseManager(String configuredJdbcUrlOverride) {
+        this.configuredJdbcUrlOverride = configuredJdbcUrlOverride;
         // Driver loaded automatically by SPI
+    }
+
+    static DatabaseManager createIsolated(String jdbcUrl) {
+        return new DatabaseManager(Objects.requireNonNull(jdbcUrl, "JDBC URL cannot be null"));
     }
 
     public void configureQueryTimeoutSeconds(int timeoutSeconds) {
@@ -71,7 +82,7 @@ public final class DatabaseManager {
         if (dataSource.get() != null) {
             return;
         }
-        final String configuredJdbcUrl = jdbcUrl;
+        final String configuredJdbcUrl = effectiveJdbcUrl();
         String configuredProfile = resolveConfiguredProfile();
         String explicitPassword = resolveExplicitPassword();
         HikariConfig config = new HikariConfig();
@@ -84,6 +95,10 @@ public final class DatabaseManager {
         config.setConnectionTestQuery("SELECT 1");
         config.setValidationTimeout(3000);
         dataSource.set(new HikariDataSource(config));
+    }
+
+    private String effectiveJdbcUrl() {
+        return configuredJdbcUrlOverride != null ? configuredJdbcUrlOverride : jdbcUrl;
     }
 
     /**

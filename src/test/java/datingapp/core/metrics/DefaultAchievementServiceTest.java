@@ -59,7 +59,8 @@ class DefaultAchievementServiceTest {
         var unlocked = achievementService.checkAndUnlock(user.getId());
 
         assertTrue(unlocked.stream().anyMatch(a -> a.achievement() == EngagementDomain.Achievement.FIRST_SPARK));
-        assertEquals(1, achievementService.countUnlocked(user.getId()));
+        assertTrue(unlocked.stream().anyMatch(a -> a.achievement() == EngagementDomain.Achievement.COMPLETE_PACKAGE));
+        assertEquals(2, achievementService.countUnlocked(user.getId()));
     }
 
     private static User createActiveUser(String name) {

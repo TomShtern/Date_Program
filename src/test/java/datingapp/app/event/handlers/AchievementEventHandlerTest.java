@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import datingapp.app.event.AppEvent;
 import datingapp.app.event.AppEventBus;
 import datingapp.app.event.InProcessAppEventBus;
+import datingapp.core.connection.ConnectionModels.Like;
 import datingapp.core.metrics.AchievementService;
 import datingapp.core.metrics.EngagementDomain.Achievement;
 import datingapp.core.metrics.EngagementDomain.Achievement.UserAchievement;
@@ -31,21 +32,23 @@ class AchievementEventHandlerTest {
     @Test
     void callsCheckAndUnlockWhenMatchCreated() {
         UUID swiperId = UUID.randomUUID();
-        bus.publish(new AppEvent.SwipeRecorded(swiperId, UUID.randomUUID(), "LIKE", true, Instant.now()));
+        bus.publish(new AppEvent.SwipeRecorded(swiperId, UUID.randomUUID(), Like.Direction.LIKE, true, Instant.now()));
 
         assertEquals(List.of(swiperId), achievementService.checkedUserIds);
     }
 
     @Test
     void doesNotCallCheckAndUnlockWhenNoMatch() {
-        bus.publish(new AppEvent.SwipeRecorded(UUID.randomUUID(), UUID.randomUUID(), "LIKE", false, Instant.now()));
+        bus.publish(new AppEvent.SwipeRecorded(
+                UUID.randomUUID(), UUID.randomUUID(), Like.Direction.LIKE, false, Instant.now()));
 
         assertEquals(List.of(), achievementService.checkedUserIds);
     }
 
     @Test
     void doesNotCallCheckAndUnlockOnPass() {
-        bus.publish(new AppEvent.SwipeRecorded(UUID.randomUUID(), UUID.randomUUID(), "PASS", false, Instant.now()));
+        bus.publish(new AppEvent.SwipeRecorded(
+                UUID.randomUUID(), UUID.randomUUID(), Like.Direction.PASS, false, Instant.now()));
 
         assertEquals(List.of(), achievementService.checkedUserIds);
     }

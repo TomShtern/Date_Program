@@ -91,7 +91,7 @@ public final class LocationService {
     }
 
     public List<Country> getAvailableCountries() {
-        return COUNTRIES;
+        return COUNTRIES.stream().filter(Country::available).toList();
     }
 
     public Optional<Country> findCountry(String countryCode) {

@@ -1,6 +1,9 @@
 package datingapp.app.api;
 
 import datingapp.app.event.InProcessAppEventBus;
+import datingapp.app.event.handlers.AchievementEventHandler;
+import datingapp.app.event.handlers.MetricsEventHandler;
+import datingapp.app.event.handlers.NotificationEventHandler;
 import datingapp.core.AppConfig;
 import datingapp.core.ServiceRegistry;
 import datingapp.core.connection.ConnectionService;
@@ -32,7 +35,6 @@ import datingapp.core.storage.UserStorage;
 import datingapp.core.testutil.TestStorages;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -97,8 +99,12 @@ final class RestApiTestFixture {
         }
 
         ServiceRegistry build() {
-            CandidateFinder candidateFinder =
-                    new CandidateFinder(userStorage, interactionStorage, trustSafetyStorage, ZoneId.of("UTC"));
+            InProcessAppEventBus eventBus = new InProcessAppEventBus();
+            CandidateFinder candidateFinder = new CandidateFinder(
+                    userStorage,
+                    interactionStorage,
+                    trustSafetyStorage,
+                    config.safety().userTimeZone());
             ActivityMetricsService activityMetricsService =
                     new ActivityMetricsService(interactionStorage, trustSafetyStorage, analyticsStorage, config);
             ProfileService profileService = new ProfileService(userStorage);
@@ -131,6 +137,10 @@ final class RestApiTestFixture {
             AchievementService achievementService = new DefaultAchievementService(
                     config, analyticsStorage, interactionStorage, trustSafetyStorage, userStorage, profileService);
 
+            new AchievementEventHandler(achievementService).register(eventBus);
+            new MetricsEventHandler(activityMetricsService).register(eventBus);
+            new NotificationEventHandler(communicationStorage).register(eventBus);
+
             return ServiceRegistry.builder()
                     .config(config)
                     .userStorage(userStorage)
@@ -154,7 +164,7 @@ final class RestApiTestFixture {
                     .connectionService(connectionService)
                     .validationService(validationService)
                     .locationService(locationService)
-                    .eventBus(new InProcessAppEventBus())
+                    .eventBus(eventBus)
                     .build();
         }
     }

@@ -41,7 +41,12 @@ class NotificationEventHandlerTest {
         UUID targetId = UUID.randomUUID();
 
         bus.publish(new AppEvent.RelationshipTransitioned(
-                "match-" + UUID.randomUUID(), initiatorId, targetId, "ACTIVE", "GRACEFUL_EXIT", Instant.now()));
+                "match-" + UUID.randomUUID(),
+                initiatorId,
+                targetId,
+                AppEvent.RelationshipTransitionState.ACTIVE,
+                AppEvent.RelationshipTransitionState.GRACEFUL_EXIT,
+                Instant.now()));
 
         assertEquals(1, savedNotifications.size());
         Notification n = savedNotifications.getFirst();
@@ -57,7 +62,12 @@ class NotificationEventHandlerTest {
         UUID targetId = UUID.randomUUID();
 
         bus.publish(new AppEvent.RelationshipTransitioned(
-                "match-" + UUID.randomUUID(), initiatorId, targetId, "ACTIVE", "FRIEND_ZONE_REQUESTED", Instant.now()));
+                "match-" + UUID.randomUUID(),
+                initiatorId,
+                targetId,
+                AppEvent.RelationshipTransitionState.ACTIVE,
+                AppEvent.RelationshipTransitionState.FRIEND_ZONE_REQUESTED,
+                Instant.now()));
 
         assertEquals(1, savedNotifications.size());
         Notification n = savedNotifications.getFirst();
@@ -73,8 +83,8 @@ class NotificationEventHandlerTest {
                 "match-" + UUID.randomUUID(),
                 UUID.randomUUID(),
                 UUID.randomUUID(),
-                "PENDING",
-                "ACTIVE",
+                AppEvent.RelationshipTransitionState.MATCHED,
+                AppEvent.RelationshipTransitionState.ACTIVE,
                 Instant.now()));
 
         assertEquals(0, savedNotifications.size());
@@ -146,8 +156,8 @@ class NotificationEventHandlerTest {
                 "match-" + UUID.randomUUID(),
                 UUID.randomUUID(),
                 UUID.randomUUID(),
-                "ACTIVE",
-                "GRACEFUL_EXIT",
+                AppEvent.RelationshipTransitionState.ACTIVE,
+                AppEvent.RelationshipTransitionState.GRACEFUL_EXIT,
                 Instant.now()));
 
         // Original handler still fired despite the throwing handler

@@ -649,6 +649,30 @@ class JdbiUserStorageNormalizationTest {
         assertEquals("Modified bio", reloaded.getBio(), "Bio should be persisted after lock-based modification");
     }
 
+    @Test
+    @DisplayName("withUserLock provides explicit same-handle get and save access")
+    void withUserLockProvidesExplicitSameHandleGetAndSaveAccess() {
+        User original = new User(userId, "TestUser");
+        original.setBio("Original bio");
+        storage.save(original);
+
+        storage.withUserLock(userId, lockedUsers -> {
+            User locked = lockedUsers.get(userId).orElseThrow();
+            locked.setBio("Explicit lock bio");
+            lockedUsers.save(locked);
+            return null;
+        });
+
+        User reloaded = storage.get(userId).orElseThrow();
+        assertEquals("Explicit lock bio", reloaded.getBio());
+    }
+
+    @Test
+    @DisplayName("normalized group parser rejects unknown groups")
+    void normalizedGroupParserRejectsUnknownGroups() {
+        assertThrows(IllegalArgumentException.class, () -> JdbiUserStorage.normalizedGroupFromStorage("mystery_group"));
+    }
+
     private static User createActiveUser(
             UUID id, String name, Gender gender, Set<Gender> interestedIn, boolean withLocation) {
         return createActiveUser(id, name, gender, interestedIn, withLocation, Instant.now());

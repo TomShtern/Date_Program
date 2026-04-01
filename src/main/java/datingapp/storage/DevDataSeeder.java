@@ -18,7 +18,6 @@ import datingapp.core.storage.UserStorage;
 import java.time.LocalDate;
 import java.util.EnumSet;
 import java.util.List;
-import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.slf4j.Logger;
@@ -229,16 +228,9 @@ public final class DevDataSeeder {
      * @param userStorage the storage layer to write seed users into
      */
     public static void seed(UserStorage userStorage) {
-        // Fast-path: if the sentinel user exists, seeding already ran.
-        Optional<User> existing = userStorage.get(SEED_SENTINEL_ID);
-        if (existing.isPresent()) {
-            LOG.debug("DevDataSeeder: seed data already present, skipping.");
-            return;
-        }
-
-        LOG.info("DevDataSeeder: inserting 30 seed users for development/testing...");
+        LOG.info("DevDataSeeder: ensuring 30 seed users for development/testing...");
         buildAllSeedUsers().forEach(userStorage::save);
-        LOG.info("DevDataSeeder: seed data inserted successfully.");
+        LOG.info("DevDataSeeder: seed users ensured successfully.");
     }
 
     /**
@@ -261,33 +253,35 @@ public final class DevDataSeeder {
         UUID batelId = uuid(12); // F2 — Batel Oron
 
         String matchSentinelId = Match.generateId(adamId, avitalId);
-        if (interactionStorage.get(matchSentinelId).isPresent()) {
-            LOG.debug("DevDataSeeder: seed matches already present, skipping.");
-            return;
+        String secondMatchId = Match.generateId(adamId, batelId);
+        String conversationId = Conversation.generateId(adamId, avitalId);
+
+        LOG.info("DevDataSeeder: ensuring seed matches and sample conversation...");
+
+        if (interactionStorage.get(matchSentinelId).isEmpty()) {
+            interactionStorage.save(Match.create(adamId, avitalId));
         }
 
-        LOG.info("DevDataSeeder: inserting seed matches and sample conversation...");
+        if (interactionStorage.get(secondMatchId).isEmpty()) {
+            interactionStorage.save(Match.create(adamId, batelId));
+        }
 
-        // Active match: Adam ↔ Avital
-        interactionStorage.save(Match.create(adamId, avitalId));
+        if (communicationStorage.getConversation(conversationId).isEmpty()) {
+            communicationStorage.saveConversation(Conversation.create(adamId, avitalId));
+        }
 
-        // Active match: Adam ↔ Batel (no messages — tests the "match exists, no chat yet" path)
-        interactionStorage.save(Match.create(adamId, batelId));
+        if (communicationStorage.countMessages(conversationId) == 0) {
+            Message msg1 = Message.create(conversationId, avitalId, "Hey Adam! I saw you like hiking too");
+            communicationStorage.saveMessageAndUpdateConversationLastMessageAt(msg1);
 
-        // Seed a short sample conversation between Adam and Avital
-        Conversation convo = Conversation.create(adamId, avitalId);
-        communicationStorage.saveConversation(convo);
+            Message msg2 = Message.create(conversationId, adamId, "Haha yeah! We should grab coffee sometime.");
+            communicationStorage.saveMessageAndUpdateConversationLastMessageAt(msg2);
 
-        Message msg1 = Message.create(convo.getId(), avitalId, "Hey Adam! I saw you like hiking too");
-        communicationStorage.saveMessageAndUpdateConversationLastMessageAt(msg1);
+            Message msg3 = Message.create(conversationId, avitalId, "Sounds perfect! When are you free?");
+            communicationStorage.saveMessageAndUpdateConversationLastMessageAt(msg3);
+        }
 
-        Message msg2 = Message.create(convo.getId(), adamId, "Haha yeah! We should grab coffee sometime.");
-        communicationStorage.saveMessageAndUpdateConversationLastMessageAt(msg2);
-
-        Message msg3 = Message.create(convo.getId(), avitalId, "Sounds perfect! When are you free?");
-        communicationStorage.saveMessageAndUpdateConversationLastMessageAt(msg3);
-
-        LOG.info("DevDataSeeder: seed matches and sample conversation inserted.");
+        LOG.info("DevDataSeeder: seed matches and sample conversation ensured.");
     }
 
     // ════════════════════════════════════════════════════════════════════════
@@ -1190,7 +1184,7 @@ public final class DevDataSeeder {
      * {@code activate()} is called — surfaces misconfigured seed entries early.
      *
      */
-    @SuppressWarnings({"checkstyle:ParameterNumber", "PMD.ExcessiveParameterList"})
+    @SuppressWarnings({"checkstyle:ParameterNumber", "PMD.ExcessiveParameterList", "java:S107"})
     private static User build(
             UUID id,
             String name,

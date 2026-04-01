@@ -43,7 +43,12 @@ class TimePolicyArchitectureTest {
     void noFeatureCodeUsesAppConfigDefaults() throws IOException {
         // This guard can be enabled now: the current src/main/java scan has no runtime
         // AppConfig.defaults() usage, and the remaining matches are documentation-only.
-        List<String> violations = findViolations("AppConfig.defaults()", CONFIG_DEFAULTS_ALLOWLIST);
+        List<String> violations = ArchitectureTestSupport.collectMethodInvocationViolations(
+                SOURCE_ROOT,
+                path -> CONFIG_DEFAULTS_ALLOWLIST.contains(path.getFileName().toString()),
+                invocation -> false,
+                "AppConfig",
+                "defaults");
         assertTrue(violations.isEmpty(), "AppConfig.defaults() violations found:\n" + String.join("\n", violations));
     }
 

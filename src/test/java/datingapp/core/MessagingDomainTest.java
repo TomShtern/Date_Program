@@ -397,11 +397,12 @@ class MessagingDomainTest {
                 assertEquals(original.isVisibleToUserA(), copy.isVisibleToUserA());
                 assertEquals(original.isVisibleToUserB(), copy.isVisibleToUserB());
 
+                boolean copiedVisibilityForUserA = copy.isVisibleToUserA();
                 original.updateLastMessageAt(FIXED_INSTANT.plusSeconds(60));
                 original.setVisibility(a, false);
 
                 assertEquals(lastMessageAt, copy.getLastMessageAt());
-                assertTrue(copy.isVisibleToUserA());
+                assertEquals(copiedVisibilityForUserA, copy.isVisibleToUserA());
             }
         }
     }

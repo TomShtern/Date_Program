@@ -107,6 +107,16 @@ class DatabaseManagerConfigurationTest {
                 invokeEffectiveJdbcUrl("jdbc:h2:./data/dating", "dev", "super-secret-password"));
     }
 
+    @Test
+    @DisplayName("resetInstance restores the default singleton JDBC URL")
+    void resetInstanceRestoresDefaultSingletonJdbcUrl() throws Exception {
+        DatabaseManager.setJdbcUrl("jdbc:h2:./target/dbmanager-config-reset-" + UUID.randomUUID());
+
+        DatabaseManager.resetInstance();
+
+        assertEquals("jdbc:h2:./data/dating", currentJdbcUrl());
+    }
+
     private static String invokeEffectiveJdbcUrl(String jdbcUrl, String profile, String explicitPassword)
             throws Exception {
         Method method =
@@ -129,6 +139,12 @@ class DatabaseManagerConfigurationTest {
         } catch (ReflectiveOperationException exception) {
             throw new RuntimeException(exception);
         }
+    }
+
+    private static String currentJdbcUrl() throws Exception {
+        var field = DatabaseManager.class.getDeclaredField("jdbcUrl");
+        field.setAccessible(true);
+        return (String) field.get(null);
     }
 
     private static void clearRuntimeConfig() {

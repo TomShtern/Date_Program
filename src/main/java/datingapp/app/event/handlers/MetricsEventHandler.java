@@ -2,7 +2,6 @@ package datingapp.app.event.handlers;
 
 import datingapp.app.event.AppEvent;
 import datingapp.app.event.AppEventBus;
-import datingapp.core.connection.ConnectionModels.Like;
 import datingapp.core.metrics.ActivityMetricsService;
 
 /** Listens for activity-producing events and forwards them to session metrics tracking. */
@@ -38,8 +37,7 @@ public final class MetricsEventHandler {
     }
 
     void onSwipeRecorded(AppEvent.SwipeRecorded event) {
-        Like.Direction direction = Like.Direction.valueOf(event.direction());
-        activityMetricsService.recordSwipe(event.swiperId(), direction, event.resultedInMatch());
+        activityMetricsService.recordSwipe(event.swiperId(), event.direction(), event.resultedInMatch());
     }
 
     void onMessageSent(AppEvent.MessageSent event) {

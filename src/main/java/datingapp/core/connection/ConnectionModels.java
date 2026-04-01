@@ -178,6 +178,11 @@ public final class ConnectionModels {
         }
 
         public static String generateId(UUID a, UUID b) {
+            Objects.requireNonNull(a, "a cannot be null");
+            Objects.requireNonNull(b, "b cannot be null");
+            if (a.equals(b)) {
+                throw new IllegalArgumentException("Cannot have conversation with yourself");
+            }
             String userAString = a.toString();
             String userBString = b.toString();
 

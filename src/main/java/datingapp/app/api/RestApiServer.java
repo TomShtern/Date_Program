@@ -886,13 +886,12 @@ public class RestApiServer {
         }
 
         RestApiIdentityPolicy.ConversationParticipants participants = parseConversationParticipants(conversationId);
-        Optional<UUID> actingUserId = resolveActingUserId(ctx);
-        actingUserId.ifPresent(participants::requireParticipant);
-        UUID requestUserId = actingUserId.orElse(participants.firstUserId());
-        UUID otherUserId = actingUserId.map(participants::otherParticipant).orElse(participants.secondUserId());
+        UUID requestUserId = requireActingUserId(ctx);
+        participants.requireParticipant(requestUserId);
+        UUID otherUserId = participants.otherParticipant(requestUserId);
 
-        var result = messagingUseCases.loadConversation(new LoadConversationQuery(
-                UserContext.api(requestUserId), otherUserId, limit, offset, actingUserId.isPresent()));
+        var result = messagingUseCases.loadConversation(
+                new LoadConversationQuery(UserContext.api(requestUserId), otherUserId, limit, offset, true));
         if (!result.success()) {
             handleUseCaseFailure(ctx, result.error());
             return;

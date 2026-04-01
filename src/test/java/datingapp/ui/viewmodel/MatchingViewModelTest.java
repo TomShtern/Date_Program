@@ -305,20 +305,20 @@ class MatchingViewModelTest {
         private final TestStorages.Standouts standouts = new TestStorages.Standouts();
         private final TestStorages.Undos undos = new TestStorages.Undos();
         private final AppConfig config = AppConfig.defaults();
-        private final User currentUser = createUser("Alex", Gender.MALE, EnumSet.of(Gender.FEMALE));
-        private final User prioritizedCandidate = createUser("Blair", Gender.FEMALE, EnumSet.of(Gender.MALE));
-        private final User fallbackCandidate = createUser("Casey", Gender.FEMALE, EnumSet.of(Gender.MALE));
+        private final User currentUser;
+        private final User prioritizedCandidate;
+        private final User fallbackCandidate;
 
         private Fixture() {
             this(true);
         }
 
         private Fixture(boolean withCurrentUserLocation) {
-            if (withCurrentUserLocation) {
-                currentUser.setLocation(40.7128, -74.0060);
-            }
-            prioritizedCandidate.setLocation(40.7130, -74.0050);
-            fallbackCandidate.setLocation(40.7140, -74.0040);
+            currentUser = withCurrentUserLocation
+                    ? createUser("Alex", Gender.MALE, EnumSet.of(Gender.FEMALE), true)
+                    : createStorageActiveUserWithoutLocation("Alex", Gender.MALE, EnumSet.of(Gender.FEMALE));
+            prioritizedCandidate = createUser("Blair", Gender.FEMALE, EnumSet.of(Gender.MALE), true);
+            fallbackCandidate = createUser("Casey", Gender.FEMALE, EnumSet.of(Gender.MALE), true);
             session.setCurrentUser(currentUser);
         }
 
@@ -414,11 +414,14 @@ class MatchingViewModelTest {
             return users.getProfileNote(currentUser.getId(), prioritizedCandidate.getId());
         }
 
-        private User createUser(String name, Gender gender, EnumSet<Gender> interestedIn) {
+        private User createUser(String name, Gender gender, EnumSet<Gender> interestedIn, boolean withLocation) {
             User user = new User(UUID.randomUUID(), name);
             user.setBirthDate(AppClock.today().minusYears(27));
             user.setGender(gender);
             user.setInterestedIn(interestedIn);
+            if (withLocation) {
+                user.setLocation(40.7128, -74.0060);
+            }
             user.setAgeRange(20, 45, 18, 120);
             user.setMaxDistanceKm(100, config.matching().maxDistanceKm());
             user.addPhotoUrl("http://example.com/" + name + ".jpg");
@@ -428,8 +431,28 @@ class MatchingViewModelTest {
                     PacePreferences.TimeToFirstDate.FEW_DAYS,
                     PacePreferences.CommunicationStyle.MIX_OF_EVERYTHING,
                     PacePreferences.DepthPreference.DEEP_CHAT));
-            user.activate();
+            if (withLocation) {
+                user.activate();
+            }
             return user;
+        }
+
+        private User createStorageActiveUserWithoutLocation(String name, Gender gender, EnumSet<Gender> interestedIn) {
+            return User.StorageBuilder.create(UUID.randomUUID(), name, AppClock.now())
+                    .birthDate(AppClock.today().minusYears(27))
+                    .gender(gender)
+                    .interestedIn(interestedIn)
+                    .ageRange(20, 45)
+                    .maxDistanceKm(100)
+                    .photoUrls(java.util.List.of("http://example.com/" + name + ".jpg"))
+                    .bio("Matching test user")
+                    .pacePreferences(new PacePreferences(
+                            PacePreferences.MessagingFrequency.OFTEN,
+                            PacePreferences.TimeToFirstDate.FEW_DAYS,
+                            PacePreferences.CommunicationStyle.MIX_OF_EVERYTHING,
+                            PacePreferences.DepthPreference.DEEP_CHAT))
+                    .state(User.UserState.ACTIVE)
+                    .build();
         }
     }
 

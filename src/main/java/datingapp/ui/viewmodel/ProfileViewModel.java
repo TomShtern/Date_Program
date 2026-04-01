@@ -33,7 +33,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.function.Consumer;
-import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.DoubleProperty;
 import javafx.beans.property.IntegerProperty;
 import javafx.beans.property.ObjectProperty;
@@ -84,13 +83,14 @@ public class ProfileViewModel extends BaseViewModel {
     private final StringProperty primaryPhotoUrl = new SimpleStringProperty("");
     private final DoubleProperty latitude = new SimpleDoubleProperty(Double.NaN);
     private final DoubleProperty longitude = new SimpleDoubleProperty(Double.NaN);
-    private final BooleanProperty hasLocation = new SimpleBooleanProperty(false);
+    private final javafx.beans.property.BooleanProperty hasLocation = new SimpleBooleanProperty(false);
     private final IntegerProperty photoCount = new SimpleIntegerProperty(0);
-    private final BooleanProperty saving = new SimpleBooleanProperty(false);
+    private final javafx.beans.property.BooleanProperty saving = new SimpleBooleanProperty(false);
 
     // Multiple photos
     private final javafx.collections.ObservableList<String> photoUrls = FXCollections.observableArrayList();
     private final IntegerProperty currentPhotoIndex = new SimpleIntegerProperty(0);
+    private final PhotoCarouselState photoCarousel = new PhotoCarouselState();
 
     // Gender and preferences
     private final ObjectProperty<Gender> gender = new SimpleObjectProperty<>(null);
@@ -116,7 +116,7 @@ public class ProfileViewModel extends BaseViewModel {
     private final ObjectProperty<PacePreferences.TimeToFirstDate> timeToFirstDate = new SimpleObjectProperty<>();
     private final ObjectProperty<PacePreferences.CommunicationStyle> communicationStyle = new SimpleObjectProperty<>();
     private final ObjectProperty<PacePreferences.DepthPreference> depthPreference = new SimpleObjectProperty<>();
-    private final BooleanProperty hasUnsavedChanges = new SimpleBooleanProperty(false);
+    private final javafx.beans.property.BooleanProperty hasUnsavedChanges = new SimpleBooleanProperty(false);
 
     // Selected interests (observable set for multi-selection)
     private final ObservableSet<Interest> selectedInterests =
@@ -321,26 +321,12 @@ public class ProfileViewModel extends BaseViewModel {
     private void updatePrimaryPhoto(User user) {
         if (user == null) {
             primaryPhotoUrl.set("");
-            photoUrls.clear();
-            currentPhotoIndex.set(0);
-            photoCount.set(0);
+            photoCarousel.setPhotos(List.of());
+            syncPhotoCarousel();
             return;
         }
-        List<String> urls = user.getPhotoUrls();
-        photoUrls.setAll(urls != null ? urls : List.of());
-        currentPhotoIndex.set(0);
-        photoCount.set(photoUrls.size());
-
-        if (urls == null || urls.isEmpty()) {
-            primaryPhotoUrl.set("");
-            return;
-        }
-        String first = urls.getFirst();
-        if (first == null || first.isBlank() || PLACEHOLDER_PHOTO_URL.equals(first)) {
-            primaryPhotoUrl.set("");
-        } else {
-            primaryPhotoUrl.set(first);
-        }
+        photoCarousel.setPhotos(user.getPhotoUrls());
+        syncPhotoCarousel();
     }
 
     private void loadLocation(User user) {
@@ -599,7 +585,7 @@ public class ProfileViewModel extends BaseViewModel {
         markCurrentStateSaved();
     }
 
-    public BooleanProperty hasUnsavedChangesProperty() {
+    public javafx.beans.property.BooleanProperty hasUnsavedChangesProperty() {
         return hasUnsavedChanges;
     }
 
@@ -694,7 +680,7 @@ public class ProfileViewModel extends BaseViewModel {
         return LocalPhotoStore.MAX_PHOTOS;
     }
 
-    public BooleanProperty savingProperty() {
+    public javafx.beans.property.BooleanProperty savingProperty() {
         return saving;
     }
 
@@ -703,39 +689,24 @@ public class ProfileViewModel extends BaseViewModel {
     }
 
     public void showNextPhoto() {
-        if (photoUrls.isEmpty()) {
-            return;
-        }
-        int nextIndex = (currentPhotoIndex.get() + 1) % photoUrls.size();
-        currentPhotoIndex.set(nextIndex);
-        updatePrimaryPhotoFromIndex();
+        photoCarousel.showNextPhoto();
+        syncPhotoCarousel();
     }
 
     public void showPreviousPhoto() {
-        if (photoUrls.isEmpty()) {
-            return;
-        }
-        int prevIndex = currentPhotoIndex.get() - 1;
-        if (prevIndex < 0) {
-            prevIndex = photoUrls.size() - 1;
-        }
-        currentPhotoIndex.set(prevIndex);
-        updatePrimaryPhotoFromIndex();
+        photoCarousel.showPreviousPhoto();
+        syncPhotoCarousel();
     }
 
-    private void updatePrimaryPhotoFromIndex() {
-        if (photoUrls.isEmpty()) {
+    private void syncPhotoCarousel() {
+        photoUrls.setAll(photoCarousel.photoUrls());
+        currentPhotoIndex.set(photoCarousel.currentPhotoIndex());
+        photoCount.set(photoCarousel.photoCount());
+        String url = photoCarousel.currentPhotoUrl();
+        if (url == null || url.isBlank() || PLACEHOLDER_PHOTO_URL.equals(url)) {
             primaryPhotoUrl.set("");
-            return;
-        }
-        int index = currentPhotoIndex.get();
-        if (index >= 0 && index < photoUrls.size()) {
-            String url = photoUrls.get(index);
-            if (url == null || url.isBlank() || PLACEHOLDER_PHOTO_URL.equals(url)) {
-                primaryPhotoUrl.set("");
-            } else {
-                primaryPhotoUrl.set(url);
-            }
+        } else {
+            primaryPhotoUrl.set(url);
         }
     }
 
@@ -1097,9 +1068,11 @@ public class ProfileViewModel extends BaseViewModel {
                 return;
             }
             photoUrls.setAll(updatedPhotoUrls);
-            photoCount.set(updatedPhotoUrls.size());
-            currentPhotoIndex.set(Math.max(0, selectedIndex));
-            updatePrimaryPhotoFromIndex();
+            photoCarousel.setPhotos(updatedPhotoUrls);
+            for (int i = 0; i < Math.max(0, selectedIndex); i++) {
+                photoCarousel.showNextPhoto();
+            }
+            syncPhotoCarousel();
             session.setCurrentUser(user);
             updateCompletion(user);
             markCurrentStateSaved();
@@ -1194,8 +1167,20 @@ public class ProfileViewModel extends BaseViewModel {
             throw new IllegalStateException("No current user available for preview.");
         }
 
-        User draftUser = User.StorageBuilder.create(
-                        currentUser.getId(), currentUser.getName(), currentUser.getCreatedAt())
+        User draftUser = copyCurrentUserToDraft(currentUser);
+
+        applyBasicFields(draftUser);
+        applyLocation(draftUser);
+        applyInterests(draftUser);
+        applyLifestyleFields(draftUser);
+        applySearchPreferences(draftUser, false);
+        applyDealbreakers(draftUser);
+        applyPacePreferences(draftUser, false);
+        return draftUser;
+    }
+
+    private static User copyCurrentUserToDraft(User currentUser) {
+        return User.StorageBuilder.create(currentUser.getId(), currentUser.getName(), currentUser.getCreatedAt())
                 .bio(currentUser.getBio())
                 .birthDate(currentUser.getBirthDate())
                 .gender(currentUser.getGender())
@@ -1223,15 +1208,6 @@ public class ProfileViewModel extends BaseViewModel {
                 .verifiedAt(currentUser.getVerifiedAt())
                 .pacePreferences(currentUser.getPacePreferences())
                 .build();
-
-        applyBasicFields(draftUser);
-        applyLocation(draftUser);
-        applyInterests(draftUser);
-        applyLifestyleFields(draftUser);
-        applySearchPreferences(draftUser, false);
-        applyDealbreakers(draftUser);
-        applyPacePreferences(draftUser, false);
-        return draftUser;
     }
 
     private void applyPacePreferences(User user, boolean notifyUser) {

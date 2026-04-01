@@ -79,6 +79,36 @@ class RestApiConversationBatchCountTest {
         assertEquals(0, communicationStorage.singleCountCalls());
     }
 
+    @Test
+    @DisplayName("getTotalUnreadCount uses the batched unread-count path")
+    void totalUnreadCountUsesBatchUnreadPath() {
+        TestStorages.Users userStorage = new TestStorages.Users();
+        TestStorages.Interactions interactionStorage = new TestStorages.Interactions();
+        SpyCommunications communicationStorage = new SpyCommunications();
+        ServiceRegistry services = createServices(userStorage, interactionStorage, communicationStorage);
+
+        UUID userA = UUID.randomUUID();
+        UUID userB = UUID.randomUUID();
+        UUID userC = UUID.randomUUID();
+
+        userStorage.save(activeUser(userA, "Alice"));
+        userStorage.save(activeUser(userB, "Bob"));
+        userStorage.save(activeUser(userC, "Cara"));
+
+        interactionStorage.save(Match.create(userA, userB));
+        interactionStorage.save(Match.create(userA, userC));
+
+        ConnectionService connectionService = services.getConnectionService();
+        connectionService.sendMessage(userB, userA, "AB-unread");
+        connectionService.sendMessage(userC, userA, "AC-unread");
+
+        int unread = connectionService.getTotalUnreadCount(userA);
+
+        assertEquals(2, unread);
+        assertEquals(1, communicationStorage.batchUnreadCountCalls());
+        assertEquals(0, communicationStorage.singleUnreadCountCalls());
+    }
+
     private static ServiceRegistry createServices(
             UserStorage userStorage, InteractionStorage interactionStorage, CommunicationStorage communicationStorage) {
         return RestApiTestFixture.builder(userStorage, interactionStorage, communicationStorage)
@@ -95,7 +125,10 @@ class RestApiConversationBatchCountTest {
     private static final class SpyCommunications extends TestStorages.Communications {
         private int singleCountCalls;
         private int batchCountCalls;
+        private int singleUnreadCountCalls;
+        private int batchUnreadCountCalls;
         private boolean countingWithinBatch;
+        private boolean countingUnreadWithinBatch;
 
         @Override
         public int countMessages(String conversationId) {
@@ -116,12 +149,47 @@ class RestApiConversationBatchCountTest {
             }
         }
 
+        @Override
+        public int countMessagesNotFromSender(String conversationId, UUID senderId) {
+            if (!countingUnreadWithinBatch) {
+                singleUnreadCountCalls++;
+            }
+            return super.countMessagesNotFromSender(conversationId, senderId);
+        }
+
+        @Override
+        public int countMessagesAfterNotFrom(String conversationId, java.time.Instant after, UUID senderId) {
+            if (!countingUnreadWithinBatch) {
+                singleUnreadCountCalls++;
+            }
+            return super.countMessagesAfterNotFrom(conversationId, after, senderId);
+        }
+
+        @Override
+        public Map<String, Integer> countUnreadMessagesByConversationIds(UUID userId, Set<String> conversationIds) {
+            batchUnreadCountCalls++;
+            countingUnreadWithinBatch = true;
+            try {
+                return super.countUnreadMessagesByConversationIds(userId, conversationIds);
+            } finally {
+                countingUnreadWithinBatch = false;
+            }
+        }
+
         private int singleCountCalls() {
             return singleCountCalls;
         }
 
         private int batchCountCalls() {
             return batchCountCalls;
+        }
+
+        private int singleUnreadCountCalls() {
+            return singleUnreadCountCalls;
+        }
+
+        private int batchUnreadCountCalls() {
+            return batchUnreadCountCalls;
         }
     }
 }

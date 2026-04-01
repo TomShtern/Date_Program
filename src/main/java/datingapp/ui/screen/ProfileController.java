@@ -9,6 +9,7 @@ import datingapp.core.profile.MatchPreferences.Dealbreakers;
 import datingapp.core.profile.MatchPreferences.Interest;
 import datingapp.core.profile.MatchPreferences.Lifestyle;
 import datingapp.core.profile.MatchPreferences.PacePreferences;
+import datingapp.core.profile.ProfileService;
 import datingapp.ui.ImageCache;
 import datingapp.ui.NavigationService;
 import datingapp.ui.UiAnimations;
@@ -1446,66 +1447,9 @@ public class ProfileController extends BaseController implements Initializable {
     private void handlePreview() {
         try {
             ProfileViewModel.ProfilePreviewSnapshot snapshot = viewModel.buildPreviewSnapshot();
-
-            Dialog<ButtonType> dialog =
-                    UiUtils.createThemedDialog(rootPane, "Profile Preview", "How your profile appears to others");
-            VBox content = new VBox(UiConstants.SPACING_XLARGE - UiConstants.SPACING_XSMALL);
-            content.setPadding(new Insets(UiConstants.PADDING_XXLARGE));
-            content.setPrefWidth(420);
-
-            StackPane photoContainer = new StackPane();
-            photoContainer.getStyleClass().add("card-photo-placeholder");
-            photoContainer.setPrefHeight(220);
-
-            if (!snapshot.photoUrls().isEmpty()) {
-                ImageView imageView =
-                        new ImageView(ImageCache.getImage(snapshot.photoUrls().getFirst(), 360, 220));
-                imageView.setFitWidth(360);
-                imageView.setFitHeight(220);
-                imageView.setPreserveRatio(true);
-                photoContainer.getChildren().add(imageView);
-            } else {
-                FontIcon placeholderIcon = new FontIcon("mdi2a-account-circle");
-                placeholderIcon.setIconSize(72);
-                placeholderIcon.setIconColor(Color.web("#94a3b8"));
-                photoContainer.getChildren().add(placeholderIcon);
-            }
-
-            Label nameAndAgeLabel = new Label(snapshot.name() + ", " + snapshot.age());
-            nameAndAgeLabel.getStyleClass().add("card-name");
-            Label completionChip = new Label(snapshot.completionText());
-            completionChip.getStyleClass().add("notification-badge");
-
-            HBox titleRow = new HBox(UiConstants.SPACING_MEDIUM, nameAndAgeLabel, completionChip);
-            titleRow.setFillHeight(true);
-
-            Label locationLabel = new Label("📍 " + snapshot.location());
-            locationLabel.getStyleClass().add("card-distance");
-
-            Label lookingForLabel = UiUtils.createSecondaryLabel("Looking for: " + snapshot.lookingFor());
-
-            Label bioPreviewLabel = UiUtils.createSecondaryLabel(snapshot.bio());
-
-            FlowPane interestPane = new FlowPane(UiConstants.SPACING_SMALL, UiConstants.SPACING_SMALL);
-            interestPane.getStyleClass().add("interests-container");
-            if (snapshot.interests().isEmpty()) {
-                Label placeholderChip = new Label("No interests added yet");
-                placeholderChip.getStyleClass().add(STYLE_CLASS_INTEREST_CHIP);
-                interestPane.getChildren().add(placeholderChip);
-            } else {
-                snapshot.interests().forEach(interest -> {
-                    Label chip = new Label(interest);
-                    chip.getStyleClass().add(STYLE_CLASS_INTEREST_CHIP);
-                    interestPane.getChildren().add(chip);
-                });
-            }
-
-            content.getChildren()
-                    .addAll(photoContainer, titleRow, locationLabel, lookingForLabel, bioPreviewLabel, interestPane);
-
-            dialog.getDialogPane().setContent(content);
+            Dialog<ButtonType> dialog = buildPreviewDialog(snapshot);
             dialog.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
-            UiAnimations.fadeIn(content, 300);
+            UiAnimations.fadeIn(dialog.getDialogPane().getContent(), 300);
             dialog.showAndWait();
         } catch (Exception e) {
             logError("Failed to build profile preview", e);
@@ -1517,72 +1461,173 @@ public class ProfileController extends BaseController implements Initializable {
     private void handleProfileScore() {
         try {
             var completion = viewModel.calculateCurrentCompletion();
-
-            Dialog<ButtonType> dialog =
-                    UiUtils.createThemedDialog(rootPane, "Profile Score", "Your profile quality breakdown");
-            VBox scoreContent = new VBox(UiConstants.SPACING_LARGE);
-            scoreContent.setPadding(new Insets(UiConstants.PADDING_XXLARGE));
-            scoreContent.setPrefWidth(460);
-
-            Label scoreLabel =
-                    new Label(completion.getTierEmoji() + " " + completion.score() + "% " + completion.tier());
-            scoreLabel.getStyleClass().add("subheading");
-
-            ProgressBar totalProgress = new ProgressBar(completion.score() / 100.0);
-            totalProgress.setPrefWidth(380);
-
-            VBox breakdownBox = new VBox(UiConstants.SPACING_MEDIUM);
-            completion.breakdown().forEach(category -> {
-                VBox categoryBox = new VBox(UiConstants.SPACING_SMALL - UiConstants.SPACING_XSMALL);
-                Label categoryLabel = new Label(category.category() + " • " + category.score() + "%");
-                categoryLabel.getStyleClass().add("stat-label-primary");
-                ProgressBar categoryProgress = new ProgressBar(category.score() / 100.0);
-                categoryProgress.setPrefWidth(360);
-                VBox missingItems = new VBox(UiConstants.SPACING_XSMALL);
-                if (category.missingItems().isEmpty()) {
-                    Label doneLabel = new Label("Fully completed");
-                    doneLabel.getStyleClass().add(STYLE_CLASS_TEXT_SECONDARY);
-                    missingItems.getChildren().add(doneLabel);
-                } else {
-                    category.missingItems().forEach(item -> {
-                        Label itemLabel = new Label("• " + item);
-                        itemLabel.getStyleClass().add(STYLE_CLASS_TEXT_SECONDARY);
-                        missingItems.getChildren().add(itemLabel);
-                    });
-                }
-                categoryBox.getChildren().addAll(categoryLabel, categoryProgress, missingItems);
-                breakdownBox.getChildren().add(categoryBox);
-            });
-
-            VBox nextStepsBox = new VBox(UiConstants.SPACING_SMALL - UiConstants.SPACING_XSMALL);
-            if (!completion.nextSteps().isEmpty()) {
-                Label nextStepsTitle = new Label("Next steps");
-                nextStepsTitle.getStyleClass().add("stat-label-primary");
-                nextStepsBox.getChildren().add(nextStepsTitle);
-                completion.nextSteps().forEach(step -> {
-                    Label stepLabel = new Label("• " + step);
-                    stepLabel.setWrapText(true);
-                    stepLabel.getStyleClass().add(STYLE_CLASS_TEXT_SECONDARY);
-                    nextStepsBox.getChildren().add(stepLabel);
-                });
-            }
-
-            VBox rootBox = new VBox(
-                    UiConstants.SPACING_XLARGE - UiConstants.SPACING_XSMALL,
-                    scoreLabel,
-                    totalProgress,
-                    breakdownBox,
-                    nextStepsBox);
-            ScrollPane scrollPane = new ScrollPane(rootBox);
-            scrollPane.setFitToWidth(true);
-            scrollPane.getStyleClass().add("transparent-scroll");
-
-            dialog.getDialogPane().setContent(scrollPane);
+            Dialog<ButtonType> dialog = buildProfileScoreDialog(completion);
             dialog.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
             dialog.showAndWait();
         } catch (Exception e) {
             logError("Failed to calculate profile score", e);
             UiFeedbackService.showError("Unable to calculate profile score: " + e.getMessage());
         }
+    }
+
+    private Dialog<ButtonType> buildPreviewDialog(ProfileViewModel.ProfilePreviewSnapshot snapshot) {
+        Dialog<ButtonType> dialog =
+                UiUtils.createThemedDialog(rootPane, "Profile Preview", "How your profile appears to others");
+        dialog.getDialogPane().setContent(buildPreviewContent(snapshot));
+        return dialog;
+    }
+
+    private VBox buildPreviewContent(ProfileViewModel.ProfilePreviewSnapshot snapshot) {
+        VBox content = new VBox(UiConstants.SPACING_XLARGE - UiConstants.SPACING_XSMALL);
+        content.setPadding(new Insets(UiConstants.PADDING_XXLARGE));
+        content.setPrefWidth(420);
+
+        content.getChildren()
+                .addAll(
+                        buildPreviewPhotoContainer(snapshot),
+                        buildPreviewTitleRow(snapshot),
+                        buildPreviewLocationLabel(snapshot),
+                        UiUtils.createSecondaryLabel("Looking for: " + snapshot.lookingFor()),
+                        UiUtils.createSecondaryLabel(snapshot.bio()),
+                        buildPreviewInterestPane(snapshot));
+        return content;
+    }
+
+    private StackPane buildPreviewPhotoContainer(ProfileViewModel.ProfilePreviewSnapshot snapshot) {
+        StackPane photoContainer = new StackPane();
+        photoContainer.getStyleClass().add("card-photo-placeholder");
+        photoContainer.setPrefHeight(220);
+
+        if (!snapshot.photoUrls().isEmpty()) {
+            ImageView imageView =
+                    new ImageView(ImageCache.getImage(snapshot.photoUrls().getFirst(), 360, 220));
+            imageView.setFitWidth(360);
+            imageView.setFitHeight(220);
+            imageView.setPreserveRatio(true);
+            photoContainer.getChildren().add(imageView);
+            return photoContainer;
+        }
+
+        FontIcon placeholderIcon = new FontIcon("mdi2a-account-circle");
+        placeholderIcon.setIconSize(72);
+        placeholderIcon.setIconColor(Color.web("#94a3b8"));
+        photoContainer.getChildren().add(placeholderIcon);
+        return photoContainer;
+    }
+
+    private HBox buildPreviewTitleRow(ProfileViewModel.ProfilePreviewSnapshot snapshot) {
+        Label nameAndAgeLabel = new Label(snapshot.name() + ", " + snapshot.age());
+        nameAndAgeLabel.getStyleClass().add("card-name");
+        Label completionChip = new Label(snapshot.completionText());
+        completionChip.getStyleClass().add("notification-badge");
+
+        HBox titleRow = new HBox(UiConstants.SPACING_MEDIUM, nameAndAgeLabel, completionChip);
+        titleRow.setFillHeight(true);
+        return titleRow;
+    }
+
+    private Label buildPreviewLocationLabel(ProfileViewModel.ProfilePreviewSnapshot snapshot) {
+        Label locationLabel = new Label("📍 " + snapshot.location());
+        locationLabel.getStyleClass().add("card-distance");
+        return locationLabel;
+    }
+
+    private FlowPane buildPreviewInterestPane(ProfileViewModel.ProfilePreviewSnapshot snapshot) {
+        FlowPane interestPane = new FlowPane(UiConstants.SPACING_SMALL, UiConstants.SPACING_SMALL);
+        interestPane.getStyleClass().add("interests-container");
+        if (snapshot.interests().isEmpty()) {
+            Label placeholderChip = new Label("No interests added yet");
+            placeholderChip.getStyleClass().add(STYLE_CLASS_INTEREST_CHIP);
+            interestPane.getChildren().add(placeholderChip);
+            return interestPane;
+        }
+
+        snapshot.interests().forEach(interest -> {
+            Label chip = new Label(interest);
+            chip.getStyleClass().add(STYLE_CLASS_INTEREST_CHIP);
+            interestPane.getChildren().add(chip);
+        });
+        return interestPane;
+    }
+
+    private Dialog<ButtonType> buildProfileScoreDialog(ProfileService.CompletionResult completion) {
+        Dialog<ButtonType> dialog =
+                UiUtils.createThemedDialog(rootPane, "Profile Score", "Your profile quality breakdown");
+        dialog.getDialogPane().setContent(buildProfileScoreContent(completion));
+        return dialog;
+    }
+
+    private ScrollPane buildProfileScoreContent(ProfileService.CompletionResult completion) {
+        VBox scoreContent = new VBox(UiConstants.SPACING_LARGE);
+        scoreContent.setPadding(new Insets(UiConstants.PADDING_XXLARGE));
+        scoreContent.setPrefWidth(460);
+
+        Label scoreLabel = new Label(completion.getTierEmoji() + " " + completion.score() + "% " + completion.tier());
+        scoreLabel.getStyleClass().add("subheading");
+
+        ProgressBar totalProgress = new ProgressBar(completion.score() / 100.0);
+        totalProgress.setPrefWidth(380);
+
+        VBox rootBox = new VBox(
+                UiConstants.SPACING_XLARGE - UiConstants.SPACING_XSMALL,
+                scoreLabel,
+                totalProgress,
+                buildCategoryBreakdownBox(completion),
+                buildNextStepsBox(completion));
+        ScrollPane scrollPane = new ScrollPane(rootBox);
+        scrollPane.setFitToWidth(true);
+        scrollPane.getStyleClass().add("transparent-scroll");
+        return scrollPane;
+    }
+
+    private VBox buildCategoryBreakdownBox(ProfileService.CompletionResult completion) {
+        VBox breakdownBox = new VBox(UiConstants.SPACING_MEDIUM);
+        completion.breakdown().forEach(category -> breakdownBox.getChildren().add(buildCategoryBox(category)));
+        return breakdownBox;
+    }
+
+    private VBox buildCategoryBox(ProfileService.CategoryBreakdown category) {
+        VBox categoryBox = new VBox(UiConstants.SPACING_SMALL - UiConstants.SPACING_XSMALL);
+        Label categoryLabel = new Label(category.category() + " • " + category.score() + "%");
+        categoryLabel.getStyleClass().add("stat-label-primary");
+        ProgressBar categoryProgress = new ProgressBar(category.score() / 100.0);
+        categoryProgress.setPrefWidth(360);
+        categoryBox.getChildren().addAll(categoryLabel, categoryProgress, buildMissingItemsBox(category));
+        return categoryBox;
+    }
+
+    private VBox buildMissingItemsBox(ProfileService.CategoryBreakdown category) {
+        VBox missingItems = new VBox(UiConstants.SPACING_XSMALL);
+        if (category.missingItems().isEmpty()) {
+            Label doneLabel = new Label("Fully completed");
+            doneLabel.getStyleClass().add(STYLE_CLASS_TEXT_SECONDARY);
+            missingItems.getChildren().add(doneLabel);
+            return missingItems;
+        }
+
+        category.missingItems().forEach(item -> {
+            Label itemLabel = new Label("• " + item);
+            itemLabel.getStyleClass().add(STYLE_CLASS_TEXT_SECONDARY);
+            missingItems.getChildren().add(itemLabel);
+        });
+        return missingItems;
+    }
+
+    private VBox buildNextStepsBox(ProfileService.CompletionResult completion) {
+        VBox nextStepsBox = new VBox(UiConstants.SPACING_SMALL - UiConstants.SPACING_XSMALL);
+        if (completion.nextSteps().isEmpty()) {
+            return nextStepsBox;
+        }
+
+        Label nextStepsTitle = new Label("Next steps");
+        nextStepsTitle.getStyleClass().add("stat-label-primary");
+        nextStepsBox.getChildren().add(nextStepsTitle);
+        completion.nextSteps().forEach(step -> {
+            Label stepLabel = new Label("• " + step);
+            stepLabel.setWrapText(true);
+            stepLabel.getStyleClass().add(STYLE_CLASS_TEXT_SECONDARY);
+            nextStepsBox.getChildren().add(stepLabel);
+        });
+        return nextStepsBox;
     }
 }

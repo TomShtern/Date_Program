@@ -48,7 +48,7 @@ public final class NotificationEventHandler {
 
     void onRelationshipTransitioned(AppEvent.RelationshipTransitioned event) {
         switch (event.toState()) {
-            case "GRACEFUL_EXIT" -> {
+            case GRACEFUL_EXIT -> {
                 Notification notification = Notification.create(
                         event.targetId(),
                         Notification.Type.GRACEFUL_EXIT,
@@ -57,7 +57,7 @@ public final class NotificationEventHandler {
                         Map.of("initiatorId", event.initiatorId().toString()));
                 communicationStorage.saveNotification(notification);
             }
-            case "FRIEND_ZONE_REQUESTED" -> {
+            case FRIEND_ZONE_REQUESTED -> {
                 Notification notification = Notification.create(
                         event.initiatorId(),
                         Notification.Type.FRIEND_REQUEST_ACCEPTED,
@@ -66,8 +66,11 @@ public final class NotificationEventHandler {
                         Map.of("responderId", event.targetId().toString()));
                 communicationStorage.saveNotification(notification);
             }
-            default -> {
+            case MATCHED, UNMATCHED, ACTIVE -> {
                 // No notification needed for other transitions
+            }
+            default -> {
+                // Defensive default for future enum additions.
             }
         }
     }

@@ -40,7 +40,7 @@ public final class DefaultDailyPickService implements DailyPickService {
 
     @Override
     public Optional<DailyPick> getDailyPick(User seeker) {
-        LocalDate today = LocalDate.now(clock);
+        LocalDate today = currentDate();
 
         List<User> candidates = candidateFinder.findCandidatesForUser(seeker);
 
@@ -88,12 +88,12 @@ public final class DefaultDailyPickService implements DailyPickService {
 
     @Override
     public boolean hasViewedDailyPick(UUID userId) {
-        return hasViewedDailyPick(userId, LocalDate.now(clock));
+        return hasViewedDailyPick(userId, currentDate());
     }
 
     @Override
     public void markDailyPickViewed(UUID userId) {
-        markDailyPickViewed(userId, LocalDate.now(clock));
+        markDailyPickViewed(userId, currentDate());
     }
 
     private boolean hasViewedDailyPick(UUID userId, LocalDate date) {
@@ -107,6 +107,10 @@ public final class DefaultDailyPickService implements DailyPickService {
     @Override
     public int cleanupOldDailyPickViews(LocalDate before) {
         return analyticsStorage.deleteDailyPickViewsOlderThan(before);
+    }
+
+    private LocalDate currentDate() {
+        return LocalDate.ofInstant(clock.instant(), config.safety().userTimeZone());
     }
 
     private String generateReason(User seeker, User picked, Random random) {

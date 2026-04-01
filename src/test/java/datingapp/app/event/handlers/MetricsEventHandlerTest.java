@@ -9,6 +9,7 @@ import datingapp.app.event.AppEvent;
 import datingapp.app.event.AppEventBus;
 import datingapp.app.event.InProcessAppEventBus;
 import datingapp.core.AppConfig;
+import datingapp.core.connection.ConnectionModels.Like;
 import datingapp.core.metrics.ActivityMetricsService;
 import datingapp.core.testutil.TestStorages;
 import java.time.Instant;
@@ -33,11 +34,12 @@ class MetricsEventHandlerTest {
         List<Boolean> matchFlags = new ArrayList<>();
 
         bus.subscribe(AppEvent.SwipeRecorded.class, event -> {
-            swipeDirections.add(event.direction());
+            swipeDirections.add(event.direction().name());
             matchFlags.add(event.resultedInMatch());
         });
 
-        bus.publish(new AppEvent.SwipeRecorded(UUID.randomUUID(), UUID.randomUUID(), "LIKE", true, Instant.now()));
+        bus.publish(new AppEvent.SwipeRecorded(
+                UUID.randomUUID(), UUID.randomUUID(), Like.Direction.LIKE, true, Instant.now()));
 
         assertEquals(1, swipeDirections.size());
         assertEquals("LIKE", swipeDirections.getFirst());
@@ -63,7 +65,8 @@ class MetricsEventHandlerTest {
         MetricsEventHandler handler = new MetricsEventHandler(null);
         assertDoesNotThrow(() -> {
             handler.register(bus);
-            bus.publish(new AppEvent.SwipeRecorded(UUID.randomUUID(), UUID.randomUUID(), "LIKE", false, Instant.now()));
+            bus.publish(new AppEvent.SwipeRecorded(
+                    UUID.randomUUID(), UUID.randomUUID(), Like.Direction.LIKE, false, Instant.now()));
             bus.publish(
                     new AppEvent.MessageSent(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), Instant.now()));
         });
@@ -78,8 +81,8 @@ class MetricsEventHandlerTest {
                 },
                 AppEventBus.HandlerPolicy.BEST_EFFORT);
 
-        assertDoesNotThrow(() -> bus.publish(
-                new AppEvent.SwipeRecorded(UUID.randomUUID(), UUID.randomUUID(), "LIKE", true, Instant.now())));
+        assertDoesNotThrow(() -> bus.publish(new AppEvent.SwipeRecorded(
+                UUID.randomUUID(), UUID.randomUUID(), Like.Direction.LIKE, true, Instant.now())));
     }
 
     @Test

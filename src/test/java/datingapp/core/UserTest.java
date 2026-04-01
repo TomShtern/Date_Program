@@ -259,7 +259,9 @@ class UserTest {
         partialUser.setGender(Gender.FEMALE);
 
         assertFalse(partialUser.isComplete());
-        assertEquals(List.of("interestedIn", "photoUrls", "pacePreferences"), partialUser.getMissingProfileFields());
+        assertEquals(
+                List.of("interestedIn", "location", "photoUrls", "pacePreferences"),
+                partialUser.getMissingProfileFields());
 
         User completeUser = createCompleteUser("CompleteUser");
         assertTrue(completeUser.isComplete());
@@ -768,6 +770,34 @@ class UserTest {
             assertEquals(MatchPreferences.Lifestyle.Education.BACHELORS, user.getEducation());
             assertTrue(user.isVerified());
             assertEquals(VerificationMethod.EMAIL, user.getVerificationMethod());
+        }
+
+        @Test
+        @DisplayName("StorageBuilder requires coordinates before setting hasLocationSet true")
+        void storageBuilderRequiresCoordinatesBeforeEnablingLocation() {
+            IllegalStateException error = assertThrows(IllegalStateException.class, this::buildLocationlessStorageUser);
+
+            assertTrue(error.getMessage().contains("location"));
+        }
+
+        @Test
+        @DisplayName("StorageBuilder clears coordinates when hasLocationSet is false")
+        void storageBuilderClearsCoordinatesWhenLocationFlagIsFalse() {
+            User user = User.StorageBuilder.create(UUID.randomUUID(), "Ghost", AppClock.now())
+                    .location(32.0853, 34.7818)
+                    .hasLocationSet(false)
+                    .build();
+
+            assertFalse(user.hasLocationSet());
+            assertFalse(user.hasLocation());
+            assertEquals(0.0, user.getLat());
+            assertEquals(0.0, user.getLon());
+        }
+
+        private User buildLocationlessStorageUser() {
+            return User.StorageBuilder.create(UUID.randomUUID(), "Locationless", AppClock.now())
+                    .hasLocationSet(true)
+                    .build();
         }
     }
 }

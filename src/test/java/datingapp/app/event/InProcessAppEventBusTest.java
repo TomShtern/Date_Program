@@ -2,8 +2,14 @@ package datingapp.app.event;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
+import datingapp.core.connection.ConnectionModels.Like;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -12,6 +18,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.slf4j.LoggerFactory;
 
 class InProcessAppEventBusTest {
 
@@ -27,7 +34,8 @@ class InProcessAppEventBusTest {
         AtomicInteger callCount = new AtomicInteger();
         bus.subscribe(AppEvent.SwipeRecorded.class, e -> callCount.incrementAndGet());
 
-        bus.publish(new AppEvent.SwipeRecorded(UUID.randomUUID(), UUID.randomUUID(), "LIKE", false, Instant.now()));
+        bus.publish(new AppEvent.SwipeRecorded(
+                UUID.randomUUID(), UUID.randomUUID(), Like.Direction.LIKE, false, Instant.now()));
         assertEquals(1, callCount.get());
     }
 
@@ -48,6 +56,13 @@ class InProcessAppEventBusTest {
 
     @Test
     void bestEffortHandlerExceptionDoesNotPropagate() {
+        Logger busLogger = (Logger) LoggerFactory.getLogger(InProcessAppEventBus.class);
+        Level originalLevel = busLogger.getLevel();
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        busLogger.setLevel(Level.WARN);
+        appender.start();
+        busLogger.addAppender(appender);
+
         bus.subscribe(
                 AppEvent.SwipeRecorded.class,
                 e -> {
@@ -55,14 +70,23 @@ class InProcessAppEventBusTest {
                 },
                 AppEventBus.HandlerPolicy.BEST_EFFORT);
 
-        assertDoesNotThrow(() -> bus.publish(
-                new AppEvent.SwipeRecorded(UUID.randomUUID(), UUID.randomUUID(), "LIKE", false, Instant.now())));
+        try {
+            assertDoesNotThrow(() -> bus.publish(new AppEvent.SwipeRecorded(
+                    UUID.randomUUID(), UUID.randomUUID(), Like.Direction.LIKE, false, Instant.now())));
+
+            ILoggingEvent event = appender.list.getFirst();
+            assertNotNull(event.getThrowableProxy());
+            assertEquals("handler failure", event.getThrowableProxy().getMessage());
+        } finally {
+            busLogger.detachAppender(appender);
+            busLogger.setLevel(originalLevel);
+        }
     }
 
     @Test
     void requiredHandlerExceptionPropagates() {
-        AppEvent.SwipeRecorded event =
-                new AppEvent.SwipeRecorded(UUID.randomUUID(), UUID.randomUUID(), "LIKE", false, Instant.now());
+        AppEvent.SwipeRecorded event = new AppEvent.SwipeRecorded(
+                UUID.randomUUID(), UUID.randomUUID(), Like.Direction.LIKE, false, Instant.now());
         bus.subscribe(
                 AppEvent.SwipeRecorded.class,
                 e -> {
@@ -80,7 +104,8 @@ class InProcessAppEventBusTest {
         bus.subscribe(AppEvent.SwipeRecorded.class, e -> order.add(2));
         bus.subscribe(AppEvent.SwipeRecorded.class, e -> order.add(3));
 
-        bus.publish(new AppEvent.SwipeRecorded(UUID.randomUUID(), UUID.randomUUID(), "LIKE", false, Instant.now()));
+        bus.publish(new AppEvent.SwipeRecorded(
+                UUID.randomUUID(), UUID.randomUUID(), Like.Direction.LIKE, false, Instant.now()));
         assertEquals(List.of(1, 2, 3), order);
     }
 

@@ -67,6 +67,7 @@ public class ChatController extends BaseController implements Initializable {
     private static final String MESSAGE_LENGTH_STYLE_LIMIT = "-fx-font-size: 11px; -fx-text-fill: #ef4444;";
     private static final String SNIPPET_STYLE_NORMAL = "-fx-font-size: 12px;";
     private static final String SNIPPET_STYLE_EMPTY = "-fx-font-size: 12px; -fx-font-style: italic;";
+    private static final String TEXT_SECONDARY_STYLE_CLASS = "text-secondary";
 
     @FXML
     private javafx.scene.layout.BorderPane rootPane;
@@ -146,38 +147,46 @@ public class ChatController extends BaseController implements Initializable {
     @Override
     public void initialize(URL location, ResourceBundle resources) {
         viewModel.setErrorHandler(UiFeedbackService::showError);
+        configureConversationList();
+        configureMessageList();
+        configureNotePanel();
+        configureRelationshipButtons();
+        configureTypingIndicatorHost();
+        configureMessageComposer();
+        configureSendButtonState();
+        configureStaticControls();
+        setupAccessibilityMetadata();
+        registerViewModelSubscriptions();
+        applyInitialViewState();
+        viewModel.initialize();
+        restoreNavigationSelection();
+        UiAnimations.fadeIn(rootPane, 800);
+    }
+
+    private void configureConversationList() {
         conversationListView.setItems(viewModel.getConversations());
-        messageListView.setItems(viewModel.getActiveMessages());
+        conversationListView.setPlaceholder(createConversationPlaceholder());
+        conversationListView.setCellFactory(_ -> createConversationCell());
+    }
+
+    private Label createConversationPlaceholder() {
         Label noConversationsLabel = new Label("No conversations yet.\nMatch with someone to start.");
-        noConversationsLabel.getStyleClass().add("text-secondary");
+        noConversationsLabel.getStyleClass().add(TEXT_SECONDARY_STYLE_CLASS);
         noConversationsLabel.setWrapText(true);
         noConversationsLabel.setTextAlignment(TextAlignment.CENTER);
         noConversationsLabel.setMaxWidth(220);
-        conversationListView.setPlaceholder(noConversationsLabel);
+        return noConversationsLabel;
+    }
 
-        conversationListView.setCellFactory(lv -> createConversationCell());
-        messageListView.setCellFactory(lv -> createMessageCell());
+    private void configureMessageList() {
+        messageListView.setItems(viewModel.getActiveMessages());
+        messageListView.setCellFactory(_ -> createMessageCell());
         messageListView.addEventFilter(ScrollEvent.SCROLL, _ -> updateAutoScrollState());
-        activeMessagesListener = change -> {
-            if (viewModel.selectedConversationProperty().get() == null) {
-                return;
-            }
-            boolean hasAddedMessages = false;
-            while (change.next()) {
-                if (change.wasAdded() && !change.getAddedSubList().isEmpty()) {
-                    hasAddedMessages = true;
-                }
-            }
-            if (!hasAddedMessages) {
-                return;
-            }
-            updateAutoScrollState();
-            if (!shouldAutoScrollToBottom) {
-                return;
-            }
-            scrollToLatestMessage();
-        };
+        activeMessagesListener = new ActiveMessagesListener();
         viewModel.getActiveMessages().addListener(activeMessagesListener);
+    }
+
+    private void configureNotePanel() {
         if (profileNoteArea != null) {
             profileNoteArea.textProperty().bindBidirectional(viewModel.profileNoteContentProperty());
         }
@@ -192,55 +201,60 @@ public class ChatController extends BaseController implements Initializable {
         if (profileNoteStatusLabel != null) {
             profileNoteStatusLabel.textProperty().bind(viewModel.profileNoteStatusMessageProperty());
         }
-        if (saveProfileNoteButton != null) {
-            saveProfileNoteButton
-                    .disableProperty()
+        bindNoteActionDisable(saveProfileNoteButton);
+        bindNoteActionDisable(deleteProfileNoteButton);
+    }
+
+    private void bindNoteActionDisable(Button button) {
+        if (button != null) {
+            button.disableProperty()
                     .bind(viewModel.selectedConversationProperty().isNull().or(viewModel.profileNoteBusyProperty()));
         }
-        if (deleteProfileNoteButton != null) {
-            deleteProfileNoteButton
-                    .disableProperty()
-                    .bind(viewModel.selectedConversationProperty().isNull().or(viewModel.profileNoteBusyProperty()));
-        }
-        if (friendZoneButton != null) {
-            friendZoneButton
-                    .disableProperty()
+    }
+
+    private void configureRelationshipButtons() {
+        bindConversationSelectionRequired(friendZoneButton);
+        bindConversationSelectionRequired(gracefulExitButton);
+        bindConversationSelectionRequired(unmatchButton);
+    }
+
+    private void bindConversationSelectionRequired(Button button) {
+        if (button != null) {
+            button.disableProperty()
                     .bind(viewModel.selectedConversationProperty().isNull());
         }
-        if (gracefulExitButton != null) {
-            gracefulExitButton
-                    .disableProperty()
-                    .bind(viewModel.selectedConversationProperty().isNull());
-        }
-        if (unmatchButton != null) {
-            unmatchButton
-                    .disableProperty()
-                    .bind(viewModel.selectedConversationProperty().isNull());
-        }
+    }
+
+    private void configureTypingIndicatorHost() {
         if (typingIndicatorHost != null) {
             typingIndicatorHost.getChildren().setAll(typingIndicator);
             typingIndicatorHost.setVisible(false);
             typingIndicatorHost.setManaged(false);
         }
+    }
+
+    private void configureMessageComposer() {
         if (messageArea != null) {
             messageArea.addEventFilter(KeyEvent.KEY_PRESSED, this::handleMessageComposerKeyPressed);
             updateMessageLengthIndicator(messageArea.getText());
             addSubscription(messageArea.textProperty().subscribe(this::updateMessageLengthIndicator));
         }
-        configureSendButtonState();
         if (messageLengthLabel != null) {
             messageLengthLabel.setText("0/" + Message.MAX_LENGTH);
             messageLengthLabel.setStyle(MESSAGE_LENGTH_STYLE_NORMAL);
         }
+    }
+
+    private void configureStaticControls() {
         if (chatLoadingIndicator != null) {
             chatLoadingIndicator.visibleProperty().bind(viewModel.loadingProperty());
         }
         if (refreshButton != null) {
             refreshButton.setContentDisplay(ContentDisplay.GRAPHIC_ONLY);
         }
-        setupAccessibilityMetadata();
+    }
 
-        // Bind selection using Subscription API
+    private void registerViewModelSubscriptions() {
         addSubscription(conversationListView
                 .getSelectionModel()
                 .selectedItemProperty()
@@ -250,27 +264,48 @@ public class ChatController extends BaseController implements Initializable {
         addSubscription(viewModel.remoteTypingProperty().subscribe(this::updateTypingIndicator));
         addSubscription(viewModel.presenceSupportedProperty().subscribe(_ -> refreshPresenceTooltip()));
         addSubscription(viewModel.presenceUnavailableMessageProperty().subscribe(_ -> refreshPresenceTooltip()));
+    }
 
-        // Initial state
+    private void applyInitialViewState() {
         chatContainer.setVisible(false);
         emptyStateContainer.setVisible(true);
         updatePresenceIndicator(viewModel.presenceStatusProperty().get());
         updateTypingIndicator(viewModel.remoteTypingProperty().get());
+    }
 
-        // Initialize ViewModel with current user from UISession
-        viewModel.initialize();
-
+    private void restoreNavigationSelection() {
         NavigationService.getInstance()
                 .consumeNavigationContext(NavigationService.ViewType.CHAT, UUID.class)
-                .ifPresent(userId -> viewModel.openConversationWithUser(userId, preview -> {
-                    if (preview != null) {
-                        conversationListView.getSelectionModel().select(preview);
-                        conversationListView.scrollTo(preview);
-                    }
-                }));
+                .ifPresent(userId -> viewModel.openConversationWithUser(userId, this::selectConversationPreview));
+    }
 
-        // Apply fade-in animation
-        UiAnimations.fadeIn(rootPane, 800);
+    private void selectConversationPreview(ConversationPreview preview) {
+        if (preview != null) {
+            conversationListView.getSelectionModel().select(preview);
+            conversationListView.scrollTo(preview);
+        }
+    }
+
+    private final class ActiveMessagesListener implements ListChangeListener<Message> {
+        @Override
+        public void onChanged(Change<? extends Message> change) {
+            if (viewModel.selectedConversationProperty().get() == null) {
+                return;
+            }
+            boolean hasAddedMessages = false;
+            while (change.next()) {
+                if (change.wasAdded() && !change.getAddedSubList().isEmpty()) {
+                    hasAddedMessages = true;
+                }
+            }
+            if (!hasAddedMessages) {
+                return;
+            }
+            updateAutoScrollState();
+            if (shouldAutoScrollToBottom) {
+                scrollToLatestMessage();
+            }
+        }
     }
 
     /** Handle conversation selection change. */
@@ -488,10 +523,10 @@ public class ChatController extends BaseController implements Initializable {
             avatarStack.getChildren().addAll(avatarInitials, statusDot);
 
             nameLabel.setStyle("-fx-font-weight: bold; -fx-font-size: 14px;");
-            snippetLabel.getStyleClass().add("text-secondary");
+            snippetLabel.getStyleClass().add(TEXT_SECONDARY_STYLE_CLASS);
             snippetLabel.setStyle(SNIPPET_STYLE_NORMAL);
 
-            timeLabel.getStyleClass().add("text-secondary");
+            timeLabel.getStyleClass().add(TEXT_SECONDARY_STYLE_CLASS);
             timeLabel.setStyle("-fx-font-size: 11px;");
 
             unreadBadge.getStyleClass().add("notification-badge");
@@ -516,50 +551,67 @@ public class ChatController extends BaseController implements Initializable {
             super.updateItem(item, empty);
             if (empty || item == null) {
                 setGraphic(null);
-            } else {
-                String userName = item.otherUser().getName();
-                nameLabel.setText(userName);
-                avatarInitials.setText(computeInitials(userName));
-                avatarStack.setStyle(
-                        "-fx-background-color: " + colorForName(userName) + "; -fx-background-radius: 20;");
-                timeLabel.setText(item.lastMessage()
-                        .map(Message::createdAt)
-                        .map(createdAt -> {
-                            var zonedDateTime = createdAt.atZone(ZoneId.systemDefault());
-                            LocalDate messageDate = zonedDateTime.toLocalDate();
-                            return messageDate.equals(AppClock.today())
-                                    ? zonedDateTime.format(TIME_FORMAT)
-                                    : zonedDateTime.format(CONVERSATION_DATE_FORMAT);
-                        })
-                        .orElse(""));
-
-                if (item.unreadCount() > 0) {
-                    unreadBadge.setText(String.valueOf(item.unreadCount()));
-                    unreadBadge.setVisible(true);
-                    unreadBadge.setManaged(true);
-                } else {
-                    unreadBadge.setVisible(false);
-                    unreadBadge.setManaged(false);
-                }
-
-                Message lastMessage = item.lastMessage().orElse(null);
-                if (lastMessage == null) {
-                    snippetLabel.setText("No messages yet");
-                    snippetLabel.setStyle(SNIPPET_STYLE_EMPTY);
-                } else {
-                    UUID currentUserId = currentUserIdSupplier != null ? currentUserIdSupplier.get() : null;
-                    String senderPrefix =
-                            currentUserId != null && currentUserId.equals(lastMessage.senderId()) ? "You: " : "";
-                    String preview = senderPrefix + lastMessage.content();
-                    if (preview.length() > UiConstants.CONVERSATION_PREVIEW_CHARS) {
-                        preview = preview.substring(0, UiConstants.CONVERSATION_PREVIEW_CHARS) + "...";
-                    }
-                    snippetLabel.setText(preview);
-                    snippetLabel.setStyle(SNIPPET_STYLE_NORMAL);
-                }
-
-                setGraphic(container);
+                return;
             }
+            updateConversationSummary(item);
+            setGraphic(container);
+        }
+
+        private void updateConversationSummary(ConversationPreview item) {
+            String userName = item.otherUser().getName();
+            updateAvatar(userName);
+            updateTimestamp(item);
+            updateUnreadBadge(item.unreadCount());
+            updateSnippet(item.lastMessage().orElse(null));
+        }
+
+        private void updateAvatar(String userName) {
+            nameLabel.setText(userName);
+            avatarInitials.setText(computeInitials(userName));
+            avatarStack.setStyle("-fx-background-color: " + colorForName(userName) + "; -fx-background-radius: 20;");
+        }
+
+        private void updateTimestamp(ConversationPreview item) {
+            timeLabel.setText(item.lastMessage()
+                    .map(Message::createdAt)
+                    .map(this::formatTimestamp)
+                    .orElse(""));
+        }
+
+        private String formatTimestamp(java.time.Instant createdAt) {
+            var zonedDateTime = createdAt.atZone(ZoneId.systemDefault());
+            LocalDate messageDate = zonedDateTime.toLocalDate();
+            return messageDate.equals(AppClock.today())
+                    ? zonedDateTime.format(TIME_FORMAT)
+                    : zonedDateTime.format(CONVERSATION_DATE_FORMAT);
+        }
+
+        private void updateUnreadBadge(int unreadCount) {
+            boolean visible = unreadCount > 0;
+            unreadBadge.setVisible(visible);
+            unreadBadge.setManaged(visible);
+            if (visible) {
+                unreadBadge.setText(String.valueOf(unreadCount));
+            }
+        }
+
+        private void updateSnippet(Message lastMessage) {
+            if (lastMessage == null) {
+                snippetLabel.setText("No messages yet");
+                snippetLabel.setStyle(SNIPPET_STYLE_EMPTY);
+                return;
+            }
+            snippetLabel.setText(buildMessagePreview(lastMessage));
+            snippetLabel.setStyle(SNIPPET_STYLE_NORMAL);
+        }
+
+        private String buildMessagePreview(Message lastMessage) {
+            UUID currentUserId = currentUserIdSupplier != null ? currentUserIdSupplier.get() : null;
+            String senderPrefix = currentUserId != null && currentUserId.equals(lastMessage.senderId()) ? "You: " : "";
+            String preview = senderPrefix + lastMessage.content();
+            return preview.length() > UiConstants.CONVERSATION_PREVIEW_CHARS
+                    ? preview.substring(0, UiConstants.CONVERSATION_PREVIEW_CHARS) + "..."
+                    : preview;
         }
 
         private static String computeInitials(String name) {
@@ -610,7 +662,7 @@ public class ChatController extends BaseController implements Initializable {
             contentLabel.maxWidthProperty().bind(bubble.maxWidthProperty().subtract(24));
             timeLabel.setStyle("-fx-font-size: 10px; -fx-text-fill: rgba(255,255,255,0.6);");
 
-            dateSeparatorLabel.getStyleClass().add("text-secondary");
+            dateSeparatorLabel.getStyleClass().add(TEXT_SECONDARY_STYLE_CLASS);
             dateSeparatorLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: bold;");
             dateSeparatorLabel.setAlignment(Pos.CENTER);
             dateSeparatorLabel.setMaxWidth(Double.MAX_VALUE);

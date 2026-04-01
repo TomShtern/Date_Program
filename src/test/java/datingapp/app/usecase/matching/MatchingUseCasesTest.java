@@ -121,16 +121,17 @@ class MatchingUseCasesTest {
     @Test
     @DisplayName("browseCandidates reports location missing when seeker has no location")
     void browseCandidatesReportsLocationMissingWhenSeekerHasNoLocation() {
-        User noLocationUser = new User(UUID.randomUUID(), "NoLocation");
-        noLocationUser.setBirthDate(AppClock.today().minusYears(27));
-        noLocationUser.setGender(User.Gender.MALE);
-        noLocationUser.setInterestedIn(Set.of(User.Gender.FEMALE));
-        noLocationUser.setAgeRange(20, 45, 18, 120);
-        noLocationUser.setMaxDistanceKm(100, AppConfig.defaults().matching().maxDistanceKm());
-        noLocationUser.addPhotoUrl("http://example.com/no-location.jpg");
-        noLocationUser.setBio("No location test user");
-        noLocationUser.setPacePreferences(currentUser.getPacePreferences());
-        noLocationUser.activate();
+        User noLocationUser = User.StorageBuilder.create(UUID.randomUUID(), "NoLocation", AppClock.now())
+                .birthDate(AppClock.today().minusYears(27))
+                .gender(User.Gender.MALE)
+                .interestedIn(Set.of(User.Gender.FEMALE))
+                .ageRange(20, 45)
+                .maxDistanceKm(100)
+                .photoUrls(List.of("http://example.com/no-location.jpg"))
+                .bio("No location test user")
+                .pacePreferences(currentUser.getPacePreferences())
+                .state(UserState.ACTIVE)
+                .build();
         userStorage.save(noLocationUser);
 
         var result = useCases.browseCandidates(
@@ -448,16 +449,17 @@ class MatchingUseCasesTest {
     @Test
     @DisplayName("browseCandidates still preserves locationMissing contract after filtering")
     void browseCandidatesPreservesLocationMissingContractAfterFiltering() {
-        User noLocationUser = new User(UUID.randomUUID(), "NoLocationFiltering");
-        noLocationUser.setBirthDate(AppClock.today().minusYears(27));
-        noLocationUser.setGender(User.Gender.MALE);
-        noLocationUser.setInterestedIn(Set.of(User.Gender.FEMALE));
-        noLocationUser.setAgeRange(20, 45, 18, 120);
-        noLocationUser.setMaxDistanceKm(100, AppConfig.defaults().matching().maxDistanceKm());
-        noLocationUser.addPhotoUrl("http://example.com/no-location-filter.jpg");
-        noLocationUser.setBio("No location but otherwise complete");
-        noLocationUser.setPacePreferences(currentUser.getPacePreferences());
-        noLocationUser.activate();
+        User noLocationUser = User.StorageBuilder.create(UUID.randomUUID(), "NoLocationFiltering", AppClock.now())
+                .birthDate(AppClock.today().minusYears(27))
+                .gender(User.Gender.MALE)
+                .interestedIn(Set.of(User.Gender.FEMALE))
+                .ageRange(20, 45)
+                .maxDistanceKm(100)
+                .photoUrls(List.of("http://example.com/no-location-filter.jpg"))
+                .bio("No location but otherwise complete")
+                .pacePreferences(currentUser.getPacePreferences())
+                .state(UserState.ACTIVE)
+                .build();
         userStorage.save(noLocationUser);
 
         var result = useCases.browseCandidates(

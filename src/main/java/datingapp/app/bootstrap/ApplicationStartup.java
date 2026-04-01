@@ -25,7 +25,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.Function;
+import java.util.function.UnaryOperator;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -84,6 +84,7 @@ public final class ApplicationStartup {
     private static volatile DatabaseManager dbManager;
     private static final AtomicReference<CleanupScheduler> CLEANUP_SCHEDULER_REF = new AtomicReference<>();
     private static final AtomicReference<Thread> SHUTDOWN_HOOK_REF = new AtomicReference<>();
+    private static final AtomicReference<Runnable> INITIALIZATION_FAILURE_HOOK = new AtomicReference<>();
     private static volatile boolean initialized = false;
 
     private ApplicationStartup() {}
@@ -99,27 +100,41 @@ public final class ApplicationStartup {
     public static synchronized ServiceRegistry initialize(AppConfig config) {
         Objects.requireNonNull(config, "config cannot be null");
         installShutdownHook();
-        if (!initialized) {
-            dbManager = DatabaseManager.getInstance();
-            services = StorageFactory.buildH2(dbManager, config);
+        if (initialized) {
+            return services;
+        }
+
+        DatabaseManager initializedDbManager = null;
+        CleanupScheduler cleanupScheduler = null;
+        try {
+            initializedDbManager = DatabaseManager.getInstance();
+            ServiceRegistry initializedServices = StorageFactory.buildH2(initializedDbManager, config);
+
+            dbManager = initializedDbManager;
+            services = initializedServices;
+
+            runInitializationFailureHook();
 
             // Seed the database with developer test data only when explicitly enabled.
             // DevDataSeeder.seed(...) remains idempotent via sentinel checks.
             if (isDevDataSeedingEnabled()) {
                 DevDataSeeder.seed(
-                        services.getUserStorage(),
-                        services.getInteractionStorage(),
-                        services.getCommunicationStorage());
+                        initializedServices.getUserStorage(),
+                        initializedServices.getInteractionStorage(),
+                        initializedServices.getCommunicationStorage());
                 logInfo("Dev data seeding enabled ({}=true)", SEED_DATA_ENV_VAR);
             } else if (logger.isDebugEnabled()) {
                 logger.debug("Dev data seeding skipped ({} is not true)", SEED_DATA_ENV_VAR);
             }
 
-            startCleanupScheduler(services);
-
+            cleanupScheduler = startCleanupScheduler(initializedServices);
+            CLEANUP_SCHEDULER_REF.set(cleanupScheduler);
             initialized = true;
+            return initializedServices;
+        } catch (Exception ex) {
+            rollbackFailedInitialization(initializedDbManager, cleanupScheduler);
+            throw ex;
         }
-        return services;
     }
 
     public static ServiceRegistry getServices() {
@@ -164,7 +179,7 @@ public final class ApplicationStartup {
                 String json = Files.readString(configPath);
                 applyJsonConfig(builder, json);
                 logInfo("Loaded configuration from: {}", configPath);
-            } catch (IOException ex) {
+            } catch (IllegalStateException | IOException ex) {
                 // File exists but failed to read/parse — this is a configuration error, not
                 // ignorable
                 throw new IllegalStateException("Config file exists but failed to load: " + configPath, ex);
@@ -209,7 +224,7 @@ public final class ApplicationStartup {
         } catch (IllegalStateException ex) {
             throw ex;
         } catch (IOException ex) {
-            logWarn("Failed to parse JSON config — using defaults for all unread fields", ex);
+            throw new IllegalStateException("Failed to parse JSON config", ex);
         }
     }
 
@@ -258,7 +273,7 @@ public final class ApplicationStartup {
         applyEnvironmentOverrides(builder, System::getenv);
     }
 
-    static void applyEnvironmentOverrides(AppConfig.Builder builder, Function<String, String> envLookup) {
+    static void applyEnvironmentOverrides(AppConfig.Builder builder, UnaryOperator<String> envLookup) {
         applyEnvInt(envLookup, "DAILY_LIKE_LIMIT", builder::dailyLikeLimit);
         applyEnvInt(envLookup, "DAILY_SUPER_LIKE_LIMIT", builder::dailySuperLikeLimit);
         applyEnvInt(envLookup, "DAILY_PASS_LIMIT", builder::dailyPassLimit);
@@ -288,7 +303,7 @@ public final class ApplicationStartup {
     }
 
     private static void applyEnvInt(
-            Function<String, String> envLookup, String suffix, java.util.function.IntConsumer setter) {
+            UnaryOperator<String> envLookup, String suffix, java.util.function.IntConsumer setter) {
         String value = envLookup.apply(ENV_PREFIX + suffix);
         if (value != null && !value.isBlank()) {
             try {
@@ -467,10 +482,31 @@ public final class ApplicationStartup {
         }
     }
 
-    private static void startCleanupScheduler(ServiceRegistry serviceRegistry) {
+    private static CleanupScheduler startCleanupScheduler(ServiceRegistry serviceRegistry) {
         CleanupScheduler scheduler =
                 new CleanupScheduler(Duration.ofHours(24), serviceRegistry.getActivityMetricsService()::runCleanup);
-        CLEANUP_SCHEDULER_REF.set(scheduler);
         scheduler.start();
+        return scheduler;
+    }
+
+    private static void rollbackFailedInitialization(
+            DatabaseManager initializedDbManager, CleanupScheduler cleanupScheduler) {
+        if (cleanupScheduler != null) {
+            cleanupScheduler.stop();
+        }
+        CLEANUP_SCHEDULER_REF.set(null);
+        services = null;
+        dbManager = null;
+        initialized = false;
+        if (initializedDbManager != null) {
+            initializedDbManager.shutdown();
+        }
+    }
+
+    private static void runInitializationFailureHook() {
+        Runnable hook = INITIALIZATION_FAILURE_HOOK.get();
+        if (hook != null) {
+            hook.run();
+        }
     }
 }

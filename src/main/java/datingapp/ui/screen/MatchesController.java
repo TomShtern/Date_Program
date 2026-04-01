@@ -12,6 +12,7 @@ import datingapp.ui.viewmodel.MatchesViewModel.MatchCardData;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -20,6 +21,7 @@ import java.util.Objects;
 import java.util.Random;
 import java.util.ResourceBundle;
 import java.util.Set;
+import javafx.animation.Animation;
 import javafx.animation.FadeTransition;
 import javafx.animation.Interpolator;
 import javafx.animation.KeyFrame;
@@ -136,6 +138,7 @@ public class MatchesController extends BaseController implements Initializable {
     private Section currentSection = Section.MATCHES;
     private final Map<Section, Map<String, VBox>> cardCacheBySection = new EnumMap<>(Section.class);
     private final Map<Section, Map<String, Object>> cardDataBySection = new EnumMap<>(Section.class);
+    private final Map<String, Animation> newMatchBadgeAnimations = new HashMap<>();
 
     public MatchesController(MatchesViewModel viewModel) {
         this.viewModel = viewModel;
@@ -263,7 +266,7 @@ public class MatchesController extends BaseController implements Initializable {
             e.consume();
             spawnFloatingHeart();
         }));
-        spawnTimeline.setCycleCount(javafx.animation.Animation.INDEFINITE);
+        spawnTimeline.setCycleCount(Animation.INDEFINITE);
         spawnTimeline.play();
         trackAnimation(spawnTimeline);
 
@@ -364,7 +367,7 @@ public class MatchesController extends BaseController implements Initializable {
                         Duration.millis(1200),
                         new KeyValue(glow.radiusProperty(), 45, Interpolator.EASE_BOTH),
                         new KeyValue(glow.spreadProperty(), 0.6, Interpolator.EASE_BOTH)));
-        glowPulse.setCycleCount(javafx.animation.Animation.INDEFINITE);
+        glowPulse.setCycleCount(Animation.INDEFINITE);
         glowPulse.setAutoReverse(true);
         glowPulse.play();
         trackAnimation(glowPulse);
@@ -375,7 +378,7 @@ public class MatchesController extends BaseController implements Initializable {
         breathe.setFromY(1.0);
         breathe.setToX(1.15);
         breathe.setToY(1.15);
-        breathe.setCycleCount(javafx.animation.Animation.INDEFINITE);
+        breathe.setCycleCount(Animation.INDEFINITE);
         breathe.setAutoReverse(true);
         breathe.setInterpolator(Interpolator.EASE_BOTH);
         breathe.play();
@@ -387,7 +390,7 @@ public class MatchesController extends BaseController implements Initializable {
         TranslateTransition floatAnim = new TranslateTransition(Duration.millis(2500), emptyStateContainer);
         floatAnim.setFromY(0);
         floatAnim.setToY(-12);
-        floatAnim.setCycleCount(javafx.animation.Animation.INDEFINITE);
+        floatAnim.setCycleCount(Animation.INDEFINITE);
         floatAnim.setAutoReverse(true);
         floatAnim.setInterpolator(Interpolator.EASE_BOTH);
         floatAnim.play();
@@ -552,9 +555,12 @@ public class MatchesController extends BaseController implements Initializable {
             badgePulse.setFromY(1.0);
             badgePulse.setToX(1.2);
             badgePulse.setToY(1.2);
-            badgePulse.setCycleCount(javafx.animation.Animation.INDEFINITE);
+            badgePulse.setCycleCount(Animation.INDEFINITE);
             badgePulse.setAutoReverse(true);
             badgePulse.play();
+            registerNewMatchBadgeAnimation(match.userId().toString(), badgePulse);
+        } else {
+            removeNewMatchBadgeAnimation(match.userId().toString());
         }
 
         // Avatar container with glow effect
@@ -839,6 +845,8 @@ public class MatchesController extends BaseController implements Initializable {
      */
     @Override
     public void cleanup() {
+        newMatchBadgeAnimations.values().forEach(Animation::stop);
+        newMatchBadgeAnimations.clear();
         // Clear particle layer if it exists
         if (particleLayer != null) {
             particleLayer.getChildren().clear();
@@ -849,6 +857,21 @@ public class MatchesController extends BaseController implements Initializable {
         cardDataBySection.values().forEach(Map::clear);
         // super.cleanup() stops all tracked animations and subscriptions
         super.cleanup();
+    }
+
+    private void registerNewMatchBadgeAnimation(String key, Animation animation) {
+        Animation previous = newMatchBadgeAnimations.put(key, animation);
+        if (previous != null) {
+            previous.stop();
+        }
+        trackAnimation(animation);
+    }
+
+    private void removeNewMatchBadgeAnimation(String key) {
+        Animation animation = newMatchBadgeAnimations.remove(key);
+        if (animation != null) {
+            animation.stop();
+        }
     }
 
     // --- Likes tab card rendering (inlined from LikesTabRenderer) ---

@@ -282,11 +282,15 @@ public class ConnectionService {
 
     public int getTotalUnreadCount(UUID userId) {
         List<Conversation> conversations = communicationStorage.getAllConversationsFor(userId);
-        int total = 0;
-        for (Conversation convo : conversations) {
-            total += calculateUnreadCount(userId, convo);
+        if (conversations.isEmpty()) {
+            return 0;
         }
-        return total;
+
+        Set<String> conversationIds =
+                conversations.stream().map(Conversation::getId).collect(java.util.stream.Collectors.toSet());
+        return communicationStorage.countUnreadMessagesByConversationIds(userId, conversationIds).values().stream()
+                .mapToInt(Integer::intValue)
+                .sum();
     }
 
     public int getUnreadNotificationCount(UUID userId) {

@@ -45,6 +45,10 @@ public final class UiAsyncTestSupport {
         }
     }
 
+    public static boolean await(CountDownLatch latch, Duration timeout) throws InterruptedException {
+        return latch.await(timeout.toMillis(), TimeUnit.MILLISECONDS);
+    }
+
     public static final class TestUiThreadDispatcher implements UiThreadDispatcher {
         private final ThreadLocal<Boolean> uiThread = ThreadLocal.withInitial(() -> false);
 
