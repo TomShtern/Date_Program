@@ -572,20 +572,7 @@ public class ConnectionService {
     }
 
     private static Conversation copyConversation(Conversation conversation) {
-        return Conversation.fromStorage(
-                conversation.getId(),
-                conversation.getUserA(),
-                conversation.getUserB(),
-                conversation.getCreatedAt(),
-                conversation.getLastMessageAt(),
-                conversation.getUserAReadAt(),
-                conversation.getUserBReadAt(),
-                conversation.getUserAArchivedAt(),
-                conversation.getUserAArchiveReason(),
-                conversation.getUserBArchivedAt(),
-                conversation.getUserBArchiveReason(),
-                conversation.isVisibleToUserA(),
-                conversation.isVisibleToUserB());
+        return Conversation.copyOf(conversation);
     }
 
     public List<FriendRequest> getPendingRequestsFor(UUID userId) {

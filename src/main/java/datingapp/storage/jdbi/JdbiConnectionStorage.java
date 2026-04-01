@@ -333,14 +333,14 @@ public final class JdbiConnectionStorage implements CommunicationStorage {
 
     @Override
     public int markAllNotificationsAsRead(UUID userId) {
-        Objects.requireNonNull(userId, "userId cannot be null");
+        Objects.requireNonNull(userId, ERR_USER_ID_NULL);
 
         return jdbi.inTransaction(handle -> handle.attach(SocialDao.class).markAllNotificationsAsRead(userId));
     }
 
     @Override
     public void markNotificationAsRead(UUID userId, UUID id) {
-        Objects.requireNonNull(userId, "userId cannot be null");
+        Objects.requireNonNull(userId, ERR_USER_ID_NULL);
         Objects.requireNonNull(id, "id cannot be null");
         socialDao.markNotificationAsRead(userId, id);
     }
@@ -357,14 +357,14 @@ public final class JdbiConnectionStorage implements CommunicationStorage {
 
     @Override
     public int deleteNotificationsForUser(UUID userId) {
-        Objects.requireNonNull(userId, "userId cannot be null");
+        Objects.requireNonNull(userId, ERR_USER_ID_NULL);
 
         return jdbi.inTransaction(handle -> handle.attach(SocialDao.class).deleteNotificationsForUser(userId));
     }
 
     @Override
     public void deleteNotification(UUID userId, UUID id) {
-        Objects.requireNonNull(userId, "userId cannot be null");
+        Objects.requireNonNull(userId, ERR_USER_ID_NULL);
         Objects.requireNonNull(id, "id cannot be null");
         socialDao.deleteNotification(userId, id);
     }
@@ -783,7 +783,7 @@ public final class JdbiConnectionStorage implements CommunicationStorage {
         @Override
         public Message map(ResultSet rs, StatementContext ctx) throws SQLException {
             var id = JdbiTypeCodecs.SqlRowReaders.readUuid(rs, "id");
-            var conversationId = rs.getString("conversation_id");
+            var conversationId = rs.getString(COLUMN_CONVERSATION_ID);
             var senderId = JdbiTypeCodecs.SqlRowReaders.readUuid(rs, "sender_id");
             var content = rs.getString("content");
             var createdAt = JdbiTypeCodecs.SqlRowReaders.readInstant(rs, ConversationMapper.COL_CREATED_AT);

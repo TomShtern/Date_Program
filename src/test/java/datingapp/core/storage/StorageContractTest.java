@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.core.connection.ConnectionModels.Conversation;
 import datingapp.core.connection.ConnectionModels.FriendRequest;
+import datingapp.core.connection.ConnectionModels.Like;
 import datingapp.core.connection.ConnectionModels.Message;
 import datingapp.core.connection.ConnectionModels.Notification;
 import datingapp.core.model.Match;
@@ -104,6 +105,20 @@ class StorageContractTest {
         InteractionStorage storage = new UnsupportedInteractionStorage();
 
         assertThrows(UnsupportedOperationException.class, () -> storage.purgeDeletedBefore(Instant.EPOCH));
+    }
+
+    @Test
+    @DisplayName("InteractionStorage deleteLikeOwnedBy holds the storage monitor across read and delete")
+    void interactionStorageDeleteLikeOwnedByHoldsStorageMonitorAcrossReadAndDelete() {
+        LockObservingInteractionStorage storage = new LockObservingInteractionStorage();
+        Like like = Like.create(UUID.randomUUID(), UUID.randomUUID(), Like.Direction.LIKE);
+        storage.setStoredLike(like);
+
+        boolean deleted = storage.deleteLikeOwnedBy(like.whoLikes(), like.id());
+
+        assertTrue(deleted);
+        assertTrue(storage.getLikeByIdObservedLockHeld());
+        assertTrue(storage.deleteObservedLockHeld());
     }
 
     @Test
@@ -303,6 +318,156 @@ class StorageContractTest {
 
         @Override
         public boolean unmatchTransition(Match updatedMatch, Optional<Conversation> archivedConversation) {
+            throw new UnsupportedOperationException("stub");
+        }
+
+        @Override
+        public boolean atomicUndoDelete(UUID likeId, String matchId) {
+            throw new UnsupportedOperationException("stub");
+        }
+    }
+
+    private static final class LockObservingInteractionStorage implements InteractionStorage {
+        private Like storedLike;
+        private boolean getLikeByIdObservedLockHeld;
+        private boolean deleteObservedLockHeld;
+
+        void setStoredLike(Like like) {
+            this.storedLike = like;
+        }
+
+        boolean getLikeByIdObservedLockHeld() {
+            return getLikeByIdObservedLockHeld;
+        }
+
+        boolean deleteObservedLockHeld() {
+            return deleteObservedLockHeld;
+        }
+
+        @Override
+        public Optional<Like> getLikeById(UUID likeId) {
+            getLikeByIdObservedLockHeld = Thread.holdsLock(this);
+            if (storedLike == null || !storedLike.id().equals(likeId)) {
+                return Optional.empty();
+            }
+            return Optional.of(storedLike);
+        }
+
+        @Override
+        public void delete(UUID likeId) {
+            deleteObservedLockHeld = Thread.holdsLock(this);
+            if (storedLike != null && storedLike.id().equals(likeId)) {
+                storedLike = null;
+            }
+        }
+
+        @Override
+        public Optional<Like> getLike(UUID fromUserId, UUID toUserId) {
+            throw new UnsupportedOperationException("stub");
+        }
+
+        @Override
+        public void save(Like like) {
+            throw new UnsupportedOperationException("stub");
+        }
+
+        @Override
+        public boolean exists(UUID from, UUID to) {
+            throw new UnsupportedOperationException("stub");
+        }
+
+        @Override
+        public boolean mutualLikeExists(UUID a, UUID b) {
+            throw new UnsupportedOperationException("stub");
+        }
+
+        @Override
+        public Set<UUID> getLikedOrPassedUserIds(UUID userId) {
+            throw new UnsupportedOperationException("stub");
+        }
+
+        @Override
+        public Set<UUID> getUserIdsWhoLiked(UUID userId) {
+            throw new UnsupportedOperationException("stub");
+        }
+
+        @Override
+        public List<Map.Entry<UUID, Instant>> getLikeTimesForUsersWhoLiked(UUID userId) {
+            throw new UnsupportedOperationException("stub");
+        }
+
+        @Override
+        public int countByDirection(UUID userId, Like.Direction direction) {
+            throw new UnsupportedOperationException("stub");
+        }
+
+        @Override
+        public int countReceivedByDirection(UUID userId, Like.Direction direction) {
+            throw new UnsupportedOperationException("stub");
+        }
+
+        @Override
+        public int countMutualLikes(UUID userId) {
+            throw new UnsupportedOperationException("stub");
+        }
+
+        @Override
+        public int countLikesToday(UUID userId, Instant startOfDay) {
+            throw new UnsupportedOperationException("stub");
+        }
+
+        @Override
+        public int countSuperLikesToday(UUID userId, Instant startOfDay) {
+            throw new UnsupportedOperationException("stub");
+        }
+
+        @Override
+        public int countPassesToday(UUID userId, Instant startOfDay) {
+            throw new UnsupportedOperationException("stub");
+        }
+
+        @Override
+        public void save(Match match) {
+            throw new UnsupportedOperationException("stub");
+        }
+
+        @Override
+        public void update(Match match) {
+            throw new UnsupportedOperationException("stub");
+        }
+
+        @Override
+        public Optional<Match> get(String matchId) {
+            throw new UnsupportedOperationException("stub");
+        }
+
+        @Override
+        public boolean exists(String matchId) {
+            throw new UnsupportedOperationException("stub");
+        }
+
+        @Override
+        public List<Match> getActiveMatchesFor(UUID userId) {
+            throw new UnsupportedOperationException("stub");
+        }
+
+        @Override
+        public List<Match> getAllMatchesFor(UUID userId) {
+            throw new UnsupportedOperationException("stub");
+        }
+
+        @Override
+        public void delete(String matchId) {
+            throw new UnsupportedOperationException("stub");
+        }
+
+        @Override
+        public int countMatchesFor(UUID userId) {
+            throw new UnsupportedOperationException("stub");
+        }
+
+        @Override
+        public int countActiveMatchesFor(UUID userId) {
             throw new UnsupportedOperationException("stub");
         }
 

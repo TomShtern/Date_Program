@@ -142,6 +142,25 @@ public final class ConnectionModels {
                     visibleToUserB);
         }
 
+        /** Returns a defensive copy of the given conversation aggregate. */
+        public static Conversation copyOf(Conversation conversation) {
+            Objects.requireNonNull(conversation, "conversation cannot be null");
+            return new Conversation(
+                    conversation.getId(),
+                    conversation.getUserA(),
+                    conversation.getUserB(),
+                    conversation.getCreatedAt(),
+                    conversation.getLastMessageAt(),
+                    conversation.getUserAReadAt(),
+                    conversation.getUserBReadAt(),
+                    conversation.getUserAArchivedAt(),
+                    conversation.getUserAArchiveReason(),
+                    conversation.getUserBArchivedAt(),
+                    conversation.getUserBArchiveReason(),
+                    conversation.isVisibleToUserA(),
+                    conversation.isVisibleToUserB());
+        }
+
         public static Conversation create(UUID a, UUID b) {
             Objects.requireNonNull(a, "a cannot be null");
             Objects.requireNonNull(b, "b cannot be null");

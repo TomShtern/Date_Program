@@ -3,12 +3,14 @@ package datingapp.core;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.core.connection.ConnectionModels.Conversation;
 import datingapp.core.connection.ConnectionModels.Message;
+import datingapp.core.model.Match.MatchArchiveReason;
 import datingapp.core.testutil.TestClock;
 import java.time.Instant;
 import java.util.UUID;
@@ -355,6 +357,51 @@ class MessagingDomainTest {
             void rejectNullUserB() {
                 UUID userA = UUID.randomUUID();
                 assertThrows(NullPointerException.class, () -> Conversation.create(userA, null));
+            }
+        }
+
+        @Nested
+        @DisplayName("Copying")
+        class Copying {
+
+            @Test
+            @DisplayName("copyOf preserves state and returns an independent instance")
+            void copyOfPreservesStateAndReturnsIndependentInstance() {
+                UUID a = UUID.randomUUID();
+                UUID b = UUID.randomUUID();
+                Instant lastMessageAt = FIXED_INSTANT.plusSeconds(30);
+                Instant userAReadAt = FIXED_INSTANT.plusSeconds(40);
+                Instant userBReadAt = FIXED_INSTANT.plusSeconds(50);
+
+                Conversation original = Conversation.create(a, b);
+                original.updateLastMessageAt(lastMessageAt);
+                original.updateReadTimestamp(a, userAReadAt);
+                original.updateReadTimestamp(b, userBReadAt);
+                original.archive(a, MatchArchiveReason.UNMATCH);
+                original.setVisibility(b, false);
+
+                Conversation copy = Conversation.copyOf(original);
+
+                assertNotSame(original, copy);
+                assertEquals(original.getId(), copy.getId());
+                assertEquals(original.getUserA(), copy.getUserA());
+                assertEquals(original.getUserB(), copy.getUserB());
+                assertEquals(original.getCreatedAt(), copy.getCreatedAt());
+                assertEquals(original.getLastMessageAt(), copy.getLastMessageAt());
+                assertEquals(original.getUserAReadAt(), copy.getUserAReadAt());
+                assertEquals(original.getUserBReadAt(), copy.getUserBReadAt());
+                assertEquals(original.getUserAArchivedAt(), copy.getUserAArchivedAt());
+                assertEquals(original.getUserAArchiveReason(), copy.getUserAArchiveReason());
+                assertEquals(original.getUserBArchivedAt(), copy.getUserBArchivedAt());
+                assertEquals(original.getUserBArchiveReason(), copy.getUserBArchiveReason());
+                assertEquals(original.isVisibleToUserA(), copy.isVisibleToUserA());
+                assertEquals(original.isVisibleToUserB(), copy.isVisibleToUserB());
+
+                original.updateLastMessageAt(FIXED_INSTANT.plusSeconds(60));
+                original.setVisibility(a, false);
+
+                assertEquals(lastMessageAt, copy.getLastMessageAt());
+                assertTrue(copy.isVisibleToUserA());
             }
         }
     }

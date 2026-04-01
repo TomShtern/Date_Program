@@ -61,13 +61,15 @@ public interface InteractionStorage {
         Objects.requireNonNull(ownerUserId, "ownerUserId cannot be null");
         Objects.requireNonNull(likeId, "likeId cannot be null");
 
-        Optional<Like> like = getLikeById(likeId);
-        if (like.isEmpty() || !like.get().whoLikes().equals(ownerUserId)) {
-            return false;
-        }
+        synchronized (this) {
+            Optional<Like> like = getLikeById(likeId);
+            if (like.isEmpty() || !like.get().whoLikes().equals(ownerUserId)) {
+                return false;
+            }
 
-        delete(likeId);
-        return true;
+            delete(likeId);
+            return true;
+        }
     }
 
     /** Result of persisting a like and optionally creating a match. */
