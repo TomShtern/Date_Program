@@ -43,8 +43,8 @@ class ProfileViewControllerTest {
 
         NavigationService.getInstance()
                 .setNavigationContext(NavigationService.ViewType.PROFILE_VIEW, viewedUser.getId());
-        ProfileReadOnlyViewModel viewModel =
-                new ProfileReadOnlyViewModel(new StorageUiUserStore(users), AppConfig.defaults());
+        ProfileReadOnlyViewModel viewModel = new ProfileReadOnlyViewModel(
+                new StorageUiUserStore(users), AppConfig.defaults(), JavaFxTestSupport.blockingUiDispatcher());
 
         JavaFxTestSupport.LoadedFxml loaded =
                 JavaFxTestSupport.loadFxml("/fxml/profile-view.fxml", () -> new ProfileViewController(viewModel));
@@ -69,8 +69,8 @@ class ProfileViewControllerTest {
 
         NavigationService.getInstance()
                 .setNavigationContext(NavigationService.ViewType.PROFILE_VIEW, viewedUser.getId());
-        ProfileReadOnlyViewModel viewModel =
-                new ProfileReadOnlyViewModel(new StorageUiUserStore(users), AppConfig.defaults());
+        ProfileReadOnlyViewModel viewModel = new ProfileReadOnlyViewModel(
+                new StorageUiUserStore(users), AppConfig.defaults(), JavaFxTestSupport.blockingUiDispatcher());
 
         JavaFxTestSupport.LoadedFxml loaded =
                 JavaFxTestSupport.loadFxml("/fxml/profile-view.fxml", () -> new ProfileViewController(viewModel));

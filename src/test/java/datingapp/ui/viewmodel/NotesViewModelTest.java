@@ -31,17 +31,7 @@ import org.junit.jupiter.api.Timeout;
 @DisplayName("NotesViewModel note browser")
 class NotesViewModelTest {
 
-    private static final UiThreadDispatcher TEST_DISPATCHER = new UiThreadDispatcher() {
-        @Override
-        public boolean isUiThread() {
-            return true;
-        }
-
-        @Override
-        public void dispatch(Runnable action) {
-            action.run();
-        }
-    };
+    private static final UiThreadDispatcher TEST_DISPATCHER = JavaFxTestSupport.immediateUiDispatcher();
 
     @BeforeAll
     static void initJfx() {
@@ -62,11 +52,8 @@ class NotesViewModelTest {
     @DisplayName("initialize loads notes and enriches them with subject names")
     void initializeLoadsNotesWithNames() throws InterruptedException {
         TestStorages.Users users = new TestStorages.Users();
-        TestStorages.Analytics analytics = new TestStorages.Analytics();
-        TestStorages.Interactions interactions = new TestStorages.Interactions();
-        TestStorages.TrustSafety trustSafety = new TestStorages.TrustSafety();
         AppConfig config = AppConfig.defaults();
-        ProfileService profileService = new ProfileService(config, analytics, interactions, trustSafety, users);
+        ProfileService profileService = new ProfileService(users);
         ProfileUseCases profileUseCases = new ProfileUseCases(
                 users,
                 profileService,
@@ -105,11 +92,8 @@ class NotesViewModelTest {
     @DisplayName("initialize keeps notes empty when the user has no saved notes")
     void initializeLeavesEmptyStateForNoNotes() throws InterruptedException {
         TestStorages.Users users = new TestStorages.Users();
-        TestStorages.Analytics analytics = new TestStorages.Analytics();
-        TestStorages.Interactions interactions = new TestStorages.Interactions();
-        TestStorages.TrustSafety trustSafety = new TestStorages.TrustSafety();
         AppConfig config = AppConfig.defaults();
-        ProfileService profileService = new ProfileService(config, analytics, interactions, trustSafety, users);
+        ProfileService profileService = new ProfileService(users);
         ProfileUseCases profileUseCases = new ProfileUseCases(
                 users,
                 profileService,
@@ -136,11 +120,8 @@ class NotesViewModelTest {
     @DisplayName("saveSelectedNote updates storage and the observable note list")
     void saveSelectedNoteUpdatesStorageAndList() throws InterruptedException {
         TestStorages.Users users = new TestStorages.Users();
-        TestStorages.Analytics analytics = new TestStorages.Analytics();
-        TestStorages.Interactions interactions = new TestStorages.Interactions();
-        TestStorages.TrustSafety trustSafety = new TestStorages.TrustSafety();
         AppConfig config = AppConfig.defaults();
-        ProfileService profileService = new ProfileService(config, analytics, interactions, trustSafety, users);
+        ProfileService profileService = new ProfileService(users);
         ProfileUseCases profileUseCases = new ProfileUseCases(
                 users,
                 profileService,
@@ -184,11 +165,8 @@ class NotesViewModelTest {
     @DisplayName("deleteSelectedNote removes storage and the observable note list")
     void deleteSelectedNoteRemovesStorageAndList() throws InterruptedException {
         TestStorages.Users users = new TestStorages.Users();
-        TestStorages.Analytics analytics = new TestStorages.Analytics();
-        TestStorages.Interactions interactions = new TestStorages.Interactions();
-        TestStorages.TrustSafety trustSafety = new TestStorages.TrustSafety();
         AppConfig config = AppConfig.defaults();
-        ProfileService profileService = new ProfileService(config, analytics, interactions, trustSafety, users);
+        ProfileService profileService = new ProfileService(users);
         ProfileUseCases profileUseCases = new ProfileUseCases(
                 users,
                 profileService,

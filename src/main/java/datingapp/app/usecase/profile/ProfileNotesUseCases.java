@@ -153,7 +153,6 @@ public class ProfileNotesUseCases {
         return validationService;
     }
 
-    @SuppressWarnings("unchecked")
     private <T> UseCaseResult<T> requireAuthorExists(UUID authorId) {
         if (userStorage == null) {
             return UseCaseResult.failure(UseCaseError.dependency(USER_STORAGE_REQUIRED));

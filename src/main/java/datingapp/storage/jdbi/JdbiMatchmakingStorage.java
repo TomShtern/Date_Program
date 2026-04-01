@@ -567,12 +567,6 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
 
         try {
             return jdbi.inTransaction(handle -> {
-                handle.createUpdate(SQL_SOFT_DELETE_PAIR_LIKES)
-                        .bind("userA", updatedMatch.getUserA())
-                        .bind("userB", updatedMatch.getUserB())
-                        .bind("deletedAt", updatedMatch.getUpdatedAt())
-                        .execute();
-
                 int matchRows = handle.createUpdate(SQL_UPDATE_MATCH_TRANSITION)
                         .bind(PARAM_ID, updatedMatch.getId())
                         .bind(PARAM_STATE, updatedMatch.getState().name())
@@ -587,8 +581,14 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
                         .bind(PARAM_DELETED_AT, updatedMatch.getDeletedAt())
                         .execute();
                 if (matchRows != 1) {
-                    throw new StorageException("Failed to update match during atomic unmatch");
+                    return false;
                 }
+
+                handle.createUpdate(SQL_SOFT_DELETE_PAIR_LIKES)
+                        .bind("userA", updatedMatch.getUserA())
+                        .bind("userB", updatedMatch.getUserB())
+                        .bind("deletedAt", updatedMatch.getUpdatedAt())
+                        .execute();
 
                 if (archivedConversation.isPresent()) {
                     Conversation conversation = archivedConversation.get();

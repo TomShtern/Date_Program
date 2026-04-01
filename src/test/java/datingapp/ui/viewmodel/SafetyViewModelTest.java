@@ -38,17 +38,7 @@ import org.junit.jupiter.api.Timeout;
 @DisplayName("SafetyViewModel blocked user management")
 class SafetyViewModelTest {
 
-    private static final UiThreadDispatcher TEST_DISPATCHER = new UiThreadDispatcher() {
-        @Override
-        public boolean isUiThread() {
-            return true;
-        }
-
-        @Override
-        public void dispatch(Runnable action) {
-            action.run();
-        }
-    };
+    private static final UiThreadDispatcher TEST_DISPATCHER = datingapp.ui.JavaFxTestSupport.immediateUiDispatcher();
 
     private SafetyViewModel viewModel;
 
@@ -143,7 +133,7 @@ class SafetyViewModelTest {
                 .build();
         ProfileUseCases profileUseCases = new ProfileUseCases(
                 users,
-                new ProfileService(config, analytics, interactions, trustSafetyStorage, users),
+                new ProfileService(users),
                 new ValidationService(config),
                 new ActivityMetricsService(interactions, trustSafetyStorage, analytics, config),
                 TestAchievementService.empty(),
@@ -185,7 +175,7 @@ class SafetyViewModelTest {
 
         ProfileUseCases profileUseCases = new ProfileUseCases(
                 users,
-                new ProfileService(config, analytics, interactions, trustSafetyStorage, users),
+                new ProfileService(users),
                 new ValidationService(config),
                 new ActivityMetricsService(interactions, trustSafetyStorage, analytics, config),
                 TestAchievementService.empty(),

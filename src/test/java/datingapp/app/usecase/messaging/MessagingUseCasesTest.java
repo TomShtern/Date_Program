@@ -140,6 +140,23 @@ class MessagingUseCasesTest {
     }
 
     @Test
+    @DisplayName("openConversation returns a preview for a newly created empty conversation")
+    void openConversationReturnsPreviewForNewlyCreatedEmptyConversation() {
+        var result = useCases.openConversation(
+                new MessagingUseCases.OpenConversationCommand(UserContext.cli(sender.getId()), recipient.getId()));
+
+        assertTrue(result.success());
+        assertNotNull(result.data());
+        assertEquals(
+                Conversation.generateId(sender.getId(), recipient.getId()),
+                result.data().conversation().getId());
+        assertEquals(
+                result.data().conversation().getId(),
+                result.data().preview().conversation().getId());
+        assertTrue(result.data().preview().lastMessage().isEmpty());
+    }
+
+    @Test
     @DisplayName("loadConversation maps a missing conversation to NOT_FOUND")
     void loadConversationMapsMissingConversationToNotFound() {
         var result = useCases.loadConversation(

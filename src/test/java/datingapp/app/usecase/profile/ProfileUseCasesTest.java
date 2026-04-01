@@ -76,8 +76,7 @@ class ProfileUseCasesTest {
         var analyticsStorage = new TestStorages.Analytics();
         var trustSafetyStorage = new TestStorages.TrustSafety();
 
-        profileService =
-                new ProfileService(config, analyticsStorage, interactionStorage, trustSafetyStorage, userStorage);
+        profileService = new ProfileService(userStorage);
         validationService = new ValidationService(config);
         metricsService = new ActivityMetricsService(interactionStorage, trustSafetyStorage, analyticsStorage, config);
         achievementService = TestAchievementService.empty();

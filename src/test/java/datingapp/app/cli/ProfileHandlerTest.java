@@ -175,10 +175,7 @@ class ProfileHandlerTest {
         AppConfig config =
                 AppConfig.builder().userTimeZone(ZoneId.of("Pacific/Honolulu")).build();
         TestStorages.Users previewUsers = new TestStorages.Users();
-        TestStorages.Analytics analytics = new TestStorages.Analytics();
-        TestStorages.Interactions interactions = new TestStorages.Interactions();
-        TestStorages.TrustSafety trustSafety = new TestStorages.TrustSafety();
-        ProfileService profileService = new ProfileService(config, analytics, interactions, trustSafety, previewUsers);
+        ProfileService profileService = new ProfileService(previewUsers);
         ProfileUseCases previewUseCases = new ProfileUseCases(
                 previewUsers,
                 profileService,

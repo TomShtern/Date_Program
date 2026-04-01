@@ -53,8 +53,7 @@ class AchievementServiceTest {
         trustSafetyStorage = new TestStorages.TrustSafety();
         userStorage = new InMemoryUserStorage();
         config = AppConfig.defaults();
-        ProfileService profileService =
-                new ProfileService(config, analyticsStorage, interactionStorage, trustSafetyStorage, userStorage);
+        ProfileService profileService = new ProfileService(userStorage);
         service = new DefaultAchievementService(
                 config, analyticsStorage, interactionStorage, trustSafetyStorage, userStorage, profileService);
         userId = UUID.randomUUID();

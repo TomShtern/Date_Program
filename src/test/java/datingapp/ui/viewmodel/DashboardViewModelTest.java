@@ -21,18 +21,17 @@ import datingapp.core.testutil.TestAchievementService;
 import datingapp.core.testutil.TestClock;
 import datingapp.core.testutil.TestStorages;
 import datingapp.ui.JavaFxTestSupport;
-import datingapp.ui.async.UiThreadDispatcher;
+import datingapp.ui.async.UiAsyncTestSupport;
 import datingapp.ui.viewmodel.UiDataAdapters.StorageUiMatchDataAccess;
 import datingapp.ui.viewmodel.UiDataAdapters.UiMatchDataAccess;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -52,7 +51,6 @@ class DashboardViewModelTest {
     private TestStorages.Communications communications;
     private RecommendationService dailyService;
     private AchievementService achievementService;
-    private TestUiThreadDispatcher uiDispatcher;
 
     private DashboardViewModel viewModel;
     private User currentUser;
@@ -78,8 +76,7 @@ class DashboardViewModelTest {
         CandidateFinder candidateFinder =
                 new CandidateFinder(users, interactions, trustSafetyStorage, ZoneId.of("UTC"));
         TestStorages.Standouts standoutStorage = new TestStorages.Standouts();
-        ProfileService profileService =
-                new ProfileService(config, analyticsStorage, interactions, trustSafetyStorage, users);
+        ProfileService profileService = new ProfileService(users);
 
         dailyService = RecommendationService.builder()
                 .interactionStorage(interactions)
@@ -96,19 +93,16 @@ class DashboardViewModelTest {
         achievementService = TestAchievementService.empty();
 
         ConnectionService messagingService = new ConnectionService(config, communications, interactions, users);
-        uiDispatcher = new TestUiThreadDispatcher();
 
         viewModel = new DashboardViewModel(
                 new DashboardViewModel.Dependencies(
                         dailyService, matchData, achievementService, messagingService, profileService, config),
                 AppSession.getInstance(),
-                uiDispatcher);
+                new UiAsyncTestSupport.TestUiThreadDispatcher());
 
         currentUser = createActiveUser("DashboardUser");
         users.save(currentUser);
         AppSession.getInstance().setCurrentUser(currentUser);
-
-        uiDispatcher.drainAll();
     }
 
     @AfterEach
@@ -197,7 +191,7 @@ class DashboardViewModelTest {
         assertTrue(done.await(5, TimeUnit.SECONDS), "Timed out waiting for dashboard refresh workers to complete");
         assertNull(failure.get(), "Concurrent dashboard refresh worker failed: " + failure.get());
 
-        awaitAndDrainUntilLoadingClears();
+        awaitUntilLoadingClears();
 
         assertFalse(viewModel.loadingProperty().get());
         assertEquals(currentUser.getName(), viewModel.userNameProperty().get());
@@ -209,7 +203,7 @@ class DashboardViewModelTest {
         viewModel.refresh();
         viewModel.dispose();
 
-        awaitAndDrainUntilLoadingClears();
+        awaitUntilLoadingClears();
 
         assertEquals("Not Logged In", viewModel.userNameProperty().get());
         assertFalse(viewModel.loadingProperty().get());
@@ -224,19 +218,12 @@ class DashboardViewModelTest {
 
     private void performRefreshAndDrainUntilIdle() throws InterruptedException {
         viewModel.performRefresh();
-        awaitAndDrainUntilLoadingClears();
+        awaitUntilLoadingClears();
     }
 
-    private void awaitAndDrainUntilLoadingClears() throws InterruptedException {
-        for (int attempts = 0; attempts < 10; attempts++) {
-            uiDispatcher.drainAll();
-            if (!viewModel.loadingProperty().get()) {
-                return;
-            }
-            int observedQueueCount = uiDispatcher.queuedActionCount();
-            assertTrue(uiDispatcher.awaitQueuedActionCountAtLeast(observedQueueCount + 1, 5000));
-        }
-        uiDispatcher.drainAll();
+    private void awaitUntilLoadingClears() throws InterruptedException {
+        assertTrue(
+                UiAsyncTestSupport.waitUntil(() -> !viewModel.loadingProperty().get(), Duration.ofSeconds(5)));
     }
 
     private static User createActiveUser(String name) {
@@ -259,59 +246,5 @@ class DashboardViewModelTest {
             throw new IllegalStateException("User should be active for test");
         }
         return user;
-    }
-
-    private static final class TestUiThreadDispatcher implements UiThreadDispatcher {
-        private final ConcurrentLinkedQueue<Runnable> queuedActions = new ConcurrentLinkedQueue<>();
-        private final AtomicInteger queuedActionCount = new AtomicInteger();
-        private final Object monitor = new Object();
-        private final ThreadLocal<Boolean> uiThread = ThreadLocal.withInitial(() -> false);
-
-        @Override
-        public boolean isUiThread() {
-            return uiThread.get();
-        }
-
-        @Override
-        public void dispatch(Runnable action) {
-            queuedActions.add(action);
-            synchronized (monitor) {
-                queuedActionCount.incrementAndGet();
-                monitor.notifyAll();
-            }
-        }
-
-        int queuedActionCount() {
-            return queuedActionCount.get();
-        }
-
-        boolean awaitQueuedActionCountAtLeast(int expectedCount, long timeoutMillis) throws InterruptedException {
-            long deadlineNanos = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMillis);
-            synchronized (monitor) {
-                while (queuedActionCount.get() < expectedCount) {
-                    long remainingNanos = deadlineNanos - System.nanoTime();
-                    if (remainingNanos <= 0) {
-                        return false;
-                    }
-                    long waitMillis = TimeUnit.NANOSECONDS.toMillis(remainingNanos);
-                    int waitNanos = (int) (remainingNanos - TimeUnit.MILLISECONDS.toNanos(waitMillis));
-                    monitor.wait(waitMillis, waitNanos);
-                }
-                return true;
-            }
-        }
-
-        void drainAll() {
-            Runnable action;
-            while ((action = queuedActions.poll()) != null) {
-                boolean previous = uiThread.get();
-                uiThread.set(true);
-                try {
-                    action.run();
-                } finally {
-                    uiThread.set(previous);
-                }
-            }
-        }
     }
 }

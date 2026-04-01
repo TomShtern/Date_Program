@@ -443,23 +443,18 @@ public class ChatViewModel extends BaseViewModel {
 
         if (silent) {
             asyncScope.runLatestSilently(
-                    "chat-refresh", TASK_REFRESH_CONVERSATIONS, () -> refreshConversationData(user), data -> {
-                        if (data.previews() != null) {
-                            updateConversations(data.previews(), data.unreadCount());
-                        } else {
-                            totalUnreadCount.set(data.unreadCount());
-                        }
-                    });
+                    "chat-refresh",
+                    TASK_REFRESH_CONVERSATIONS,
+                    () -> refreshConversationData(user),
+                    this::applyConversationRefreshData);
             return;
         }
 
-        asyncScope.runLatest("chat-refresh", TASK_REFRESH_CONVERSATIONS, () -> refreshConversationData(user), data -> {
-            if (data.previews() != null) {
-                updateConversations(data.previews(), data.unreadCount());
-            } else {
-                totalUnreadCount.set(data.unreadCount());
-            }
-        });
+        asyncScope.runLatest(
+                "chat-refresh",
+                TASK_REFRESH_CONVERSATIONS,
+                () -> refreshConversationData(user),
+                this::applyConversationRefreshData);
     }
 
     private ConversationRefreshData refreshConversationData(User user) {
@@ -477,6 +472,33 @@ public class ChatViewModel extends BaseViewModel {
             logError("Failed to refresh conversations", e);
         }
         return new ConversationRefreshData(previews, unread);
+    }
+
+    private void applyConversationRefreshData(ConversationRefreshData data) {
+        if (data.previews() != null) {
+            updateConversations(data.previews(), data.unreadCount());
+            return;
+        }
+        totalUnreadCount.set(data.unreadCount());
+    }
+
+    private void pollConversationsOnce() {
+        User user = ensureCurrentUser();
+        if (asyncScope.isDisposed()) {
+            return;
+        }
+        if (user == null) {
+            asyncScope.dispatchToUi(this::stopConversationsPolling);
+            return;
+        }
+
+        ConversationRefreshData data = refreshConversationData(user);
+        asyncScope.dispatchToUi(() -> {
+            if (asyncScope.isDisposed()) {
+                return;
+            }
+            applyConversationRefreshData(data);
+        });
     }
 
     public void openConversationWithUser(UUID otherUserId, Consumer<ConversationPreview> onReady) {
@@ -645,6 +667,36 @@ public class ChatViewModel extends BaseViewModel {
         }
     }
 
+    private void pollMessagesOnce() {
+        if (asyncScope.isDisposed()) {
+            return;
+        }
+
+        ConversationPreview conversation = selectedConversation.get();
+        User user = currentUser;
+        if (conversation == null || user == null) {
+            asyncScope.dispatchToUi(this::stopMessagesPolling);
+            return;
+        }
+
+        UUID otherUserId = conversation.otherUser().getId();
+        MessageLoadData messageData =
+                loadMessagesInBackground(conversation.conversation().getId(), otherUserId, user);
+        asyncScope.dispatchToUi(() -> updateMessagesOnFx(messageData));
+        pollPresenceState(otherUserId);
+    }
+
+    private void pollPresenceState(UUID otherUserId) {
+        try {
+            PresenceStatus status = presenceDataAccess.getPresence(otherUserId);
+            boolean typing = presenceDataAccess.isTyping(otherUserId);
+            asyncScope.dispatchToUi(() -> applyPresenceState(otherUserId, status, typing));
+        } catch (Exception e) {
+            logError("Failed to load presence state", e);
+            asyncScope.dispatchToUi(() -> applyPresenceState(otherUserId, PresenceStatus.UNKNOWN, false));
+        }
+    }
+
     public boolean sendMessage(String text) {
         return sendMessage(text, null);
     }
@@ -797,7 +849,7 @@ public class ChatViewModel extends BaseViewModel {
                 "chat-conversations-polling",
                 "poll conversations",
                 conversationPollInterval,
-                () -> refreshConversations(true));
+                this::pollConversationsOnce);
     }
 
     private void stopConversationsPolling() {
@@ -813,13 +865,10 @@ public class ChatViewModel extends BaseViewModel {
             return;
         }
         messagesPollingHandle = asyncScope.runPolling(
-                "chat-messages-polling", "poll active conversation", activeConversationPollInterval, () -> {
-                    ConversationPreview conversation = selectedConversation.get();
-                    if (conversation != null) {
-                        loadMessages(conversation, true);
-                        refreshPresenceState(conversation.otherUser());
-                    }
-                });
+                "chat-messages-polling",
+                "poll active conversation",
+                activeConversationPollInterval,
+                this::pollMessagesOnce);
     }
 
     private void stopMessagesPolling() {

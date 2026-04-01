@@ -1,6 +1,7 @@
 package datingapp.ui;
 
 import datingapp.core.i18n.I18n;
+import datingapp.ui.async.UiThreadDispatcher;
 import java.util.ArrayDeque;
 import java.util.Objects;
 import java.util.Queue;
@@ -23,8 +24,18 @@ import javafx.scene.control.Button;
 public final class JavaFxTestSupport {
 
     private static final AtomicBoolean JAVA_FX_INITIALIZED = new AtomicBoolean(false);
+    private static final UiThreadDispatcher IMMEDIATE_UI_DISPATCHER = new ImmediateUiThreadDispatcher();
+    private static final UiThreadDispatcher BLOCKING_UI_DISPATCHER = new BlockingJavaFxUiThreadDispatcher();
 
     private JavaFxTestSupport() {}
+
+    public static UiThreadDispatcher immediateUiDispatcher() {
+        return IMMEDIATE_UI_DISPATCHER;
+    }
+
+    public static UiThreadDispatcher blockingUiDispatcher() {
+        return BLOCKING_UI_DISPATCHER;
+    }
 
     public static void initJfx() throws InterruptedException {
         if (JAVA_FX_INITIALIZED.get()) {
@@ -157,6 +168,71 @@ public final class JavaFxTestSupport {
         Platform.runLater(latch::countDown);
         if (!latch.await(5, TimeUnit.SECONDS)) {
             throw new IllegalStateException("Timed out waiting for JavaFX events");
+        }
+    }
+
+    private static final class ImmediateUiThreadDispatcher implements UiThreadDispatcher {
+
+        @Override
+        public boolean isUiThread() {
+            return true;
+        }
+
+        @Override
+        public void dispatch(Runnable action) {
+            Objects.requireNonNull(action, "action cannot be null");
+            action.run();
+        }
+    }
+
+    private static final class BlockingJavaFxUiThreadDispatcher implements UiThreadDispatcher {
+
+        @Override
+        public boolean isUiThread() {
+            try {
+                return Platform.isFxApplicationThread();
+            } catch (IllegalStateException _) {
+                return false;
+            }
+        }
+
+        @Override
+        public void dispatch(Runnable action) {
+            Objects.requireNonNull(action, "action cannot be null");
+            if (isUiThread()) {
+                action.run();
+                return;
+            }
+
+            CountDownLatch latch = new CountDownLatch(1);
+            AtomicReference<Throwable> error = new AtomicReference<>();
+            Platform.runLater(() -> {
+                try {
+                    action.run();
+                } catch (Throwable throwable) {
+                    error.set(throwable);
+                } finally {
+                    latch.countDown();
+                }
+            });
+
+            try {
+                if (!latch.await(5, TimeUnit.SECONDS)) {
+                    throw new IllegalStateException("Timed out dispatching to JavaFX thread");
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException("Interrupted dispatching to JavaFX thread", e);
+            }
+
+            Throwable throwable = error.get();
+            if (throwable == null) {
+                return;
+            }
+            if (throwable instanceof RuntimeException runtimeException) {
+                throw runtimeException;
+            }
+            throw new IllegalStateException("JavaFX action failed", throwable);
         }
     }
 

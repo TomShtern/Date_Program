@@ -430,5 +430,16 @@ class DealbreakersEvaluatorTest {
             assertEquals(1, failures.size());
             assertTrue(failures.get(0).contains("not specified"));
         }
+
+        @Test
+        @DisplayName("Indicates when height is unavailable for a height dealbreaker")
+        void indicatesWhenHeightIsUnavailable() {
+            seeker.setDealbreakers(Dealbreakers.builder().minHeight(160).build());
+
+            List<String> failures = Dealbreakers.Evaluator.getFailedDealbreakers(seeker, candidate, ZoneId.of("UTC"));
+
+            assertEquals(1, failures.size());
+            assertEquals("Height unavailable (required by dealbreaker)", failures.getFirst());
+        }
     }
 }

@@ -64,8 +64,7 @@ class LikerBrowserHandlerTest {
                 trustSafetyStorage,
                 config.safety().userTimeZone());
         MatchQualityService matchQualityService = new MatchQualityService(userStorage, interactionStorage, config);
-        ProfileService profileCompletionService =
-                new ProfileService(config, analyticsStorage, interactionStorage, trustSafetyStorage, userStorage);
+        ProfileService profileCompletionService = new ProfileService(userStorage);
         RecommendationService dailyService = RecommendationService.builder()
                 .interactionStorage(interactionStorage)
                 .userStorage(userStorage)

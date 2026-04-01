@@ -17,7 +17,10 @@ import java.util.concurrent.atomic.AtomicReference;
  */
 public final class DatabaseManager {
 
-    private static volatile String jdbcUrl = "jdbc:h2:./data/dating";
+    private static final String DEFAULT_JDBC_URL = "jdbc:h2:./data/dating";
+    private static final String DEFAULT_DEV_JDBC_URL = "jdbc:h2:./data/dating-dev";
+    private static final String DEFAULT_TEST_JDBC_URL = "jdbc:h2:./data/dating-test";
+    private static volatile String jdbcUrl = DEFAULT_JDBC_URL;
     private static final String DB_PASSWORD_PROPERTY = "datingapp.db.password";
     private static final String DB_PASSWORD_ENV = "DATING_APP_DB_PASSWORD";
     private static final String DB_PROFILE_PROPERTY = "datingapp.db.profile";
@@ -68,10 +71,13 @@ public final class DatabaseManager {
         if (dataSource.get() != null) {
             return;
         }
+        final String configuredJdbcUrl = jdbcUrl;
+        String configuredProfile = resolveConfiguredProfile();
+        String explicitPassword = resolveExplicitPassword();
         HikariConfig config = new HikariConfig();
-        config.setJdbcUrl(jdbcUrl);
+        config.setJdbcUrl(resolveJdbcUrl(configuredJdbcUrl, configuredProfile, explicitPassword));
         config.setUsername(USER);
-        config.setPassword(getPassword());
+        config.setPassword(resolvePassword(explicitPassword, configuredProfile, configuredJdbcUrl));
         config.setMaximumPoolSize(10);
         config.setMinimumIdle(2);
         config.setConnectionTimeout(5000);
@@ -153,29 +159,44 @@ public final class DatabaseManager {
     // - test: allow passwordless local file or in-memory database access
     // - dev: allow passwordless local file database access during intentional development runs
 
-    private static String getPassword() {
-        return getConfiguredPassword();
+    static String getConfiguredPassword() {
+        String configuredJdbcUrl = jdbcUrl;
+        return resolvePassword(resolveExplicitPassword(), resolveConfiguredProfile(), configuredJdbcUrl);
     }
 
-    private static String getConfiguredPassword() {
-        String configuredPassword =
-                firstNonBlank(System.getProperty(DB_PASSWORD_PROPERTY), System.getenv(DB_PASSWORD_ENV));
-        if (configuredPassword != null) {
-            return configuredPassword;
+    private static String resolveExplicitPassword() {
+        return firstNonBlank(System.getProperty(DB_PASSWORD_PROPERTY), System.getenv(DB_PASSWORD_ENV));
+    }
+
+    private static String resolvePassword(String explicitPassword, String configuredProfile, String configuredJdbcUrl) {
+        if (explicitPassword != null) {
+            return explicitPassword;
         }
 
-        String configuredProfile = resolveConfiguredProfile();
         if (isExplicitDevOrTestProfile(configuredProfile)) {
             return "";
         }
 
-        if (isLocalFileUrl(jdbcUrl)) {
+        if (isLocalFileUrl(configuredJdbcUrl)) {
             throw new IllegalStateException(
                     "Local file databases require an explicit password or an explicit database profile (test/dev)");
         }
 
         throw new IllegalStateException(
                 "Database password must be provided via datingapp.db.password or DATING_APP_DB_PASSWORD");
+    }
+
+    private static String resolveJdbcUrl(String configuredJdbcUrl, String configuredProfile, String explicitPassword) {
+        if (explicitPassword != null || !DEFAULT_JDBC_URL.equals(configuredJdbcUrl)) {
+            return configuredJdbcUrl;
+        }
+        if (DEV_PROFILE.equalsIgnoreCase(configuredProfile)) {
+            return DEFAULT_DEV_JDBC_URL;
+        }
+        if (TEST_PROFILE.equalsIgnoreCase(configuredProfile)) {
+            return DEFAULT_TEST_JDBC_URL;
+        }
+        return configuredJdbcUrl;
     }
 
     private static boolean isLocalFileUrl(String url) {

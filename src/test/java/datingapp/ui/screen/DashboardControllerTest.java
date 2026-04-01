@@ -69,8 +69,7 @@ class DashboardControllerTest {
 
         CandidateFinder candidateFinder =
                 new CandidateFinder(users, interactions, trustSafetyStorage, ZoneId.of("UTC"));
-        ProfileService profileService =
-                new ProfileService(config, analyticsStorage, interactions, trustSafetyStorage, users);
+        ProfileService profileService = new ProfileService(users);
         RecommendationService dailyService = RecommendationService.builder()
                 .interactionStorage(interactions)
                 .userStorage(users)
@@ -99,7 +98,8 @@ class DashboardControllerTest {
                         messagingService,
                         profileService,
                         config),
-                AppSession.getInstance());
+                AppSession.getInstance(),
+                JavaFxTestSupport.blockingUiDispatcher());
 
         JavaFxTestSupport.LoadedFxml loaded =
                 JavaFxTestSupport.loadFxml("/fxml/dashboard.fxml", () -> new DashboardController(viewModel));
@@ -151,8 +151,7 @@ class DashboardControllerTest {
 
         CandidateFinder candidateFinder =
                 new CandidateFinder(users, interactions, trustSafetyStorage, ZoneId.of("UTC"));
-        ProfileService profileService =
-                new ProfileService(config, analyticsStorage, interactions, trustSafetyStorage, users);
+        ProfileService profileService = new ProfileService(users);
         RecommendationService dailyService = RecommendationService.builder()
                 .interactionStorage(interactions)
                 .userStorage(users)
@@ -179,7 +178,8 @@ class DashboardControllerTest {
                         messagingService,
                         profileService,
                         config),
-                AppSession.getInstance());
+                AppSession.getInstance(),
+                JavaFxTestSupport.blockingUiDispatcher());
 
         JavaFxTestSupport.LoadedFxml loaded =
                 JavaFxTestSupport.loadFxml("/fxml/dashboard.fxml", () -> new DashboardController(viewModel));
@@ -217,7 +217,7 @@ class DashboardControllerTest {
 
         // Verify seen label is not visible
         boolean seenLabelVisible = JavaFxTestSupport.callOnFxAndWait(dailyPickSeenLabel::isVisible);
-        assertTrue(!seenLabelVisible, "Daily pick seen label should not be visible when no daily pick available");
+        assertFalse(seenLabelVisible, "Daily pick seen label should not be visible when no daily pick available");
 
         viewModel.dispose();
     }
@@ -237,8 +237,7 @@ class DashboardControllerTest {
 
         CandidateFinder candidateFinder =
                 new CandidateFinder(users, interactions, trustSafetyStorage, ZoneId.of("UTC"));
-        ProfileService profileService =
-                new ProfileService(config, analyticsStorage, interactions, trustSafetyStorage, users);
+        ProfileService profileService = new ProfileService(users);
         RecommendationService dailyService = RecommendationService.builder()
                 .interactionStorage(interactions)
                 .userStorage(users)
@@ -265,7 +264,8 @@ class DashboardControllerTest {
                         messagingService,
                         profileService,
                         config),
-                AppSession.getInstance());
+                AppSession.getInstance(),
+                JavaFxTestSupport.blockingUiDispatcher());
 
         JavaFxTestSupport.LoadedFxml loaded =
                 JavaFxTestSupport.loadFxml("/fxml/dashboard.fxml", () -> new DashboardController(viewModel));

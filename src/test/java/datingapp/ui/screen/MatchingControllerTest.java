@@ -43,17 +43,7 @@ import org.junit.jupiter.api.Timeout;
 @DisplayName("MatchingController wiring and binding tests")
 class MatchingControllerTest {
 
-    private static final UiThreadDispatcher TEST_DISPATCHER = new UiThreadDispatcher() {
-        @Override
-        public boolean isUiThread() {
-            return true;
-        }
-
-        @Override
-        public void dispatch(Runnable action) {
-            action.run();
-        }
-    };
+    private static final UiThreadDispatcher TEST_DISPATCHER = JavaFxTestSupport.immediateUiDispatcher();
 
     @BeforeAll
     static void initJfx() throws InterruptedException {
@@ -319,8 +309,7 @@ class MatchingControllerTest {
         private MatchingViewModel createViewModel() {
             CandidateFinder candidateFinder =
                     new CandidateFinder(users, interactions, trustSafetyStorage, ZoneId.of("UTC"));
-            ProfileService profileService =
-                    new ProfileService(config, analytics, interactions, trustSafetyStorage, users);
+            ProfileService profileService = new ProfileService(users);
             RecommendationService recommendationService = RecommendationService.builder()
                     .interactionStorage(interactions)
                     .userStorage(users)
@@ -343,8 +332,7 @@ class MatchingControllerTest {
             TrustSafetyService trustSafetyService = TrustSafetyService.builder(
                             trustSafetyStorage, interactions, users, config, communications)
                     .build();
-            ProfileService noteProfileService =
-                    new ProfileService(config, analytics, interactions, trustSafetyStorage, users);
+            ProfileService noteProfileService = new ProfileService(users);
             var noteUseCases = new datingapp.app.usecase.profile.ProfileUseCases(
                     users,
                     noteProfileService,

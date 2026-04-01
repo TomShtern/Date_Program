@@ -60,8 +60,7 @@ class StatsHandlerTest {
         InputReader inputReader = new InputReader(new Scanner(new StringReader(input)));
         ActivityMetricsService statsService = new ActivityMetricsService(
                 interactionStorage, trustSafetyStorage, analyticsStorage, AppConfig.defaults());
-        ProfileService achievementService = new ProfileService(
-                AppConfig.defaults(), analyticsStorage, interactionStorage, trustSafetyStorage, userStorage);
+        ProfileService achievementService = new ProfileService(userStorage);
         ProfileUseCases profileUseCases = new ProfileUseCases(
                 userStorage,
                 achievementService,

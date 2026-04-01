@@ -183,7 +183,7 @@ class SocialControllerTest {
                     new StorageUiUserStore(users),
                     socialUseCases,
                     AppSession.getInstance(),
-                    new datingapp.ui.async.JavaFxUiThreadDispatcher());
+                    JavaFxTestSupport.blockingUiDispatcher());
         }
 
         private void seedData() {

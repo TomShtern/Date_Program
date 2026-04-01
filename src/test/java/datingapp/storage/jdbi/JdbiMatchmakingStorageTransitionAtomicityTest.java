@@ -235,6 +235,22 @@ class JdbiMatchmakingStorageTransitionAtomicityTest {
                         .getState());
     }
 
+    @Test
+    @DisplayName("unmatchTransition returns false when the match row is missing and keeps likes intact")
+    void unmatchTransitionReturnsFalseWhenMatchRowIsMissingAndKeepsLikesIntact() {
+        Like firstLike = Like.create(userA, userB, Like.Direction.LIKE);
+        Like secondLike = Like.create(userB, userA, Like.Direction.LIKE);
+        interactionStorage.save(firstLike);
+        interactionStorage.save(secondLike);
+
+        Match missingMatch = Match.create(userA, userB);
+        missingMatch.unmatch(userA);
+
+        assertFalse(interactionStorage.unmatchTransition(missingMatch, Optional.empty()));
+        assertEquals(1, interactionStorage.countByDirection(userA, Like.Direction.LIKE));
+        assertEquals(1, interactionStorage.countByDirection(userB, Like.Direction.LIKE));
+    }
+
     private Match createPersistedActiveMatchWithOldTimestamp() {
         Instant baseline = Instant.now().minusSeconds(120);
         UUID firstUser = userA.toString().compareTo(userB.toString()) <= 0 ? userA : userB;

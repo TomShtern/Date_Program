@@ -13,17 +13,7 @@ import org.junit.jupiter.api.Test;
 @DisplayName("BaseViewModel late-bound error routing")
 class BaseViewModelTest {
 
-    private static final UiThreadDispatcher TEST_DISPATCHER = new UiThreadDispatcher() {
-        @Override
-        public boolean isUiThread() {
-            return true;
-        }
-
-        @Override
-        public void dispatch(Runnable action) {
-            action.run();
-        }
-    };
+    private static final UiThreadDispatcher TEST_DISPATCHER = datingapp.ui.JavaFxTestSupport.immediateUiDispatcher();
 
     @Test
     @DisplayName("late-bound error sink receives async failures after construction")

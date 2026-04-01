@@ -43,17 +43,7 @@ import org.junit.jupiter.api.Timeout;
 @DisplayName("MatchingViewModel selected-candidate handoff")
 class MatchingViewModelTest {
 
-    private static final UiThreadDispatcher TEST_DISPATCHER = new UiThreadDispatcher() {
-        @Override
-        public boolean isUiThread() {
-            return true;
-        }
-
-        @Override
-        public void dispatch(Runnable action) {
-            action.run();
-        }
-    };
+    private static final UiThreadDispatcher TEST_DISPATCHER = datingapp.ui.JavaFxTestSupport.immediateUiDispatcher();
 
     private final AppSession session = AppSession.getInstance();
 
@@ -232,11 +222,13 @@ class MatchingViewModelTest {
         MatchingViewModel viewModel = fixture.createViewModel(dispatcher);
         viewModel.initialize(fixture.prioritizedCandidate.getId());
 
-        drainUntil(() -> viewModel.currentCandidateProperty().get() != null, dispatcher, 5000);
+        waitUntil(() -> viewModel.currentCandidateProperty().get() != null, 5000);
 
         assertEquals(
                 fixture.prioritizedCandidate.getId(),
                 viewModel.currentCandidateProperty().get().getId());
+
+        dispatcher.setQueuedMode(true);
 
         viewModel.like();
         viewModel.like();
@@ -284,22 +276,6 @@ class MatchingViewModelTest {
         assertEquals(0, fixture.interactions.countByDirection(fixture.currentUser.getId(), Like.Direction.LIKE));
 
         viewModel.dispose();
-    }
-
-    private static void drainUntil(
-            CheckedBooleanSupplier condition, QueuedUiDispatcher dispatcher, long timeoutMillis) {
-        long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMillis);
-        while (System.nanoTime() < deadline) {
-            dispatcher.drain();
-            if (condition.getAsBoolean()) {
-                return;
-            }
-            LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(25));
-        }
-        dispatcher.drain();
-        if (!condition.getAsBoolean()) {
-            throw new IllegalStateException("Timed out waiting for queued UI work");
-        }
     }
 
     private static void waitUntil(CheckedBooleanSupplier condition, long timeoutMillis) {
@@ -366,8 +342,7 @@ class MatchingViewModelTest {
                 UiThreadDispatcher dispatcher, UiProfileNoteDataAccess noteDataAccess) {
             CandidateFinder candidateFinder =
                     new CandidateFinder(users, interactions, trustSafetyStorage, ZoneId.of("UTC"));
-            ProfileService profileService =
-                    new ProfileService(config, analytics, interactions, trustSafetyStorage, users);
+            ProfileService profileService = new ProfileService(users);
             RecommendationService recommendationService = RecommendationService.builder()
                     .interactionStorage(interactions)
                     .userStorage(users)
@@ -419,8 +394,7 @@ class MatchingViewModelTest {
         }
 
         private datingapp.app.usecase.profile.ProfileUseCases createNoteUseCases() {
-            ProfileService noteProfileService =
-                    new ProfileService(config, analytics, interactions, trustSafetyStorage, users);
+            ProfileService noteProfileService = new ProfileService(users);
             return new datingapp.app.usecase.profile.ProfileUseCases(
                     users,
                     noteProfileService,
@@ -461,17 +435,27 @@ class MatchingViewModelTest {
 
     private static final class QueuedUiDispatcher implements UiThreadDispatcher {
         private final Queue<Runnable> pending = new ArrayDeque<>();
+        private final ThreadLocal<Boolean> uiThread = ThreadLocal.withInitial(() -> false);
+        private volatile boolean queuedMode;
 
         @Override
         public boolean isUiThread() {
-            return false;
+            return uiThread.get();
         }
 
         @Override
         public void dispatch(Runnable action) {
+            if (!queuedMode) {
+                action.run();
+                return;
+            }
             synchronized (pending) {
                 pending.add(action);
             }
+        }
+
+        private void setQueuedMode(boolean queuedMode) {
+            this.queuedMode = queuedMode;
         }
 
         private void drain() {
@@ -483,7 +467,13 @@ class MatchingViewModelTest {
                 if (next == null) {
                     return;
                 }
-                next.run();
+                boolean previous = uiThread.get();
+                uiThread.set(true);
+                try {
+                    next.run();
+                } finally {
+                    uiThread.set(previous);
+                }
             }
         }
     }

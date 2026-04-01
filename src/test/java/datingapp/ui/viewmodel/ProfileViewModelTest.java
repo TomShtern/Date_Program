@@ -41,17 +41,7 @@ class ProfileViewModelTest {
     private static final String FILE_URLS_ENABLED_PROPERTY = "datingapp.allowFileUrls";
     private static final String FILE_URL_ROOT_PROPERTY = "datingapp.allowedFileUrlRoot";
 
-    private static final UiThreadDispatcher TEST_DISPATCHER = new UiThreadDispatcher() {
-        @Override
-        public boolean isUiThread() {
-            return true;
-        }
-
-        @Override
-        public void dispatch(Runnable action) {
-            action.run();
-        }
-    };
+    private static final UiThreadDispatcher TEST_DISPATCHER = datingapp.ui.JavaFxTestSupport.immediateUiDispatcher();
 
     private static final String SAMPLE_PNG_BASE64 =
             "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4////fwAJ+wP9KobjigAAAABJRU5ErkJggg==";
@@ -88,11 +78,8 @@ class ProfileViewModelTest {
         System.setProperty(FILE_URL_ROOT_PROPERTY, tempHome.toString());
 
         TestStorages.Users users = new TestStorages.Users();
-        TestStorages.Interactions interactions = new TestStorages.Interactions();
-        TestStorages.TrustSafety trustSafety = new TestStorages.TrustSafety();
-        TestStorages.Analytics analytics = new TestStorages.Analytics();
         AppConfig config = AppConfig.defaults();
-        ProfileService profileService = new ProfileService(config, analytics, interactions, trustSafety, users);
+        ProfileService profileService = new ProfileService(users);
 
         User currentUser = createActiveUser("PhotoUser");
         users.save(currentUser);
@@ -152,11 +139,8 @@ class ProfileViewModelTest {
         System.setProperty(FILE_URL_ROOT_PROPERTY, tempHome.toString());
 
         TestStorages.Users users = new TestStorages.Users();
-        TestStorages.Interactions interactions = new TestStorages.Interactions();
-        TestStorages.TrustSafety trustSafety = new TestStorages.TrustSafety();
-        TestStorages.Analytics analytics = new TestStorages.Analytics();
         AppConfig config = AppConfig.defaults();
-        ProfileService profileService = new ProfileService(config, analytics, interactions, trustSafety, users);
+        ProfileService profileService = new ProfileService(users);
 
         User currentUser = createActiveUser("PhotoUser");
         users.save(currentUser);
@@ -206,11 +190,8 @@ class ProfileViewModelTest {
     @DisplayName("saveAsync persists edits only after a successful background save")
     void saveAsyncPersistsEditsOnlyAfterSuccess() throws Exception {
         TestStorages.Users users = new TestStorages.Users();
-        TestStorages.Interactions interactions = new TestStorages.Interactions();
-        TestStorages.TrustSafety trustSafety = new TestStorages.TrustSafety();
-        TestStorages.Analytics analytics = new TestStorages.Analytics();
         AppConfig config = AppConfig.defaults();
-        ProfileService profileService = new ProfileService(config, analytics, interactions, trustSafety, users);
+        ProfileService profileService = new ProfileService(users);
 
         User currentUser = createActiveUser("SaveUser");
         currentUser.setBio("Original bio");
@@ -249,11 +230,8 @@ class ProfileViewModelTest {
     @DisplayName("saveAsync failure keeps the original session user unchanged")
     void saveAsyncFailureKeepsOriginalSessionUserUnchanged() throws Exception {
         TestStorages.Users users = new TestStorages.Users();
-        TestStorages.Interactions interactions = new TestStorages.Interactions();
-        TestStorages.TrustSafety trustSafety = new TestStorages.TrustSafety();
-        TestStorages.Analytics analytics = new TestStorages.Analytics();
         AppConfig config = AppConfig.defaults();
-        ProfileService profileService = new ProfileService(config, analytics, interactions, trustSafety, users);
+        ProfileService profileService = new ProfileService(users);
 
         User currentUser = createActiveUser("SaveFailureUser");
         currentUser.setBio("Original bio");
@@ -310,11 +288,8 @@ class ProfileViewModelTest {
     @DisplayName("supported saved coordinates are shown with a human friendly label")
     void supportedSavedCoordinatesUseHumanFriendlyLabel() {
         TestStorages.Users users = new TestStorages.Users();
-        TestStorages.Interactions interactions = new TestStorages.Interactions();
-        TestStorages.TrustSafety trustSafety = new TestStorages.TrustSafety();
-        TestStorages.Analytics analytics = new TestStorages.Analytics();
         AppConfig config = AppConfig.defaults();
-        ProfileService profileService = new ProfileService(config, analytics, interactions, trustSafety, users);
+        ProfileService profileService = new ProfileService(users);
 
         User currentUser = createActiveUser("LocationUser");
         currentUser.setLocation(32.0853, 34.7818);
@@ -343,11 +318,8 @@ class ProfileViewModelTest {
     @DisplayName("profile preview snapshot uses human friendly labels for supported locations")
     void profilePreviewSnapshotUsesHumanFriendlyLabelsForSupportedLocations() {
         TestStorages.Users users = new TestStorages.Users();
-        TestStorages.Interactions interactions = new TestStorages.Interactions();
-        TestStorages.TrustSafety trustSafety = new TestStorages.TrustSafety();
-        TestStorages.Analytics analytics = new TestStorages.Analytics();
         AppConfig config = AppConfig.defaults();
-        ProfileService profileService = new ProfileService(config, analytics, interactions, trustSafety, users);
+        ProfileService profileService = new ProfileService(users);
 
         User currentUser = createActiveUser("Preview Location User");
         currentUser.setLocation(32.0853, 34.7818);
@@ -380,11 +352,8 @@ class ProfileViewModelTest {
         System.setProperty("user.home", tempHome.toString());
 
         TestStorages.Users users = new TestStorages.Users();
-        TestStorages.Interactions interactions = new TestStorages.Interactions();
-        TestStorages.TrustSafety trustSafety = new TestStorages.TrustSafety();
-        TestStorages.Analytics analytics = new TestStorages.Analytics();
         AppConfig config = AppConfig.defaults();
-        ProfileService profileService = new ProfileService(config, analytics, interactions, trustSafety, users);
+        ProfileService profileService = new ProfileService(users);
 
         User currentUser = createActiveUser("LargePhotoUser");
         users.save(currentUser);
@@ -414,11 +383,8 @@ class ProfileViewModelTest {
     @DisplayName("toggleInterest honors the configured maximum interests limit")
     void toggleInterestHonorsConfiguredMaximumInterests() {
         TestStorages.Users users = new TestStorages.Users();
-        TestStorages.Interactions interactions = new TestStorages.Interactions();
-        TestStorages.TrustSafety trustSafety = new TestStorages.TrustSafety();
-        TestStorages.Analytics analytics = new TestStorages.Analytics();
         AppConfig config = AppConfig.builder().maxInterests(1).build();
-        ProfileService profileService = new ProfileService(config, analytics, interactions, trustSafety, users);
+        ProfileService profileService = new ProfileService(users);
 
         User currentUser = createActiveUser("InterestLimitUser");
         users.save(currentUser);
@@ -446,11 +412,8 @@ class ProfileViewModelTest {
     @DisplayName("getMaxBioLength returns the configured bio length limit")
     void getMaxBioLengthReturnsConfiguredLimit() {
         TestStorages.Users users = new TestStorages.Users();
-        TestStorages.Interactions interactions = new TestStorages.Interactions();
-        TestStorages.TrustSafety trustSafety = new TestStorages.TrustSafety();
-        TestStorages.Analytics analytics = new TestStorages.Analytics();
         AppConfig config = AppConfig.builder().maxBioLength(320).build();
-        ProfileService profileService = new ProfileService(config, analytics, interactions, trustSafety, users);
+        ProfileService profileService = new ProfileService(users);
 
         User currentUser = createActiveUser("BioLimitUser");
         users.save(currentUser);
@@ -474,11 +437,8 @@ class ProfileViewModelTest {
     @DisplayName("saveAsync clears interestedIn and interests when selections are emptied")
     void saveAsyncClearsInterestedInAndInterestsWhenSelectionsAreEmptied() throws Exception {
         TestStorages.Users users = new TestStorages.Users();
-        TestStorages.Interactions interactions = new TestStorages.Interactions();
-        TestStorages.TrustSafety trustSafety = new TestStorages.TrustSafety();
-        TestStorages.Analytics analytics = new TestStorages.Analytics();
         AppConfig config = AppConfig.defaults();
-        ProfileService profileService = new ProfileService(config, analytics, interactions, trustSafety, users);
+        ProfileService profileService = new ProfileService(users);
 
         User currentUser = createActiveUser("ClearSelectionsUser");
         currentUser.setInterestedIn(EnumSet.of(Gender.MALE, Gender.FEMALE));

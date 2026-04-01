@@ -13,6 +13,7 @@ import datingapp.core.model.User;
 import datingapp.core.testutil.TestClock;
 import datingapp.core.testutil.TestStorages;
 import datingapp.core.testutil.TestUserFactory;
+import datingapp.ui.async.UiAsyncTestSupport;
 import datingapp.ui.viewmodel.UiDataAdapters.StorageUiSocialDataAccess;
 import datingapp.ui.viewmodel.UiDataAdapters.StorageUiUserStore;
 import datingapp.ui.viewmodel.UiDataAdapters.UiSocialDataAccess;
@@ -73,7 +74,7 @@ class SocialViewModelTest {
                 userStore,
                 socialUseCases,
                 AppSession.getInstance(),
-                new datingapp.ui.async.JavaFxUiThreadDispatcher());
+                new UiAsyncTestSupport.TestUiThreadDispatcher());
 
         currentUser = TestUserFactory.createActiveUser("Mia");
         users.save(currentUser);

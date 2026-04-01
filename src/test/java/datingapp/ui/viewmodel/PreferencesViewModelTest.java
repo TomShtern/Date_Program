@@ -32,17 +32,7 @@ import org.junit.jupiter.api.Timeout;
 @DisplayName("PreferencesViewModel theme and discovery preferences")
 class PreferencesViewModelTest {
 
-    private static final UiThreadDispatcher TEST_DISPATCHER = new UiThreadDispatcher() {
-        @Override
-        public boolean isUiThread() {
-            return true;
-        }
-
-        @Override
-        public void dispatch(Runnable action) {
-            action.run();
-        }
-    };
+    private static final UiThreadDispatcher TEST_DISPATCHER = datingapp.ui.JavaFxTestSupport.immediateUiDispatcher();
 
     private final AppSession session = AppSession.getInstance();
 

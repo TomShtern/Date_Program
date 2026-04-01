@@ -59,8 +59,7 @@ class RelationshipHandlerTest {
                 interactionStorage,
                 trustSafetyStorage,
                 config.safety().userTimeZone());
-        ProfileService profileCompletionService =
-                new ProfileService(config, analyticsStorage, interactionStorage, trustSafetyStorage, userStorage);
+        ProfileService profileCompletionService = new ProfileService(userStorage);
         RecommendationService dailyService = RecommendationService.builder()
                 .interactionStorage(interactionStorage)
                 .userStorage(userStorage)

@@ -43,17 +43,7 @@ import org.junit.jupiter.api.Timeout;
 @DisplayName("NotesController bindings")
 class NotesControllerTest {
 
-    private static final UiThreadDispatcher TEST_DISPATCHER = new UiThreadDispatcher() {
-        @Override
-        public boolean isUiThread() {
-            return true;
-        }
-
-        @Override
-        public void dispatch(Runnable action) {
-            action.run();
-        }
-    };
+    private static final UiThreadDispatcher TEST_DISPATCHER = JavaFxTestSupport.immediateUiDispatcher();
 
     private final AppSession session = AppSession.getInstance();
 
@@ -186,11 +176,8 @@ class NotesControllerTest {
     @DisplayName("FXML loads saved notes into the list and hides the empty state")
     void fxmlLoadsSavedNotesIntoListAndHidesEmptyState() throws Exception {
         TestStorages.Users users = new TestStorages.Users();
-        TestStorages.Analytics analytics = new TestStorages.Analytics();
-        TestStorages.Interactions interactions = new TestStorages.Interactions();
-        TestStorages.TrustSafety trustSafety = new TestStorages.TrustSafety();
         AppConfig config = AppConfig.defaults();
-        ProfileService profileService = new ProfileService(config, analytics, interactions, trustSafety, users);
+        ProfileService profileService = new ProfileService(users);
         ProfileUseCases profileUseCases = new ProfileUseCases(
                 users,
                 profileService,
@@ -229,11 +216,8 @@ class NotesControllerTest {
     @DisplayName("FXML shows empty state and disables Open Selected when no notes exist")
     void fxmlShowsEmptyStateWhenNoNotesSaved() throws Exception {
         TestStorages.Users users = new TestStorages.Users();
-        TestStorages.Analytics analytics = new TestStorages.Analytics();
-        TestStorages.Interactions interactions = new TestStorages.Interactions();
-        TestStorages.TrustSafety trustSafety = new TestStorages.TrustSafety();
         AppConfig config = AppConfig.defaults();
-        ProfileService profileService = new ProfileService(config, analytics, interactions, trustSafety, users);
+        ProfileService profileService = new ProfileService(users);
         ProfileUseCases profileUseCases = new ProfileUseCases(
                 users,
                 profileService,
@@ -346,12 +330,8 @@ class NotesControllerTest {
 
     private final class Fixture {
         private final TestStorages.Users users = new TestStorages.Users();
-        private final TestStorages.Analytics analytics = new TestStorages.Analytics();
-        private final TestStorages.Interactions interactions = new TestStorages.Interactions();
-        private final TestStorages.TrustSafety trustSafety = new TestStorages.TrustSafety();
         private final AppConfig config = AppConfig.defaults();
-        private final ProfileService profileService =
-                new ProfileService(config, analytics, interactions, trustSafety, users);
+        private final ProfileService profileService = new ProfileService(users);
         private final ProfileUseCases profileUseCases = new ProfileUseCases(
                 users,
                 profileService,

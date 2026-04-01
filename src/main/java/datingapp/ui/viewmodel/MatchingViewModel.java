@@ -288,12 +288,12 @@ public class MatchingViewModel extends BaseViewModel {
         }
 
         String content = noteContent.get();
+        int token = noteLoadToken.incrementAndGet();
         noteBusy.set(true);
         noteStatusMessage.set(null);
         asyncScope.runFireAndForget("save candidate note", () -> {
             try {
                 ProfileNote savedNote = noteDataAccess.upsertProfileNote(user.getId(), candidate.getId(), content);
-                int token = noteLoadToken.incrementAndGet();
                 asyncScope.dispatchToUi(() -> {
                     if (!isCurrentCandidate(candidate.getId(), token)) {
                         return;
@@ -303,8 +303,7 @@ public class MatchingViewModel extends BaseViewModel {
                     noteBusy.set(false);
                 });
             } catch (Exception e) {
-                asyncScope.dispatchToUi(
-                        () -> applyNoteFailure(candidate.getId(), noteLoadToken.get(), "Failed to save note", e));
+                asyncScope.dispatchToUi(() -> applyNoteFailure(candidate.getId(), token, "Failed to save note", e));
             }
         });
     }
@@ -316,12 +315,12 @@ public class MatchingViewModel extends BaseViewModel {
             return;
         }
 
+        int token = noteLoadToken.incrementAndGet();
         noteBusy.set(true);
         noteStatusMessage.set(null);
         asyncScope.runFireAndForget("delete candidate note", () -> {
             try {
                 boolean deleted = noteDataAccess.deleteProfileNote(user.getId(), candidate.getId());
-                int token = noteLoadToken.incrementAndGet();
                 asyncScope.dispatchToUi(() -> {
                     if (!isCurrentCandidate(candidate.getId(), token)) {
                         return;
@@ -336,8 +335,7 @@ public class MatchingViewModel extends BaseViewModel {
                     noteBusy.set(false);
                 });
             } catch (Exception e) {
-                asyncScope.dispatchToUi(
-                        () -> applyNoteFailure(candidate.getId(), noteLoadToken.get(), "Failed to delete note", e));
+                asyncScope.dispatchToUi(() -> applyNoteFailure(candidate.getId(), token, "Failed to delete note", e));
             }
         });
     }

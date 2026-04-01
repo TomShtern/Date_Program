@@ -35,7 +35,7 @@ class DefaultAchievementServiceTest {
         analytics = new TestStorages.Analytics();
         config = AppConfig.defaults();
 
-        ProfileService profileService = new ProfileService(config, analytics, interactions, trustSafety, users);
+        ProfileService profileService = new ProfileService(users);
         achievementService =
                 new DefaultAchievementService(config, analytics, interactions, trustSafety, users, profileService);
     }

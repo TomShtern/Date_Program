@@ -214,6 +214,47 @@ class TrustSafetyServiceAuditTest {
         }
     }
 
+    @Test
+    @DisplayName("block audit records whether a match was actually updated")
+    void blockAuditRecordsWhetherMatchWasActuallyUpdated() {
+        TestStorages.Users userStorage = new TestStorages.Users();
+        TestStorages.TrustSafety trustSafetyStorage = new TestStorages.TrustSafety();
+        TestStorages.Interactions interactionStorage = new TestStorages.Interactions();
+
+        TrustSafetyService service = TrustSafetyService.builder(
+                        trustSafetyStorage, interactionStorage, userStorage, AppConfig.defaults())
+                .build();
+
+        User blocker = createActiveUser("Blocker");
+        User blocked = createActiveUser("Blocked");
+        userStorage.save(blocker);
+        userStorage.save(blocked);
+
+        Logger logger = (Logger) org.slf4j.LoggerFactory.getLogger("audit.moderation");
+        Level previousLevel = logger.getLevel();
+        logger.setLevel(Level.INFO);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+
+        try {
+            assertTrue(service.block(blocker.getId(), blocked.getId()).success());
+
+            String context = appender.list.getFirst().getKeyValuePairs().stream()
+                    .filter(pair -> pair.key.equals("context"))
+                    .findFirst()
+                    .orElseThrow()
+                    .value
+                    .toString();
+
+            assertTrue(context.contains("match_updated=false"));
+        } finally {
+            logger.detachAppender(appender);
+            logger.setLevel(previousLevel);
+            appender.stop();
+        }
+    }
+
     private static User createActiveUser(String name) {
         User user = new User(UUID.randomUUID(), name);
         user.setBio("Test user");

@@ -3,7 +3,6 @@ package datingapp.app.cli;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.app.cli.CliTextAndInput.InputReader;
 import datingapp.app.event.InProcessAppEventBus;
@@ -93,8 +92,7 @@ class MatchingHandlerTest {
                 trustSafetyStorage,
                 config.safety().userTimeZone());
         MatchQualityService matchQualityService = new MatchQualityService(userStorage, interactionStorage, config);
-        ProfileService profileCompletionService =
-                new ProfileService(config, analyticsStorage, interactionStorage, trustSafetyStorage, userStorage);
+        ProfileService profileCompletionService = new ProfileService(userStorage);
         RecommendationService dailyService = RecommendationService.builder()
                 .interactionStorage(interactionStorage)
                 .userStorage(userStorage)
@@ -169,7 +167,7 @@ class MatchingHandlerTest {
 
         @Test
         @DisplayName("readValidatedChoice returns null on EOF instead of looping")
-        void readValidatedChoiceReturnsNullOnEofInsteadOfLooping() throws Exception {
+        void readValidatedChoiceReturnsNullOnEofInsteadOfLooping() {
             User candidate = TestUserFactory.createActiveUser("EOFCandidate");
             candidate.setBirthDate(LocalDate.of(1990, 1, 1));
             candidate.setLocation(32.0853, 34.7818);
@@ -269,14 +267,14 @@ class MatchingHandlerTest {
         @DisplayName("Executes undo after a swipe without error")
         void executesUndoAfterASwipeWithoutError() {
             User candidate = TestUserFactory.createActiveUser("UndoCandidate");
+            candidate.setGender(Gender.FEMALE);
+            candidate.setInterestedIn(java.util.Set.of(Gender.MALE));
             userStorage.save(candidate);
 
             MatchingHandler handler = createHandler("l\ny\nq\n");
 
             assertDoesNotThrow(handler::browseCandidates);
-            // Like count should be 0 or 1 depending on undo timing
-            int likeCount = interactionStorage.countByDirection(testUser.getId(), Like.Direction.LIKE);
-            assertTrue(likeCount >= 0 && likeCount <= 1);
+            assertEquals(0, interactionStorage.countByDirection(testUser.getId(), Like.Direction.LIKE));
         }
     }
 

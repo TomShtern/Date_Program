@@ -177,14 +177,11 @@ class CandidateFinderTest {
 
         finder.findCandidatesForUser(cachedSeeker);
         finder.findCandidatesForUser(cachedSeeker);
-        assertEquals(
-                2,
-                userStorage.findCandidatesCallCount(),
-                "cache hits should refresh candidates from fresh storage state");
+        assertEquals(1, userStorage.findCandidatesCallCount(), "second call should be a cache hit and skip storage");
 
         finder.invalidateCacheFor(cachedSeeker.getId());
         finder.findCandidatesForUser(cachedSeeker);
-        assertEquals(3, userStorage.findCandidatesCallCount());
+        assertEquals(2, userStorage.findCandidatesCallCount(), "invalidation forces a fresh storage query");
     }
 
     @Test
@@ -197,10 +194,7 @@ class CandidateFinderTest {
 
         finder.findCandidatesForUser(cachedSeeker);
         finder.findCandidatesForUser(cachedSeeker);
-        assertEquals(
-                2,
-                userStorage.findCandidatesCallCount(),
-                "second call should revalidate cached candidates against fresh storage state");
+        assertEquals(1, userStorage.findCandidatesCallCount(), "second call should be a cache hit and skip storage");
 
         cachedSeeker.setDealbreakers(
                 Dealbreakers.builder().acceptSmoking(Lifestyle.Smoking.NEVER).build());
@@ -213,7 +207,7 @@ class CandidateFinderTest {
 
         finder.findCandidatesForUser(cachedSeeker);
         assertEquals(
-                3,
+                2,
                 userStorage.findCandidatesCallCount(),
                 "preference changes must invalidate fingerprint-equivalent cache entries");
     }
@@ -335,7 +329,7 @@ class CandidateFinderTest {
     }
 
     @Test
-    @DisplayName("Phase 1a: cache staleness detects user state changes via detached snapshots")
+    @DisplayName("Phase 1a: explicit cache invalidation detects candidate state changes")
     void phase1aStaleCacheTruthWithDetachedSnapshots() {
         User browsingSeeker = createUser("Seeker", Gender.MALE, EnumSet.of(Gender.FEMALE), 30, 32.09, 34.79);
         User candidate = createUser("Candidate", Gender.FEMALE, EnumSet.of(Gender.MALE), 28, 32.09, 34.79);
@@ -354,11 +348,16 @@ class CandidateFinderTest {
         // Modify live candidate to PAUSED state
         candidate.pause();
 
-        // Second call should revalidate cached candidates against fresh state and drop the paused user.
+        // Second call returns cached result (fingerprint unchanged, TTL valid)
+        List<User> cachedResult = filterFinder.findCandidatesForUser(browsingSeeker);
+        assertEquals(1, cachedResult.size(), "Cache hit returns stale snapshot within TTL");
+
+        // After explicit invalidation, fresh query drops the paused candidate
+        filterFinder.invalidateCacheFor(browsingSeeker.getId());
         List<User> secondResult = filterFinder.findCandidatesForUser(browsingSeeker);
         assertTrue(
                 secondResult.isEmpty(),
-                "Revalidated cached candidates should drop a candidate that paused after the snapshot was cached");
+                "After invalidation, fresh query should drop a candidate that paused after the snapshot was cached");
     }
 
     private User createUser(String name, Gender gender, Set<Gender> interestedIn, int age, double lat, double lon) {

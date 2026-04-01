@@ -83,8 +83,7 @@ class SafetyHandlerTest {
         TrustSafetyService trustSafetyService = createTrustSafetyService(config, random);
         ProfileUseCases profileUseCases = new ProfileUseCases(
                 userStorage,
-                new ProfileService(
-                        config, new TestStorages.Analytics(), interactionStorage, trustSafetyStorage, userStorage),
+                new ProfileService(userStorage),
                 new ValidationService(config),
                 null,
                 TestAchievementService.empty(),
@@ -212,12 +211,7 @@ class SafetyHandlerTest {
             ProfileUseCases profileUseCases =
                     new ProfileUseCases(
                             userStorage,
-                            new ProfileService(
-                                    AppConfig.defaults(),
-                                    new TestStorages.Analytics(),
-                                    interactionStorage,
-                                    trustSafetyStorage,
-                                    userStorage),
+                            new ProfileService(userStorage),
                             new ValidationService(AppConfig.defaults()),
                             null,
                             TestAchievementService.empty(),
@@ -451,8 +445,7 @@ class SafetyHandlerTest {
             assertEquals("123456", trustSafetyService.generateVerificationCode());
             ProfileUseCases profileUseCases = new ProfileUseCases(
                     userStorage,
-                    new ProfileService(
-                            config, new TestStorages.Analytics(), interactionStorage, trustSafetyStorage, userStorage),
+                    new ProfileService(userStorage),
                     new ValidationService(config),
                     null,
                     TestAchievementService.empty(),
@@ -522,7 +515,7 @@ class SafetyHandlerTest {
             handler.verifyProfile();
 
             // Should not modify user
-            User stored = userStorage.get(testUser.getId()).orElse(null);
+            User stored = userStorage.get(testUser.getId()).orElseThrow();
             assertFalse(stored.isVerified());
         }
 
@@ -533,12 +526,7 @@ class SafetyHandlerTest {
                     createTrustSafetyService(AppConfig.defaults(), fixedVerificationRandom());
             ProfileUseCases profileUseCases = new ProfileUseCases(
                     userStorage,
-                    new ProfileService(
-                            AppConfig.defaults(),
-                            new TestStorages.Analytics(),
-                            interactionStorage,
-                            trustSafetyStorage,
-                            userStorage),
+                    new ProfileService(userStorage),
                     new ValidationService(AppConfig.defaults()),
                     null,
                     TestAchievementService.empty(),

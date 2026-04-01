@@ -1,17 +1,27 @@
 package datingapp.core;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.core.connection.ConnectionModels.Like;
-import datingapp.core.matching.*;
 import datingapp.core.matching.CandidateFinder;
+import datingapp.core.matching.RecommendationService;
 import datingapp.core.profile.ProfileService;
 import datingapp.core.testutil.TestClock;
 import datingapp.core.testutil.TestStorages;
-import java.time.*;
-import java.util.*;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
-import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 /**
  * Unit tests for RecommendationService daily limits. Uses in-memory mock
@@ -276,8 +286,7 @@ class DailyLimitServiceTest {
                 interactionStorage,
                 trustSafetyStorage,
                 config.safety().userTimeZone());
-        var profileService =
-                new ProfileService(config, analyticsStorage, interactionStorage, trustSafetyStorage, userStorage);
+        var profileService = new ProfileService(userStorage);
 
         return RecommendationService.builder()
                 .interactionStorage(interactionStorage)

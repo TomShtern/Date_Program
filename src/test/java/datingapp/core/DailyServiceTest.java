@@ -258,8 +258,7 @@ class DailyServiceTest {
 
     private RecommendationService createService(AppConfig config, Clock clock) {
         var standoutStorage = new TestStorages.Standouts();
-        var profileService =
-                new ProfileService(config, analyticsStorage, interactionStorage, trustSafetyStorage, userStorage);
+        var profileService = new ProfileService(userStorage);
 
         return RecommendationService.builder()
                 .userStorage(userStorage)

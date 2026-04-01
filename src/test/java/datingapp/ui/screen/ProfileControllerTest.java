@@ -40,17 +40,7 @@ class ProfileControllerTest {
     private static final String FILE_URL_ROOT_PROPERTY = "datingapp.allowedFileUrlRoot";
 
     private static final datingapp.ui.async.UiThreadDispatcher TEST_DISPATCHER =
-            new datingapp.ui.async.UiThreadDispatcher() {
-                @Override
-                public boolean isUiThread() {
-                    return true;
-                }
-
-                @Override
-                public void dispatch(Runnable action) {
-                    action.run();
-                }
-            };
+            JavaFxTestSupport.immediateUiDispatcher();
 
     @BeforeAll
     static void initJfx() throws InterruptedException {
@@ -68,11 +58,8 @@ class ProfileControllerTest {
             System.setProperty(FILE_URL_ROOT_PROPERTY, tempHome.toString());
 
             TestStorages.Users users = new TestStorages.Users();
-            TestStorages.Interactions interactions = new TestStorages.Interactions();
-            TestStorages.TrustSafety trustSafety = new TestStorages.TrustSafety();
-            TestStorages.Analytics analytics = new TestStorages.Analytics();
             AppConfig config = AppConfig.defaults();
-            ProfileService profileService = new ProfileService(config, analytics, interactions, trustSafety, users);
+            ProfileService profileService = new ProfileService(users);
 
             User currentUser = createActiveUser("Photo User");
             Path managedDir = tempHome.resolve(".datingapp").resolve("photos");
@@ -146,11 +133,8 @@ class ProfileControllerTest {
             System.setProperty(FILE_URL_ROOT_PROPERTY, tempHome.toString());
 
             TestStorages.Users users = new TestStorages.Users();
-            TestStorages.Interactions interactions = new TestStorages.Interactions();
-            TestStorages.TrustSafety trustSafety = new TestStorages.TrustSafety();
-            TestStorages.Analytics analytics = new TestStorages.Analytics();
             AppConfig config = AppConfig.defaults();
-            ProfileService profileService = new ProfileService(config, analytics, interactions, trustSafety, users);
+            ProfileService profileService = new ProfileService(users);
 
             User currentUser = createActiveUser("Button Test User");
             users.save(currentUser);

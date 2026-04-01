@@ -24,6 +24,7 @@ import datingapp.core.profile.ProfileService;
 import datingapp.core.testutil.TestAchievementService;
 import datingapp.core.testutil.TestClock;
 import datingapp.core.testutil.TestStorages;
+import datingapp.ui.async.UiAsyncTestSupport;
 import datingapp.ui.viewmodel.UiDataAdapters.PresenceStatus;
 import datingapp.ui.viewmodel.UiDataAdapters.UiPresenceDataAccess;
 import datingapp.ui.viewmodel.UiDataAdapters.UseCaseUiProfileNoteDataAccess;
@@ -60,7 +61,6 @@ class ChatViewModelTest {
     private ConnectionService connectionService;
     private User currentUser;
     private User otherUser;
-    private TestStorages.Analytics analytics;
     private final AtomicReference<PresenceStatus> presenceStatus = new AtomicReference<>(PresenceStatus.UNKNOWN);
     private final AtomicBoolean remoteTyping = new AtomicBoolean(false);
 
@@ -81,7 +81,6 @@ class ChatViewModelTest {
         interactions = new TestStorages.Interactions();
         communications = new TestStorages.Communications();
         trustSafety = new TestStorages.TrustSafety();
-        analytics = new TestStorages.Analytics();
 
         TestClock.setFixed(FIXED_INSTANT);
 
@@ -91,7 +90,7 @@ class ChatViewModelTest {
         connectionService = new ConnectionService(config, communications, interactions, users);
         TrustSafetyService trustSafetyService = TrustSafetyService.builder(trustSafety, interactions, users, config)
                 .build();
-        ProfileService profileService = new ProfileService(config, analytics, interactions, trustSafety, users);
+        ProfileService profileService = new ProfileService(users);
         var noteUseCases = new datingapp.app.usecase.profile.ProfileUseCases(
                 users,
                 profileService,
@@ -294,8 +293,7 @@ class ChatViewModelTest {
         CountDownLatch sendStarted = new CountDownLatch(1);
         CountDownLatch releaseSend = new CountDownLatch(1);
         var eventBus = new InProcessAppEventBus();
-        ProfileService profileService =
-                new ProfileService(AppConfig.defaults(), analytics, interactions, trustSafety, users);
+        ProfileService profileService = new ProfileService(users);
         var noteUseCases = new datingapp.app.usecase.profile.ProfileUseCases(
                 users,
                 profileService,
@@ -421,8 +419,7 @@ class ChatViewModelTest {
                 connectionService,
                 TrustSafetyService.builder(trustSafety, interactions, users, AppConfig.defaults())
                         .build());
-        ProfileService profileService =
-                new ProfileService(AppConfig.defaults(), analytics, interactions, trustSafety, users);
+        ProfileService profileService = new ProfileService(users);
         var noteUseCases = new datingapp.app.usecase.profile.ProfileUseCases(
                 users,
                 profileService,
@@ -436,9 +433,9 @@ class ChatViewModelTest {
                 countingMessagingUseCases,
                 socialUseCases,
                 AppSession.getInstance(),
-                new datingapp.ui.async.JavaFxUiThreadDispatcher(),
-                Duration.ofMillis(75),
-                Duration.ofMillis(75),
+                new UiAsyncTestSupport.TestUiThreadDispatcher(),
+                Duration.ofHours(1),
+                Duration.ofHours(1),
                 new ChatViewModel.ChatUiDependencies(
                         new UseCaseUiProfileNoteDataAccess(noteUseCases.getProfileNotesUseCases()),
                         new UiPresenceDataAccess() {
@@ -652,8 +649,7 @@ class ChatViewModelTest {
                 connectionService,
                 TrustSafetyService.builder(trustSafety, interactions, users, AppConfig.defaults())
                         .build());
-        ProfileService profileService =
-                new ProfileService(AppConfig.defaults(), analytics, interactions, trustSafety, users);
+        ProfileService profileService = new ProfileService(users);
         var noteUseCases = new datingapp.app.usecase.profile.ProfileUseCases(
                 users,
                 profileService,

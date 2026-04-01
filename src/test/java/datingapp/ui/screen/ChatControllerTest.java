@@ -352,7 +352,6 @@ class ChatControllerTest {
         private final TestStorages.Interactions interactions = new TestStorages.Interactions();
         private final TestStorages.Communications communications = new TestStorages.Communications();
         private final TestStorages.TrustSafety trustSafety = new TestStorages.TrustSafety();
-        private final TestStorages.Analytics analytics = new TestStorages.Analytics();
         private final AppConfig config = AppConfig.defaults();
         private final ConnectionService connectionService =
                 new ConnectionService(config, communications, interactions, users);
@@ -364,7 +363,7 @@ class ChatControllerTest {
         private final ChatViewModel viewModel;
 
         private Fixture() {
-            ProfileService profileService = new ProfileService(config, analytics, interactions, trustSafety, users);
+            ProfileService profileService = new ProfileService(users);
             var noteUseCases = new datingapp.app.usecase.profile.ProfileUseCases(
                     users,
                     profileService,

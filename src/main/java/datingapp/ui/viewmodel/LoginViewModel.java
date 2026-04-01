@@ -40,6 +40,8 @@ public class LoginViewModel extends BaseViewModel {
     private final ProfileActivationPolicy activationPolicy;
     private final ObservableList<User> users = FXCollections.observableArrayList();
     private final ObservableList<User> filteredUsers = FXCollections.observableArrayList();
+    private final ObservableList<User> readOnlyUsers = FXCollections.unmodifiableObservableList(users);
+    private final ObservableList<User> readOnlyFilteredUsers = FXCollections.unmodifiableObservableList(filteredUsers);
     private final BooleanProperty loginDisabled = new SimpleBooleanProperty(true);
     private final StringProperty filterText = new SimpleStringProperty("");
 
@@ -106,11 +108,11 @@ public class LoginViewModel extends BaseViewModel {
     }
 
     public ObservableList<User> getUsers() {
-        return users;
+        return readOnlyUsers;
     }
 
     public ObservableList<User> getFilteredUsers() {
-        return filteredUsers;
+        return readOnlyFilteredUsers;
     }
 
     public BooleanProperty loginDisabledProperty() {
@@ -237,70 +239,14 @@ public class LoginViewModel extends BaseViewModel {
     public User createUser(String name, int age, Gender gender, Gender interestedIn) {
         errorMessage.set("");
 
-        if (name == null || name.trim().isEmpty()) {
-            errorMessage.set("Name cannot be empty");
-            return null;
-        }
-
-        if (age < config.validation().minAge() || age > config.validation().maxAge()) {
-            errorMessage.set("Age must be between " + config.validation().minAge() + " and "
-                    + config.validation().maxAge());
-            return null;
-        }
-
-        if (gender == null) {
-            errorMessage.set("Gender must be provided");
-            return null;
-        }
-
-        if (interestedIn == null) {
-            errorMessage.set("InterestedIn must be provided");
+        if (!validateCreateInput(name, age, gender, interestedIn)) {
             return null;
         }
 
         try {
-            // Calculate birth date from age
-            LocalDate birthDate = AppClock.today().minusYears(age);
-
-            // Create a new user with minimal constructor, then set all required fields
             User newUser = new User(UUID.randomUUID(), name.trim());
-            newUser.setBirthDate(birthDate);
-            newUser.setGender(gender);
-            newUser.setInterestedIn(EnumSet.of(interestedIn));
+            applyDefaultCreateProfile(newUser, age, gender, interestedIn);
 
-            // Set default location (Tel Aviv area as a reasonable default)
-            newUser.setLocation(32.0853, 34.7818);
-
-            // Set default bio placeholder - required for profile completion
-            newUser.setBio("New to the app! 👋");
-
-            // Set default age range preferences (±5 years from user's age)
-            int minAge = Math.max(config.validation().minAge(), age - 5);
-            int maxAge = Math.min(config.validation().maxAge(), age + 5);
-            newUser.setAgeRange(
-                    minAge,
-                    maxAge,
-                    config.validation().minAge(),
-                    config.validation().maxAge());
-
-            // Set default distance preference
-            newUser.setMaxDistanceKm(50, config.matching().maxDistanceKm());
-
-            // Set default photo placeholder - required for profile completion
-            newUser.setPhotoUrls(List.of("placeholder://default-avatar"));
-
-            // Set default pace preferences - required for profile completion
-            PacePreferences pacePrefs = new PacePreferences(
-                    PacePreferences.MessagingFrequency.OFTEN,
-                    PacePreferences.TimeToFirstDate.FEW_DAYS,
-                    PacePreferences.CommunicationStyle.MIX_OF_EVERYTHING,
-                    PacePreferences.DepthPreference.DEPENDS_ON_VIBE);
-            newUser.setPacePreferences(pacePrefs);
-
-            // Set default dealbreakers (none) - marks section as reviewed for profile completion
-            newUser.setDealbreakers(Dealbreakers.none());
-
-            // Now attempt to activate the user since profile is complete
             ActivationResult activation = activationPolicy.tryActivate(newUser);
             if (activation.activated()) {
                 logInfo("User {} is complete and activated. MatchState: {}", newUser.getName(), newUser.getState());
@@ -328,6 +274,60 @@ public class LoginViewModel extends BaseViewModel {
             errorMessage.set("Failed to create user: " + e.getMessage());
             return null;
         }
+    }
+
+    private boolean validateCreateInput(String name, int age, Gender gender, Gender interestedIn) {
+        if (name == null || name.trim().isEmpty()) {
+            errorMessage.set("Name cannot be empty");
+            return false;
+        }
+
+        if (age < config.validation().minAge() || age > config.validation().maxAge()) {
+            errorMessage.set("Age must be between " + config.validation().minAge() + " and "
+                    + config.validation().maxAge());
+            return false;
+        }
+
+        if (gender == null) {
+            errorMessage.set("Gender must be provided");
+            return false;
+        }
+
+        if (interestedIn == null) {
+            errorMessage.set("InterestedIn must be provided");
+            return false;
+        }
+
+        return true;
+    }
+
+    private void applyDefaultCreateProfile(User user, int age, Gender gender, Gender interestedIn) {
+        LocalDate birthDate = AppClock.today().minusYears(age);
+        user.setBirthDate(birthDate);
+        user.setGender(gender);
+        user.setInterestedIn(EnumSet.of(interestedIn));
+        user.setLocation(32.0853, 34.7818);
+        user.setBio("New to the app! 👋");
+
+        int minAge = Math.max(config.validation().minAge(), age - 5);
+        int maxAge = Math.min(config.validation().maxAge(), age + 5);
+        user.setAgeRange(
+                minAge,
+                maxAge,
+                config.validation().minAge(),
+                config.validation().maxAge());
+        user.setMaxDistanceKm(50, config.matching().maxDistanceKm());
+        user.setPhotoUrls(List.of("placeholder://default-avatar"));
+        user.setPacePreferences(defaultPacePreferences());
+        user.setDealbreakers(Dealbreakers.none());
+    }
+
+    private static PacePreferences defaultPacePreferences() {
+        return new PacePreferences(
+                PacePreferences.MessagingFrequency.OFTEN,
+                PacePreferences.TimeToFirstDate.FEW_DAYS,
+                PacePreferences.CommunicationStyle.MIX_OF_EVERYTHING,
+                PacePreferences.DepthPreference.DEPENDS_ON_VIBE);
     }
 
     /**

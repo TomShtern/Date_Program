@@ -54,8 +54,7 @@ class DailyPickServiceTest {
         candidateFinder = new CandidateFinder(userStorage, interactionStorage, trustSafetyStorage, ZoneId.of("UTC"));
         // Create dummies for missing dependencies
         var standoutStorage = new TestStorages.Standouts();
-        var profileService =
-                new ProfileService(config, analyticsStorage, interactionStorage, trustSafetyStorage, userStorage);
+        var profileService = new ProfileService(userStorage);
 
         service = RecommendationService.builder()
                 .userStorage(userStorage)
@@ -267,8 +266,7 @@ class DailyPickServiceTest {
                 .analyticsStorage(analyticsStorage)
                 .candidateFinder(candidateFinder)
                 .standoutStorage(new TestStorages.Standouts())
-                .profileService(new ProfileService(
-                        config, analyticsStorage, interactionStorage, trustSafetyStorage, userStorage))
+                .profileService(new ProfileService(userStorage))
                 .config(config)
                 .clock(oldClock)
                 .build();
@@ -324,8 +322,7 @@ class DailyPickServiceTest {
                 .analyticsStorage(analyticsStorage)
                 .candidateFinder(candidateFinder)
                 .standoutStorage(new TestStorages.Standouts())
-                .profileService(new ProfileService(
-                        config, analyticsStorage, interactionStorage, trustSafetyStorage, userStorage))
+                .profileService(new ProfileService(userStorage))
                 .config(config)
                 .clock(AppClock.clock())
                 .build();

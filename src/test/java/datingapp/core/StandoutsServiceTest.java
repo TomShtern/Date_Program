@@ -60,8 +60,7 @@ class StandoutsServiceTest {
         analyticsStorage = new TestStorages.Analytics();
         standoutStorage = new TestStandoutStorage();
         candidateFinder = new CandidateFinder(userStorage, interactionStorage, trustSafetyStorage, ZoneId.of("UTC"));
-        profileCompletionService =
-                new ProfileService(config, analyticsStorage, interactionStorage, trustSafetyStorage, userStorage);
+        profileCompletionService = new ProfileService(userStorage);
         service = RecommendationService.builder()
                 .userStorage(userStorage)
                 .interactionStorage(interactionStorage)

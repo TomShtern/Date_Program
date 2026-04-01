@@ -33,17 +33,7 @@ import org.junit.jupiter.api.Timeout;
 @DisplayName("PreferencesController bindings")
 class PreferencesControllerTest {
 
-    private static final UiThreadDispatcher TEST_DISPATCHER = new UiThreadDispatcher() {
-        @Override
-        public boolean isUiThread() {
-            return true;
-        }
-
-        @Override
-        public void dispatch(Runnable action) {
-            action.run();
-        }
-    };
+    private static final UiThreadDispatcher TEST_DISPATCHER = JavaFxTestSupport.immediateUiDispatcher();
 
     private final AppSession session = AppSession.getInstance();
     private PreferencesViewModel viewModel;

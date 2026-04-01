@@ -2,6 +2,7 @@ package datingapp.ui.viewmodel;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.core.AppConfig;
@@ -9,6 +10,7 @@ import datingapp.core.AppSession;
 import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
 import datingapp.core.testutil.TestStorages;
+import datingapp.ui.async.UiAsyncTestSupport;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.LockSupport;
 import java.util.function.BooleanSupplier;
@@ -42,7 +44,10 @@ class LoginViewModelTest {
     void createUserBuildsActiveProfileAndRefreshesUserList() throws InterruptedException {
         TestStorages.Users users = new TestStorages.Users();
         LoginViewModel viewModel = new LoginViewModel(
-                new UiDataAdapters.StorageUiUserStore(users), AppConfig.defaults(), AppSession.getInstance());
+                new UiDataAdapters.StorageUiUserStore(users),
+                AppConfig.defaults(),
+                AppSession.getInstance(),
+                new UiAsyncTestSupport.TestUiThreadDispatcher());
 
         assertTrue(waitUntil(() -> viewModel.getUsers().isEmpty(), 5000));
 
@@ -64,13 +69,44 @@ class LoginViewModelTest {
         users.save(createUser("Blair", Gender.FEMALE));
 
         LoginViewModel viewModel = new LoginViewModel(
-                new UiDataAdapters.StorageUiUserStore(users), AppConfig.defaults(), AppSession.getInstance());
+                new UiDataAdapters.StorageUiUserStore(users),
+                AppConfig.defaults(),
+                AppSession.getInstance(),
+                new UiAsyncTestSupport.TestUiThreadDispatcher());
 
         assertTrue(waitUntil(() -> viewModel.getUsers().size() == 2, 5000));
         viewModel.filterTextProperty().set("blair");
 
         assertTrue(waitUntil(() -> viewModel.getFilteredUsers().size() == 1, 5000));
         assertEquals("Blair", viewModel.getFilteredUsers().getFirst().getName());
+
+        viewModel.dispose();
+    }
+
+    @Test
+    @DisplayName("exposed user lists stay live but cannot be mutated directly")
+    void exposedUserListsStayLiveButCannotBeMutatedDirectly() throws InterruptedException {
+        TestStorages.Users users = new TestStorages.Users();
+        users.save(createUser("Alex", Gender.MALE));
+        users.save(createUser("Blair", Gender.FEMALE));
+
+        LoginViewModel viewModel = new LoginViewModel(
+                new UiDataAdapters.StorageUiUserStore(users),
+                AppConfig.defaults(),
+                AppSession.getInstance(),
+                new UiAsyncTestSupport.TestUiThreadDispatcher());
+
+        var exposedUsers = viewModel.getUsers();
+        var exposedFilteredUsers = viewModel.getFilteredUsers();
+
+        assertTrue(waitUntil(() -> exposedUsers.size() == 2, 5000));
+        assertThrows(UnsupportedOperationException.class, exposedUsers::clear);
+        assertThrows(UnsupportedOperationException.class, exposedFilteredUsers::clear);
+
+        viewModel.filterTextProperty().set("blair");
+
+        assertTrue(waitUntil(() -> exposedFilteredUsers.size() == 1, 5000));
+        assertEquals("Blair", exposedFilteredUsers.getFirst().getName());
 
         viewModel.dispose();
     }

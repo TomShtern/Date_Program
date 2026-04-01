@@ -117,7 +117,7 @@ class MatchesControllerTest {
             var analyticsStorage = new TestStorages.Analytics();
             var candidateFinder = new CandidateFinder(users, interactions, trustSafetyStorage, ZoneId.of("UTC"));
             var standoutStorage = new TestStorages.Standouts();
-            var profileService = new ProfileService(config, analyticsStorage, interactions, trustSafetyStorage, users);
+            var profileService = new ProfileService(users);
 
             RecommendationService dailyService = RecommendationService.builder()
                     .interactionStorage(interactions)
@@ -172,7 +172,7 @@ class MatchesControllerTest {
                             socialUseCases,
                             config),
                     AppSession.getInstance(),
-                    new datingapp.ui.async.JavaFxUiThreadDispatcher());
+                    JavaFxTestSupport.blockingUiDispatcher());
         }
 
         private void seedCurrentUserOnly() {

@@ -771,6 +771,7 @@ public final class MatchPreferences {
                 }
                 Integer candidateHeight = candidate.getHeightCm();
                 if (candidateHeight == null) {
+                    failures.add("Height unavailable (required by dealbreaker)");
                     return;
                 }
                 Integer minHeight = db.minHeightCm();

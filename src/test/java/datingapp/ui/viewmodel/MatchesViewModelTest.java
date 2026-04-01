@@ -21,6 +21,7 @@ import datingapp.core.profile.ProfileService;
 import datingapp.core.testutil.TestClock;
 import datingapp.core.testutil.TestStorages;
 import datingapp.core.testutil.TestUserFactory;
+import datingapp.ui.async.UiAsyncTestSupport;
 import datingapp.ui.viewmodel.UiDataAdapters.StorageUiMatchDataAccess;
 import datingapp.ui.viewmodel.UiDataAdapters.StorageUiUserStore;
 import datingapp.ui.viewmodel.UiDataAdapters.UiMatchDataAccess;
@@ -75,7 +76,7 @@ class MatchesViewModelTest {
         var analyticsStorage = new TestStorages.Analytics();
         var candidateFinder = new CandidateFinder(users, interactions, trustSafetyStorage, ZoneId.of("UTC"));
         var standoutStorage = new TestStorages.Standouts();
-        var profileService = new ProfileService(config, analyticsStorage, interactions, trustSafetyStorage, users);
+        var profileService = new ProfileService(users);
 
         dailyService = RecommendationService.builder()
                 .interactionStorage(interactions)
@@ -125,7 +126,7 @@ class MatchesViewModelTest {
                 new MatchesViewModel.Dependencies(
                         matchData, userStore, matchingService, dailyService, matchingUseCases, socialUseCases, config),
                 AppSession.getInstance(),
-                new datingapp.ui.async.JavaFxUiThreadDispatcher());
+                new UiAsyncTestSupport.TestUiThreadDispatcher());
         currentUser = createActiveUser("Current");
         users.save(currentUser);
         AppSession.getInstance().setCurrentUser(currentUser);
@@ -147,8 +148,7 @@ class MatchesViewModelTest {
         var analyticsStorage = new TestStorages.Analytics();
         var candidateFinder = new CandidateFinder(users, interactions, trustSafetyStorage, ZoneId.of("UTC"));
         var standoutStorage = new TestStorages.Standouts();
-        var profileService =
-                new ProfileService(zeroLimitConfig, analyticsStorage, interactions, trustSafetyStorage, users);
+        var profileService = new ProfileService(users);
 
         RecommendationService zeroLimitRecommendationService = RecommendationService.builder()
                 .interactionStorage(interactions)

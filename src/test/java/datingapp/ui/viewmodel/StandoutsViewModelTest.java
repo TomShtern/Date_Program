@@ -18,6 +18,7 @@ import datingapp.core.profile.MatchPreferences.PacePreferences;
 import datingapp.core.profile.ProfileService;
 import datingapp.core.testutil.TestClock;
 import datingapp.core.testutil.TestStorages;
+import datingapp.ui.async.UiAsyncTestSupport;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -75,7 +76,7 @@ class StandoutsViewModelTest {
 
         AppConfig config = AppConfig.defaults();
         CandidateFinder candidateFinder = new CandidateFinder(users, interactions, trustSafety, ZoneId.of("UTC"));
-        ProfileService profileService = new ProfileService(config, analytics, interactions, trustSafety, users);
+        ProfileService profileService = new ProfileService(users);
 
         RecommendationService recommendationService = RecommendationService.builder()
                 .interactionStorage(interactions)
@@ -88,7 +89,8 @@ class StandoutsViewModelTest {
                 .config(config)
                 .build();
 
-        viewModel = new StandoutsViewModel(recommendationService, AppSession.getInstance());
+        viewModel = new StandoutsViewModel(
+                recommendationService, null, AppSession.getInstance(), new UiAsyncTestSupport.TestUiThreadDispatcher());
 
         currentUser = buildActiveUser("Alice");
         users.save(currentUser);

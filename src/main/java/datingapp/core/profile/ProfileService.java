@@ -24,10 +24,10 @@ public final class ProfileService {
     }
 
     /**
-     * @deprecated Use {@link #ProfileService(UserStorage)} instead.
-     *             This constructor validates the extra parameters but does not use them.
+     * Compatibility overload for callers that still construct {@link ProfileService}
+     * with the wider dependency set. The extra parameters are validated but not used;
+     * prefer {@link #ProfileService(UserStorage)} for new code.
      */
-    @Deprecated
     public ProfileService(
             AppConfig config,
             AnalyticsStorage analyticsStorage,

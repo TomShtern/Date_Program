@@ -275,6 +275,7 @@ public class MatchesController extends BaseController implements Initializable {
                 spawnFloatingHeart();
             });
             delay.play();
+            trackAnimation(delay);
         }
     }
 
@@ -341,6 +342,7 @@ public class MatchesController extends BaseController implements Initializable {
             particleLayer.getChildren().remove(heart);
         });
         animation.play();
+        trackAnimation(animation);
     }
 
     /** Animate the main broken heart icon. */
@@ -840,7 +842,9 @@ public class MatchesController extends BaseController implements Initializable {
         // Clear particle layer if it exists
         if (particleLayer != null) {
             particleLayer.getChildren().clear();
+            particleLayer = null;
         }
+        emptyStateAnimated = false;
         cardCacheBySection.values().forEach(Map::clear);
         cardDataBySection.values().forEach(Map::clear);
         // super.cleanup() stops all tracked animations and subscriptions

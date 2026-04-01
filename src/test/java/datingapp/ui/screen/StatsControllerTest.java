@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import datingapp.app.usecase.profile.ProfileUseCases;
 import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
 import datingapp.core.AppSession;
@@ -67,7 +68,13 @@ class StatsControllerTest {
                 new ActivityMetricsService(interactions, trustSafety, analytics, config);
         ConnectionService connectionService = new ConnectionService(config, communications, interactions, users);
         StatsViewModel viewModel = new StatsViewModel(
-                achievementService, activityMetricsService, connectionService, AppSession.getInstance());
+                achievementService,
+                activityMetricsService,
+                connectionService,
+                (ProfileUseCases) null,
+                AppSession.getInstance(),
+                AppClock.clock(),
+                JavaFxTestSupport.blockingUiDispatcher());
 
         JavaFxTestSupport.LoadedFxml loaded =
                 JavaFxTestSupport.loadFxml("/fxml/stats.fxml", () -> new StatsController(viewModel));

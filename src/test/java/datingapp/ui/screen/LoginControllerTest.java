@@ -47,16 +47,17 @@ class LoginControllerTest {
     @DisplayName("FXML filter narrows the list and selection enables login")
     void fxmlFilterNarrowsListAndSelectionEnablesLogin() throws Exception {
         TestStorages.Users users = new TestStorages.Users();
-        TestStorages.Interactions interactions = new TestStorages.Interactions();
-        TestStorages.TrustSafety trustSafety = new TestStorages.TrustSafety();
-        TestStorages.Analytics analytics = new TestStorages.Analytics();
         AppConfig config = AppConfig.defaults();
-        ProfileService profileService = new ProfileService(config, analytics, interactions, trustSafety, users);
+        ProfileService profileService = new ProfileService(users);
 
         users.save(createActiveUser("Alex", Gender.MALE, EnumSet.of(Gender.FEMALE)));
         users.save(createActiveUser("Blair", Gender.FEMALE, EnumSet.of(Gender.MALE)));
 
-        LoginViewModel viewModel = new LoginViewModel(new StorageUiUserStore(users), config, AppSession.getInstance());
+        LoginViewModel viewModel = new LoginViewModel(
+                new StorageUiUserStore(users),
+                config,
+                AppSession.getInstance(),
+                JavaFxTestSupport.blockingUiDispatcher());
 
         JavaFxTestSupport.LoadedFxml loaded =
                 JavaFxTestSupport.loadFxml("/fxml/login.fxml", () -> new LoginController(viewModel, profileService));
@@ -105,15 +106,16 @@ class LoginControllerTest {
     @DisplayName("Empty user repository keeps login button disabled")
     void emptyUserRepositoryKeepsLoginButtonDisabled() throws Exception {
         TestStorages.Users users = new TestStorages.Users();
-        TestStorages.Interactions interactions = new TestStorages.Interactions();
-        TestStorages.TrustSafety trustSafety = new TestStorages.TrustSafety();
-        TestStorages.Analytics analytics = new TestStorages.Analytics();
         AppConfig config = AppConfig.defaults();
-        ProfileService profileService = new ProfileService(config, analytics, interactions, trustSafety, users);
+        ProfileService profileService = new ProfileService(users);
 
         // No users saved - repository is empty
 
-        LoginViewModel viewModel = new LoginViewModel(new StorageUiUserStore(users), config, AppSession.getInstance());
+        LoginViewModel viewModel = new LoginViewModel(
+                new StorageUiUserStore(users),
+                config,
+                AppSession.getInstance(),
+                JavaFxTestSupport.blockingUiDispatcher());
 
         JavaFxTestSupport.LoadedFxml loaded =
                 JavaFxTestSupport.loadFxml("/fxml/login.fxml", () -> new LoginController(viewModel, profileService));

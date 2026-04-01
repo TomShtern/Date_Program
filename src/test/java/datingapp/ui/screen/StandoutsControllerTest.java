@@ -139,7 +139,7 @@ class StandoutsControllerTest {
         private Fixture() {
             TestClock.setFixed(FIXED_INSTANT);
             CandidateFinder candidateFinder = new CandidateFinder(users, interactions, trustSafety, ZoneId.of("UTC"));
-            ProfileService profileService = new ProfileService(config, analytics, interactions, trustSafety, users);
+            ProfileService profileService = new ProfileService(users);
 
             RecommendationService recommendationService = RecommendationService.builder()
                     .interactionStorage(interactions)
@@ -152,7 +152,8 @@ class StandoutsControllerTest {
                     .config(config)
                     .build();
 
-            this.viewModel = new StandoutsViewModel(recommendationService, AppSession.getInstance());
+            this.viewModel = new StandoutsViewModel(
+                    recommendationService, null, AppSession.getInstance(), JavaFxTestSupport.blockingUiDispatcher());
         }
 
         private void seedData() {

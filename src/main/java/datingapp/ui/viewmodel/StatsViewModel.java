@@ -59,6 +59,8 @@ public class StatsViewModel extends BaseViewModel {
     private final BooleanProperty loadFailed = new SimpleBooleanProperty(false);
     private final StringProperty loadFailureMessage = new SimpleStringProperty("");
 
+    private static final String UNKNOWN = "unknown";
+
     private final AtomicReference<User> currentUser = new AtomicReference<>();
 
     /** Error handler for late-bound error communication (M-22). */
@@ -298,34 +300,7 @@ public class StatsViewModel extends BaseViewModel {
     }
 
     private StatsData fetchStats(java.util.UUID userId) {
-        UserStats stats;
-        if (profileInsightsUseCases != null) {
-            var result = profileInsightsUseCases.getOrComputeStats(new StatsQuery(UserContext.ui(userId)));
-            if (result.success()) {
-                stats = result.data();
-            } else {
-                if (logger.isWarnEnabled()) {
-                    logger.warn(
-                            "profileInsightsUseCases.getOrComputeStats failed: {}",
-                            result.error() != null ? result.error().message() : "unknown");
-                }
-                stats = statsService.getOrComputeStats(userId);
-            }
-        } else if (profileUseCases != null) {
-            var result = profileUseCases.getOrComputeStats(new ProfileUseCases.StatsQuery(UserContext.ui(userId)));
-            if (result.success()) {
-                stats = result.data();
-            } else {
-                if (logger.isWarnEnabled()) {
-                    logger.warn(
-                            "profileUseCases.getOrComputeStats failed: {}",
-                            result.error() != null ? result.error().message() : "unknown");
-                }
-                stats = statsService.getOrComputeStats(userId);
-            }
-        } else {
-            stats = statsService.getOrComputeStats(userId);
-        }
+        UserStats stats = resolveUserStats(userId);
 
         int likesGiven = stats.likesGiven();
         int likesReceived = stats.likesReceived();
@@ -340,6 +315,38 @@ public class StatsViewModel extends BaseViewModel {
         }
 
         return new StatsData(likesGiven, likesReceived, matchesCount, messageCount, streakDays, rateText);
+    }
+
+    private UserStats resolveUserStats(java.util.UUID userId) {
+        if (profileInsightsUseCases != null) {
+            return resolveViaInsights(userId);
+        }
+        if (profileUseCases != null) {
+            return resolveViaProfileUseCases(userId);
+        }
+        return statsService.getOrComputeStats(userId);
+    }
+
+    private UserStats resolveViaInsights(java.util.UUID userId) {
+        var result = profileInsightsUseCases.getOrComputeStats(new StatsQuery(UserContext.ui(userId)));
+        if (result.success()) {
+            return result.data();
+        }
+        logWarn(
+                "profileInsightsUseCases.getOrComputeStats failed: {}",
+                result.error() != null ? result.error().message() : UNKNOWN);
+        return statsService.getOrComputeStats(userId);
+    }
+
+    private UserStats resolveViaProfileUseCases(java.util.UUID userId) {
+        var result = profileUseCases.getOrComputeStats(new ProfileUseCases.StatsQuery(UserContext.ui(userId)));
+        if (result.success()) {
+            return result.data();
+        }
+        logWarn(
+                "profileUseCases.getOrComputeStats failed: {}",
+                result.error() != null ? result.error().message() : UNKNOWN);
+        return statsService.getOrComputeStats(userId);
     }
 
     private int fetchMessagesExchanged(java.util.UUID userId) {
@@ -438,7 +445,7 @@ public class StatsViewModel extends BaseViewModel {
 
     private String maskUserIdentifier(User user) {
         if (user == null || user.getId() == null) {
-            return "unknown";
+            return UNKNOWN;
         }
         return Integer.toHexString(user.getId().toString().hashCode());
     }

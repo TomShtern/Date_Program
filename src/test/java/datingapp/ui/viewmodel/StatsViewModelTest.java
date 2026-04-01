@@ -20,6 +20,7 @@ import datingapp.core.model.User;
 import datingapp.core.testutil.TestStorages;
 import datingapp.core.testutil.TestUserFactory;
 import datingapp.ui.JavaFxTestSupport;
+import datingapp.ui.async.UiAsyncTestSupport;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -77,7 +78,10 @@ class StatsViewModelTest {
                 new SingleAchievementService(currentUser.getId()),
                 new ActivityMetricsService(interactions, trustSafety, analytics, config),
                 new ConnectionService(config, communications, interactions, users),
-                AppSession.getInstance());
+                (ProfileUseCases) null,
+                AppSession.getInstance(),
+                AppClock.clock(),
+                new UiAsyncTestSupport.TestUiThreadDispatcher());
 
         viewModel.initialize();
 
@@ -127,7 +131,9 @@ class StatsViewModelTest {
                 new ActivityMetricsService(interactions, trustSafety, analytics, config),
                 new ConnectionService(config, communications, interactions, users),
                 failingProfileUseCases,
-                AppSession.getInstance());
+                AppSession.getInstance(),
+                AppClock.clock(),
+                new UiAsyncTestSupport.TestUiThreadDispatcher());
 
         viewModel.initialize();
 
@@ -157,7 +163,10 @@ class StatsViewModelTest {
                 new SingleAchievementService(currentUser.getId()),
                 new ActivityMetricsService(interactions, trustSafety, analytics, config),
                 new ConnectionService(config, communications, interactions, users),
-                AppSession.getInstance());
+                (ProfileUseCases) null,
+                AppSession.getInstance(),
+                AppClock.clock(),
+                new UiAsyncTestSupport.TestUiThreadDispatcher());
         try {
             assertEquals(Achievement.values().length, viewModel.getTotalAchievementCount());
         } finally {
@@ -209,7 +218,10 @@ class StatsViewModelTest {
                 new SingleAchievementService(currentUser.getId()),
                 new ActivityMetricsService(interactions, trustSafety, analytics, config),
                 new ConnectionService(config, communications, interactions, users),
-                AppSession.getInstance());
+                (ProfileUseCases) null,
+                AppSession.getInstance(),
+                AppClock.clock(),
+                new UiAsyncTestSupport.TestUiThreadDispatcher());
 
         viewModel.initialize();
 

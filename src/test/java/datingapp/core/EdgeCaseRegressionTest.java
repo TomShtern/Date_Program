@@ -44,8 +44,7 @@ class EdgeCaseRegressionTest {
         TestStorages.Analytics analyticsStorage = new TestStorages.Analytics();
         CandidateFinder candidateFinder =
                 new CandidateFinder(userStorage, interactionStorage, trustSafetyStorage, ZoneId.of("UTC"));
-        ProfileService profileService =
-                new ProfileService(config, analyticsStorage, interactionStorage, trustSafetyStorage, userStorage);
+        ProfileService profileService = new ProfileService(userStorage);
         RecommendationService recommendationService = RecommendationService.builder()
                 .interactionStorage(interactionStorage)
                 .userStorage(userStorage)
