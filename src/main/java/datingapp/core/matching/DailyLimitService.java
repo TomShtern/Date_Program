@@ -26,11 +26,6 @@ public interface DailyLimitService {
     /** Time remaining until next daily reset (midnight local time). */
     Duration getTimeUntilReset();
 
-    /**
-     * Format duration as HH:mm:ss.
-     */
-    String formatDuration(Duration duration);
-
     /** Status snapshot for daily limits. */
     record DailyStatus(
             int likesUsed,

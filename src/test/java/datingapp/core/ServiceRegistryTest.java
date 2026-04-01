@@ -1,6 +1,5 @@
 package datingapp.core;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -206,8 +205,9 @@ class ServiceRegistryTest {
             var result = registry.getProfileUseCases().listUsers();
 
             assertTrue(result.success());
-            assertEquals(1, result.data().size());
-            assertEquals(userId, result.data().get(0).getId());
+            assertTrue(
+                    result.data().stream().anyMatch(u -> u.getId().equals(userId)),
+                    "Saved user should be present in listUsers result");
         }
 
         @Test

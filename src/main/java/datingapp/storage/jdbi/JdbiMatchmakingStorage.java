@@ -587,7 +587,7 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
                         .bind(PARAM_DELETED_AT, updatedMatch.getDeletedAt())
                         .execute();
                 if (matchRows != 1) {
-                    return false;
+                    throw new StorageException("Failed to update match during atomic unmatch");
                 }
 
                 if (archivedConversation.isPresent()) {

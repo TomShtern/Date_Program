@@ -1,5 +1,6 @@
 package datingapp.app.api;
 
+import datingapp.core.AppClock;
 import io.javalin.Javalin;
 import io.javalin.http.Context;
 import java.net.InetAddress;
@@ -87,7 +88,7 @@ final class RestApiRequestGuards {
         }
 
         private RateLimitDecision tryAcquire(String key) {
-            long now = System.currentTimeMillis();
+            long now = AppClock.now().toEpochMilli();
             Window window = windows.compute(key, (ignored, current) -> {
                 if (current == null || now - current.windowStartedAtMillis >= windowMillis) {
                     return new Window(now, 1);

@@ -1,6 +1,6 @@
 # 2026-03-31 CAST Structural Quality Advisor Report
 
-> **Workspace:** `c:\Users\tom7s\Desktopp\Claude_Folder_2\Date_Program`
+> **Workspace:** `c:\Users\tom7s\Desktop\Claude_Folder_2\Date_Program`
 >
 > **Perspective:** CAST-style structural quality advisory pass derived from the local checked-out source
 >

@@ -10,8 +10,7 @@ import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import datingapp.app.cli.CliTextAndInput.InputReader;
 import datingapp.app.testutil.TestEventBus;
-import datingapp.app.usecase.common.UseCaseError;
-import datingapp.app.usecase.common.UseCaseResult;
+import datingapp.app.usecase.profile.ProfileMutationUseCases;
 import datingapp.app.usecase.profile.ProfileUseCases;
 import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
@@ -141,22 +140,24 @@ class ProfileHandlerTest {
         original.setBio("original-bio");
         session.setCurrentUser(original);
 
-        ProfileUseCases failingUseCases =
-                new ProfileUseCases(
-                        userStorage,
-                        null,
-                        validationService,
-                        null,
-                        TestAchievementService.empty(),
-                        AppConfig.defaults(),
-                        new datingapp.core.workflow.ProfileActivationPolicy(),
-                        new TestEventBus()) {
-                    @Override
-                    public UseCaseResult<ProfileUseCases.ProfileSaveResult> saveProfile(
-                            ProfileUseCases.SaveProfileCommand command) {
-                        return UseCaseResult.failure(UseCaseError.internal("forced-save-failure"));
-                    }
-                };
+        ProfileMutationUseCases failingMutation = new ProfileMutationUseCases(
+                null,
+                validationService,
+                TestAchievementService.empty(),
+                AppConfig.defaults(),
+                new datingapp.core.workflow.ProfileActivationPolicy(),
+                new TestEventBus(),
+                null);
+
+        ProfileUseCases failingUseCases = ProfileUseCases.builder()
+                .userStorage(userStorage)
+                .validationService(validationService)
+                .achievementService(TestAchievementService.empty())
+                .config(AppConfig.defaults())
+                .activationPolicy(new datingapp.core.workflow.ProfileActivationPolicy())
+                .eventBus(new TestEventBus())
+                .profileMutationUseCases(failingMutation)
+                .build();
 
         InputReader inputReader = new InputReader(new Scanner(new StringReader("new-bio\n")));
         ProfileHandler handler = new ProfileHandler(

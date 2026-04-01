@@ -3,7 +3,6 @@ package datingapp.ui.viewmodel;
 import datingapp.app.usecase.common.UseCaseError;
 import datingapp.app.usecase.common.UserContext;
 import datingapp.app.usecase.profile.ProfileNotesUseCases;
-import datingapp.app.usecase.profile.ProfileUseCases;
 import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
 import datingapp.core.connection.ConnectionModels.Like;
@@ -282,11 +281,6 @@ public final class UiDataAdapters {
         public UseCaseUiProfileNoteDataAccess(ProfileNotesUseCases profileNotesUseCases) {
             this.profileNotesUseCases =
                     Objects.requireNonNull(profileNotesUseCases, "profileNotesUseCases cannot be null");
-        }
-
-        public UseCaseUiProfileNoteDataAccess(ProfileUseCases profileUseCases) {
-            this(Objects.requireNonNull(profileUseCases, "profileUseCases cannot be null")
-                    .getProfileNotesUseCases());
         }
 
         @Override

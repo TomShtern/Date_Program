@@ -385,7 +385,8 @@ class ChatControllerTest {
                     Duration.ofMillis(75),
                     Duration.ofMillis(75),
                     new ChatViewModel.ChatUiDependencies(
-                            new UseCaseUiProfileNoteDataAccess(noteUseCases), new NoOpUiPresenceDataAccess()));
+                            new UseCaseUiProfileNoteDataAccess(noteUseCases.getProfileNotesUseCases()),
+                            new NoOpUiPresenceDataAccess()));
         }
 
         private void seedConversationWithNote(String noteContent) {

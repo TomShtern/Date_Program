@@ -187,11 +187,6 @@ class MatchingTransactionTest {
             public Duration getTimeUntilReset() {
                 return Duration.ZERO;
             }
-
-            @Override
-            public String formatDuration(Duration duration) {
-                return RecommendationService.formatDuration(duration);
-            }
         };
     }
 
@@ -220,11 +215,6 @@ class MatchingTransactionTest {
             @Override
             public Duration getTimeUntilReset() {
                 return Duration.ZERO;
-            }
-
-            @Override
-            public String formatDuration(Duration duration) {
-                return RecommendationService.formatDuration(duration);
             }
         };
     }

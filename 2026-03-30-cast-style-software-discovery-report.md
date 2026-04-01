@@ -4,7 +4,7 @@
 
 This report covers the `Date_Program` workspace as a **source-driven CAST-style discovery pass**.
 
-- **Workspace root:** `c:\Users\tom7s\Desktopp\Claude_Folder_2\Date_Program`
+- **Workspace root:** `c:\Users\tom7s\Desktop\Claude_Folder_2\Date_Program`
 - **Primary source of truth used:** `pom.xml`, `src/main/java`, `src/test/java`, `config/app-config.json`, and `src/main/resources`
 - **Important note:** a live CAST Imaging application inventory/API surface was **not exposed in this session**, so the application, architecture, dependency, database, and source-file mapping below is derived directly from the checked-out codebase rather than a remote CAST server model.
 

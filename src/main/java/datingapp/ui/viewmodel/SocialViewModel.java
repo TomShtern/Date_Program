@@ -143,41 +143,30 @@ public class SocialViewModel extends BaseViewModel {
 
     /** Accepts a friend zone request from another user. */
     public void acceptRequest(FriendRequestEntry entry) {
-        User user = ensureCurrentUser();
-        if (user == null || entry == null) {
-            return;
-        }
-        asyncScope.runFireAndForget("accept friend request", () -> {
-            try {
-                var result = socialUseCases.respondToFriendRequest(new RespondFriendRequestCommand(
-                        UserContext.ui(user.getId()), entry.requestId(), FriendRequestAction.ACCEPT));
-                if (!result.success()) {
-                    notifyError("Could not accept request: " + result.error().message());
-                }
-            } catch (Exception _) {
-                logger.error("Failed to accept friend request");
-                notifyError("Failed to accept request.");
-            }
-            asyncScope.dispatchToUi(this::refresh);
-        });
+        handleFriendRequest(entry, FriendRequestAction.ACCEPT, "accept");
     }
 
     /** Declines a friend zone request from another user. */
     public void declineRequest(FriendRequestEntry entry) {
+        handleFriendRequest(entry, FriendRequestAction.DECLINE, "decline");
+    }
+
+    private void handleFriendRequest(FriendRequestEntry entry, FriendRequestAction action, String verb) {
         User user = ensureCurrentUser();
         if (user == null || entry == null) {
             return;
         }
-        asyncScope.runFireAndForget("decline friend request", () -> {
+        asyncScope.runFireAndForget(verb + " friend request", () -> {
             try {
-                var result = socialUseCases.respondToFriendRequest(new RespondFriendRequestCommand(
-                        UserContext.ui(user.getId()), entry.requestId(), FriendRequestAction.DECLINE));
+                var result = socialUseCases.respondToFriendRequest(
+                        new RespondFriendRequestCommand(UserContext.ui(user.getId()), entry.requestId(), action));
                 if (!result.success()) {
-                    notifyError("Could not decline request: " + result.error().message());
+                    notifyError(
+                            "Could not " + verb + " request: " + result.error().message());
                 }
             } catch (Exception _) {
-                logger.error("Failed to decline friend request");
-                notifyError("Failed to decline request.");
+                logger.error("Failed to {} friend request", verb);
+                notifyError("Failed to " + verb + " request.");
             }
             asyncScope.dispatchToUi(this::refresh);
         });

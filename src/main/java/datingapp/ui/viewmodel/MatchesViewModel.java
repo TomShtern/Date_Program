@@ -630,6 +630,9 @@ public class MatchesViewModel extends BaseViewModel {
     }
 
     private void performLikeBack(UUID userId, UUID targetUserId) {
+        if (matchingUseCases == null) {
+            throw new IllegalStateException("Matching use cases not configured");
+        }
         if (!dailyService.canLike(userId)) {
             throw new IllegalStateException("Daily like limit reached");
         }
@@ -638,11 +641,17 @@ public class MatchesViewModel extends BaseViewModel {
     }
 
     private void performPassOn(UUID userId, UUID targetUserId) {
+        if (matchingUseCases == null) {
+            throw new IllegalStateException("Matching use cases not configured");
+        }
         matchingUseCases.recordLike(
                 new RecordLikeCommand(UserContext.ui(userId), targetUserId, Like.Direction.PASS, false));
     }
 
     private void performWithdrawLike(UUID likeId) {
+        if (matchingUseCases == null) {
+            throw new IllegalStateException("Matching use cases not configured");
+        }
         User user = resolveCurrentUser();
         if (user != null) {
             matchingUseCases.removeLike(new RemoveLikeCommand(UserContext.ui(user.getId()), likeId));

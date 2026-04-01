@@ -5,6 +5,7 @@ import datingapp.core.profile.MatchPreferences.Interest;
 import datingapp.ui.async.JavaFxUiThreadDispatcher;
 import datingapp.ui.async.UiThreadDispatcher;
 import datingapp.ui.viewmodel.UiDataAdapters.UiUserStore;
+import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
@@ -73,7 +74,7 @@ public final class ProfileReadOnlyViewModel extends BaseViewModel {
                         : "Location not shared");
         lookingFor.set(user.getLookingFor() != null ? user.getLookingFor().getDisplayName() : "Open to meeting people");
         interests.set(formatInterests(user.getInterests()));
-        photoUrls.setAll(user.getPhotoUrls());
+        photoUrls.setAll(user.getPhotoUrls() != null ? user.getPhotoUrls() : List.of());
         currentPhotoIndex.set(0);
         currentPhotoUrl.set(photoUrls.isEmpty() ? "" : photoUrls.getFirst());
     }

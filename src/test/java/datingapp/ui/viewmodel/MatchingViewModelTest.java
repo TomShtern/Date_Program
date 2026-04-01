@@ -357,7 +357,9 @@ class MatchingViewModelTest {
         }
 
         private MatchingViewModel createViewModel(UiThreadDispatcher dispatcher) {
-            return createViewModel(dispatcher, new UseCaseUiProfileNoteDataAccess(createNoteUseCases()));
+            return createViewModel(
+                    dispatcher,
+                    new UseCaseUiProfileNoteDataAccess(createNoteUseCases().getProfileNotesUseCases()));
         }
 
         private MatchingViewModel createViewModel(

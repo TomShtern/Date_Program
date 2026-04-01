@@ -505,11 +505,6 @@ class MatchingUseCasesTest {
             public Duration getTimeUntilReset() {
                 return Duration.ZERO;
             }
-
-            @Override
-            public String formatDuration(Duration duration) {
-                return "00:00:00";
-            }
         };
     }
 

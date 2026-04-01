@@ -38,11 +38,7 @@ public final class EnumSetUtil {
      * @return A new EnumSet containing the source elements, or an empty EnumSet
      */
     public static <E extends Enum<E>> EnumSet<E> safeCopy(Set<E> source, Class<E> enumClass) {
-        Objects.requireNonNull(enumClass, "enumClass cannot be null");
-        if (source == null || source.isEmpty()) {
-            return EnumSet.noneOf(enumClass);
-        }
-        return EnumSet.copyOf(source);
+        return safeCopy((Collection<E>) source, enumClass);
     }
 
     /**

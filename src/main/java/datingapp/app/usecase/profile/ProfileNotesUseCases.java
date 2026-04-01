@@ -93,8 +93,10 @@ public class ProfileNotesUseCases {
             if (validationService != null) {
                 var validationResult = validationService.validateProfileNoteContent(sanitizedContent);
                 if (!validationResult.valid()) {
-                    return UseCaseResult.failure(
-                            UseCaseError.validation(validationResult.errors().getFirst()));
+                    String errorMessage = validationResult.errors().isEmpty()
+                            ? "Profile note content is invalid"
+                            : validationResult.errors().getFirst();
+                    return UseCaseResult.failure(UseCaseError.validation(errorMessage));
                 }
             } else {
                 int maxProfileNoteLength = config.validation().maxProfileNoteLength();

@@ -170,7 +170,7 @@ public final class DefaultCompatibilityCalculator implements CompatibilityCalcul
 
     @Override
     public double calculateResponseScore(Duration timeBetweenLikes) {
-        if (timeBetweenLikes == null || timeBetweenLikes.isZero()) {
+        if (timeBetweenLikes == null || timeBetweenLikes.isZero() || timeBetweenLikes.isNegative()) {
             return NEUTRAL_SCORE;
         }
 

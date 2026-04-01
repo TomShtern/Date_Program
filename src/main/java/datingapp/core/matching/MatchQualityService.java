@@ -471,9 +471,4 @@ public class MatchQualityService {
     public boolean isLowPaceCompatibility(int score) {
         return score >= 0 && score < config.algorithm().paceCompatibilityThreshold();
     }
-
-    /** Gets the warning message for low pace compatibility. */
-    public String getLowPaceCompatibilityWarning() {
-        return "Your pacing styles differ significantly. Worth discussing early!";
-    }
 }

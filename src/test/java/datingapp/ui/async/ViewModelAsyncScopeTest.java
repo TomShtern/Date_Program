@@ -196,9 +196,13 @@ class ViewModelAsyncScopeTest {
         assertTrue(secondTick.await(2, TimeUnit.SECONDS));
         assertTrue(UiAsyncTestSupport.waitUntil(() -> first.isCancelled() && first.isDone(), Duration.ofSeconds(2)));
 
+        assertTrue(
+                UiAsyncTestSupport.waitUntil(
+                        () -> scope.diagnosticsSnapshot().supersededTaskCount() == 1L, Duration.ofSeconds(2)),
+                "supersededTaskCount should reach 1");
         ViewModelAsyncScope.DiagnosticsSnapshot diagnostics = scope.diagnosticsSnapshot();
         assertEquals(1L, diagnostics.supersededTaskCount());
-        assertEquals(1L, diagnostics.cancelledBeforeDeliveryCount());
+        assertEquals(0L, diagnostics.cancelledBeforeDeliveryCount());
         assertEquals(0L, diagnostics.callbackSuppressedCount());
         assertEquals(0L, diagnostics.routedErrorCount());
 

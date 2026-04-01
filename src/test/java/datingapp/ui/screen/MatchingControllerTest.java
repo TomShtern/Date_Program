@@ -377,7 +377,7 @@ class MatchingControllerTest {
                                     eventBus,
                                     recommendationService),
                             new datingapp.app.usecase.social.SocialUseCases(trustSafetyService),
-                            new UseCaseUiProfileNoteDataAccess(noteUseCases)),
+                            new UseCaseUiProfileNoteDataAccess(noteUseCases.getProfileNotesUseCases())),
                     AppSession.getInstance(),
                     TEST_DISPATCHER);
         }

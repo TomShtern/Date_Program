@@ -123,7 +123,8 @@ class ChatViewModelTest {
                 Duration.ofMillis(75),
                 Duration.ofMillis(75),
                 new ChatViewModel.ChatUiDependencies(
-                        new UseCaseUiProfileNoteDataAccess(noteUseCases), presenceDataAccess));
+                        new UseCaseUiProfileNoteDataAccess(noteUseCases.getProfileNotesUseCases()),
+                        presenceDataAccess));
 
         currentUser = createActiveUser("CurrentUser");
         otherUser = createActiveUser("OtherUser");
@@ -343,7 +344,8 @@ class ChatViewModelTest {
                 Duration.ofMillis(75),
                 Duration.ofMillis(75),
                 new ChatViewModel.ChatUiDependencies(
-                        new UseCaseUiProfileNoteDataAccess(noteUseCases), delayedPresenceDataAccess));
+                        new UseCaseUiProfileNoteDataAccess(noteUseCases.getProfileNotesUseCases()),
+                        delayedPresenceDataAccess));
 
         try {
             delayedViewModel.setCurrentUser(currentUser);
@@ -438,7 +440,8 @@ class ChatViewModelTest {
                 Duration.ofMillis(75),
                 Duration.ofMillis(75),
                 new ChatViewModel.ChatUiDependencies(
-                        new UseCaseUiProfileNoteDataAccess(noteUseCases), new UiPresenceDataAccess() {
+                        new UseCaseUiProfileNoteDataAccess(noteUseCases.getProfileNotesUseCases()),
+                        new UiPresenceDataAccess() {
                             @Override
                             public PresenceStatus getPresence(UUID userId) {
                                 return presenceStatus.get();
@@ -668,7 +671,8 @@ class ChatViewModelTest {
                 Duration.ofMillis(75),
                 Duration.ofMillis(75),
                 new ChatViewModel.ChatUiDependencies(
-                        new UseCaseUiProfileNoteDataAccess(noteUseCases), new UiPresenceDataAccess() {
+                        new UseCaseUiProfileNoteDataAccess(noteUseCases.getProfileNotesUseCases()),
+                        new UiPresenceDataAccess() {
                             @Override
                             public PresenceStatus getPresence(UUID userId) {
                                 return presenceStatus.get();

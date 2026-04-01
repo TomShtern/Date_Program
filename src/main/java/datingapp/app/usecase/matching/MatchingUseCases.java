@@ -62,11 +62,6 @@ public class MatchingUseCases {
         public Duration getTimeUntilReset() {
             return Duration.ZERO;
         }
-
-        @Override
-        public String formatDuration(Duration duration) {
-            return RecommendationService.formatDuration(duration);
-        }
     };
     private static final DailyPickService NO_OP_DAILY_PICK_SERVICE = new DailyPickService() {
         @Override
@@ -729,11 +724,6 @@ public class MatchingUseCases {
             @Override
             public Duration getTimeUntilReset() {
                 return recommendationService.getTimeUntilReset();
-            }
-
-            @Override
-            public String formatDuration(Duration duration) {
-                return RecommendationService.formatDuration(duration);
             }
         };
     }

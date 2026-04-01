@@ -9,7 +9,6 @@ import datingapp.core.AppConfig;
 import datingapp.core.metrics.AchievementService;
 import datingapp.core.metrics.EngagementDomain.Achievement.UserAchievement;
 import datingapp.core.model.User;
-import datingapp.core.profile.ProfileService;
 import datingapp.core.profile.SanitizerUtils;
 import datingapp.core.profile.ValidationService;
 import datingapp.core.storage.AccountCleanupStorage;
@@ -32,7 +31,6 @@ public final class ProfileMutationUseCases {
     private static final String USER_NOT_FOUND = "User not found";
 
     private final UserStorage userStorage;
-    private final ProfileService profileService;
     private final ValidationService validationService;
     private final AchievementService achievementService;
     private final AccountCleanupStorage accountCleanupStorage;
@@ -42,27 +40,17 @@ public final class ProfileMutationUseCases {
 
     public ProfileMutationUseCases(
             UserStorage userStorage,
-            ProfileService profileService,
             ValidationService validationService,
             AchievementService achievementService,
             AppConfig config,
             ProfileActivationPolicy activationPolicy,
             AppEventBus eventBus) {
-        this(
-                userStorage,
-                profileService,
-                validationService,
-                achievementService,
-                config,
-                activationPolicy,
-                eventBus,
-                null);
+        this(userStorage, validationService, achievementService, config, activationPolicy, eventBus, null);
     }
 
     @SuppressWarnings("java:S107")
     public ProfileMutationUseCases(
             UserStorage userStorage,
-            ProfileService profileService,
             ValidationService validationService,
             AchievementService achievementService,
             AppConfig config,
@@ -70,7 +58,6 @@ public final class ProfileMutationUseCases {
             AppEventBus eventBus,
             AccountCleanupStorage accountCleanupStorage) {
         this.userStorage = userStorage;
-        this.profileService = profileService;
         this.validationService = validationService;
         this.achievementService = achievementService;
         this.accountCleanupStorage = accountCleanupStorage;
@@ -83,8 +70,8 @@ public final class ProfileMutationUseCases {
         if (command == null || command.context() == null || command.user() == null) {
             return UseCaseResult.failure(UseCaseError.validation("Context and user are required"));
         }
-        if (userStorage == null || profileService == null) {
-            return UseCaseResult.failure(UseCaseError.dependency("UserStorage and ProfileService are required"));
+        if (userStorage == null) {
+            return UseCaseResult.failure(UseCaseError.dependency(USER_STORAGE_REQUIRED));
         }
         if (!command.context().userId().equals(command.user().getId())) {
             return UseCaseResult.failure(UseCaseError.forbidden("User context does not match profile user"));
@@ -236,6 +223,9 @@ public final class ProfileMutationUseCases {
             } else {
                 userStorage.save(deletedUser);
             }
+            // Intentional: mutate the caller-visible original so any downstream
+            // request-local logic sees the deleted state. Persistence already
+            // occurred on deletedUser above.
             applyDeletionState(user, deletedAt);
             if (logger.isInfoEnabled()) {
                 logger.info("Account soft-deleted for user {} (reasonCode={})", user.getId(), command.reason());

@@ -485,6 +485,10 @@ public class ConnectionService {
             return TransitionResult.failure("Relationship has already ended.");
         }
 
+        if (!interactionStorage.supportsAtomicRelationshipTransitions()) {
+            return TransitionResult.failure(ATOMIC_TRANSITIONS_REQUIRED);
+        }
+
         match.gracefulExit(initiatorId);
 
         Optional<Conversation> convoOpt = communicationStorage.getConversationByUsers(initiatorId, targetUserId);
@@ -492,10 +496,6 @@ public class ConnectionService {
             convo.archive(convo.getUserA(), MatchArchiveReason.GRACEFUL_EXIT);
             convo.archive(convo.getUserB(), MatchArchiveReason.GRACEFUL_EXIT);
         });
-
-        if (!interactionStorage.supportsAtomicRelationshipTransitions()) {
-            return TransitionResult.failure(ATOMIC_TRANSITIONS_REQUIRED);
-        }
 
         try {
             boolean transitioned = interactionStorage.gracefulExitTransition(match, convoOpt, null);
@@ -531,6 +531,10 @@ public class ConnectionService {
             return TransitionResult.failure("Match cannot be unmatched from its current state.");
         }
 
+        if (!interactionStorage.supportsAtomicRelationshipTransitions()) {
+            return TransitionResult.failure(ATOMIC_TRANSITIONS_REQUIRED);
+        }
+
         match.unmatch(initiatorId);
 
         // Archive the conversation for both participants, if one exists.
@@ -539,10 +543,6 @@ public class ConnectionService {
             convo.archive(convo.getUserA(), MatchArchiveReason.UNMATCH);
             convo.archive(convo.getUserB(), MatchArchiveReason.UNMATCH);
         });
-
-        if (!interactionStorage.supportsAtomicRelationshipTransitions()) {
-            return TransitionResult.failure(ATOMIC_TRANSITIONS_REQUIRED);
-        }
 
         try {
             boolean transitioned = interactionStorage.unmatchTransition(match, convoOpt);

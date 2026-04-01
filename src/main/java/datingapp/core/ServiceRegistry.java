@@ -124,7 +124,6 @@ public final class ServiceRegistry {
                 ? Objects.requireNonNull(builder.profileMutationUseCases, "profileMutationUseCases cannot be null")
                 : new ProfileMutationUseCases(
                         this.userStorage,
-                        this.profileService,
                         this.validationService,
                         this.achievementService,
                         this.config,

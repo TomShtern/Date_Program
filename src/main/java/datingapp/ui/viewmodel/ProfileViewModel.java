@@ -1102,6 +1102,7 @@ public class ProfileViewModel extends BaseViewModel {
             updatePrimaryPhotoFromIndex();
             session.setCurrentUser(user);
             updateCompletion(user);
+            markCurrentStateSaved();
             UiFeedbackService.showSuccess(successMessage);
         });
     }

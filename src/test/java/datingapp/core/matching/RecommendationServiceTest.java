@@ -232,11 +232,6 @@ class RecommendationServiceTest {
             timeUntilResetCalls++;
             return timeUntilResetReturn;
         }
-
-        @Override
-        public String formatDuration(Duration duration) {
-            return RecommendationService.formatDuration(duration);
-        }
     }
 
     private static final class FakeDailyPickService implements DailyPickService {

@@ -23,6 +23,11 @@ public final class ProfileService {
         this.completionSupport = new ProfileCompletionSupport();
     }
 
+    /**
+     * @deprecated Use {@link #ProfileService(UserStorage)} instead.
+     *             This constructor validates the extra parameters but does not use them.
+     */
+    @Deprecated
     public ProfileService(
             AppConfig config,
             AnalyticsStorage analyticsStorage,

@@ -426,13 +426,9 @@ public final class TrustSafetyService {
     /**
      * Updates the match state to BLOCKED if a match exists between the two users,
      * and archives any existing conversation from the blocker's perspective.
-     * Silently succeeds if interactionStorage is not configured or no match exists.
+     * Silently succeeds if no match exists.
      */
     private void updateMatchStateForBlock(UUID blockerId, UUID blockedId) {
-        if (interactionStorage == null) {
-            logger.debug("InteractionStorage not configured; skipping match state update for block");
-            return;
-        }
         interactionStorage.getByUsers(blockerId, blockedId).ifPresent(match -> {
             if (workflowPolicy.canBlock(match).isAllowed()) {
                 match.block(blockerId);
@@ -464,10 +460,6 @@ public final class TrustSafetyService {
     public BlockResult block(UUID blockerId, UUID blockedId) {
         Objects.requireNonNull(blockerId, "blockerId cannot be null");
         Objects.requireNonNull(blockedId, "blockedId cannot be null");
-
-        if (trustSafetyStorage == null || userStorage == null) {
-            throw new IllegalStateException("Block dependencies are not configured");
-        }
 
         if (blockerId.equals(blockedId)) {
             auditModeration(
@@ -563,10 +555,6 @@ public final class TrustSafetyService {
         Objects.requireNonNull(blockerId, "blockerId cannot be null");
         Objects.requireNonNull(blockedId, "blockedId cannot be null");
 
-        if (trustSafetyStorage == null) {
-            throw new IllegalStateException("TrustSafetyStorage is not configured");
-        }
-
         boolean deleted = trustSafetyStorage.deleteBlock(blockerId, blockedId);
         if (deleted) {
             logger.info("User {} unblocked user {}", blockerId, blockedId);
@@ -626,10 +614,6 @@ public final class TrustSafetyService {
      */
     public List<User> getBlockedUsers(UUID userId) {
         Objects.requireNonNull(userId, "userId cannot be null");
-
-        if (trustSafetyStorage == null || userStorage == null) {
-            throw new IllegalStateException("TrustSafetyStorage or UserStorage is not configured");
-        }
 
         return trustSafetyStorage.findByBlocker(userId).stream()
                 .map(block -> userStorage.get(block.blockedId()).orElse(null))

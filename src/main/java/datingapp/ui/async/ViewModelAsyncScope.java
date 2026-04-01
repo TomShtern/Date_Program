@@ -257,11 +257,14 @@ public final class ViewModelAsyncScope {
 
     private void executePollingTask(
             PollingTaskHandle handle, String taskKey, long version, String taskName, ThrowingRunnable backgroundWork) {
+        boolean executedAtLeastOnce = false;
         try {
             while (canDeliver(handle, taskKey, version)) {
                 try {
                     backgroundWork.run();
+                    executedAtLeastOnce = true;
                 } catch (RuntimeException error) {
+                    executedAtLeastOnce = true;
                     if (canDeliver(handle, taskKey, version)) {
                         onError(taskName, error);
                     }
@@ -277,7 +280,7 @@ public final class ViewModelAsyncScope {
                 }
             }
         } finally {
-            if (!canDeliver(handle, taskKey, version)) {
+            if (!executedAtLeastOnce && !canDeliver(handle, taskKey, version)) {
                 diagnostics.recordCancelledBeforeDelivery();
             }
             handle.markDone();

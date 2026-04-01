@@ -732,11 +732,6 @@ class MatchingServiceTest {
             public Duration getTimeUntilReset() {
                 return Duration.ZERO;
             }
-
-            @Override
-            public String formatDuration(Duration duration) {
-                return "00:00:00";
-            }
         };
     }
 
@@ -765,11 +760,6 @@ class MatchingServiceTest {
             @Override
             public Duration getTimeUntilReset() {
                 return Duration.ZERO;
-            }
-
-            @Override
-            public String formatDuration(Duration duration) {
-                return "00:00:00";
             }
         };
     }

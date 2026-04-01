@@ -232,6 +232,12 @@
                         <usePhrasedTestCaseMethodName>true</usePhrasedTestCaseMethodName>
                     </statelessTestsetReporter>
                     <!--
+                        Kill the forked test JVM if it hasn't exited within 120s
+                        after the last test finishes. Prevents hangs caused by
+                        non-daemon threads (e.g. JavaFX Toolkit).
+                    -->
+                    <forkedProcessExitTimeoutInSeconds>120</forkedProcessExitTimeoutInSeconds>
+                    <!--
                         useModulePath: puts JARs with module-info.class (e.g. JavaFX)
                         on the module path. Our code stays on the classpath (unnamed module).
                     -->

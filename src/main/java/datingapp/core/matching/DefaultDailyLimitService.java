@@ -85,22 +85,6 @@ public final class DefaultDailyLimitService implements DailyLimitService {
         return Duration.between(now, resetTime);
     }
 
-    @Override
-    public String formatDuration(Duration duration) {
-        if (duration == null) {
-            return "00:00:00";
-        }
-
-        boolean negative = duration.isNegative();
-        Duration normalized = negative ? duration.abs() : duration;
-        long hours = normalized.toHours();
-        int minutes = normalized.toMinutesPart();
-        int seconds = normalized.toSecondsPart();
-
-        String formatted = String.format("%02d:%02d:%02d", hours, minutes, seconds);
-        return negative ? "-" + formatted : formatted;
-    }
-
     private int remainingFor(boolean unlimited, int limit, int used) {
         return unlimited ? -1 : Math.max(0, limit - used);
     }

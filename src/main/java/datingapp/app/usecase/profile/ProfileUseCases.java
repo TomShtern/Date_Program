@@ -113,7 +113,6 @@ public class ProfileUseCases {
                 ? profileMutationUseCases
                 : new ProfileMutationUseCases(
                         userStorage,
-                        profileService,
                         validationService,
                         achievementService,
                         config,

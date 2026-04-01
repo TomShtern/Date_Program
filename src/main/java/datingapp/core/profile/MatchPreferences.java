@@ -760,7 +760,7 @@ public final class MatchPreferences {
                 Integer seekerAge = seeker.getAge(timezone).orElse(null);
                 Integer candidateAge = candidate.getAge(timezone).orElse(null);
                 if (seekerAge == null || candidateAge == null) {
-                    return true;
+                    return false;
                 }
                 return Math.abs(seekerAge - candidateAge) <= db.maxAgeDifference();
             }
@@ -791,6 +791,7 @@ public final class MatchPreferences {
                 Integer seekerAge = seeker.getAge(timezone).orElse(null);
                 Integer candidateAge = candidate.getAge(timezone).orElse(null);
                 if (seekerAge == null || candidateAge == null) {
+                    failures.add("Age unavailable (required by dealbreaker)");
                     return;
                 }
                 int ageDiff = Math.abs(seekerAge - candidateAge);

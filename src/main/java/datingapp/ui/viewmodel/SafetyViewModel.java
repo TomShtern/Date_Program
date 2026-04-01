@@ -26,8 +26,8 @@ import javafx.collections.ObservableList;
 /**
  * ViewModel for the Safety & Privacy screen.
  *
- * <p><b>Simulation Mode:</b> All blocking and verification operations are simulated and do not
- * persist beyond the current session. Status messages include [SIMULATED] markers.
+ * <p>Delegates to {@link TrustSafetyService} for blocking and safety operations, which
+ * are persisted through the configured storage layer.
  */
 public final class SafetyViewModel extends BaseViewModel {
 

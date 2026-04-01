@@ -76,7 +76,12 @@ public class ProfileInsightsUseCases {
 
     public static record AchievementsQuery(UserContext context, boolean checkForNew) {}
 
-    public static record AchievementSnapshot(List<UserAchievement> unlocked, List<UserAchievement> newlyUnlocked) {}
+    public static record AchievementSnapshot(List<UserAchievement> unlocked, List<UserAchievement> newlyUnlocked) {
+        public AchievementSnapshot {
+            unlocked = List.copyOf(unlocked);
+            newlyUnlocked = List.copyOf(newlyUnlocked);
+        }
+    }
 
     public static record StatsQuery(UserContext context) {}
 

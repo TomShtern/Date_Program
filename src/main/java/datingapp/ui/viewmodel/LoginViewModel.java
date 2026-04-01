@@ -44,8 +44,6 @@ public class LoginViewModel extends BaseViewModel {
     private final StringProperty filterText = new SimpleStringProperty("");
 
     // For account creation dialog
-    private final StringProperty newUserName = new SimpleStringProperty("");
-    private final StringProperty newUserAge = new SimpleStringProperty("");
     private final StringProperty errorMessage = new SimpleStringProperty("");
 
     private User selectedUser;
@@ -76,8 +74,9 @@ public class LoginViewModel extends BaseViewModel {
     }
 
     public void setErrorHandler(ViewModelErrorSink handler) {
-        // Intentionally retained for API compatibility with controllers.
-        // LoginViewModel currently reports inline validation through errorMessageProperty().
+        // LoginViewModel primarily reports inline validation through errorMessageProperty(),
+        // but still delegates to BaseViewModel for consistency with other ViewModels.
+        setErrorSink(handler);
     }
 
     /**
@@ -116,14 +115,6 @@ public class LoginViewModel extends BaseViewModel {
 
     public BooleanProperty loginDisabledProperty() {
         return loginDisabled;
-    }
-
-    public StringProperty newUserNameProperty() {
-        return newUserName;
-    }
-
-    public StringProperty newUserAgeProperty() {
-        return newUserAge;
     }
 
     public StringProperty errorMessageProperty() {
@@ -343,8 +334,6 @@ public class LoginViewModel extends BaseViewModel {
      * Clears the account creation form fields.
      */
     public void clearCreateForm() {
-        newUserName.set("");
-        newUserAge.set("");
         errorMessage.set("");
     }
 

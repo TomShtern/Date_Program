@@ -95,8 +95,7 @@ class RestApiHealthRoutesTest {
         TestStorages.Users userStorage = new TestStorages.Users();
         TestStorages.Communications communicationStorage = new TestStorages.Communications();
         TestStorages.Interactions interactionStorage = new TestStorages.Interactions(communicationStorage);
-        RestApiServer localServer =
-                new RestApiServer(createServices(userStorage, interactionStorage, communicationStorage), 0);
+        server = new RestApiServer(createServices(userStorage, interactionStorage, communicationStorage), 0);
 
         Method method = RestApiServer.class.getDeclaredMethod("enforceLocalhostOnly", Context.class);
         method.setAccessible(true);
@@ -135,7 +134,7 @@ class RestApiHealthRoutesTest {
                 });
 
         InvocationTargetException thrown =
-                assertThrows(InvocationTargetException.class, () -> method.invoke(localServer, ctx));
+                assertThrows(InvocationTargetException.class, () -> method.invoke(server, ctx));
         assertEquals("ApiForbiddenException", thrown.getCause().getClass().getSimpleName());
         assertEquals(
                 "REST API is restricted to localhost requests",

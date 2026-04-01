@@ -264,6 +264,11 @@ public final class StorageFactory {
             LocationService locationService,
             AppEventBus eventBus) {}
 
+    /**
+     * Builds a {@link ServiceRegistry} using an H2 in-memory database.
+     * Despite the name, this uses a full SQL database engine (H2) in
+     * in-memory mode, not a pure in-memory data structure.
+     */
     public static ServiceRegistry buildInMemory(AppConfig config) {
         return buildH2(DatabaseManager.getInstance(), config);
     }

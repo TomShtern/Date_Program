@@ -301,10 +301,28 @@ public class StatsViewModel extends BaseViewModel {
         UserStats stats;
         if (profileInsightsUseCases != null) {
             var result = profileInsightsUseCases.getOrComputeStats(new StatsQuery(UserContext.ui(userId)));
-            stats = result.success() ? result.data() : statsService.getOrComputeStats(userId);
+            if (result.success()) {
+                stats = result.data();
+            } else {
+                if (logger.isWarnEnabled()) {
+                    logger.warn(
+                            "profileInsightsUseCases.getOrComputeStats failed: {}",
+                            result.error() != null ? result.error().message() : "unknown");
+                }
+                stats = statsService.getOrComputeStats(userId);
+            }
         } else if (profileUseCases != null) {
             var result = profileUseCases.getOrComputeStats(new ProfileUseCases.StatsQuery(UserContext.ui(userId)));
-            stats = result.success() ? result.data() : statsService.getOrComputeStats(userId);
+            if (result.success()) {
+                stats = result.data();
+            } else {
+                if (logger.isWarnEnabled()) {
+                    logger.warn(
+                            "profileUseCases.getOrComputeStats failed: {}",
+                            result.error() != null ? result.error().message() : "unknown");
+                }
+                stats = statsService.getOrComputeStats(userId);
+            }
         } else {
             stats = statsService.getOrComputeStats(userId);
         }

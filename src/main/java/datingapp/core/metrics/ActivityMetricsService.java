@@ -172,13 +172,16 @@ public class ActivityMetricsService {
     }
 
     public void endSession(UUID userId) {
-        Optional<Session> active = analyticsStorage.getActiveSession(userId);
-        if (active.isPresent()) {
-            Session session = active.get();
-            session.end();
-            analyticsStorage.saveSession(session);
-        } else {
-            endSessionNoOpCount.increment();
+        Object lock = lockStripes[Math.floorMod(userId.hashCode(), LOCK_STRIPE_COUNT)];
+        synchronized (lock) {
+            Optional<Session> active = analyticsStorage.getActiveSession(userId);
+            if (active.isPresent()) {
+                Session session = active.get();
+                session.end();
+                analyticsStorage.saveSession(session);
+            } else {
+                endSessionNoOpCount.increment();
+            }
         }
     }
 

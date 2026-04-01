@@ -18,16 +18,6 @@ public final class ConnectionModels {
         // Utility class
     }
 
-    /** Formats a deterministic conversation ID for two users. */
-    public static String formatConversationId(UUID a, UUID b) {
-        return Conversation.generateId(a, b);
-    }
-
-    /** Returns true if a friend request status is terminal. */
-    public static boolean isTerminalStatus(FriendRequest.Status status) {
-        return status == FriendRequest.Status.DECLINED || status == FriendRequest.Status.EXPIRED;
-    }
-
     /**
      * Represents a single message within a conversation. Immutable after creation.
      */
