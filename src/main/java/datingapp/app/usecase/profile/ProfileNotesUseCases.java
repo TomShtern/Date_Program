@@ -49,8 +49,8 @@ public class ProfileNotesUseCases {
             return authorCheck;
         }
         try {
-            return UseCaseResult.success(
-                    userStorage.getProfileNotesByAuthor(query.context().userId()));
+            return UseCaseResult.success(List.copyOf(
+                    userStorage.getProfileNotesByAuthor(query.context().userId())));
         } catch (Exception e) {
             return UseCaseResult.failure(UseCaseError.internal("Failed to load profile notes: " + e.getMessage()));
         }

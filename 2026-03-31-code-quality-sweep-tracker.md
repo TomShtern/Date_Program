@@ -95,7 +95,7 @@
 
 `mvn spotless:apply verify` — all non-UI tests pass. 15 UI test classes fail with pre-existing JavaFX async flakiness (documented). Spotless, Checkstyle, PMD all clean. No new test failures from sweep changes.
 
-## Files Modified (29 total)
+## Files Modified (33 total)
 ### Production (24)
 - `src/main/java/datingapp/core/connection/ConnectionService.java` (B1)
 - `src/main/java/datingapp/core/connection/ConnectionModels.java` (D1, D2)

@@ -1,6 +1,8 @@
-# Phase 1A Candidate Truthfulness Implementation Plan
+# Phase 1A Candidate Truthfulness — Completion Report
 
-> **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development (if subagents are available) or superpowers:executing-plans to implement this plan. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **Execution status:** All tasks completed. Executed by `github_copilot` agent, 2026-03-30. All checkboxes below reflect verified agent execution; the plan is fully implemented and merged into the working branch.
+
+> **For agentic workers:** This plan has been fully executed. All checkbox steps below are checked `[x]` and verified. No further implementation is needed.
 
 **Goal:** Fix the first Phase 1a correctness slice so candidate browsing and swipe acceptance tell the truth about who is actually eligible, and so an `UNMATCH` pair becomes genuinely rematchable again after cooldown expiry, while preserving the existing location-missing empty-state contract across CLI, REST, and JavaFX.
 
@@ -176,7 +178,8 @@ Also add a validator test that `rematchCooldownHours < 0` is rejected.
 - [x] ✅ **Step 2: Run the config-only test pack and confirm it fails for the missing field**
 
 Run:
-`mvn --% -Dcheckstyle.skip=true -Dtest=AppConfigTest,AppConfigValidatorTest,ConfigLoaderTest test`
+> **PowerShell:** `mvn --% -Dcheckstyle.skip=true -Dtest=AppConfigTest,AppConfigValidatorTest,ConfigLoaderTest test`
+> **Bash/Zsh:** `mvn -Dcheckstyle.skip=true -Dtest=AppConfigTest,AppConfigValidatorTest,ConfigLoaderTest test`
 
 Expected before implementation: compile or test failure mentioning the missing cooldown field/setter/parser.
 
@@ -222,7 +225,8 @@ Add failing tests that prove all of the following:
 - [x] ✅ **Step 7: Run the focused regression pack and confirm the failures are the intended ones**
 
 Run:
-`mvn --% -Dcheckstyle.skip=true -Dtest=CandidateFinderTest,MatchingServiceTest,MatchingUseCasesTest,RestApiReadRoutesTest,ConnectionServiceTransitionTest,SocialUseCasesTest,JdbiMatchmakingStorageTransitionAtomicityTest,MatchingFlowIntegrationTest test`
+> **PowerShell:** `mvn --% -Dcheckstyle.skip=true -Dtest=CandidateFinderTest,MatchingServiceTest,MatchingUseCasesTest,RestApiReadRoutesTest,ConnectionServiceTransitionTest,SocialUseCasesTest,JdbiMatchmakingStorageTransitionAtomicityTest,MatchingFlowIntegrationTest test`
+> **Bash/Zsh:** `mvn -Dcheckstyle.skip=true -Dtest=CandidateFinderTest,MatchingServiceTest,MatchingUseCasesTest,RestApiReadRoutesTest,ConnectionServiceTransitionTest,SocialUseCasesTest,JdbiMatchmakingStorageTransitionAtomicityTest,MatchingFlowIntegrationTest test`
 
 Expected before implementation: failures around reverse block filtering, cooldown exclusion, stale cached candidates, stale swipe acceptance, or fake post-cooldown rematchability.
 
@@ -288,7 +292,8 @@ Do **not** leave production code relying on `AppConfig.defaults()` for the new b
 - [x] ✅ **Step 5: Re-run the config-only test pack**
 
 Run:
-`mvn --% -Dcheckstyle.skip=true -Dtest=AppConfigTest,AppConfigValidatorTest,ConfigLoaderTest test`
+> **PowerShell:** `mvn --% -Dcheckstyle.skip=true -Dtest=AppConfigTest,AppConfigValidatorTest,ConfigLoaderTest test`
+> **Bash/Zsh:** `mvn -Dcheckstyle.skip=true -Dtest=AppConfigTest,AppConfigValidatorTest,ConfigLoaderTest test`
 
 Expected: green.
 
@@ -354,7 +359,8 @@ If full-source refresh makes the final candidate cache effectively useless, it i
 - [x] ✅ **Step 5: Re-run the focused candidate tests**
 
 Run:
-`mvn --% -Dcheckstyle.skip=true -Dtest=CandidateFinderTest,MatchingUseCasesTest,RestApiReadRoutesTest test`
+> **PowerShell:** `mvn --% -Dcheckstyle.skip=true -Dtest=CandidateFinderTest,MatchingUseCasesTest,RestApiReadRoutesTest test`
+> **Bash/Zsh:** `mvn -Dcheckstyle.skip=true -Dtest=CandidateFinderTest,MatchingUseCasesTest,RestApiReadRoutesTest test`
 
 Expected: green for the browse path regressions.
 
@@ -409,7 +415,8 @@ Do **not** reactivate:
 - [x] ✅ **Step 4: Re-run the relationship/storage regression pack**
 
 Run:
-`mvn --% -Dcheckstyle.skip=true -Dtest=InteractionStorageAtomicityTest,JdbiMatchmakingStorageTransitionAtomicityTest,ConnectionServiceTransitionTest,SocialUseCasesTest,RestApiRelationshipRoutesTest,MatchingFlowIntegrationTest test`
+> **PowerShell:** `mvn --% -Dcheckstyle.skip=true -Dtest=InteractionStorageAtomicityTest,JdbiMatchmakingStorageTransitionAtomicityTest,ConnectionServiceTransitionTest,SocialUseCasesTest,RestApiRelationshipRoutesTest,MatchingFlowIntegrationTest test`
+> **Bash/Zsh:** `mvn -Dcheckstyle.skip=true -Dtest=InteractionStorageAtomicityTest,JdbiMatchmakingStorageTransitionAtomicityTest,ConnectionServiceTransitionTest,SocialUseCasesTest,RestApiRelationshipRoutesTest,MatchingFlowIntegrationTest test`
 
 Expected: green.
 
@@ -457,7 +464,8 @@ It is acceptable if daily-limit checks remain in `processSwipeWithinLock(...)`, 
 - [x] ✅ **Step 4: Re-run the swipe-guard regression pack**
 
 Run:
-`mvn --% -Dcheckstyle.skip=true -Dtest=MatchingServiceTest,MatchingUseCasesTest test`
+> **PowerShell:** `mvn --% -Dcheckstyle.skip=true -Dtest=MatchingServiceTest,MatchingUseCasesTest test`
+> **Bash/Zsh:** `mvn -Dcheckstyle.skip=true -Dtest=MatchingServiceTest,MatchingUseCasesTest test`
 
 Expected: green, with stale-snapshot pause/block cases now rejected correctly.
 
@@ -501,7 +509,8 @@ If one of these fails because the empty-state copy becomes misleading after the 
 - [x] ✅ **Step 3: Run the adapter regression pack**
 
 Run:
-`mvn --% -Dcheckstyle.skip=true -Dtest=MatchingUseCasesTest,RestApiReadRoutesTest,MatchingViewModelTest,MatchingControllerTest,MatchingHandlerTest test`
+> **PowerShell:** `mvn --% -Dcheckstyle.skip=true -Dtest=MatchingUseCasesTest,RestApiReadRoutesTest,MatchingViewModelTest,MatchingControllerTest,MatchingHandlerTest test`
+> **Bash/Zsh:** `mvn -Dcheckstyle.skip=true -Dtest=MatchingUseCasesTest,RestApiReadRoutesTest,MatchingViewModelTest,MatchingControllerTest,MatchingHandlerTest test`
 
 Expected: green.
 
@@ -521,7 +530,8 @@ Commit message:
 - [x] ✅ **Step 1: Run the combined targeted regression suite**
 
 Run:
-`mvn --% -Dcheckstyle.skip=true -Dtest=AppConfigTest,AppConfigValidatorTest,ConfigLoaderTest,CandidateFinderTest,MatchingServiceTest,MatchingUseCasesTest,InteractionStorageAtomicityTest,JdbiMatchmakingStorageTransitionAtomicityTest,ConnectionServiceTransitionTest,SocialUseCasesTest,RestApiReadRoutesTest,RestApiRelationshipRoutesTest,MatchingFlowIntegrationTest,MatchingViewModelTest,MatchingControllerTest,MatchingHandlerTest test`
+> **PowerShell:** `mvn --% -Dcheckstyle.skip=true -Dtest=AppConfigTest,AppConfigValidatorTest,ConfigLoaderTest,CandidateFinderTest,MatchingServiceTest,MatchingUseCasesTest,InteractionStorageAtomicityTest,JdbiMatchmakingStorageTransitionAtomicityTest,ConnectionServiceTransitionTest,SocialUseCasesTest,RestApiReadRoutesTest,RestApiRelationshipRoutesTest,MatchingFlowIntegrationTest,MatchingViewModelTest,MatchingControllerTest,MatchingHandlerTest test`
+> **Bash/Zsh:** `mvn -Dcheckstyle.skip=true -Dtest=AppConfigTest,AppConfigValidatorTest,ConfigLoaderTest,CandidateFinderTest,MatchingServiceTest,MatchingUseCasesTest,InteractionStorageAtomicityTest,JdbiMatchmakingStorageTransitionAtomicityTest,ConnectionServiceTransitionTest,SocialUseCasesTest,RestApiReadRoutesTest,RestApiRelationshipRoutesTest,MatchingFlowIntegrationTest,MatchingViewModelTest,MatchingControllerTest,MatchingHandlerTest test`
 
 Expected: green.
 

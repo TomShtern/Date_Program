@@ -446,7 +446,13 @@ class MatchingViewModelTest {
         @Override
         public void dispatch(Runnable action) {
             if (!queuedMode) {
-                action.run();
+                boolean previous = uiThread.get();
+                uiThread.set(true);
+                try {
+                    action.run();
+                } finally {
+                    uiThread.set(previous);
+                }
                 return;
             }
             synchronized (pending) {

@@ -261,6 +261,9 @@ public class ProfileUseCases {
     }
 
     public UseCaseResult<AchievementSnapshot> getAchievements(AchievementsQuery query) {
+        if (query == null) {
+            throw new IllegalArgumentException("achievements query must not be null");
+        }
         var result = profileInsightsUseCases.getAchievements(toInsightsQuery(query));
         if (!result.success()) {
             return UseCaseResult.failure(result.error());

@@ -209,7 +209,7 @@ Default to **keeping** the façade/overload through the end of the plan unless t
 - Modify: `src/main/java/datingapp/ui/viewmodel/ViewModelFactory.java`
 - Modify: `src/main/java/datingapp/app/api/RestApiServer.java`
 - Modify: `src/main/java/datingapp/app/cli/ProfileHandler.java`
-- Modify: `src/main/java/datingapp/app/cli/ProfileNotesHandler.java`
+- Modify: `src/main/java/datingapp/app/cli/ProfileHandler.java`
 - Test: `src/test/java/datingapp/app/usecase/profile/ProfileUseCasesNotesTest.java`
 - Test: `src/test/java/datingapp/app/api/RestApiNotesRoutesTest.java`
 - Test: `src/test/java/datingapp/ui/viewmodel/NotesViewModelTest.java`

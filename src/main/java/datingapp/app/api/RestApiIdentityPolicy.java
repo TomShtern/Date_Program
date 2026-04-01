@@ -16,7 +16,8 @@ final class RestApiIdentityPolicy {
         validateActingUserMatchesPathParam(ctx, "id");
         validateActingUserMatchesPathParam(ctx, "authorId");
 
-        if (ctx.path().startsWith(CONVERSATION_ROUTE_PREFIX)) {
+        if (ctx.path().startsWith(CONVERSATION_ROUTE_PREFIX)
+                && ctx.pathParamMap().containsKey("conversationId")) {
             resolveActingUserId(ctx)
                     .ifPresent(actingUserId -> parseConversationParticipants(ctx.pathParam("conversationId"))
                             .requireParticipant(actingUserId));

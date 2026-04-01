@@ -360,7 +360,10 @@ public final class ProfileMutationUseCases {
 
     private static void assertValid(ValidationService.ValidationResult validationResult) {
         if (!validationResult.valid()) {
-            throw new IllegalArgumentException(validationResult.errors().getFirst());
+            String message = validationResult.errors().isEmpty()
+                    ? "Validation failed"
+                    : validationResult.errors().getFirst();
+            throw new IllegalArgumentException(message);
         }
     }
 }
