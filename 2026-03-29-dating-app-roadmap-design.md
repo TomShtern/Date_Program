@@ -31,39 +31,107 @@ A working dating app on the user's Android phone, backed by a Kotlin server depl
 
 ---
 
-## Phase 1: Stabilize Core (Java, H2, CLI)
+## Code Reality Snapshot (2026-04-03) 🧪
+
+> **Status markers below are based on the current code** in `src/main/java`, `src/test/java`, and `pom.xml` — not on older docs.
+
+### Legend
+
+- ✅ **Implemented in code**
+- 🟡 **Partially implemented / inconsistent / needs hardening**
+- 🔴 **Not implemented / not started**
+- ⚪ **Later phase / intentionally deferred**
+
+### High-level phase status
+
+| Phase                         | Status | Current code reality                                                                                                                               |
+|-------------------------------|--------|----------------------------------------------------------------------------------------------------------------------------------------------------|
+| Phase 1: Stabilize Core       | 🟡     | Core matching / profile / messaging / stats / safety logic is mostly real; remaining work is consolidation, parity, onboarding, and seam hardening |
+| Phase 2: PostgreSQL Migration | 🔴     | Runtime still uses H2; `pom.xml` has no PostgreSQL dependency or runtime migration path yet                                                        |
+| Phase 3: Kotlin Migration     | 🔴     | No Kotlin plugin, no mixed Java/Kotlin build, no Kotlin sources                                                                                    |
+| Phase 4: Android App          | 🔴     | No Android project yet; REST server is still localhost-only                                                                                        |
+| Phase 5: Cloud & Services     | ⚪      | Still a future phase; cloud/auth/photo/push infrastructure is not started in code                                                                  |
+
+### Phase 1 reality check
+
+#### 1a. Semantic / logic fixes
+
+| Item                               | Status | Code reality                                                                                                        |
+|------------------------------------|--------|---------------------------------------------------------------------------------------------------------------------|
+| Paused users ghost-matchable       | ✅      | `CandidateFinder` rejects non-`ACTIVE` candidates                                                                   |
+| One-way blocking                   | ✅      | Candidate filtering checks blocks in either direction                                                               |
+| No re-match cooldown               | ✅      | Recently unmatched pairs are excluded until cooldown expires                                                        |
+| Friend-zone doesn't clean up       | 🟡     | Relationship transition APIs and tests exist, but storage-backed cleanup/failure semantics should still be hardened |
+| Undo silently expires              | 🟡     | Undo availability and messaging exist in CLI/JavaFX, but parity/polish across all surfaces is still incomplete      |
+| Location silently kills experience | 🟡     | CLI explains missing location before browsing, but location UX/parity is still not fully polished                   |
+
+#### 1b. Hollow features → real features
+
+| Feature                       | Status | Code reality                                                                                                                                                           |
+|-------------------------------|--------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| MatchQuality scores           | ✅      | Surfaced in CLI, JavaFX, and REST                                                                                                                                      |
+| RecommendationService ranking | 🟡     | Daily picks / standouts are real, but normal browse flow still returns `CandidateFinder.findCandidatesForUser(...)` results rather than recommendation-ranked browsing |
+| ActivityMetrics               | ✅      | Exposed through stats/achievements flows in CLI, JavaFX, and REST                                                                                                      |
+| ProfileCompletion score       | 🟡     | Surfaced in JavaFX and CLI, but not yet turned into a strong guided onboarding / first-run experience                                                                  |
+| Event handlers                | ✅      | Achievements and notifications have visible surfaced outputs                                                                                                           |
+
+#### 1c. User journey gaps
+
+| Gap                                    | Status | Code reality                                                                                           |
+|----------------------------------------|--------|--------------------------------------------------------------------------------------------------------|
+| Signup auto-fills garbage              | ✅      | Current account creation is minimal and no longer auto-fills fake bio/photo/location or auto-activates |
+| No first-launch experience             | 🔴     | Still missing a real guided onboarding / first-run flow                                                |
+| No profile editing in JavaFX           | ✅      | JavaFX profile editing exists, including preferences, photos, and dealbreakers                         |
+| 5 REST endpoints bypass use-case layer | 🟡     | Most routes use use cases now, but some adapter exceptions remain (notably direct candidate reads)     |
+
+#### 1d. Testing & validation
+
+| Goal                                                      | Status | Code reality                                                                                                                     |
+|-----------------------------------------------------------|--------|----------------------------------------------------------------------------------------------------------------------------------|
+| CLI exercises every feature                               | 🟡     | CLI is broad and useful, but safety flows still carry simulated wording and some polish gaps                                     |
+| REST API exposes every feature through the use-case layer | 🟡     | REST is broad, but safety parity is incomplete and one deliberate direct-read exception remains                                  |
+| All semantic fixes get regression tests                   | 🟡     | Strong regression coverage exists for many matching/relationship/storage cases, but policy/guard seams still need targeted tests |
+| Quality gate passes                                       | 🟡     | The full Maven quality gate is defined in `pom.xml`, but this snapshot is read-only and did not re-run it                        |
+
+### Bottom line right now
+
+- ✅ **Core engine work is much further along than the roadmap implies**
+- 🟡 **The main remaining Phase 1 work is consolidation, parity, onboarding, and hardening**
+- 🔴 **Phases 2-4 are still largely ahead of the current codebase**
+
+## Phase 1: Stabilize Core (Java, H2, CLI) 🟡
 
 **Goal:** Make the core business logic correct and complete. Test everything via CLI and REST API. No technology changes.
 
 ### 1a. Semantic/Logic Fixes
 
-| Bug | Description |
-|-----|-------------|
-| Paused users ghost-matchable | Someone can like/match a paused user who won't see it |
-| One-way blocking | Blocker can't see blocked, but blocked can still see blocker in candidates |
-| No re-match cooldown | Unmatch someone, immediately see them again as a candidate |
-| Friend-zone doesn't clean up | Conversations and match artifacts linger after friend-zoning |
-| Undo silently expires | User gets no feedback when the undo window closes |
-| Location silently kills experience | Non-Israeli users get zero candidates with no explanation |
+| Bug                                | Description                                                                |
+|------------------------------------|----------------------------------------------------------------------------|
+| Paused users ghost-matchable       | Someone can like/match a paused user who won't see it                      |
+| One-way blocking                   | Blocker can't see blocked, but blocked can still see blocker in candidates |
+| No re-match cooldown               | Unmatch someone, immediately see them again as a candidate                 |
+| Friend-zone doesn't clean up       | Conversations and match artifacts linger after friend-zoning               |
+| Undo silently expires              | User gets no feedback when the undo window closes                          |
+| Location silently kills experience | Non-Israeli users get zero candidates with no explanation                  |
 
 ### 1b. Hollow Features → Real Features
 
-| Feature | Current State | Target |
-|---------|--------------|--------|
-| MatchQuality scores | Computed (0-100, 5-star, 6-factor breakdown) but JavaFX shows only 2 fields, CLI shows nothing | Surfaced in CLI output and REST API responses |
+| Feature                       | Current State                                                                                                                              | Target                                                    |
+|-------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------|
+| MatchQuality scores           | Computed (0-100, 5-star, 6-factor breakdown) but JavaFX shows only 2 fields, CLI shows nothing                                             | Surfaced in CLI output and REST API responses             |
 | RecommendationService ranking | Partially wired into CLI (daily limit display only); candidate-ranking algorithm is unused — candidates shown in storage order, not ranked | Ranking algorithm integrated into candidate browsing flow |
-| ActivityMetrics | Tracked silently, never surfaced | Exposed via CLI stats and REST API |
-| ProfileCompletion score | Computed but not used to guide users | Used to prompt users to complete their profile |
-| Event handlers | Achievements/notifications fire but produce no visible effect | Surfaced in CLI and REST API |
+| ActivityMetrics               | Tracked silently, never surfaced                                                                                                           | Exposed via CLI stats and REST API                        |
+| ProfileCompletion score       | Computed but not used to guide users                                                                                                       | Used to prompt users to complete their profile            |
+| Event handlers                | Achievements/notifications fire but produce no visible effect                                                                              | Surfaced in CLI and REST API                              |
 
 ### 1c. User Journey Gaps
 
-| Gap | Description |
-|-----|-------------|
-| Signup auto-fills garbage | LoginViewModel hardcodes Tel Aviv, placeholder photo, default bio, auto-activates |
-| No first-launch experience | New user sees the same screen as a returning user |
-| No profile editing in JavaFX | Can create but can't edit |
-| 5 REST endpoints bypass use-case layer | Inconsistent behavior for GET users, candidates, matches, messages |
+| Gap                                    | Description                                                                       |
+|----------------------------------------|-----------------------------------------------------------------------------------|
+| Signup auto-fills garbage              | LoginViewModel hardcodes Tel Aviv, placeholder photo, default bio, auto-activates |
+| No first-launch experience             | New user sees the same screen as a returning user                                 |
+| No profile editing in JavaFX           | Can create but can't edit                                                         |
+| 5 REST endpoints bypass use-case layer | Inconsistent behavior for GET users, candidates, matches, messages                |
 
 ### 1d. Testing & Validation
 
@@ -82,7 +150,7 @@ A working dating app on the user's Android phone, backed by a Kotlin server depl
 
 ---
 
-## Phase 2: PostgreSQL Migration (still Java)
+## Phase 2: PostgreSQL Migration (still Java) 🔴
 
 **Goal:** Replace H2 with PostgreSQL for runtime. Keep H2 for tests.
 
@@ -107,7 +175,7 @@ A working dating app on the user's Android phone, backed by a Kotlin server depl
 
 ---
 
-## Phase 3: Kotlin Migration
+## Phase 3: Kotlin Migration 🔴
 
 **Goal:** Convert Java → Kotlin file by file. Mechanical transformation, no behavior changes.
 
@@ -136,7 +204,7 @@ A working dating app on the user's Android phone, backed by a Kotlin server depl
 
 ---
 
-## Phase 4: Android App
+## Phase 4: Android App 🔴
 
 **Goal:** Build a native Android app (Kotlin + Jetpack Compose) that connects to the backend over local WiFi.
 
@@ -156,12 +224,12 @@ A working dating app on the user's Android phone, backed by a Kotlin server depl
 
 ### Incremental Delivery
 
-| Version | Screens | Features |
-|---------|---------|----------|
-| v0.1 (MVP) | Login, Browse, Matches, Chat | Create account, view candidates, like/pass, view matches, basic messaging |
-| v0.2 | Profile wizard, Swipe UI | Step-by-step profile creation, swipe gestures (card stack), compatibility scores |
-| v0.3 | Settings, Profile progress | Preferences editing, profile completion progress, local notifications |
-| v0.4+ | Full parity | Everything the backend supports, polish, animations, Material 3 theming |
+| Version    | Screens                      | Features                                                                         |
+|------------|------------------------------|----------------------------------------------------------------------------------|
+| v0.1 (MVP) | Login, Browse, Matches, Chat | Create account, view candidates, like/pass, view matches, basic messaging        |
+| v0.2       | Profile wizard, Swipe UI     | Step-by-step profile creation, swipe gestures (card stack), compatibility scores |
+| v0.3       | Settings, Profile progress   | Preferences editing, profile completion progress, local notifications            |
+| v0.4+      | Full parity                  | Everything the backend supports, polish, animations, Material 3 theming          |
 
 Each version is independently usable — v0.1 is already a functional dating app on the phone.
 
@@ -173,20 +241,20 @@ Each version is independently usable — v0.1 is already a functional dating app
 
 ---
 
-## Phase 5: Cloud & Services
+## Phase 5: Cloud & Services ⚪
 
 **Goal:** Make the app accessible outside the local network. Enable real-world usage.
 
 ### Service Categories (tool choices left open)
 
-| Category | Purpose | Examples (not prescriptive) |
-|----------|---------|---------------------------|
-| Authentication | Real user identity, secure login | Firebase Auth, Auth0, Supabase Auth, custom JWT |
-| Database hosting | Cloud PostgreSQL | Railway, Supabase, managed PostgreSQL on any cloud |
-| Photo storage | Real photo upload and serving | S3-compatible storage, Firebase Storage, Cloudflare R2 |
-| Push notifications | Match alerts, new messages | FCM, OneSignal, or equivalent |
-| Backend deployment | Host the Kotlin server | Docker on VPS, Railway, Fly.io, cloud VM |
-| Domain (optional) | Custom API domain | Any registrar + DNS provider |
+| Category           | Purpose                          | Examples (not prescriptive)                            |
+|--------------------|----------------------------------|--------------------------------------------------------|
+| Authentication     | Real user identity, secure login | Firebase Auth, Auth0, Supabase Auth, custom JWT        |
+| Database hosting   | Cloud PostgreSQL                 | Railway, Supabase, managed PostgreSQL on any cloud     |
+| Photo storage      | Real photo upload and serving    | S3-compatible storage, Firebase Storage, Cloudflare R2 |
+| Push notifications | Match alerts, new messages       | FCM, OneSignal, or equivalent                          |
+| Backend deployment | Host the Kotlin server           | Docker on VPS, Railway, Fly.io, cloud VM               |
+| Domain (optional)  | Custom API domain                | Any registrar + DNS provider                           |
 
 Specific tool choices will be evaluated when Phase 5 begins, based on cost, complexity, and the project's needs at that point.
 
