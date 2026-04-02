@@ -3,6 +3,7 @@ package datingapp.ui.screen;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.core.AppClock;
@@ -20,10 +21,12 @@ import datingapp.ui.viewmodel.UiDataAdapters.StorageUiUserStore;
 import java.util.EnumSet;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import javafx.event.ActionEvent;
 import javafx.scene.Parent;
 import javafx.scene.control.Button;
 import javafx.scene.control.Dialog;
 import javafx.scene.control.ListView;
+import javafx.scene.control.Spinner;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.StackPane;
 import org.junit.jupiter.api.AfterEach;
@@ -173,7 +176,48 @@ class LoginControllerTest {
         viewModel.dispose();
     }
 
+    @Test
+    @DisplayName("create account dialog clamps manual age edits into configured bounds")
+    void createAccountDialogClampsManualAgeEditsIntoConfiguredBounds() throws Exception {
+        TestStorages.Users users = new TestStorages.Users();
+        LoginViewModel viewModel = new LoginViewModel(
+                new StorageUiUserStore(users),
+                AppConfig.defaults(),
+                AppSession.getInstance(),
+                JavaFxTestSupport.blockingUiDispatcher());
+
+        Dialog<User> dialog =
+                JavaFxTestSupport.callOnFxAndWait(() -> CreateAccountDialogFactory.create(new StackPane(), viewModel));
+        Spinner<Integer> ageSpinner = JavaFxTestSupport.callOnFxAndWait(
+                () -> JavaFxTestSupport.lookup(dialog.getDialogPane(), "#createAccountAgeSpinner", Spinner.class));
+
+        JavaFxTestSupport.runOnFxAndWait(() -> {
+            ageSpinner.getEditor().setText(String.valueOf(viewModel.getMaxAge() + 50));
+            ageSpinner.getEditor().fireEvent(new ActionEvent());
+        });
+
+        assertEquals(viewModel.getMaxAge(), JavaFxTestSupport.callOnFxAndWait(ageSpinner::getValue));
+
+        JavaFxTestSupport.runOnFxAndWait(() -> {
+            ageSpinner.getEditor().setText("not-a-number");
+            ageSpinner.getEditor().fireEvent(new ActionEvent());
+        });
+
+        assertEquals(25, JavaFxTestSupport.callOnFxAndWait(ageSpinner::getValue));
+
+        viewModel.dispose();
+    }
+
+    @Test
+    @DisplayName("findFirstTextField returns null for null roots")
+    void findFirstTextFieldReturnsNullForNullRoot() {
+        assertNull(findFirstTextField(null));
+    }
+
     private static TextField findFirstTextField(Parent root) {
+        if (root == null) {
+            return null;
+        }
         if (root instanceof TextField textField) {
             return textField;
         }

@@ -84,7 +84,7 @@ public final class ApplicationStartup {
     private static volatile DatabaseManager dbManager;
     private static final AtomicReference<CleanupScheduler> CLEANUP_SCHEDULER_REF = new AtomicReference<>();
     private static final AtomicReference<Thread> SHUTDOWN_HOOK_REF = new AtomicReference<>();
-    private static final AtomicReference<Runnable> INITIALIZATION_FAILURE_HOOK = new AtomicReference<>();
+    private static final AtomicReference<Runnable> INITIALIZATION_COMPLETE_HOOK = new AtomicReference<>();
     private static volatile boolean initialized = false;
 
     private ApplicationStartup() {}
@@ -113,10 +113,10 @@ public final class ApplicationStartup {
             dbManager = initializedDbManager;
             services = initializedServices;
 
-            runInitializationFailureHook();
+            runInitializationCompleteHook();
 
             // Seed the database with developer test data only when explicitly enabled.
-            // DevDataSeeder.seed(...) remains idempotent via sentinel checks.
+            // DevDataSeeder.seed(...) remains idempotent via UserStorage.save upsert semantics.
             if (isDevDataSeedingEnabled()) {
                 DevDataSeeder.seed(
                         initializedServices.getUserStorage(),
@@ -213,9 +213,10 @@ public final class ApplicationStartup {
      * new configuration properties are added to {@link AppConfig.Builder}.
      *
      * <p>
-     * If the JSON is malformed the exception is logged and the builder is left with
-     * defaults,
-     * preserving the previous lenient-on-parse behavior.
+     * If the JSON is malformed or deserialization fails, configuration loading now
+     * fails fast
+     * with an {@link IllegalStateException} so startup cannot continue with silent
+     * defaults.
      */
     private static void applyJsonConfig(AppConfig.Builder builder, String json) {
         try {
@@ -503,8 +504,8 @@ public final class ApplicationStartup {
         }
     }
 
-    private static void runInitializationFailureHook() {
-        Runnable hook = INITIALIZATION_FAILURE_HOOK.get();
+    private static void runInitializationCompleteHook() {
+        Runnable hook = INITIALIZATION_COMPLETE_HOOK.get();
         if (hook != null) {
             hook.run();
         }

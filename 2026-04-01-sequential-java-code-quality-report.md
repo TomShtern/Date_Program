@@ -129,6 +129,7 @@ These are valid, appropriate for the project direction, and should stay in the a
 
 - **13** — Candidate cache invalidation (`active matching correctness`)
 - **14** — Daily-limit timezone correctness (`core behavior consistency`)
+- **11** — Enforce `AppClock` usage and eliminate direct time API drift (`keep AppClock canonical`)
 - **15** — Centralize profile-completeness rules (`supports active ProfileCompletion work`)
 - **17** — Unify swipe eligibility (`protects active semantic bug fixes`)
 - **23** — Align `LocationService` advertised support (`matches current unsupported-location problem`)
@@ -196,6 +197,7 @@ These claims are technically sound, but they do **not** fit the current phase, c
 - **62** — Batch total unread count (`valid performance cleanup, but not current-phase critical`)
 - **63** — Batch stats snapshot computation (`surface ActivityMetrics first; optimize internals later`)
 - **64** — Publish achievement unlock events (`valid seam, but not a current product target`)
+- **78** — Route UI profile-insight consumers through `ProfileUseCases` instead of calling `AchievementService` and `ActivityMetricsService` directly (`wiring cleanup for DashboardViewModel, StatsViewModel, UiDataAdapters, and ViewModelFactory`)
 
 #### Storage / schema / tests
 
@@ -220,7 +222,6 @@ These are **real issues**, but the current wording or proposed implementation di
 
 - **1** — REST scoping/identity centralization (`real issue, but generic auth-metadata refactor is too broad`)
 - **4** — `RestApiServer` cleanup (`real transport-root problem, but route modules already exist`)
-- **11** — Replace global `AppClock` (`underlying time issue is real, but timezone semantics matter before a full clock migration`)
 - **21** — Split `MatchQualityService` (`surface the feature first; deeper refactor can come later`)
 
 #### Storage / tests
@@ -323,12 +324,12 @@ Below are **77 numbered findings** in their original audit form. Keep them as th
 
 ## `core/**`
 
-### 11. Replace the global mutable `AppClock` with explicit time injection in core services
+### 11. Enforce `AppClock` as the canonical time provider and eliminate direct time API drift
 - **Severity:** Critical
 - **Files:** `src/main/java/datingapp/core/AppClock.java` plus services reading it directly
-- **Evidence:** `AppClock` stores a JVM-wide mutable static `Clock` and exposes `setFixed`, `setClock`, and `reset`.
-- **Why it matters:** test cross-talk and hidden global state are a long-term maintenance tax.
-- **Fix direction:** inject `Clock`/time providers into services and keep `AppClock` as a minimal bridge at bootstrap/test boundaries only.
+- **Evidence:** `AppClock` exposes the canonical `now()`, `today()`, and `clock()` accessors, while `setFixed`, `setClock`, and `reset` support tests/bootstrap. The drift problem is that some code still reaches for `Instant.now(...)`, `LocalDate.now(...)`, and `clock.getZone()` directly instead of staying on the `AppClock` path.
+- **Why it matters:** direct time calls and implicit-zone reads weaken determinism, make `TestClock`-backed testing less reliable, and let configured timezone policy drift.
+- **Fix direction:** keep `AppClock` as the canonical domain time provider and enforce its usage (`AppClock.now()`, `AppClock.today()`, `AppClock.clock()`) while eliminating direct time API drift (`Instant.now(...)`, `LocalDate.now(...)`, `clock.getZone()`). Use configured timezone accessors instead of `clock.getZone()`, and keep `setFixed`, `setClock`, and `reset` confined to bootstrap/test seams.
 
 ### 12. Validate conversation ID inputs consistently
 - **Severity:** Important
@@ -810,6 +811,13 @@ Below are **77 numbered findings** in their original audit form. Keep them as th
 - **Why it matters:** the highest-risk lifecycle seam still lacks direct test pressure.
 - **Fix direction:** add a focused lifecycle/integration test for the real main-entry bootstrap and shutdown path.
 
+### 78. UI code is bypassing `ProfileUseCases` for profile-insight data
+- **Severity:** Important
+- **Files:** `src/main/java/datingapp/app/usecase/profile/ProfileUseCases.java`, `src/main/java/datingapp/core/metrics/AchievementService.java`, `src/main/java/datingapp/core/metrics/ActivityMetricsService.java`, `src/main/java/datingapp/ui/viewmodel/DashboardViewModel.java`, `src/main/java/datingapp/ui/viewmodel/StatsViewModel.java`, `src/main/java/datingapp/ui/viewmodel/UiDataAdapters.java`, `src/main/java/datingapp/ui/viewmodel/ViewModelFactory.java`
+- **Evidence:** UI-facing profile-insight flows appear to reach into `AchievementService` and `ActivityMetricsService` directly instead of flowing through the existing `ProfileUseCases` boundary.
+- **Why it matters:** direct service access from UI wiring makes the profile-insight seam harder to test and easier to drift from the application boundary.
+- **Fix direction:** route profile-insight reads through `ProfileUseCases` and keep `AchievementService`/`ActivityMetricsService` behind the application boundary.
+
 ## Pre-classification audit prioritization (reference only)
 
 > **Note:** this was the original raw-audit prioritization. The intent-based classification above now takes precedence when deciding what to keep active vs ignore for this project phase.
@@ -848,5 +856,5 @@ If I were picking the **first five tickets** from this report, I would start wit
 1. require acting-user identity on conversation reads and other sensitive user-scoped `GET` routes,
 2. route metadata-based REST identity enforcement,
 3. fail-fast config loading plus bootstrap rollback on startup failure,
-4. explicit timezone handling in daily limits and daily picks,
+4. explicit AppClock/configured-timezone enforcement for daily limits and daily picks, eliminating direct `Instant.now(...)`, `LocalDate.now(...)`, `ZoneId.systemDefault()`, and `clock.getZone()` drift while keeping constructors/factories on the `AppClock` + configured-`ZoneId` seam and using `TestClock` in tests,
 5. candidate-cache invalidation redesign.

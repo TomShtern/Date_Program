@@ -130,7 +130,8 @@ public final class ImageCache {
         return getOrLoadCachedImage(key, () -> loadDefaultAvatarImage(width, height));
     }
 
-    private static Image getOrLoadCachedImage(String key, java.util.function.Supplier<Image> loader) {
+    @SuppressWarnings("java:S1181")
+    static Image getOrLoadCachedImage(String key, java.util.function.Supplier<Image> loader) {
         synchronized (CACHE) {
             Image cached = CACHE.get(key);
             if (cached != null) {
@@ -156,12 +157,26 @@ public final class ImageCache {
             }
             newLoad.complete(loaded);
             return loaded;
-        } catch (RuntimeException exception) {
-            newLoad.completeExceptionally(exception);
-            throw exception;
+        } catch (Throwable throwable) { // NOPMD - must complete the in-flight future even when the loader throws Error
+            newLoad.completeExceptionally(throwable);
+            throw rethrowLoadFailure(throwable);
         } finally {
             IN_FLIGHT_LOADS.remove(key, newLoad);
         }
+    }
+
+    private static RuntimeException rethrowLoadFailure(Throwable throwable) {
+        if (throwable instanceof Error error) {
+            throw error;
+        }
+        if (throwable instanceof RuntimeException runtimeException) {
+            return runtimeException;
+        }
+        return new IllegalStateException("Unexpected checked throwable from image loader", throwable);
+    }
+
+    static CompletableFuture<Image> inFlightLoad(String key) {
+        return IN_FLIGHT_LOADS.get(key);
     }
 
     /** Loads the default avatar image from resources or creates a placeholder. */

@@ -32,14 +32,14 @@ class ApplicationStartupFailureRecoveryTest {
 
     @AfterEach
     void tearDown() {
-        clearInitializeFailureHook();
+        clearInitializationCompleteHook();
         clearBootstrapState();
     }
 
     @Test
     @DisplayName("initialize should roll back partial state after a startup failure")
     void initializeRollsBackPartialStateAfterFailure() {
-        setInitializeFailureHook(() -> {
+        setInitializationCompleteHook(() -> {
             throw new IllegalStateException("synthetic startup failure");
         });
 
@@ -52,7 +52,7 @@ class ApplicationStartupFailureRecoveryTest {
         assertFalse(stateAfterFailure.hasDbManager());
         assertFalse(stateAfterFailure.hasCleanupScheduler());
 
-        clearInitializeFailureHook();
+        clearInitializationCompleteHook();
 
         ServiceRegistry services = ApplicationStartup.initialize(AppConfig.defaults());
 
@@ -60,26 +60,27 @@ class ApplicationStartupFailureRecoveryTest {
         assertTrue(snapshotState().initialized());
     }
 
-    private static void setInitializeFailureHook(Runnable hook) {
-        initializationFailureHook().set(hook);
+    private static void setInitializationCompleteHook(Runnable hook) {
+        initializationCompleteHook().set(hook);
     }
 
     private ServiceRegistry initializeWithDefaults() {
         return ApplicationStartup.initialize(AppConfig.defaults());
     }
 
-    private static void clearInitializeFailureHook() {
-        initializationFailureHook().set(null);
+    private static void clearInitializationCompleteHook() {
+        initializationCompleteHook().set(null);
     }
 
     @SuppressWarnings("unchecked")
-    private static AtomicReference<Runnable> initializationFailureHook() {
+    private static AtomicReference<Runnable> initializationCompleteHook() {
         try {
-            Field field = ApplicationStartup.class.getDeclaredField("INITIALIZATION_FAILURE_HOOK");
+            Field field = ApplicationStartup.class.getDeclaredField("INITIALIZATION_COMPLETE_HOOK");
             field.setAccessible(true);
             return (AtomicReference<Runnable>) field.get(null);
         } catch (ReflectiveOperationException ex) {
-            throw new AssertionError("Expected ApplicationStartup to expose INITIALIZATION_FAILURE_HOOK for tests", ex);
+            throw new AssertionError(
+                    "Expected ApplicationStartup to expose INITIALIZATION_COMPLETE_HOOK for tests", ex);
         }
     }
 

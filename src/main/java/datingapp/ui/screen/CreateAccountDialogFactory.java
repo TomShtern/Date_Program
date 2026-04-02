@@ -127,24 +127,46 @@ final class CreateAccountDialogFactory {
         Spinner<Integer> ageSpinner = new Spinner<>();
         int ageMin = viewModel.getMinAge();
         int ageMax = viewModel.getMaxAge();
-        SpinnerValueFactory<Integer> ageValueFactory = new SpinnerValueFactory<>() {
-            @Override
-            public void decrement(int steps) {
-                int current = getValue() == null ? AGE_DEFAULT : getValue();
-                setValue(Math.max(ageMin, current - steps));
-            }
-
-            @Override
-            public void increment(int steps) {
-                int current = getValue() == null ? AGE_DEFAULT : getValue();
-                setValue(Math.min(ageMax, current + steps));
-            }
-        };
-        ageValueFactory.setValue(AGE_DEFAULT);
+        int defaultAge = clampAge(AGE_DEFAULT, ageMin, ageMax);
+        SpinnerValueFactory.IntegerSpinnerValueFactory ageValueFactory =
+                new SpinnerValueFactory.IntegerSpinnerValueFactory(ageMin, ageMax, defaultAge);
         ageSpinner.setValueFactory(ageValueFactory);
         ageSpinner.setEditable(true);
         ageSpinner.setPrefWidth(120);
+        configureAgeSpinnerEditor(ageSpinner, ageValueFactory, ageMin, ageMax, defaultAge);
         return ageSpinner;
+    }
+
+    private static void configureAgeSpinnerEditor(
+            Spinner<Integer> ageSpinner,
+            SpinnerValueFactory.IntegerSpinnerValueFactory ageValueFactory,
+            int ageMin,
+            int ageMax,
+            int defaultAge) {
+        Runnable commitEditorText = () -> {
+            String editorText = ageSpinner.getEditor().getText();
+            int committedAge = defaultAge;
+            if (editorText != null && !editorText.isBlank()) {
+                try {
+                    committedAge = clampAge(Integer.parseInt(editorText.trim()), ageMin, ageMax);
+                } catch (NumberFormatException _) {
+                    committedAge = defaultAge;
+                }
+            }
+            ageValueFactory.setValue(committedAge);
+            ageSpinner.getEditor().setText(ageValueFactory.getConverter().toString(committedAge));
+        };
+
+        ageSpinner.getEditor().setOnAction(event -> commitEditorText.run());
+        ageSpinner.focusedProperty().addListener((obs, wasFocused, isFocused) -> {
+            if (!isFocused) {
+                commitEditorText.run();
+            }
+        });
+    }
+
+    private static int clampAge(int age, int minAge, int maxAge) {
+        return Math.max(minAge, Math.min(maxAge, age));
     }
 
     private static ComboBox<Gender> createGenderCombo() {

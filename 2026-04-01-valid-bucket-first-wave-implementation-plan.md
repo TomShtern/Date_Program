@@ -137,6 +137,8 @@ After each task:
 - fix regressions before continuing,
 - keep diffs small and scoped.
 
+- [ ] Commit immediately after successful local verification to preserve atomic rollback points and smaller review diffs.
+
 Do **not** open large refactors preemptively. If a task starts requiring broad restructuring, stop at the narrowest safe helper extraction that still solves the active finding.
 
 ## Task map
@@ -167,11 +169,11 @@ Do **not** open large refactors preemptively. If a task starts requiring broad r
 
 ### Task 1: Startup/config hardening
 
-**Status:** ✅ Implemented and verified in workspace on 2026-04-01 *(git commit step intentionally deferred in-session)*
+**Status:** ✅ Implemented and verified in workspace on 2026-04-01 *(commit immediately after successful local verification; keep one task per commit; use the listed message as the template/pattern)*
 
 **Files:**
-- Modify: `src/main/java/datingapp/app/bootstrap/ApplicationStartup.java`
-- Modify: `src/main/java/datingapp/storage/DatabaseManager.java` *(only if needed for cleanup/reset semantics, not for redesign)*
+- Modify: `src/main/java/datingapp/app/bootstrap/ApplicationStartup.java` *(commit after successful local verification)*
+- Modify: `src/main/java/datingapp/storage/DatabaseManager.java` *(only if needed for cleanup/reset semantics, not for redesign; commit after successful local verification)*
 - Test: `src/test/java/datingapp/app/bootstrap/ApplicationStartupBootstrapTest.java`
 - Test: `src/test/java/datingapp/app/ConfigLoaderTest.java`
 - Test: `src/test/java/datingapp/app/CleanupSchedulerTest.java`
@@ -195,10 +197,10 @@ Do **not** open large refactors preemptively. If a task starts requiring broad r
 
 - [x] **Step 4: Run targeted tests**
   - Run:
-    - `mvn --% -Dcheckstyle.skip=true -Dtest=ApplicationStartupBootstrapTest,ConfigLoaderTest,CleanupSchedulerTest,MainLifecycleTest,ApplicationStartupFailureRecoveryTest test`
+    - `mvn -Dcheckstyle.skip=true -Dtest=ApplicationStartupBootstrapTest,ConfigLoaderTest,CleanupSchedulerTest,MainLifecycleTest,ApplicationStartupFailureRecoveryTest test`
   - Expected: all relevant startup/config tests pass.
 
-- [ ] **Step 5: Commit** *(deferred in this session; workspace changes are present and verified)*
+- [ ] **Step 5: Commit** *(commit immediately after the targeted tests above pass; keep one task per commit; use the listed message as the template/pattern)*
   - Commit message: `fix: harden startup rollback and config parse failures`
 
 **Acceptance criteria:**
@@ -212,7 +214,7 @@ Do **not** open large refactors preemptively. If a task starts requiring broad r
 
 ### Task 2: Timezone correctness and fallback cleanup
 
-**Status:** ✅ Implemented and verified in workspace on 2026-04-01 *(git commit step intentionally deferred in-session)*
+**Status:** ✅ Implemented and verified in workspace on 2026-04-01 *(commit immediately after successful local verification; keep one task per commit; use the listed message as the template/pattern)*
 
 **Files:**
 - Modify: `src/main/java/datingapp/core/matching/DefaultDailyLimitService.java`
@@ -240,10 +242,10 @@ Do **not** open large refactors preemptively. If a task starts requiring broad r
 
 - [x] **Step 4: Run targeted tests**
   - Run:
-    - `mvn --% -Dcheckstyle.skip=true -Dtest=AppClockTest,DailyLimitBoundaryTest,DailyLimitServiceTest,DailyPickServiceTest,DealbreakersEvaluatorTest test`
+    - `mvn -Dcheckstyle.skip=true -Dtest=AppClockTest,DailyLimitBoundaryTest,DailyLimitServiceTest,DailyPickServiceTest,DealbreakersEvaluatorTest test`
   - Expected: all time/date-boundary tests pass.
 
-- [ ] **Step 5: Commit** *(deferred in this session; workspace changes are present and verified)*
+- [ ] **Step 5: Commit** *(commit immediately after the targeted tests above pass; keep one task per commit; use the listed message as the template/pattern)*
   - Commit message: `fix: unify configured timezone usage for daily semantics`
 
 **Acceptance criteria:**
@@ -255,7 +257,7 @@ Do **not** open large refactors preemptively. If a task starts requiring broad r
 
 ### Task 3A: Candidate freshness and location truthfulness
 
-**Status:** ✅ Implemented and verified in workspace on 2026-04-01 *(git commit step intentionally deferred in-session)*
+**Status:** ✅ Implemented and verified in workspace on 2026-04-01 *(commit immediately after successful local verification; keep one task per commit; use the listed message as the template/pattern)*
 
 **Files:**
 - Modify: `src/main/java/datingapp/core/matching/CandidateFinder.java`
@@ -283,15 +285,15 @@ Do **not** open large refactors preemptively. If a task starts requiring broad r
 
 - [x] **Step 4: Run targeted tests**
   - Run:
-    - `mvn --% -Dcheckstyle.skip=true -Dtest=CandidateFinderTest,LocationServiceTest,MatchingUseCasesTest test`
+    - `mvn -Dcheckstyle.skip=true -Dtest=CandidateFinderTest,LocationServiceTest,MatchingUseCasesTest test`
   - Expected: candidate/location truthfulness tests pass.
 
-- [ ] **Step 5: Commit** *(deferred in this session; workspace changes are present and verified)*
+- [ ] **Step 5: Commit** *(commit immediately after the targeted tests above pass; keep one task per commit; use the listed message as the template/pattern)*
   - Commit message: `fix: align candidate freshness and location truthfulness`
 
 ### Task 3B: Profile-completeness rule unification and user invariants
 
-**Status:** ✅ Implemented and verified in workspace on 2026-04-01 *(git commit step intentionally deferred in-session)*
+**Status:** ✅ Implemented and verified in workspace on 2026-04-01 *(commit immediately after successful local verification; keep one task per commit; use the listed message as the template/pattern)*
 
 **Files:**
 - Modify: `src/main/java/datingapp/core/profile/ProfileCompletionSupport.java`
@@ -321,14 +323,14 @@ Do **not** open large refactors preemptively. If a task starts requiring broad r
 
 - [x] **Step 4: Run targeted tests**
   - Run:
-    - `mvn --% -Dcheckstyle.skip=true -Dtest=ProfileCompletionServiceTest,ProfileActivationPolicyTest,DefaultAchievementServiceTest,UserTest,ProfileCompletionConsistencyTest test`
+    - `mvn -Dcheckstyle.skip=true -Dtest=ProfileCompletionServiceTest,ProfileActivationPolicyTest,DefaultAchievementServiceTest,UserTest,ProfileCompletionConsistencyTest test`
 
-- [ ] **Step 5: Commit** *(deferred in this session; workspace changes are present and verified)*
+- [ ] **Step 5: Commit** *(commit immediately after the targeted tests above pass; keep one task per commit; use the listed message as the template/pattern)*
   - Commit message: `fix: unify profile completion rules and user invariants`
 
 ### Task 3C: Swipe and dealbreaker truthfulness
 
-**Status:** ✅ Implemented and verified in workspace on 2026-04-01 *(git commit step intentionally deferred in-session)*
+**Status:** ✅ Implemented and verified in workspace on 2026-04-01 *(commit immediately after successful local verification; keep one task per commit; use the listed message as the template/pattern)*
 
 **Files:**
 - Modify: `src/main/java/datingapp/core/matching/MatchingService.java`
@@ -348,14 +350,14 @@ Do **not** open large refactors preemptively. If a task starts requiring broad r
 
 - [x] **Step 3: Run targeted tests**
   - Run:
-    - `mvn --% -Dcheckstyle.skip=true -Dtest=MatchingServiceTest,DealbreakersEvaluatorTest,CandidateFinderTest test`
+    - `mvn -Dcheckstyle.skip=true -Dtest=MatchingServiceTest,DealbreakersEvaluatorTest,CandidateFinderTest test`
 
-- [ ] **Step 4: Commit** *(deferred in this session; workspace changes are present and verified)*
+- [ ] **Step 4: Commit** *(commit immediately after the targeted tests above pass; keep one task per commit; use the listed message as the template/pattern)*
   - Commit message: `fix: align swipe and dealbreaker evaluation truth`
 
 ### Task 4: REST conversation semantics and connection quick wins
 
-**Status:** ✅ Implemented and verified in workspace on 2026-04-01 *(git commit step intentionally deferred in-session)*
+**Status:** ✅ Implemented and verified in workspace on 2026-04-01 *(commit immediately after successful local verification; keep one task per commit; use the listed message as the template/pattern)*
 
 **Files:**
 - Modify: `src/main/java/datingapp/app/api/RestApiRequestGuards.java`
@@ -388,20 +390,20 @@ Do **not** open large refactors preemptively. If a task starts requiring broad r
 
 - [x] **Step 5: Run targeted tests**
   - Run:
-    - `mvn --% -Dcheckstyle.skip=true -Dtest=RestApiReadRoutesTest,RestApiConversationBatchCountTest,RestApiPhaseTwoRoutesTest,ConnectionModelsTest,ConnectionServiceAtomicityTest,ConnectionServiceTransitionTest test`
+    - `mvn -Dcheckstyle.skip=true -Dtest=RestApiReadRoutesTest,RestApiConversationBatchCountTest,RestApiPhaseTwoRoutesTest,ConnectionModelsTest,ConnectionServiceAtomicityTest,ConnectionServiceTransitionTest test`
   - Expected: route semantics and connection-service tests pass.
 
-- [ ] **Step 6: Commit** *(deferred in this session; workspace changes are present and verified)*
+- [ ] **Step 6: Commit** *(commit immediately after the targeted tests above pass; keep one task per commit; use the listed message as the template/pattern)*
   - Commit message: `fix: tighten conversation route semantics and unread counting`
 
 ## Chunk 3: Storage shared state and parity
 
 ### Task 5: Storage shared-state and dev-seed robustness
 
-**Status:** ✅ Implemented and verified in workspace on 2026-04-01 *(git commit step intentionally deferred in-session)*
+**Status:** ✅ Implemented and verified in workspace on 2026-04-01 *(commit immediately after successful local verification; keep one task per commit; use the listed message as the template/pattern)*
 
 **Files:**
-- Modify: `src/main/java/datingapp/storage/DatabaseManager.java`
+- Modify: `src/main/java/datingapp/storage/DatabaseManager.java` *(commit after successful local verification)*
 - Modify: `src/main/java/datingapp/storage/StorageFactory.java`
 - Modify: `src/main/java/datingapp/storage/DevDataSeeder.java`
 - Test: `src/test/java/datingapp/storage/DatabaseManagerConfigurationTest.java`
@@ -424,15 +426,15 @@ Do **not** open large refactors preemptively. If a task starts requiring broad r
 
 - [x] **Step 4: Run targeted tests**
   - Run:
-    - `mvn --% -Dcheckstyle.skip=true -Dtest=DatabaseManagerConfigurationTest,DatabaseManagerThreadSafetyTest,DevDataSeederTest,StorageFactoryInMemoryTest test`
+    - `mvn -Dcheckstyle.skip=true -Dtest=DatabaseManagerConfigurationTest,DatabaseManagerThreadSafetyTest,DevDataSeederTest,StorageFactoryInMemoryTest test`
   - Expected: storage shared-state and seed tests pass.
 
-- [ ] **Step 5: Commit** *(deferred in this session; workspace changes are present and verified)*
+- [ ] **Step 5: Commit** *(commit immediately after the targeted tests above pass; keep one task per commit; use the listed message as the template/pattern)*
   - Commit message: `fix: isolate storage state and harden dev seeding`
 
 ### Task 6: `JdbiUserStorage` internal cleanup
 
-**Status:** ✅ Implemented and verified in workspace on 2026-04-01 *(git commit step intentionally deferred in-session)*
+**Status:** ✅ Implemented and verified in workspace on 2026-04-01 *(commit immediately after successful local verification; keep one task per commit; use the listed message as the template/pattern)*
 
 **Files:**
 - Modify: `src/main/java/datingapp/storage/jdbi/JdbiUserStorage.java`
@@ -460,15 +462,15 @@ Do **not** open large refactors preemptively. If a task starts requiring broad r
 
 - [x] **Step 5: Run targeted tests**
   - Run:
-    - `mvn --% -Dcheckstyle.skip=true -Dtest=JdbiUserStorageNormalizationTest,JdbiUserStorageMigrationTest,StorageContractTest,RecordBindingTest,SqlRowReadersTest test`
+    - `mvn -Dcheckstyle.skip=true -Dtest=JdbiUserStorageNormalizationTest,JdbiUserStorageMigrationTest,StorageContractTest,RecordBindingTest,SqlRowReadersTest test`
   - Expected: storage normalization/contract tests pass.
 
-- [ ] **Step 6: Commit** *(deferred in this session; workspace changes are present and verified)*
+- [ ] **Step 6: Commit** *(commit immediately after the targeted tests above pass; keep one task per commit; use the listed message as the template/pattern)*
   - Commit message: `refactor: simplify and harden jdbi user storage internals`
 
 ### Task 7A: Storage parity and fixture simplification
 
-**Status:** ✅ Implemented and verified in workspace on 2026-04-01 *(git commit step intentionally deferred in-session)*
+**Status:** ✅ Implemented and verified in workspace on 2026-04-01 *(commit immediately after successful local verification; keep one task per commit; use the listed message as the template/pattern)*
 
 **Files:**
 - Modify: `src/test/java/datingapp/core/testutil/TestStorages.java`
@@ -486,15 +488,15 @@ Do **not** open large refactors preemptively. If a task starts requiring broad r
 
 - [x] **Step 3: Run targeted tests**
   - Run:
-    - `mvn --% -Dcheckstyle.skip=true -Dtest=StorageContractTest,RestApiReadRoutesTest,RestApiRelationshipRoutesTest,RestApiPhaseTwoRoutesTest test`
+    - `mvn -Dcheckstyle.skip=true -Dtest=StorageContractTest,RestApiReadRoutesTest,RestApiRelationshipRoutesTest,RestApiPhaseTwoRoutesTest test`
   - These route suites exercise the shared REST fixture while `StorageContractTest` covers fake-vs-real storage expectations.
 
-- [ ] **Step 4: Commit** *(deferred in this session; workspace changes are present and verified)*
+- [ ] **Step 4: Commit** *(commit immediately after the targeted tests above pass; keep one task per commit; use the listed message as the template/pattern)*
   - Commit message: `test: tighten storage parity and rest fixture scope`
 
 ### Task 7B: Architecture/test-support cleanup
 
-**Status:** ✅ Implemented and verified in workspace on 2026-04-01 *(git commit step intentionally deferred in-session)*
+**Status:** ✅ Implemented and verified in workspace on 2026-04-01 *(commit immediately after successful local verification; keep one task per commit; use the listed message as the template/pattern)*
 
 **Files:**
 - Modify: `src/test/java/datingapp/architecture/ArchitectureTestSupport.java`
@@ -514,14 +516,14 @@ Do **not** open large refactors preemptively. If a task starts requiring broad r
 
 - [x] **Step 3: Run targeted tests**
   - Run:
-    - `mvn --% -Dcheckstyle.skip=true -Dtest=TimePolicyArchitectureTest,ViewModelAsyncScopeTest test`
+    - `mvn -Dcheckstyle.skip=true -Dtest=TimePolicyArchitectureTest,ViewModelAsyncScopeTest test`
 
-- [ ] **Step 4: Commit** *(deferred in this session; workspace changes are present and verified)*
+- [ ] **Step 4: Commit** *(commit immediately after the targeted tests above pass; keep one task per commit; use the listed message as the template/pattern)*
   - Commit message: `test: narrow raw-line scans and reduce flaky ui waits`
 
 ### Task 7C: Test naming and lifecycle coverage cleanup
 
-**Status:** ✅ Implemented and verified in workspace on 2026-04-01 *(git commit step intentionally deferred in-session)*
+**Status:** ✅ Implemented and verified in workspace on 2026-04-01 *(commit immediately after successful local verification; keep one task per commit; use the listed message as the template/pattern)*
 
 **Files:**
 - Modify: `src/test/java/datingapp/MainLifecycleTest.java`
@@ -534,16 +536,16 @@ Do **not** open large refactors preemptively. If a task starts requiring broad r
 
 - [x] **Step 2: Run targeted tests**
   - Run:
-    - `mvn --% -Dcheckstyle.skip=true -Dtest=RestApiDtosTest,MainLifecycleTest,MainBootstrapLifecycleTest test`
+    - `mvn -Dcheckstyle.skip=true -Dtest=RestApiDtosTest,MainLifecycleTest,MainBootstrapLifecycleTest test`
 
-- [ ] **Step 3: Commit** *(deferred in this session; workspace changes are present and verified)*
+- [ ] **Step 3: Commit** *(commit immediately after the targeted tests above pass; keep one task per commit; use the listed message as the template/pattern)*
   - Commit message: `test: align route dto naming and main lifecycle coverage`
 
 ## Chunk 4: JavaFX lifecycle and user journeys
 
 ### Task 8A: `ImageCache` and shared photo state
 
-**Status:** ✅ Implemented and verified in workspace on 2026-04-01 *(git commit step intentionally deferred in-session)*
+**Status:** ✅ Implemented and verified in workspace on 2026-04-01 *(commit immediately after successful local verification; keep one task per commit; use the listed message as the template/pattern)*
 
 **Files:**
 - Modify: `src/main/java/datingapp/ui/ImageCache.java`
@@ -568,14 +570,14 @@ Do **not** open large refactors preemptively. If a task starts requiring broad r
 
 - [x] **Step 3: Run targeted tests**
   - Run:
-    - `mvn --% -Dcheckstyle.skip=true -Dtest=ImageCacheTest,ProfileViewModelTest,MatchingViewModelTest,PhotoCarouselStateTest test`
+    - `mvn -Dcheckstyle.skip=true -Dtest=ImageCacheTest,ProfileViewModelTest,MatchingViewModelTest,PhotoCarouselStateTest test`
 
-- [ ] **Step 4: Commit** *(deferred in this session; workspace changes are present and verified)*
+- [ ] **Step 4: Commit** *(commit immediately after the targeted tests above pass; keep one task per commit; use the listed message as the template/pattern)*
   - Commit message: `fix: harden image cache and shared photo state`
 
 ### Task 8B: Controller lifecycle and logout/navigation cleanup
 
-**Status:** ✅ Implemented and verified in workspace on 2026-04-01 *(git commit step intentionally deferred in-session)*
+**Status:** ✅ Implemented and verified in workspace on 2026-04-01 *(commit immediately after successful local verification; keep one task per commit; use the listed message as the template/pattern)*
 
 **Files:**
 - Modify: `src/main/java/datingapp/ui/NavigationService.java`
@@ -602,14 +604,14 @@ Do **not** open large refactors preemptively. If a task starts requiring broad r
 
 - [x] **Step 3: Run targeted tests**
   - Run:
-    - `mvn --% -Dcheckstyle.skip=true -Dtest=DashboardControllerTest,MilestonePopupControllerTest,MatchesControllerTest,NavigationServiceTest,NavigationServiceContextTest test`
+    - `mvn -Dcheckstyle.skip=true -Dtest=DashboardControllerTest,MilestonePopupControllerTest,MatchesControllerTest,NavigationServiceTest,NavigationServiceContextTest test`
 
-- [ ] **Step 4: Commit** *(deferred in this session; workspace changes are present and verified)*
+- [ ] **Step 4: Commit** *(commit immediately after the targeted tests above pass; keep one task per commit; use the listed message as the template/pattern)*
   - Commit message: `fix: harden controller lifecycle and logout navigation`
 
 ### Task 9A: Signup/onboarding correction and dialog extraction
 
-**Status:** ✅ Implemented and verified in workspace on 2026-04-01 *(git commit step intentionally deferred in-session)*
+**Status:** ✅ Implemented and verified in workspace on 2026-04-01 *(commit immediately after successful local verification; keep one task per commit; use the listed message as the template/pattern)*
 
 **Files:**
 - Modify: `src/main/java/datingapp/ui/viewmodel/LoginViewModel.java`
@@ -633,14 +635,14 @@ Do **not** open large refactors preemptively. If a task starts requiring broad r
 
 - [x] **Step 4: Run targeted tests**
   - Run:
-    - `mvn --% -Dcheckstyle.skip=true -Dtest=LoginViewModelTest,LoginControllerTest test`
+    - `mvn -Dcheckstyle.skip=true -Dtest=LoginViewModelTest,LoginControllerTest test`
 
-- [ ] **Step 5: Commit** *(deferred in this session; workspace changes are present and verified)*
+- [ ] **Step 5: Commit** *(commit immediately after the targeted tests above pass; keep one task per commit; use the listed message as the template/pattern)*
   - Commit message: `fix: make signup honest and extract account dialog`
 
 ### Task 9B: Profile screen/viewmodel overload reduction
 
-**Status:** ✅ Implemented and verified in workspace on 2026-04-01 *(git commit step intentionally deferred in-session)*
+**Status:** ✅ Implemented and verified in workspace on 2026-04-01 *(commit immediately after successful local verification; keep one task per commit; use the listed message as the template/pattern)*
 
 **Files:**
 - Modify: `src/main/java/datingapp/ui/viewmodel/ProfileViewModel.java`
@@ -660,9 +662,9 @@ Do **not** open large refactors preemptively. If a task starts requiring broad r
 
 - [x] **Step 3: Run targeted tests**
   - Run:
-    - `mvn --% -Dcheckstyle.skip=true -Dtest=ProfileViewModelTest,ProfileControllerTest,ProfileFormValidatorTest test`
+    - `mvn -Dcheckstyle.skip=true -Dtest=ProfileViewModelTest,ProfileControllerTest,ProfileFormValidatorTest test`
 
-- [ ] **Step 4: Commit** *(deferred in this session; workspace changes are present and verified)*
+- [ ] **Step 4: Commit** *(commit immediately after the targeted tests above pass; keep one task per commit; use the listed message as the template/pattern)*
   - Commit message: `refactor: simplify profile screen and viewmodel seams`
 
 ### Task 10A: `ChatViewModel` state cleanup
@@ -683,9 +685,9 @@ Do **not** open large refactors preemptively. If a task starts requiring broad r
 
 - [x] **Step 3: Run targeted tests**
   - Run:
-    - `mvn --% -Dcheckstyle.skip=true -Dtest=ChatViewModelTest test`
+    - `mvn -Dcheckstyle.skip=true -Dtest=ChatViewModelTest test`
 
-- [ ] **Step 4: Commit** *(deferred in this session; workspace changes are present and verified)*
+- [ ] **Step 4: Commit** *(commit immediately after the targeted tests above pass; keep one task per commit; use the listed message as the template/pattern)*
   - Commit message: `refactor: untangle chat viewmodel state`
 
 ### Task 10B: `MatchingViewModel` state cleanup
@@ -708,16 +710,16 @@ Do **not** open large refactors preemptively. If a task starts requiring broad r
 
 - [x] **Step 3: Run targeted tests**
   - Run:
-    - `mvn --% -Dcheckstyle.skip=true -Dtest=MatchingViewModelTest,MatchesViewModelTest test`
+    - `mvn -Dcheckstyle.skip=true -Dtest=MatchingViewModelTest,MatchesViewModelTest test`
 
-- [ ] **Step 4: Commit** *(deferred in this session; workspace changes are present and verified)*
+- [ ] **Step 4: Commit** *(commit immediately after the targeted tests above pass; keep one task per commit; use the listed message as the template/pattern)*
   - Commit message: `refactor: untangle matching viewmodel state`
 
 ## Chunk 5: Event plumbing and final verification
 
 ### Task 11: Event-bus failure visibility and typed payloads
 
-**Status:** ✅ Implemented and verified in workspace on 2026-04-01 *(git commit step intentionally deferred in-session)*
+**Status:** ✅ Implemented and verified in workspace on 2026-04-01 *(commit immediately after successful local verification; keep one task per commit; use the listed message as the template/pattern)*
 
 **Files:**
 - Modify: `src/main/java/datingapp/app/event/AppEvent.java`
@@ -745,9 +747,9 @@ Do **not** open large refactors preemptively. If a task starts requiring broad r
 
 - [x] **Step 4: Run targeted tests**
   - Run:
-    - `mvn --% -Dcheckstyle.skip=true -Dtest=InProcessAppEventBusTest,MetricsEventHandlerTest,NotificationEventHandlerTest test`
+    - `mvn -Dcheckstyle.skip=true -Dtest=InProcessAppEventBusTest,MetricsEventHandlerTest,NotificationEventHandlerTest test`
 
-- [ ] **Step 5: Commit** *(deferred in this session; workspace changes are present and verified)*
+- [ ] **Step 5: Commit** *(commit immediately after the targeted tests above pass; keep one task per commit; use the listed message as the template/pattern)*
   - Commit message: `fix: harden event payloads and handler failure visibility`
 
 ### Task 12: Final validation and completion gate
@@ -762,7 +764,7 @@ Do **not** open large refactors preemptively. If a task starts requiring broad r
 
 - [x] **Step 1: Run final targeted regression batches**
   - Run the most relevant grouped suites again:
-    - `mvn --% -Dcheckstyle.skip=true -Dtest=ApplicationStartupBootstrapTest,ConfigLoaderTest,CandidateFinderTest,DailyLimitBoundaryTest,DailyPickServiceTest,ConnectionModelsTest,ConnectionServiceTransitionTest,StorageContractTest,ProfileViewModelTest,ChatViewModelTest,MatchingViewModelTest,InProcessAppEventBusTest test`
+    - `mvn -Dcheckstyle.skip=true -Dtest=ApplicationStartupBootstrapTest,ConfigLoaderTest,CandidateFinderTest,DailyLimitBoundaryTest,DailyPickServiceTest,ConnectionModelsTest,ConnectionServiceTransitionTest,StorageContractTest,ProfileViewModelTest,ChatViewModelTest,MatchingViewModelTest,InProcessAppEventBusTest test`
 
 - [x] **Step 2: Run full repo quality gate**
   - Run:

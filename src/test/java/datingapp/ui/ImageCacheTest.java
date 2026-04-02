@@ -14,10 +14,13 @@ import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.util.Base64;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import javafx.scene.image.Image;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -114,6 +117,55 @@ class ImageCacheTest {
             assertNotNull(loaded);
             loader.join();
         }
+    }
+
+    @Test
+    @DisplayName("loader errors complete in-flight waiters exceptionally instead of hanging")
+    void loaderErrorsCompleteInFlightWaitersExceptionallyInsteadOfHanging() throws Exception {
+        CountDownLatch waiterStarted = new CountDownLatch(1);
+        CountDownLatch waiterFinished = new CountDownLatch(1);
+        AtomicReference<Throwable> waitingFailure = new AtomicReference<>();
+
+        Throwable thrownByPrimary = captureThrowable(() -> ImageCache.getOrLoadCachedImage("error-key", () -> {
+            CompletableFuture<Image> inFlightLoad = ImageCache.inFlightLoad("error-key");
+            assertNotNull(inFlightLoad);
+
+            Thread.ofPlatform().daemon(true).start(() -> {
+                waiterStarted.countDown();
+                waitingFailure.set(captureThrowable(inFlightLoad::join));
+                waiterFinished.countDown();
+            });
+
+            try {
+                assertTrue(waiterStarted.await(5, TimeUnit.SECONDS));
+            } catch (InterruptedException exception) {
+                Thread.currentThread().interrupt();
+                throw new AssertionError("Interrupted while waiting for waiter to subscribe", exception);
+            }
+            throw new AssertionError("synthetic image loader error");
+        }));
+
+        assertTrue(waiterFinished.await(5, TimeUnit.SECONDS));
+
+        Throwable thrownByWaiter = waitingFailure.get();
+
+        assertTrue(thrownByPrimary instanceof AssertionError);
+        assertTrue(thrownByWaiter instanceof CompletionException);
+        assertTrue(thrownByWaiter.getCause() instanceof AssertionError);
+    }
+
+    private static Throwable captureThrowable(ThrowableRunnable action) {
+        try {
+            action.run();
+            return null;
+        } catch (Throwable throwable) {
+            return throwable;
+        }
+    }
+
+    @FunctionalInterface
+    private interface ThrowableRunnable {
+        void run();
     }
 
     private static int countPreloadWorkerThreads() {

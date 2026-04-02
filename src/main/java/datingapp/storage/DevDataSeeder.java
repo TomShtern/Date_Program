@@ -24,16 +24,17 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * One-shot developer seed data inserter.
+ * Idempotent developer seed data inserter.
  *
  * <p>Creates 30 pre-defined, stable-UUID users (10 MALE / 10 FEMALE / 10 OTHER) that
  * cover a broad range of age, location, lifestyle, gender preference, and distance
  * edge cases. This makes the app immediately testable on a fresh database without
  * needing to manually register many accounts.
  *
- * <p><strong>Idempotency:</strong> {@link #seed(UserStorage)} does nothing if the
- * sentinel UUID ({@code SEED_SENTINEL_ID}) already exists in storage — safe to call
- * on every startup without duplicating data.
+ * <p><strong>Idempotency:</strong> {@link #seed(UserStorage)} always builds the full
+ * deterministic seed set and persists each user via {@link UserStorage#save(User)}.
+ * The method therefore ensures the 30 seed users exist by creating or updating them
+ * as needed, without relying on a separate sentinel-existence short circuit.
  *
  * <p><strong>Coordinate clusters used:</strong>
  * <ul>
@@ -208,8 +209,8 @@ public final class DevDataSeeder {
     }
 
     /**
-     * The UUID of the very first seed user. If this record already exists in
-     * storage, seeding is skipped entirely so the operation is idempotent.
+     * Stable UUID of the first seed user. This ID anchors deterministic seed
+     * relationships and sample-match wiring.
      */
     // Stable sentinel UUID used to detect whether seed data has already been inserted.
     // Must be a valid RFC-4122 UUID (only hex digits allowed); "seed" contains 's' which is
