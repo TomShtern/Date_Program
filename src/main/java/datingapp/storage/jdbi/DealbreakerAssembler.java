@@ -20,10 +20,12 @@ final class DealbreakerAssembler {
             User user,
             UUID userId,
             Map<UUID, Map<NormalizedProfileRepository.DealbreakerTable, Set<String>>> dealbreakerValuesByUserId) {
+        Map<UUID, Map<NormalizedProfileRepository.DealbreakerTable, Set<String>>> safeDealbreakerValuesByUserId =
+                dealbreakerValuesByUserId == null ? Map.of() : dealbreakerValuesByUserId;
         Dealbreakers existing = user != null ? user.getDealbreakers() : null;
         Dealbreakers.Builder builder = (existing != null ? existing : Dealbreakers.none()).toBuilder();
         Map<NormalizedProfileRepository.DealbreakerTable, Set<String>> valuesByTable =
-                dealbreakerValuesByUserId.getOrDefault(userId, Map.of());
+                safeDealbreakerValuesByUserId.getOrDefault(userId, Map.of());
 
         Set<Lifestyle.Smoking> smoking = parseEnumNames(
                 valuesByTable.getOrDefault(NormalizedProfileRepository.DealbreakerTable.SMOKING, Set.of()),

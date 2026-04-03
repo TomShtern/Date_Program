@@ -43,6 +43,7 @@ final class RelationshipActionRunner {
         Objects.requireNonNull(userMessage, "userMessage cannot be null");
         Objects.requireNonNull(action, "action cannot be null");
         Objects.requireNonNull(onSuccess, "onSuccess cannot be null");
+        Objects.requireNonNull(syncCallbacks, "syncCallbacks cannot be null");
 
         if (runAsync) {
             asyncScope.run(

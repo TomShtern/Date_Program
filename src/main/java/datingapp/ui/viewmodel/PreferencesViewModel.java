@@ -189,17 +189,14 @@ public class PreferencesViewModel extends BaseViewModel {
                 themeMode::set);
     }
 
-    private ThemeMode persistDiscoveryPreferences(
-            int minAgeVal, int maxAgeVal, int maxDistVal, Set<Gender> newInterests) {
+    private void persistDiscoveryPreferences(int minAgeVal, int maxAgeVal, int maxDistVal, Set<Gender> newInterests) {
         UseCaseResult<User> result =
                 profileMutationUseCases.updateDiscoveryPreferences(new UpdateDiscoveryPreferencesCommand(
                         UserContext.ui(currentUser.getId()), minAgeVal, maxAgeVal, maxDistVal, newInterests));
         if (!result.success()) {
-            logWarn(
-                    "Failed to save preferences via use-case: {}",
-                    result.error().message());
+            String errorMessage = result.error() != null ? result.error().message() : "Unknown error";
+            logWarn("Failed to save preferences via use-case: {}", errorMessage);
         }
-        return themeMode.get() == null ? ThemeMode.DARK : themeMode.get();
     }
 
     public IntegerProperty minAgeProperty() {

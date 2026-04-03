@@ -29,7 +29,7 @@ import javafx.collections.ObservableList;
  * ViewModel for the Social screen.
  * Displays notifications and pending friend requests for the current user.
  * Friend request accept/decline is handled via {@link ConnectionService}.
- * Notifications are fetched via the communication storage fallback when the use-case path fails.
+ * Notifications are fetched via the {@link UiSocialDataAccess} adapter when the use-case path fails.
  */
 public class SocialViewModel extends BaseViewModel {
 

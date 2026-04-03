@@ -665,7 +665,29 @@ class ProfileViewModelTest {
                 LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(10));
             }
         }
-        return List.copyOf(viewModel.getPhotoUrls());
+        try {
+            return List.copyOf(viewModel.getPhotoUrls());
+        } catch (ConcurrentModificationException _) {
+            return javafxSnapshotPhotoUrls(viewModel);
+        }
+    }
+
+    private static List<String> javafxSnapshotPhotoUrls(ProfileViewModel viewModel) {
+        CountDownLatch latch = new CountDownLatch(1);
+        AtomicReference<List<String>> snapshot = new AtomicReference<>(List.of());
+        Platform.runLater(() -> {
+            snapshot.set(List.copyOf(viewModel.getPhotoUrls()));
+            latch.countDown();
+        });
+        try {
+            if (!latch.await(5, TimeUnit.SECONDS)) {
+                throw new IllegalStateException("Timeout waiting for FX photo snapshot");
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Interrupted while waiting for FX photo snapshot", e);
+        }
+        return snapshot.get();
     }
 
     private static User createActiveUser(String name) {

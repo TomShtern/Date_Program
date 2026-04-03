@@ -4,6 +4,7 @@ import datingapp.core.model.User;
 import datingapp.core.profile.MatchPreferences.Dealbreakers;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -257,9 +258,36 @@ final class NormalizedProfileRepository {
                                 + JdbiUserStorage.normalizedGroupFromStorage(row.groupName()));
                 }
             }
+
             return new NormalizedProfileData(
-                    photoUrlsByUserId, interestsByUserId, interestedInByUserId, dealbreakerValuesByUserId);
+                    freezeListMap(photoUrlsByUserId),
+                    freezeSetMap(interestsByUserId),
+                    freezeSetMap(interestedInByUserId),
+                    freezeNestedSetMap(dealbreakerValuesByUserId));
         }
+    }
+
+    private static Map<UUID, List<String>> freezeListMap(Map<UUID, List<String>> source) {
+        Map<UUID, List<String>> frozen = new HashMap<>();
+        source.forEach((key, value) -> frozen.put(key, List.copyOf(value)));
+        return Collections.unmodifiableMap(frozen);
+    }
+
+    private static Map<UUID, Set<String>> freezeSetMap(Map<UUID, Set<String>> source) {
+        Map<UUID, Set<String>> frozen = new HashMap<>();
+        source.forEach((key, value) -> frozen.put(key, Set.copyOf(value)));
+        return Collections.unmodifiableMap(frozen);
+    }
+
+    private static Map<UUID, Map<DealbreakerTable, Set<String>>> freezeNestedSetMap(
+            Map<UUID, Map<DealbreakerTable, Set<String>>> source) {
+        Map<UUID, Map<DealbreakerTable, Set<String>>> frozenOuter = new HashMap<>();
+        source.forEach((userId, valuesByTable) -> {
+            Map<DealbreakerTable, Set<String>> frozenInner = new EnumMap<>(DealbreakerTable.class);
+            valuesByTable.forEach((table, values) -> frozenInner.put(table, Set.copyOf(values)));
+            frozenOuter.put(userId, Collections.unmodifiableMap(frozenInner));
+        });
+        return Collections.unmodifiableMap(frozenOuter);
     }
 
     private static void validateNormalizedTable(String tableName) {

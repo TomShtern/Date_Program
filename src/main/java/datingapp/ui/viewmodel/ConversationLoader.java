@@ -8,6 +8,7 @@ import datingapp.app.usecase.messaging.MessagingUseCases.OpenConversationCommand
 import datingapp.core.connection.ConnectionModels.Message;
 import datingapp.core.connection.ConnectionService.ConversationPreview;
 import datingapp.core.model.User;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -30,7 +31,7 @@ final class ConversationLoader {
             return new ConversationRefreshData(null, unreadCount);
         }
         return new ConversationRefreshData(
-                result.data().conversations(), result.data().totalUnreadCount());
+                copyPreviews(result.data().conversations()), result.data().totalUnreadCount());
     }
 
     OpenConversationData openConversation(User user, UUID otherUserId) {
@@ -49,14 +50,14 @@ final class ConversationLoader {
             return new MessageLoadData(conversationId, null, null, null);
         }
 
-        List<Message> messages = result.data().messages();
+        List<Message> messages = List.copyOf(result.data().messages());
         Integer unread = null;
         List<ConversationPreview> previews = null;
         var conversationsResult =
                 messagingUseCases.listConversations(new ListConversationsQuery(UserContext.ui(user.getId()), 50, 0));
         if (conversationsResult.success()) {
             unread = conversationsResult.data().totalUnreadCount();
-            previews = conversationsResult.data().conversations();
+            previews = copyPreviews(conversationsResult.data().conversations());
         }
 
         return new MessageLoadData(conversationId, messages, unread, previews);
@@ -68,4 +69,11 @@ final class ConversationLoader {
 
     record MessageLoadData(
             String conversationId, List<Message> messages, Integer unreadCount, List<ConversationPreview> previews) {}
+
+    private static List<ConversationPreview> copyPreviews(@Nullable List<ConversationPreview> previews) {
+        if (previews == null) {
+            return List.of();
+        }
+        return List.copyOf(new ArrayList<>(previews));
+    }
 }

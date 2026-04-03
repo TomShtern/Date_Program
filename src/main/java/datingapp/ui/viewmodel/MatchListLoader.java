@@ -21,6 +21,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /** Loads and maps match-screen data from the use-case layer. */
 final class MatchListLoader {
@@ -93,7 +94,7 @@ final class MatchListLoader {
             }
         }
         received.sort(likeTimeComparator());
-        return received;
+        return List.copyOf(received);
     }
 
     List<MatchesViewModel.LikeCardData> loadSentLikes(UUID userId) {
@@ -107,7 +108,7 @@ final class MatchListLoader {
 
         Set<UUID> blockedUserIds = blockedUsersResult.data().stream()
                 .map(SocialUseCases.BlockedUserSummary::userId)
-                .collect(java.util.stream.Collectors.toSet());
+                .collect(Collectors.toSet());
         var sentLikesResult = matchingUseCases.sentLikes(new SentLikesQuery(UserContext.ui(userId)));
         if (!sentLikesResult.success()) {
             throw new IllegalStateException(
@@ -138,7 +139,7 @@ final class MatchListLoader {
             }
         }
         sent.sort(likeTimeComparator());
-        return sent;
+        return List.copyOf(sent);
     }
 
     private MatchQualitySummary resolveMatchQualitySummary(UUID userId, Match match) {
