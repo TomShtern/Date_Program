@@ -15,7 +15,6 @@ import datingapp.ui.UiPreferencesStore;
 import datingapp.ui.UiPreferencesStore.ThemeMode;
 import datingapp.ui.UiThemeService;
 import datingapp.ui.async.UiThreadDispatcher;
-import datingapp.ui.viewmodel.UiDataAdapters.StorageUiUserStore;
 import java.util.EnumSet;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
@@ -62,8 +61,7 @@ class PreferencesViewModelTest {
         store.saveThemeMode(ThemeMode.LIGHT);
         UiThemeService themeService = new UiThemeService(store, NavigationService.getInstance());
 
-        PreferencesViewModel viewModel = new PreferencesViewModel(
-                new StorageUiUserStore(users), null, themeService, AppConfig.defaults(), session, TEST_DISPATCHER);
+        PreferencesViewModel viewModel = newPreferencesViewModel(users, AppConfig.defaults(), themeService);
 
         viewModel.initialize();
         waitForAsyncWork();
@@ -84,8 +82,7 @@ class PreferencesViewModelTest {
 
         UiPreferencesStore store = new UiPreferencesStore("/datingapp/tests/preferences-" + UUID.randomUUID());
         UiThemeService themeService = new UiThemeService(store, NavigationService.getInstance());
-        PreferencesViewModel viewModel = new PreferencesViewModel(
-                new StorageUiUserStore(users), null, themeService, AppConfig.defaults(), session, TEST_DISPATCHER);
+        PreferencesViewModel viewModel = newPreferencesViewModel(users, AppConfig.defaults(), themeService);
 
         viewModel.initialize();
         waitForAsyncWork();
@@ -119,8 +116,7 @@ class PreferencesViewModelTest {
         session.setCurrentUser(currentUser);
 
         RecordingThemeService themeService = new RecordingThemeService(ThemeMode.DARK);
-        PreferencesViewModel viewModel = new PreferencesViewModel(
-                new StorageUiUserStore(users), null, themeService, AppConfig.defaults(), session, TEST_DISPATCHER);
+        PreferencesViewModel viewModel = newPreferencesViewModel(users, AppConfig.defaults(), themeService);
 
         viewModel.initialize();
         waitForAsyncWork();
@@ -199,5 +195,21 @@ class PreferencesViewModelTest {
             this.lastAppliedTheme = null;
             this.setCalls = 0;
         }
+    }
+
+    private PreferencesViewModel newPreferencesViewModel(
+            TestStorages.Users users, AppConfig config, UiThemeService themeService) {
+        return new PreferencesViewModel(
+                new datingapp.app.usecase.profile.ProfileMutationUseCases(
+                        users,
+                        new datingapp.core.profile.ValidationService(config),
+                        datingapp.core.testutil.TestAchievementService.empty(),
+                        config,
+                        new datingapp.core.workflow.ProfileActivationPolicy(),
+                        new datingapp.app.testutil.TestEventBus()),
+                themeService,
+                config,
+                session,
+                TEST_DISPATCHER);
     }
 }

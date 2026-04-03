@@ -1,5 +1,6 @@
 package datingapp.app.api;
 
+import datingapp.app.support.UserPresentationSupport;
 import datingapp.app.usecase.matching.MatchingUseCases.MatchQualitySnapshot;
 import datingapp.app.usecase.matching.MatchingUseCases.UndoOutcome;
 import datingapp.app.usecase.profile.VerificationUseCases;
@@ -58,8 +59,10 @@ final class RestApiDtos {
          */
         static UserSummary from(User user, ZoneId userTimeZone) {
             return new UserSummary(
-                    user.getId(), user.getName(),
-                    user.getAge(userTimeZone).orElse(0), user.getState().name());
+                    user.getId(),
+                    user.getName(),
+                    UserPresentationSupport.safeAge(user, userTimeZone),
+                    user.getState().name());
         }
     }
 
@@ -83,7 +86,7 @@ final class RestApiDtos {
             return new UserDetail(
                     user.getId(),
                     user.getName(),
-                    user.getAge(userTimeZone).orElse(0),
+                    UserPresentationSupport.safeAge(user, userTimeZone),
                     user.getBio(),
                     user.getGender() != null ? user.getGender().name() : null,
                     user.getInterestedIn().stream().map(Enum::name).toList(),
@@ -160,7 +163,7 @@ final class RestApiDtos {
             return new DailyPickDto(
                     dailyPick.user().getId(),
                     dailyPick.user().getName(),
-                    dailyPick.user().getAge(userTimeZone).orElse(0),
+                    UserPresentationSupport.safeAge(dailyPick.user(), userTimeZone),
                     dailyPick.date(),
                     dailyPick.reason(),
                     dailyPick.alreadySeen());
@@ -217,7 +220,7 @@ final class RestApiDtos {
             return new PendingLikerDto(
                     pendingLiker.user().getId(),
                     pendingLiker.user().getName(),
-                    pendingLiker.user().getAge(userTimeZone).orElse(0),
+                    UserPresentationSupport.safeAge(pendingLiker.user(), userTimeZone),
                     pendingLiker.likedAt());
         }
     }
@@ -264,7 +267,7 @@ final class RestApiDtos {
                     standout.id(),
                     standout.standoutUserId(),
                     user != null ? user.getName() : UNKNOWN_USER,
-                    user != null ? user.getAge(userTimeZone).orElse(0) : 0,
+                    UserPresentationSupport.safeAge(user, userTimeZone),
                     standout.rank(),
                     standout.score(),
                     standout.reason(),
@@ -353,7 +356,7 @@ final class RestApiDtos {
             return new ProfileUpdateResponse(
                     user.getId(),
                     user.getName(),
-                    user.getAge(userTimeZone).orElse(0),
+                    UserPresentationSupport.safeAge(user, userTimeZone),
                     user.getBio(),
                     user.getGender() != null ? user.getGender().name() : null,
                     user.getInterestedIn().stream().map(Enum::name).toList(),
@@ -522,7 +525,8 @@ final class RestApiDtos {
             List<AchievementUnlockedDto> newlyUnlocked,
             int unlockedCount,
             int newlyUnlockedCount) {
-        static AchievementSnapshotDto from(datingapp.app.usecase.profile.ProfileUseCases.AchievementSnapshot snapshot) {
+        static AchievementSnapshotDto from(
+                datingapp.app.usecase.profile.ProfileInsightsUseCases.AchievementSnapshot snapshot) {
             return new AchievementSnapshotDto(
                     snapshot.unlocked().stream()
                             .map(AchievementUnlockedDto::from)

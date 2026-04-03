@@ -11,6 +11,7 @@ import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
 import datingapp.core.profile.MatchPreferences.Interest;
 import datingapp.core.profile.ProfileService;
+import datingapp.core.profile.ValidationService;
 import datingapp.core.testutil.TestStorages;
 import datingapp.core.testutil.TestUserFactory;
 import datingapp.ui.async.UiThreadDispatcher;
@@ -19,7 +20,9 @@ import java.lang.reflect.Modifier;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.ArrayList;
+import java.util.ConcurrentModificationException;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.UUID;
@@ -86,14 +89,7 @@ class ProfileViewModelTest {
         users.save(currentUser);
         session.setCurrentUser(currentUser);
 
-        ProfileViewModel viewModel = new ProfileViewModel(
-                new UiDataAdapters.StorageUiUserStore(users),
-                profileService,
-                (datingapp.app.usecase.profile.ProfileUseCases) null,
-                config,
-                session,
-                TEST_DISPATCHER,
-                new datingapp.core.workflow.ProfileActivationPolicy());
+        ProfileViewModel viewModel = newMutationBackedProfileViewModel(users, config, profileService);
         viewModel.loadCurrentUser();
 
         Path firstPhoto = createTempImageFile("photo-one");
@@ -112,16 +108,20 @@ class ProfileViewModelTest {
 
         viewModel.setPrimaryPhoto(1);
         assertTrue(waitUntil(
-                () -> !viewModel.getPhotoUrls().isEmpty()
-                        && secondManagedUri.equals(viewModel.getPhotoUrls().getFirst()),
+                () -> {
+                    List<String> urls = snapshotPhotoUrls(viewModel);
+                    return !urls.isEmpty() && secondManagedUri.equals(urls.getFirst());
+                },
                 5000));
         assertEquals(secondManagedUri, viewModel.getPhotoUrls().getFirst());
 
         viewModel.deletePhoto(0);
         assertTrue(waitUntil(() -> viewModel.getPhotoUrls().size() == 1, 5000));
         assertTrue(waitUntil(
-                () -> !viewModel.getPhotoUrls().isEmpty()
-                        && firstManagedUri.equals(viewModel.getPhotoUrls().getFirst()),
+                () -> {
+                    List<String> urls = snapshotPhotoUrls(viewModel);
+                    return !urls.isEmpty() && firstManagedUri.equals(urls.getFirst());
+                },
                 5000));
         assertEquals(firstManagedUri, viewModel.getPhotoUrls().getFirst());
         assertTrue(Files.exists(Path.of(URI.create(firstManagedUri))));
@@ -147,14 +147,7 @@ class ProfileViewModelTest {
         users.save(currentUser);
         session.setCurrentUser(currentUser);
 
-        ProfileViewModel viewModel = new ProfileViewModel(
-                new UiDataAdapters.StorageUiUserStore(users),
-                profileService,
-                (datingapp.app.usecase.profile.ProfileUseCases) null,
-                config,
-                session,
-                TEST_DISPATCHER,
-                new datingapp.core.workflow.ProfileActivationPolicy());
+        ProfileViewModel viewModel = newMutationBackedProfileViewModel(users, config, profileService);
         viewModel.loadCurrentUser();
 
         List<Path> sourcePhotos = new ArrayList<>();
@@ -200,14 +193,7 @@ class ProfileViewModelTest {
         users.save(currentUser);
         session.setCurrentUser(currentUser);
 
-        ProfileViewModel viewModel = new ProfileViewModel(
-                new UiDataAdapters.StorageUiUserStore(users),
-                profileService,
-                (datingapp.app.usecase.profile.ProfileUseCases) null,
-                config,
-                session,
-                TEST_DISPATCHER,
-                new datingapp.core.workflow.ProfileActivationPolicy());
+        ProfileViewModel viewModel = newMutationBackedProfileViewModel(users, config, profileService);
         viewModel.loadCurrentUser();
         viewModel.bioProperty().set("Updated bio");
         viewModel.setLocationCoordinates(12.3456, -45.6789);
@@ -239,14 +225,7 @@ class ProfileViewModelTest {
         users.save(currentUser);
         session.setCurrentUser(currentUser);
 
-        ProfileViewModel viewModel = new ProfileViewModel(
-                new UiDataAdapters.StorageUiUserStore(users),
-                profileService,
-                (datingapp.app.usecase.profile.ProfileUseCases) null,
-                config,
-                session,
-                TEST_DISPATCHER,
-                new datingapp.core.workflow.ProfileActivationPolicy());
+        ProfileViewModel viewModel = newMutationBackedProfileViewModel(users, config, profileService);
         viewModel.loadCurrentUser();
         viewModel.bioProperty().set("Updated bio for activation");
 
@@ -275,14 +254,7 @@ class ProfileViewModelTest {
         users.save(currentUser);
         session.setCurrentUser(currentUser);
 
-        ProfileViewModel viewModel = new ProfileViewModel(
-                new UiDataAdapters.StorageUiUserStore(users),
-                profileService,
-                (datingapp.app.usecase.profile.ProfileUseCases) null,
-                config,
-                session,
-                TEST_DISPATCHER,
-                new datingapp.core.workflow.ProfileActivationPolicy());
+        ProfileViewModel viewModel = newMutationBackedProfileViewModel(users, config, profileService);
         viewModel.loadCurrentUser();
         viewModel.bioProperty().set("Updated active bio");
 
@@ -302,6 +274,56 @@ class ProfileViewModelTest {
     }
 
     @Test
+    @DisplayName("saveAsync works with explicit mutation use cases and no profile facade")
+    void saveAsyncWorksWithExplicitMutationUseCasesAndNoProfileFacade() throws Exception {
+        TestStorages.Users users = new TestStorages.Users();
+        AppConfig config = AppConfig.defaults();
+        ProfileService profileService = new ProfileService(users);
+        ValidationService validationService = new ValidationService(config);
+
+        User currentUser = createActiveUser("ExplicitMutationUser");
+        currentUser.setBio("Original bio");
+        users.save(currentUser);
+        session.setCurrentUser(currentUser);
+
+        var mutationUseCases = new datingapp.app.usecase.profile.ProfileMutationUseCases(
+                users,
+                validationService,
+                datingapp.core.testutil.TestAchievementService.empty(),
+                config,
+                new datingapp.core.workflow.ProfileActivationPolicy(),
+                new datingapp.app.testutil.TestEventBus());
+
+        ProfileViewModel viewModel = new ProfileViewModel(new ProfileViewModel.Dependencies(
+                new UiDataAdapters.StorageUiUserStore(users),
+                profileService,
+                mutationUseCases,
+                null,
+                config,
+                session,
+                validationService,
+                new datingapp.core.profile.LocationService(validationService),
+                TEST_DISPATCHER,
+                new datingapp.core.workflow.ProfileActivationPolicy()));
+        viewModel.loadCurrentUser();
+        viewModel.bioProperty().set("Saved via explicit mutation use case");
+
+        AtomicReference<SaveOutcome> saveResult = new AtomicReference<>();
+        CountDownLatch latch = new CountDownLatch(1);
+        viewModel.saveAsync(outcome -> {
+            saveResult.set(outcome);
+            latch.countDown();
+        });
+
+        assertTrue(latch.await(5, TimeUnit.SECONDS));
+        assertEquals(SaveOutcome.ACTIVATED, saveResult.get());
+        assertEquals(
+                "Saved via explicit mutation use case", session.getCurrentUser().getBio());
+
+        viewModel.dispose();
+    }
+
+    @Test
     @DisplayName("saveAsync failure keeps the original session user unchanged")
     void saveAsyncFailureKeepsOriginalSessionUserUnchanged() throws Exception {
         TestStorages.Users users = new TestStorages.Users();
@@ -313,27 +335,96 @@ class ProfileViewModelTest {
         users.save(currentUser);
         session.setCurrentUser(currentUser);
 
-        UiDataAdapters.UiUserStore failingStore = new UiDataAdapters.UiUserStore() {
-            @Override
-            public java.util.List<User> findAll() {
-                return users.findAll();
-            }
-
+        datingapp.core.storage.UserStorage failingUserStorage = new datingapp.core.storage.UserStorage() {
             @Override
             public void save(User user) {
                 throw new IllegalStateException("Simulated save failure");
             }
 
             @Override
+            public java.util.Optional<User> get(UUID id) {
+                return users.get(id);
+            }
+
+            @Override
+            public java.util.List<User> findAll() {
+                return users.findAll();
+            }
+
+            @Override
+            public java.util.List<User> findActive() {
+                return users.findActive();
+            }
+
+            @Override
+            public java.util.List<User> findCandidates(
+                    UUID excludeId,
+                    java.util.Set<Gender> genders,
+                    int minAge,
+                    int maxAge,
+                    double seekerLat,
+                    double seekerLon,
+                    int maxDistanceKm) {
+                return users.findCandidates(excludeId, genders, minAge, maxAge, seekerLat, seekerLon, maxDistanceKm);
+            }
+
+            @Override
+            public datingapp.core.storage.PageData<User> getPageOfActiveUsers(int offset, int limit) {
+                return users.getPageOfActiveUsers(offset, limit);
+            }
+
+            @Override
+            public datingapp.core.storage.PageData<User> getPageOfAllUsers(int offset, int limit) {
+                return users.getPageOfAllUsers(offset, limit);
+            }
+
+            @Override
             public java.util.Map<UUID, User> findByIds(java.util.Set<UUID> ids) {
                 return users.findByIds(ids);
+            }
+
+            @Override
+            public void delete(UUID id) {
+                users.delete(id);
+            }
+
+            @Override
+            public int purgeDeletedBefore(Instant threshold) {
+                return users.purgeDeletedBefore(threshold);
+            }
+
+            @Override
+            public void saveProfileNote(datingapp.core.model.ProfileNote note) {
+                users.saveProfileNote(note);
+            }
+
+            @Override
+            public java.util.Optional<datingapp.core.model.ProfileNote> getProfileNote(UUID authorId, UUID subjectId) {
+                return users.getProfileNote(authorId, subjectId);
+            }
+
+            @Override
+            public java.util.List<datingapp.core.model.ProfileNote> getProfileNotesByAuthor(UUID authorId) {
+                return users.getProfileNotesByAuthor(authorId);
+            }
+
+            @Override
+            public boolean deleteProfileNote(UUID authorId, UUID subjectId) {
+                return users.deleteProfileNote(authorId, subjectId);
             }
         };
 
         ProfileViewModel viewModel = new ProfileViewModel(
-                failingStore,
+                new UiDataAdapters.StorageUiUserStore(users),
                 profileService,
-                (datingapp.app.usecase.profile.ProfileUseCases) null,
+                new datingapp.app.usecase.profile.ProfileMutationUseCases(
+                        failingUserStorage,
+                        new ValidationService(config),
+                        datingapp.core.testutil.TestAchievementService.empty(),
+                        config,
+                        new datingapp.core.workflow.ProfileActivationPolicy(),
+                        new datingapp.app.testutil.TestEventBus()),
+                null,
                 config,
                 session,
                 TEST_DISPATCHER,
@@ -371,14 +462,7 @@ class ProfileViewModelTest {
         users.save(currentUser);
         session.setCurrentUser(currentUser);
 
-        ProfileViewModel viewModel = new ProfileViewModel(
-                new UiDataAdapters.StorageUiUserStore(users),
-                profileService,
-                (datingapp.app.usecase.profile.ProfileUseCases) null,
-                config,
-                session,
-                TEST_DISPATCHER,
-                new datingapp.core.workflow.ProfileActivationPolicy());
+        ProfileViewModel viewModel = newMutationBackedProfileViewModel(users, config, profileService);
 
         viewModel.loadCurrentUser();
 
@@ -401,14 +485,7 @@ class ProfileViewModelTest {
         users.save(currentUser);
         session.setCurrentUser(currentUser);
 
-        ProfileViewModel viewModel = new ProfileViewModel(
-                new UiDataAdapters.StorageUiUserStore(users),
-                profileService,
-                (datingapp.app.usecase.profile.ProfileUseCases) null,
-                config,
-                session,
-                TEST_DISPATCHER,
-                new datingapp.core.workflow.ProfileActivationPolicy());
+        ProfileViewModel viewModel = newMutationBackedProfileViewModel(users, config, profileService);
 
         viewModel.loadCurrentUser();
 
@@ -434,14 +511,7 @@ class ProfileViewModelTest {
         users.save(currentUser);
         session.setCurrentUser(currentUser);
 
-        ProfileViewModel viewModel = new ProfileViewModel(
-                new UiDataAdapters.StorageUiUserStore(users),
-                profileService,
-                (datingapp.app.usecase.profile.ProfileUseCases) null,
-                config,
-                session,
-                TEST_DISPATCHER,
-                new datingapp.core.workflow.ProfileActivationPolicy());
+        ProfileViewModel viewModel = newMutationBackedProfileViewModel(users, config, profileService);
 
         Path oversizedPhoto = Files.createTempFile("oversized-photo", ".jpg");
         Files.write(oversizedPhoto, new byte[(5 * 1024 * 1024) + 1]);
@@ -465,14 +535,7 @@ class ProfileViewModelTest {
         users.save(currentUser);
         session.setCurrentUser(currentUser);
 
-        ProfileViewModel viewModel = new ProfileViewModel(
-                new UiDataAdapters.StorageUiUserStore(users),
-                profileService,
-                (datingapp.app.usecase.profile.ProfileUseCases) null,
-                config,
-                session,
-                TEST_DISPATCHER,
-                new datingapp.core.workflow.ProfileActivationPolicy());
+        ProfileViewModel viewModel = newMutationBackedProfileViewModel(users, config, profileService);
 
         viewModel.loadCurrentUser();
 
@@ -521,17 +584,12 @@ class ProfileViewModelTest {
         users.save(currentUser);
         session.setCurrentUser(currentUser);
 
-        ProfileViewModel viewModel = new ProfileViewModel(
-                new UiDataAdapters.StorageUiUserStore(users),
-                profileService,
-                (datingapp.app.usecase.profile.ProfileUseCases) null,
-                config,
-                session,
-                TEST_DISPATCHER,
-                new datingapp.core.workflow.ProfileActivationPolicy());
+        ProfileViewModel viewModel = newMutationBackedProfileViewModel(users, config, profileService);
         viewModel.loadCurrentUser();
         viewModel.getInterestedInGenders().clear();
         viewModel.getSelectedInterests().clear();
+        AtomicReference<String> errorMessage = new AtomicReference<>();
+        viewModel.setErrorHandler(errorMessage::set);
 
         AtomicReference<SaveOutcome> saveResult = new AtomicReference<>();
         CountDownLatch latch = new CountDownLatch(1);
@@ -541,7 +599,7 @@ class ProfileViewModelTest {
         });
 
         assertTrue(latch.await(5, TimeUnit.SECONDS));
-        assertEquals(SaveOutcome.ACTIVATED, saveResult.get());
+        assertEquals(SaveOutcome.ACTIVATED, saveResult.get(), errorMessage.get());
         assertTrue(session.getCurrentUser().getInterestedIn().isEmpty());
         assertTrue(session.getCurrentUser().getInterests().isEmpty());
 
@@ -569,6 +627,25 @@ class ProfileViewModelTest {
         return file;
     }
 
+    private ProfileViewModel newMutationBackedProfileViewModel(
+            TestStorages.Users users, AppConfig config, ProfileService profileService) {
+        return new ProfileViewModel(
+                new UiDataAdapters.StorageUiUserStore(users),
+                profileService,
+                new datingapp.app.usecase.profile.ProfileMutationUseCases(
+                        users,
+                        new ValidationService(config),
+                        datingapp.core.testutil.TestAchievementService.empty(),
+                        config,
+                        new datingapp.core.workflow.ProfileActivationPolicy(),
+                        new datingapp.app.testutil.TestEventBus()),
+                null,
+                config,
+                session,
+                TEST_DISPATCHER,
+                new datingapp.core.workflow.ProfileActivationPolicy());
+    }
+
     private static boolean waitUntil(BooleanSupplier condition, long timeoutMillis) {
         long deadlineNanos = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMillis);
         while (System.nanoTime() < deadlineNanos) {
@@ -578,6 +655,17 @@ class ProfileViewModelTest {
             LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(25));
         }
         return condition.getAsBoolean();
+    }
+
+    private static List<String> snapshotPhotoUrls(ProfileViewModel viewModel) {
+        for (int attempt = 0; attempt < 5; attempt++) {
+            try {
+                return List.copyOf(viewModel.getPhotoUrls());
+            } catch (ConcurrentModificationException _) {
+                LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(10));
+            }
+        }
+        return List.copyOf(viewModel.getPhotoUrls());
     }
 
     private static User createActiveUser(String name) {

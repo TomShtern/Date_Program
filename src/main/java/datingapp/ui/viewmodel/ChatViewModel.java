@@ -3,9 +3,6 @@ package datingapp.ui.viewmodel;
 import datingapp.app.usecase.common.UseCaseResult;
 import datingapp.app.usecase.common.UserContext;
 import datingapp.app.usecase.messaging.MessagingUseCases;
-import datingapp.app.usecase.messaging.MessagingUseCases.ListConversationsQuery;
-import datingapp.app.usecase.messaging.MessagingUseCases.LoadConversationQuery;
-import datingapp.app.usecase.messaging.MessagingUseCases.OpenConversationCommand;
 import datingapp.app.usecase.messaging.MessagingUseCases.SendMessageCommand;
 import datingapp.app.usecase.social.SocialUseCases;
 import datingapp.app.usecase.social.SocialUseCases.RelationshipCommand;
@@ -22,6 +19,9 @@ import datingapp.core.model.User;
 import datingapp.ui.async.JavaFxUiThreadDispatcher;
 import datingapp.ui.async.TaskHandle;
 import datingapp.ui.async.UiThreadDispatcher;
+import datingapp.ui.viewmodel.ConversationLoader.ConversationRefreshData;
+import datingapp.ui.viewmodel.ConversationLoader.MessageLoadData;
+import datingapp.ui.viewmodel.ConversationLoader.OpenConversationData;
 import datingapp.ui.viewmodel.UiDataAdapters.NoOpUiPresenceDataAccess;
 import datingapp.ui.viewmodel.UiDataAdapters.NoOpUiProfileNoteDataAccess;
 import datingapp.ui.viewmodel.UiDataAdapters.PresenceStatus;
@@ -70,6 +70,7 @@ public class ChatViewModel extends BaseViewModel {
     }
 
     private final MessagingUseCases messagingUseCases;
+    private final ConversationLoader conversationLoader;
     private final SocialUseCases socialUseCases;
     private final UiProfileNoteDataAccess noteDataAccess;
     private final UiPresenceDataAccess presenceDataAccess;
@@ -150,6 +151,7 @@ public class ChatViewModel extends BaseViewModel {
             ChatUiDependencies uiDependencies) {
         super("chat", uiDispatcher);
         this.messagingUseCases = Objects.requireNonNull(messagingUseCases, "messagingUseCases cannot be null");
+        this.conversationLoader = new ConversationLoader(this.messagingUseCases);
         this.socialUseCases = Objects.requireNonNull(socialUseCases, "socialUseCases cannot be null");
         this.session = Objects.requireNonNull(session, "session cannot be null");
         this.conversationPollInterval =
@@ -458,20 +460,13 @@ public class ChatViewModel extends BaseViewModel {
     }
 
     private ConversationRefreshData refreshConversationData(User user) {
-        List<ConversationPreview> previews = null;
-        int unread = totalUnreadCount.get();
         try {
             logInfo("Refreshing conversations for user: {}", user.getName());
-            var result = messagingUseCases.listConversations(
-                    new ListConversationsQuery(UserContext.ui(user.getId()), 50, 0));
-            if (result.success()) {
-                previews = result.data().conversations();
-                unread = result.data().totalUnreadCount();
-            }
+            return conversationLoader.refreshConversations(user, totalUnreadCount.get());
         } catch (Exception e) {
             logError("Failed to refresh conversations", e);
         }
-        return new ConversationRefreshData(previews, unread);
+        return new ConversationRefreshData(null, totalUnreadCount.get());
     }
 
     private void applyConversationRefreshData(ConversationRefreshData data) {
@@ -521,20 +516,13 @@ public class ChatViewModel extends BaseViewModel {
     }
 
     private OpenConversationData loadOpenConversation(User user, UUID otherUserId) {
-        ConversationPreview preview = null;
-        boolean loaded = false;
         try {
-            var result = messagingUseCases.openConversation(
-                    new OpenConversationCommand(UserContext.ui(user.getId()), otherUserId));
-            if (result.success()) {
-                preview = result.data().preview();
-                loaded = true;
-            }
+            return conversationLoader.openConversation(user, otherUserId);
         } catch (Exception e) {
             logError("Failed to open conversation", e);
             asyncScope.onError("open conversation", e);
         }
-        return new OpenConversationData(loaded, preview);
+        return new OpenConversationData(false, null);
     }
 
     private void upsertConversationPreview(ConversationPreview preview) {
@@ -613,30 +601,14 @@ public class ChatViewModel extends BaseViewModel {
      * @param user           the current user
      */
     private MessageLoadData loadMessagesInBackground(String conversationId, UUID otherUserId, User user) {
-        List<Message> messages = null;
-        Integer unread = null;
-        List<ConversationPreview> previews = null;
         try {
             logInfo("Loading messages for conversation: {}", otherUserId);
-            var result = messagingUseCases.loadConversation(
-                    new LoadConversationQuery(UserContext.ui(user.getId()), otherUserId, 100, 0, true));
-            if (result.success()) {
-                messages = result.data().messages();
-                var conversationsResult = messagingUseCases.listConversations(
-                        new ListConversationsQuery(UserContext.ui(user.getId()), 50, 0));
-                if (conversationsResult.success()) {
-                    unread = conversationsResult.data().totalUnreadCount();
-                    previews = conversationsResult.data().conversations();
-                }
-            } else {
-                logError("Failed to load messages: " + result.error().message(), null);
-            }
+            return conversationLoader.loadMessages(user, otherUserId, conversationId);
         } catch (Exception e) {
             logError("Failed to load messages", e);
             asyncScope.onError(TASK_LOAD_MESSAGES, e);
         }
-
-        return new MessageLoadData(conversationId, messages, unread, previews);
+        return new MessageLoadData(conversationId, null, null, null);
     }
 
     /**
@@ -1061,11 +1033,4 @@ public class ChatViewModel extends BaseViewModel {
     public StringProperty presenceUnavailableMessageProperty() {
         return presenceUnavailableMessage;
     }
-
-    private record ConversationRefreshData(@Nullable List<ConversationPreview> previews, int unreadCount) {}
-
-    private record OpenConversationData(boolean loaded, ConversationPreview preview) {}
-
-    private record MessageLoadData(
-            String conversationId, List<Message> messages, Integer unreadCount, List<ConversationPreview> previews) {}
 }

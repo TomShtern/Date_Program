@@ -24,8 +24,6 @@ import datingapp.core.testutil.TestStorages;
 import datingapp.ui.JavaFxTestSupport;
 import datingapp.ui.NavigationService;
 import datingapp.ui.viewmodel.MatchesViewModel;
-import datingapp.ui.viewmodel.UiDataAdapters.StorageUiMatchDataAccess;
-import datingapp.ui.viewmodel.UiDataAdapters.StorageUiUserStore;
 import java.lang.reflect.Field;
 import java.time.ZoneId;
 import java.util.EnumSet;
@@ -204,14 +202,7 @@ class MatchesControllerTest {
 
             this.viewModel = new MatchesViewModel(
                     new MatchesViewModel.Dependencies(
-                            new StorageUiMatchDataAccess(interactions, trustSafetyStorage),
-                            new StorageUiUserStore(users),
-                            matchingService,
-                            dailyService,
-                            matchingUseCases,
-                            profileUseCases,
-                            socialUseCases,
-                            config),
+                            dailyService, matchingUseCases, profileUseCases, socialUseCases, config),
                     AppSession.getInstance(),
                     JavaFxTestSupport.blockingUiDispatcher());
         }

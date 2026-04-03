@@ -11,6 +11,7 @@ import datingapp.core.metrics.EngagementDomain.Achievement.UserAchievement;
 import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
 import datingapp.core.profile.MatchPreferences.Dealbreakers;
+import datingapp.core.profile.MatchPreferences.Lifestyle;
 import datingapp.core.profile.SanitizerUtils;
 import datingapp.core.profile.ValidationService;
 import datingapp.core.storage.AccountCleanupStorage;
@@ -19,6 +20,7 @@ import datingapp.core.workflow.ProfileActivationPolicy;
 import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -98,7 +100,8 @@ public final class ProfileMutationUseCases {
                                 + config.validation().maxAge()));
             }
 
-            applyMinimalCreateProfile(user, command.age(), command.gender(), command.interestedIn());
+            ProfileNormalizationSupport.applyMinimalBootstrap(
+                    user, config, command.age(), command.gender(), command.interestedIn());
             userStorage.save(user);
             return UseCaseResult.success(new CreateUserResult(user));
         } catch (Exception e) {
@@ -106,7 +109,7 @@ public final class ProfileMutationUseCases {
         }
     }
 
-    public UseCaseResult<ProfileUseCases.ProfileSaveResult> saveProfile(ProfileUseCases.SaveProfileCommand command) {
+    public UseCaseResult<ProfileSaveResult> saveProfile(SaveProfileCommand command) {
         if (command == null || command.context() == null || command.user() == null) {
             return UseCaseResult.failure(UseCaseError.validation("Context and user are required"));
         }
@@ -145,10 +148,10 @@ public final class ProfileMutationUseCases {
                     "Post-profile-completed event failed for user " + user.getId());
         }
 
-        return UseCaseResult.success(new ProfileUseCases.ProfileSaveResult(user, activated, newAchievements));
+        return UseCaseResult.success(new ProfileSaveResult(user, activated, newAchievements));
     }
 
-    public UseCaseResult<User> updateDiscoveryPreferences(ProfileUseCases.UpdateDiscoveryPreferencesCommand command) {
+    public UseCaseResult<User> updateDiscoveryPreferences(UpdateDiscoveryPreferencesCommand command) {
         if (command == null || command.context() == null) {
             return UseCaseResult.failure(UseCaseError.validation(CONTEXT_REQUIRED));
         }
@@ -162,28 +165,16 @@ public final class ProfileMutationUseCases {
         }
 
         try {
-            int minAge = Math.clamp(
-                    command.minAge(),
-                    config.validation().minAge(),
-                    config.validation().maxAge());
-            int maxAge = Math.clamp(
-                    command.maxAge(),
-                    config.validation().minAge(),
-                    config.validation().maxAge());
-            if (minAge > maxAge) {
-                int swap = minAge;
-                minAge = maxAge;
-                maxAge = swap;
-            }
-
-            int maxDistance =
-                    Math.clamp(command.maxDistanceKm(), 1, config.matching().maxDistanceKm());
+            ProfileNormalizationSupport.DiscoveryPreferences discoveryPreferences =
+                    ProfileNormalizationSupport.normalizeDiscoveryPreferences(
+                            config, command.minAge(), command.maxAge(), command.maxDistanceKm());
             user.setAgeRange(
-                    minAge,
-                    maxAge,
+                    discoveryPreferences.minAge(),
+                    discoveryPreferences.maxAge(),
                     config.validation().minAge(),
                     config.validation().maxAge());
-            user.setMaxDistanceKm(maxDistance, config.matching().maxDistanceKm());
+            user.setMaxDistanceKm(
+                    discoveryPreferences.maxDistanceKm(), config.matching().maxDistanceKm());
 
             if (command.interestedIn() != null) {
                 user.setInterestedIn(command.interestedIn());
@@ -196,8 +187,7 @@ public final class ProfileMutationUseCases {
         }
     }
 
-    public UseCaseResult<ProfileUseCases.ProfileSaveResult> updateProfile(
-            ProfileUseCases.UpdateProfileCommand command) {
+    public UseCaseResult<ProfileSaveResult> updateProfile(UpdateProfileCommand command) {
         if (command == null || command.context() == null) {
             return UseCaseResult.failure(UseCaseError.validation(CONTEXT_REQUIRED));
         }
@@ -223,8 +213,7 @@ public final class ProfileMutationUseCases {
             return UseCaseResult.failure(UseCaseError.validation(e.getMessage()));
         }
 
-        UseCaseResult<ProfileUseCases.ProfileSaveResult> saveResult =
-                saveProfile(new ProfileUseCases.SaveProfileCommand(command.context(), user));
+        UseCaseResult<ProfileSaveResult> saveResult = saveProfile(new SaveProfileCommand(command.context(), user));
         if (saveResult.success()
                 && command.latitude() != null
                 && command.longitude() != null
@@ -238,7 +227,7 @@ public final class ProfileMutationUseCases {
         return saveResult;
     }
 
-    public UseCaseResult<Void> deleteAccount(ProfileUseCases.DeleteAccountCommand command) {
+    public UseCaseResult<Void> deleteAccount(DeleteAccountCommand command) {
         if (command == null || command.context() == null) {
             return UseCaseResult.failure(UseCaseError.validation(CONTEXT_REQUIRED));
         }
@@ -296,7 +285,7 @@ public final class ProfileMutationUseCases {
         }
     }
 
-    private void applyProfileTextAndIdentityFields(User user, ProfileUseCases.UpdateProfileCommand command) {
+    private void applyProfileTextAndIdentityFields(User user, UpdateProfileCommand command) {
         if (command.bio() != null) {
             assertValid(validationService.validateBio(command.bio()));
             user.setBio(SanitizerUtils.sanitize(command.bio()));
@@ -313,7 +302,7 @@ public final class ProfileMutationUseCases {
         }
     }
 
-    private void applyProfileLocationFields(User user, ProfileUseCases.UpdateProfileCommand command) {
+    private void applyProfileLocationFields(User user, UpdateProfileCommand command) {
         if (command.latitude() == null && command.longitude() == null) {
             return;
         }
@@ -329,7 +318,7 @@ public final class ProfileMutationUseCases {
         }
     }
 
-    private void applyProfilePreferenceFields(User user, ProfileUseCases.UpdateProfileCommand command) {
+    private void applyProfilePreferenceFields(User user, UpdateProfileCommand command) {
         if (command.maxDistanceKm() != null && command.latitude() == null && command.longitude() == null) {
             assertValid(validationService.validateDistance(command.maxDistanceKm()));
             user.setMaxDistanceKm(command.maxDistanceKm(), config.matching().maxDistanceKm());
@@ -354,7 +343,7 @@ public final class ProfileMutationUseCases {
                 config.validation().maxAge());
     }
 
-    private void applyProfileLifestyleFields(User user, ProfileUseCases.UpdateProfileCommand command) {
+    private void applyProfileLifestyleFields(User user, UpdateProfileCommand command) {
         if (command.heightCm() != null) {
             assertValid(validationService.validateHeight(command.heightCm()));
             user.setHeightCm(command.heightCm());
@@ -398,25 +387,6 @@ public final class ProfileMutationUseCases {
         }
     }
 
-    private void applyMinimalCreateProfile(User user, int age, Gender gender, Gender interestedIn) {
-        user.setBirthDate(AppClock.today().minusYears(age));
-        user.setGender(gender);
-        user.setInterestedIn(java.util.EnumSet.of(interestedIn));
-        user.setBio("");
-
-        int minAge = Math.max(config.validation().minAge(), age - 5);
-        int maxAge = Math.min(config.validation().maxAge(), age + 5);
-        user.setAgeRange(
-                minAge,
-                maxAge,
-                config.validation().minAge(),
-                config.validation().maxAge());
-        user.setMaxDistanceKm(50, config.matching().maxDistanceKm());
-        user.setPhotoUrls(List.of());
-        user.setPacePreferences(null);
-        user.setDealbreakers(Dealbreakers.none());
-    }
-
     private static void assertValid(ValidationService.ValidationResult validationResult) {
         if (!validationResult.valid()) {
             String message = validationResult.errors().isEmpty()
@@ -425,6 +395,44 @@ public final class ProfileMutationUseCases {
             throw new IllegalArgumentException(message);
         }
     }
+
+    public static record SaveProfileCommand(datingapp.app.usecase.common.UserContext context, User user) {}
+
+    public static record ProfileSaveResult(User user, boolean activated, List<UserAchievement> newlyUnlocked) {
+        public ProfileSaveResult {
+            newlyUnlocked = newlyUnlocked == null ? List.of() : List.copyOf(newlyUnlocked);
+        }
+    }
+
+    public static record UpdateDiscoveryPreferencesCommand(
+            datingapp.app.usecase.common.UserContext context,
+            int minAge,
+            int maxAge,
+            int maxDistanceKm,
+            Set<Gender> interestedIn) {}
+
+    public static record UpdateProfileCommand(
+            datingapp.app.usecase.common.UserContext context,
+            String bio,
+            java.time.LocalDate birthDate,
+            Gender gender,
+            Set<Gender> interestedIn,
+            Double latitude,
+            Double longitude,
+            Integer maxDistanceKm,
+            Integer minAge,
+            Integer maxAge,
+            Integer heightCm,
+            Lifestyle.Smoking smoking,
+            Lifestyle.Drinking drinking,
+            Lifestyle.WantsKids wantsKids,
+            Lifestyle.LookingFor lookingFor,
+            Lifestyle.Education education,
+            Set<datingapp.core.profile.MatchPreferences.Interest> interests,
+            Dealbreakers dealbreakers) {}
+
+    public static record DeleteAccountCommand(
+            datingapp.app.usecase.common.UserContext context, AppEvent.DeletionReason reason) {}
 
     public static record CreateUserCommand(String name, Integer age, Gender gender, Gender interestedIn) {}
 

@@ -2,38 +2,23 @@ package datingapp.ui.viewmodel;
 
 import datingapp.app.usecase.common.UserContext;
 import datingapp.app.usecase.matching.MatchingUseCases;
-import datingapp.app.usecase.matching.MatchingUseCases.PendingLikersQuery;
 import datingapp.app.usecase.matching.MatchingUseCases.RecordLikeCommand;
 import datingapp.app.usecase.matching.MatchingUseCases.RemoveLikeCommand;
-import datingapp.app.usecase.matching.MatchingUseCases.SentLikesQuery;
 import datingapp.app.usecase.profile.ProfileUseCases;
 import datingapp.app.usecase.social.SocialUseCases;
-import datingapp.app.usecase.social.SocialUseCases.ListBlockedUsersQuery;
 import datingapp.app.usecase.social.SocialUseCases.RelationshipCommand;
 import datingapp.app.usecase.social.SocialUseCases.ReportCommand;
 import datingapp.core.AppConfig;
 import datingapp.core.AppSession;
-import datingapp.core.TextUtil;
 import datingapp.core.connection.ConnectionModels.Like;
 import datingapp.core.connection.ConnectionModels.Report;
-import datingapp.core.matching.MatchingService;
-import datingapp.core.matching.MatchingService.PendingLiker;
 import datingapp.core.matching.RecommendationService;
 import datingapp.core.model.Match;
 import datingapp.core.model.User;
-import datingapp.core.model.User.UserState;
-import datingapp.ui.async.JavaFxUiThreadDispatcher;
 import datingapp.ui.async.UiThreadDispatcher;
-import datingapp.ui.viewmodel.UiDataAdapters.UiMatchDataAccess;
-import datingapp.ui.viewmodel.UiDataAdapters.UiUserStore;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -70,14 +55,11 @@ public class MatchesViewModel extends BaseViewModel {
     /** Number of matches returned per page from storage. */
     private static final int PAGE_SIZE = 20;
 
-    private final UiMatchDataAccess matchData;
-    private final UiUserStore userStore;
-    private final MatchingService matchingService;
     private final RecommendationService dailyService;
     private final MatchingUseCases matchingUseCases;
-    private final ProfileUseCases profileUseCases;
     private final SocialUseCases socialUseCases;
-    private final AppConfig config;
+    private final MatchListLoader matchListLoader;
+    private final RelationshipActionRunner relationshipActionRunner;
     private final AppSession session;
     private final ObservableList<MatchCardData> matches = FXCollections.observableArrayList();
     private final ObservableList<LikeCardData> likesReceived = FXCollections.observableArrayList();
@@ -112,9 +94,6 @@ public class MatchesViewModel extends BaseViewModel {
     private final AtomicReference<User> currentUser = new AtomicReference<>();
 
     public record Dependencies(
-            UiMatchDataAccess matchData,
-            UiUserStore userStore,
-            MatchingService matchingService,
             RecommendationService dailyService,
             MatchingUseCases matchingUseCases,
             ProfileUseCases profileUseCases,
@@ -123,55 +102,25 @@ public class MatchesViewModel extends BaseViewModel {
 
         public Dependencies {
             Objects.requireNonNull(dailyService, "dailyService cannot be null");
-            if (matchingUseCases == null || profileUseCases == null || socialUseCases == null) {
-                Objects.requireNonNull(matchData, "matchData cannot be null when use-case slices are absent");
-                Objects.requireNonNull(userStore, "userStore cannot be null when use-case slices are absent");
-                Objects.requireNonNull(
-                        matchingService, "matchingService cannot be null when use-case slices are absent");
-            }
+            Objects.requireNonNull(matchingUseCases, "matchingUseCases cannot be null");
+            Objects.requireNonNull(profileUseCases, "profileUseCases cannot be null");
+            Objects.requireNonNull(socialUseCases, "socialUseCases cannot be null");
             Objects.requireNonNull(config, "config cannot be null");
         }
-    }
-
-    public MatchesViewModel(
-            UiMatchDataAccess matchData,
-            UiUserStore userStore,
-            MatchingService matchingService,
-            RecommendationService dailyService,
-            AppConfig config,
-            AppSession session) {
-        this(
-                new Dependencies(matchData, userStore, matchingService, dailyService, null, null, null, config),
-                session,
-                new JavaFxUiThreadDispatcher());
-    }
-
-    public MatchesViewModel(
-            UiMatchDataAccess matchData,
-            UiUserStore userStore,
-            MatchingService matchingService,
-            RecommendationService dailyService,
-            MatchingUseCases matchingUseCases,
-            AppConfig config,
-            AppSession session) {
-        this(
-                new Dependencies(
-                        matchData, userStore, matchingService, dailyService, matchingUseCases, null, null, config),
-                session,
-                new JavaFxUiThreadDispatcher());
     }
 
     public MatchesViewModel(Dependencies dependencies, AppSession session, UiThreadDispatcher uiDispatcher) {
         super("matches", Objects.requireNonNull(uiDispatcher, "uiDispatcher cannot be null"));
         Dependencies resolvedDependencies = Objects.requireNonNull(dependencies, "dependencies cannot be null");
-        this.matchData = resolvedDependencies.matchData();
-        this.userStore = resolvedDependencies.userStore();
-        this.matchingService = resolvedDependencies.matchingService();
         this.dailyService = resolvedDependencies.dailyService();
         this.matchingUseCases = resolvedDependencies.matchingUseCases();
-        this.profileUseCases = resolvedDependencies.profileUseCases();
         this.socialUseCases = resolvedDependencies.socialUseCases();
-        this.config = resolvedDependencies.config();
+        this.matchListLoader = new MatchListLoader(
+                resolvedDependencies.matchingUseCases(),
+                resolvedDependencies.profileUseCases(),
+                resolvedDependencies.socialUseCases(),
+                resolvedDependencies.config());
+        this.relationshipActionRunner = new RelationshipActionRunner(asyncScope);
         this.session = Objects.requireNonNull(session, "session cannot be null");
     }
 
@@ -270,226 +219,32 @@ public class MatchesViewModel extends BaseViewModel {
     }
 
     /**
-     * Private result record returned by {@link #fetchMatchesFromStorage(UUID)} so
-     * that
-     * pagination metadata (total count, has-more flag) can travel alongside the UI
-     * card data
-     * without an extra storage round-trip.
+     * Private result record returned by {@link #fetchMatchesFromUseCases(UUID, long)} so that
+     * pagination metadata (total count, has-more flag) can travel alongside the UI card data without
+     * an extra use-case round-trip.
      */
     private record MatchFetchResult(List<MatchCardData> cards, int totalCount, boolean hasMore) {}
 
-    private MatchFetchResult fetchMatchesFromStorage(UUID userId, long expectedEpoch) {
-        if (matchingUseCases != null && profileUseCases != null) {
-            return fetchMatchesFromUseCases(userId, expectedEpoch);
-        }
-
-        // Reservce PAGE_SIZE items atomically to prevent concurrent callers of
-        // fetchMatchesFromStorage from fetching the same page (TOCTOU race).
-        // currentMatchOffset is advanced immediately; we adjust it downward below
-        // if the storage call returns fewer items.
-        int offset = currentMatchOffset.getAndAdd(PAGE_SIZE);
-
-        // Call matchData.getPageOfActiveMatchesFor using the reserved offset.
-        UiDataAdapters.UiPage<Match> page = matchData.getPageOfActiveMatchesFor(userId, offset, PAGE_SIZE);
-
-        // If the returned page items size is less than PAGE_SIZE (last page),
-        // adjust currentMatchOffset downward so the counter accurately reflects
-        // the total items fetched.
-        // GUARD: Only adjust if the current fetch is still valid for its epoch.
-        // If a refreshAll() happened in between, currentMatchOffset has been reset
-        // to 0 and adjusting it would corrupt the new state (possibly making it
-        // negative).
-        int actualCount = page.items().size();
-        if (actualCount < PAGE_SIZE && refreshEpoch.get() == expectedEpoch) {
-            currentMatchOffset.addAndGet(actualCount - PAGE_SIZE);
-        }
-
-        List<UUID> otherUserIds =
-                page.items().stream().map(m -> m.getOtherUser(userId)).toList();
-        Map<UUID, User> otherUsers = userStore.findByIds(new HashSet<>(otherUserIds));
-
-        List<MatchCardData> cardData = new ArrayList<>();
-        for (Match match : page.items()) {
-            UUID otherUserId = match.getOtherUser(userId);
-            User otherUser = otherUsers.get(otherUserId);
-            if (otherUser != null) {
-                MatchQualitySummary qualitySummary = resolveMatchQualitySummary(userId, match);
-                cardData.add(new MatchCardData(
-                        match.getId(),
-                        otherUser.getId(),
-                        otherUser.getName(),
-                        TextUtil.formatTimeAgo(match.getCreatedAt()),
-                        match.getCreatedAt(),
-                        qualitySummary.score(),
-                        qualitySummary.label()));
-            }
-        }
-        return new MatchFetchResult(List.copyOf(cardData), page.totalCount(), page.hasMore());
-    }
-
     private MatchFetchResult fetchMatchesFromUseCases(UUID userId, long expectedEpoch) {
+        // Reserve PAGE_SIZE items atomically to prevent concurrent callers from fetching the same page
+        // (TOCTOU race). currentMatchOffset is advanced immediately; we adjust it downward below if the
+        // use-case call returns fewer items.
         int offset = currentMatchOffset.getAndAdd(PAGE_SIZE);
-        var matchesResult = matchingUseCases.listPagedMatches(
-                new MatchingUseCases.ListPagedMatchesQuery(UserContext.ui(userId), PAGE_SIZE, offset));
-        if (!matchesResult.success()) {
-            throw new IllegalStateException(
-                    matchesResult.error() != null ? matchesResult.error().message() : "Failed to load matches");
-        }
 
-        UiDataAdapters.UiPage<Match> page =
-                UiDataAdapters.UiPage.from(matchesResult.data().page());
-        int actualCount = page.items().size();
+        MatchListLoader.MatchPageResult pageResult = matchListLoader.loadMatchPage(userId, PAGE_SIZE, offset);
+        int actualCount = pageResult.cards().size();
         if (actualCount < PAGE_SIZE && refreshEpoch.get() == expectedEpoch) {
             currentMatchOffset.addAndGet(actualCount - PAGE_SIZE);
         }
-
-        List<UUID> otherUserIds =
-                page.items().stream().map(match -> match.getOtherUser(userId)).toList();
-        Map<UUID, User> otherUsers = loadUsersByIds(otherUserIds);
-
-        List<MatchCardData> cardData = new ArrayList<>();
-        for (Match match : page.items()) {
-            UUID otherUserId = match.getOtherUser(userId);
-            User otherUser = otherUsers.get(otherUserId);
-            if (otherUser != null) {
-                MatchQualitySummary qualitySummary = resolveMatchQualitySummary(userId, match);
-                cardData.add(new MatchCardData(
-                        match.getId(),
-                        otherUser.getId(),
-                        otherUser.getName(),
-                        TextUtil.formatTimeAgo(match.getCreatedAt()),
-                        match.getCreatedAt(),
-                        qualitySummary.score(),
-                        qualitySummary.label()));
-            }
-        }
-        return new MatchFetchResult(List.copyOf(cardData), page.totalCount(), page.hasMore());
+        return new MatchFetchResult(pageResult.cards(), pageResult.totalCount(), pageResult.hasMore());
     }
 
-    private MatchQualitySummary resolveMatchQualitySummary(UUID userId, Match match) {
-        if (matchingUseCases == null) {
-            return MatchQualitySummary.empty();
-        }
-        var quality =
-                matchingUseCases.matchQuality(new MatchingUseCases.MatchQualityQuery(UserContext.ui(userId), match));
-        if (!quality.success()) {
-            return MatchQualitySummary.empty();
-        }
-        return new MatchQualitySummary(
-                quality.data().compatibilityScore(), quality.data().getCompatibilityLabel());
-    }
-
-    private List<LikeCardData> fetchReceivedLikesFromStorage(UUID userId) {
-        List<LikeCardData> received = new ArrayList<>();
-        List<PendingLiker> pendingLikers;
-        if (matchingUseCases != null) {
-            var result = matchingUseCases.pendingLikers(new PendingLikersQuery(UserContext.ui(userId)));
-            if (!result.success()) {
-                throw new IllegalStateException(
-                        result.error() != null ? result.error().message() : "Failed to load likes received");
-            }
-            pendingLikers = result.data();
-        } else {
-            pendingLikers = matchingService.findPendingLikersWithTimes(userId);
-        }
-
-        for (PendingLiker pending : pendingLikers) {
-            User liker = pending.user();
-            if (liker != null && liker.getState() == UserState.ACTIVE) {
-                int age = liker.getAge(config.safety().userTimeZone()).orElse(0);
-                received.add(new LikeCardData(
-                        liker.getId(),
-                        null,
-                        liker.getName(),
-                        age,
-                        summarizeBio(liker),
-                        TextUtil.formatTimeAgo(pending.likedAt()),
-                        pending.likedAt()));
-            }
-        }
-        received.sort(likeTimeComparator());
-        return received;
-    }
-
-    private List<LikeCardData> fetchSentLikesFromStorage(UUID userId) {
-        if (matchingUseCases != null && profileUseCases != null && socialUseCases != null) {
-            return fetchSentLikesFromUseCases(userId);
-        }
-
-        Set<UUID> blocked = matchData.getBlockedUserIds(userId);
-        Set<UUID> matched = getMatchedUserIds(userId);
-        Set<UUID> allLikedOrPassedIds = matchData.getLikedOrPassedUserIds(userId);
-
-        List<UUID> candidateIds = allLikedOrPassedIds.stream()
-                .filter(id -> !blocked.contains(id) && !matched.contains(id))
-                .toList();
-
-        Map<UUID, User> potentialUsers = userStore.findByIds(new HashSet<>(candidateIds));
-        List<LikeCardData> sent = new ArrayList<>();
-
-        for (UUID otherUserId : candidateIds) {
-            Like like = matchData.getLike(userId, otherUserId).orElse(null);
-            if (like != null && like.direction() == Like.Direction.LIKE) {
-                User otherUser = potentialUsers.get(otherUserId);
-                if (otherUser != null && otherUser.getState() == UserState.ACTIVE) {
-                    int age = otherUser.getAge(config.safety().userTimeZone()).orElse(0);
-                    sent.add(new LikeCardData(
-                            otherUser.getId(),
-                            like.id(),
-                            otherUser.getName(),
-                            age,
-                            summarizeBio(otherUser),
-                            TextUtil.formatTimeAgo(like.createdAt()),
-                            like.createdAt()));
-                }
-            }
-        }
-        sent.sort(likeTimeComparator());
-        return sent;
+    private List<LikeCardData> fetchReceivedLikesFromUseCases(UUID userId) {
+        return matchListLoader.loadReceivedLikes(userId);
     }
 
     private List<LikeCardData> fetchSentLikesFromUseCases(UUID userId) {
-        var blockedUsersResult = socialUseCases.listBlockedUsers(new ListBlockedUsersQuery(UserContext.ui(userId)));
-        if (!blockedUsersResult.success()) {
-            throw new IllegalStateException(
-                    blockedUsersResult.error() != null
-                            ? blockedUsersResult.error().message()
-                            : "Failed to load blocked users");
-        }
-
-        Set<UUID> blockedUserIds = blockedUsersResult.data().stream()
-                .map(SocialUseCases.BlockedUserSummary::userId)
-                .collect(java.util.stream.Collectors.toSet());
-        var sentLikesResult = matchingUseCases.sentLikes(new SentLikesQuery(UserContext.ui(userId)));
-        if (!sentLikesResult.success()) {
-            throw new IllegalStateException(
-                    sentLikesResult.error() != null ? sentLikesResult.error().message() : "Failed to load sent likes");
-        }
-
-        List<MatchingUseCases.SentLikeSnapshot> sentLikeSnapshots = sentLikesResult.data().stream()
-                .filter(sentLike -> !blockedUserIds.contains(sentLike.userId()))
-                .toList();
-        Map<UUID, User> potentialUsers = loadUsersByIds(sentLikeSnapshots.stream()
-                .map(MatchingUseCases.SentLikeSnapshot::userId)
-                .toList());
-        List<LikeCardData> sent = new ArrayList<>();
-
-        for (MatchingUseCases.SentLikeSnapshot sentLike : sentLikeSnapshots) {
-            User otherUser = potentialUsers.get(sentLike.userId());
-            if (otherUser != null && otherUser.getState() == UserState.ACTIVE) {
-                int age = otherUser.getAge(config.safety().userTimeZone()).orElse(0);
-                sent.add(new LikeCardData(
-                        otherUser.getId(),
-                        sentLike.likeId(),
-                        otherUser.getName(),
-                        age,
-                        summarizeBio(otherUser),
-                        TextUtil.formatTimeAgo(sentLike.likedAt()),
-                        sentLike.likedAt()));
-            }
-        }
-        sent.sort(likeTimeComparator());
-        return sent;
+        return matchListLoader.loadSentLikes(userId);
     }
 
     /** Refresh the matches list. */
@@ -581,18 +336,7 @@ public class MatchesViewModel extends BaseViewModel {
 
         UUID userId = user.getId();
 
-        if (shouldRunAsync()) {
-            asyncScope.run(
-                    "like back",
-                    () -> {
-                        performLikeBack(userId, like.userId());
-                        return Boolean.TRUE;
-                    },
-                    _ -> refreshAll());
-            return;
-        }
-
-        executeActionSync("Failed to like back", () -> performLikeBack(userId, like.userId()), this::refreshAll);
+        runAction("like back", "Failed to like back", () -> performLikeBack(userId, like.userId()), this::refreshAll);
     }
 
     public void passOn(LikeCardData like) {
@@ -605,18 +349,7 @@ public class MatchesViewModel extends BaseViewModel {
 
         UUID userId = user.getId();
 
-        if (shouldRunAsync()) {
-            asyncScope.run(
-                    "pass on like",
-                    () -> {
-                        performPassOn(userId, like.userId());
-                        return Boolean.TRUE;
-                    },
-                    _ -> refreshAll());
-            return;
-        }
-
-        executeActionSync("Failed to pass", () -> performPassOn(userId, like.userId()), this::refreshAll);
+        runAction("pass on like", "Failed to pass", () -> performPassOn(userId, like.userId()), this::refreshAll);
     }
 
     public void withdrawLike(LikeCardData like) {
@@ -625,18 +358,8 @@ public class MatchesViewModel extends BaseViewModel {
             return;
         }
 
-        if (shouldRunAsync()) {
-            asyncScope.run(
-                    "withdraw like",
-                    () -> {
-                        performWithdrawLike(like.likeId());
-                        return Boolean.TRUE;
-                    },
-                    _ -> refreshAll());
-            return;
-        }
-
-        executeActionSync("Failed to withdraw like", () -> performWithdrawLike(like.likeId()), this::refreshAll);
+        runAction(
+                "withdraw like", "Failed to withdraw like", () -> performWithdrawLike(like.likeId()), this::refreshAll);
     }
 
     public void requestFriendZone(MatchCardData match) {
@@ -696,9 +419,9 @@ public class MatchesViewModel extends BaseViewModel {
 
     private RefreshPayload fetchRefreshPayload(UUID userId, String userName, long capturedEpoch) {
         try {
-            MatchFetchResult matchResult = fetchMatchesFromStorage(userId, capturedEpoch);
-            List<LikeCardData> received = fetchReceivedLikesFromStorage(userId);
-            List<LikeCardData> sent = fetchSentLikesFromStorage(userId);
+            MatchFetchResult matchResult = fetchMatchesFromUseCases(userId, capturedEpoch);
+            List<LikeCardData> received = fetchReceivedLikesFromUseCases(userId);
+            List<LikeCardData> sent = fetchSentLikesFromUseCases(userId);
             return RefreshPayload.success(capturedEpoch, matchResult, received, sent, userName);
         } catch (Exception e) {
             return RefreshPayload.failure(capturedEpoch, userName, e);
@@ -720,7 +443,7 @@ public class MatchesViewModel extends BaseViewModel {
 
     private LoadMorePayload fetchNextPagePayload(UUID userId, long capturedEpoch) {
         try {
-            MatchFetchResult result = fetchMatchesFromStorage(userId, capturedEpoch);
+            MatchFetchResult result = fetchMatchesFromUseCases(userId, capturedEpoch);
             return new LoadMorePayload(capturedEpoch, result);
         } finally {
             isFetchingNextPage.set(false);
@@ -768,18 +491,7 @@ public class MatchesViewModel extends BaseViewModel {
             return;
         }
 
-        if (shouldRunAsync()) {
-            asyncScope.run(
-                    actionName,
-                    () -> {
-                        action.run(targetUserId);
-                        return Boolean.TRUE;
-                    },
-                    _ -> onSuccess.run());
-            return;
-        }
-
-        executeActionSync("Failed to " + actionName, () -> action.run(targetUserId), onSuccess);
+        runAction(actionName, "Failed to " + actionName, () -> action.run(targetUserId), onSuccess);
     }
 
     private void performFriendZoneRequest(UUID targetUserId) {
@@ -830,17 +542,18 @@ public class MatchesViewModel extends BaseViewModel {
         void run(UUID targetUserId);
     }
 
-    private void executeActionSync(String userMessage, Runnable action, Runnable onSuccess) {
-        setLoadingState(true);
-        try {
-            action.run();
-            onSuccess.run();
-        } catch (Exception e) {
-            logWarn("{}: {}", userMessage, e.getMessage(), e);
-            notifyError(userMessage, e);
-        } finally {
-            setLoadingState(false);
-        }
+    private void runAction(String taskName, String userMessage, Runnable action, Runnable onSuccess) {
+        relationshipActionRunner.run(
+                shouldRunAsync(),
+                taskName,
+                userMessage,
+                action,
+                onSuccess,
+                new RelationshipActionRunner.SyncCallbacks(
+                        () -> setLoadingState(true),
+                        () -> setLoadingState(false),
+                        (message, error) -> logWarn("{}: {}", message, error.getMessage(), error),
+                        this::notifyError));
     }
 
     private boolean shouldRunAsync() {
@@ -892,60 +605,6 @@ public class MatchesViewModel extends BaseViewModel {
     }
 
     private record LoadMorePayload(long epoch, MatchFetchResult result) {}
-
-    private record MatchQualitySummary(Integer score, String label) {
-        private static MatchQualitySummary empty() {
-            return new MatchQualitySummary(null, null);
-        }
-    }
-
-    private static String summarizeBio(User user) {
-        String bio = user.getBio();
-        if (bio == null || bio.isBlank()) {
-            return "No bio yet.";
-        }
-
-        String trimmed = bio.trim();
-        if (trimmed.length() <= 80) {
-            return trimmed;
-        }
-
-        return trimmed.substring(0, 77) + "...";
-    }
-
-    private Set<UUID> getMatchedUserIds(UUID userId) {
-        Set<UUID> matched = new HashSet<>();
-        for (Match match : matchData.getAllMatchesFor(userId)) {
-            matched.add(match.getOtherUser(userId));
-        }
-        return matched;
-    }
-
-    private Map<UUID, User> loadUsersByIds(List<UUID> userIds) {
-        var usersResult = profileUseCases.getUsersByIds(new ProfileUseCases.GetUsersByIdsQuery(userIds));
-        if (!usersResult.success()) {
-            throw new IllegalStateException(
-                    usersResult.error() != null ? usersResult.error().message() : "Failed to load users");
-        }
-        return usersResult.data();
-    }
-
-    private Comparator<LikeCardData> likeTimeComparator() {
-        return (left, right) -> {
-            Instant leftTime = left.likedAt();
-            Instant rightTime = right.likedAt();
-            if (leftTime == null && rightTime == null) {
-                return 0;
-            }
-            if (leftTime == null) {
-                return 1;
-            }
-            if (rightTime == null) {
-                return -1;
-            }
-            return rightTime.compareTo(leftTime);
-        };
-    }
 
     // --- Properties ---
     public ObservableList<MatchCardData> getMatches() {

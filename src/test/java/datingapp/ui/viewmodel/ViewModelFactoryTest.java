@@ -263,7 +263,6 @@ class ViewModelFactoryTest {
                 .dailyPickService(dailyPickService)
                 .standoutService(standoutService)
                 .undoService(undoService)
-                .compatibilityCalculator(compatibilityCalculator)
                 .achievementService(achievementService)
                 .connectionService(connectionService)
                 .validationService(validationService)

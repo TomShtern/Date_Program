@@ -7,7 +7,6 @@ import datingapp.core.model.User.Gender;
 import datingapp.core.model.User.UserState;
 import datingapp.core.model.User.VerificationMethod;
 import datingapp.core.profile.MatchPreferences.Dealbreakers;
-import datingapp.core.profile.MatchPreferences.Interest;
 import datingapp.core.profile.MatchPreferences.Lifestyle;
 import datingapp.core.profile.MatchPreferences.PacePreferences;
 import datingapp.core.storage.PageData;
@@ -19,11 +18,6 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
-import java.util.Collection;
-import java.util.EnumMap;
-import java.util.EnumSet;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -31,9 +25,8 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
-import java.util.function.BiConsumer;
 import java.util.function.Function;
-import java.util.stream.Collectors;
+import java.util.function.ToIntFunction;
 import org.jdbi.v3.core.Handle;
 import org.jdbi.v3.core.Jdbi;
 import org.jdbi.v3.core.mapper.RowMapper;
@@ -44,26 +37,18 @@ import org.jdbi.v3.sqlobject.customizer.BindBean;
 import org.jdbi.v3.sqlobject.customizer.BindMethods;
 import org.jdbi.v3.sqlobject.statement.SqlQuery;
 import org.jdbi.v3.sqlobject.statement.SqlUpdate;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /** Consolidated JDBI-backed user storage implementation. */
 public final class JdbiUserStorage implements UserStorage {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(JdbiUserStorage.class);
     private static final int MAX_CACHE_SIZE = 500;
     private static final Duration CACHE_TTL = Duration.ofMinutes(5);
-    private static final String USER_ID_BIND = "userId";
-    private static final String NORMALIZED_VALUE_COLUMN = "value";
     private static final String GENDER_COLUMN = "gender";
-    private static final String USER_DB_SMOKING = "user_db_smoking";
-    private static final String USER_DB_DRINKING = "user_db_drinking";
-    private static final String USER_DB_WANTS_KIDS = "user_db_wants_kids";
-    private static final String USER_DB_LOOKING_FOR = "user_db_looking_for";
-    private static final String USER_DB_EDUCATION = "user_db_education";
 
     private final Jdbi jdbi;
     private final Dao dao;
+    private final NormalizedProfileRepository normalizedProfileRepository;
+    private final NormalizedProfileHydrator normalizedProfileHydrator;
     private final Map<UUID, CacheEntry<User>> userCache = new LinkedHashMap<>(16, 0.75f, true);
 
     enum NormalizedGroup {
@@ -79,23 +64,11 @@ public final class JdbiUserStorage implements UserStorage {
         }
     }
 
-    private enum DealbreakerTable {
-        SMOKING(USER_DB_SMOKING),
-        DRINKING(USER_DB_DRINKING),
-        WANTS_KIDS(USER_DB_WANTS_KIDS),
-        LOOKING_FOR(USER_DB_LOOKING_FOR),
-        EDUCATION(USER_DB_EDUCATION);
-
-        private final String storageName;
-
-        DealbreakerTable(String storageName) {
-            this.storageName = storageName;
-        }
-    }
-
     public JdbiUserStorage(Jdbi jdbi) {
         this.jdbi = Objects.requireNonNull(jdbi, "jdbi cannot be null");
         this.dao = jdbi.onDemand(Dao.class);
+        this.normalizedProfileRepository = new NormalizedProfileRepository(jdbi);
+        this.normalizedProfileHydrator = new NormalizedProfileHydrator(new DealbreakerAssembler());
     }
 
     /** Clears the user read cache. Primarily for tests. */
@@ -129,8 +102,8 @@ public final class JdbiUserStorage implements UserStorage {
 
     @Override
     public List<User> findActive() {
-        return jdbi.withHandle((Handle handle) ->
-                applyNormalizedProfileDataBatch(handle, handle.attach(Dao.class).findActive()));
+        return jdbi.withHandle(
+                handle -> hydrateUsers(handle, handle.attach(Dao.class).findActive()));
     }
 
     @Override
@@ -156,65 +129,42 @@ public final class JdbiUserStorage implements UserStorage {
             double cosLat = Math.max(Math.cos(Math.toRadians(Math.abs(seekerLat))), 0.0001);
             double lonDelta = Math.min(effectiveDistanceKm / (111.0 * cosLat), 180.0);
 
-            StringBuilder sql = new StringBuilder("SELECT * FROM users WHERE id <> :excludeId")
-                    .append(" AND state = 'ACTIVE'")
-                    .append(" AND deleted_at IS NULL")
-                    .append(" AND gender IN (<genders>)")
-                    .append(" AND birth_date BETWEEN :oldestBirthDate AND :youngestBirthDate")
-                    .append(" AND has_location_set = TRUE")
-                    .append(" AND lat BETWEEN :latMin AND :latMax")
-                    .append(" AND lon BETWEEN :lonMin AND :lonMax");
-
-            return applyNormalizedProfileDataBatch(
-                    handle,
-                    handle.createQuery(sql.toString())
-                            .bindList("genders", genderNames)
-                            .bind("excludeId", excludeId)
-                            .bind("oldestBirthDate", oldestBirthDate)
-                            .bind("youngestBirthDate", youngestBirthDate)
-                            .bind("latMin", seekerLat - latDelta)
-                            .bind("latMax", seekerLat + latDelta)
-                            .bind("lonMin", seekerLon - lonDelta)
-                            .bind("lonMax", seekerLon + lonDelta)
-                            .map(new Mapper())
-                            .list());
+            List<User> candidates = handle.createQuery("SELECT * FROM users WHERE id <> :excludeId"
+                            + " AND state = 'ACTIVE'"
+                            + " AND deleted_at IS NULL"
+                            + " AND gender IN (<genders>)"
+                            + " AND birth_date BETWEEN :oldestBirthDate AND :youngestBirthDate"
+                            + " AND has_location_set = TRUE"
+                            + " AND lat BETWEEN :latMin AND :latMax"
+                            + " AND lon BETWEEN :lonMin AND :lonMax")
+                    .bindList("genders", genderNames)
+                    .bind("excludeId", excludeId)
+                    .bind("oldestBirthDate", oldestBirthDate)
+                    .bind("youngestBirthDate", youngestBirthDate)
+                    .bind("latMin", seekerLat - latDelta)
+                    .bind("latMax", seekerLat + latDelta)
+                    .bind("lonMin", seekerLon - lonDelta)
+                    .bind("lonMax", seekerLon + lonDelta)
+                    .map(new Mapper())
+                    .list();
+            return hydrateUsers(handle, candidates);
         });
     }
 
     @Override
     public List<User> findAll() {
-        return jdbi.withHandle((Handle handle) ->
-                applyNormalizedProfileDataBatch(handle, handle.attach(Dao.class).findAll()));
+        return jdbi.withHandle(
+                handle -> hydrateUsers(handle, handle.attach(Dao.class).findAll()));
     }
 
     @Override
     public PageData<User> getPageOfActiveUsers(int offset, int limit) {
-        validatePageArguments(offset, limit);
-        return jdbi.withHandle(handle -> {
-            Dao localDao = handle.attach(Dao.class);
-            int total = localDao.countActiveUsers();
-            if (offset >= total) {
-                return PageData.empty(limit, total);
-            }
-
-            List<User> page = applyNormalizedProfileDataBatch(handle, localDao.getPageOfActiveUsers(offset, limit));
-            return new PageData<>(page, total, offset, limit);
-        });
+        return loadPagedUsers(offset, limit, Dao::countActiveUsers, Dao::getPageOfActiveUsers);
     }
 
     @Override
     public PageData<User> getPageOfAllUsers(int offset, int limit) {
-        validatePageArguments(offset, limit);
-        return jdbi.withHandle(handle -> {
-            Dao localDao = handle.attach(Dao.class);
-            int total = localDao.countAllUsers();
-            if (offset >= total) {
-                return PageData.empty(limit, total);
-            }
-
-            List<User> page = applyNormalizedProfileDataBatch(handle, localDao.getPageOfAllUsers(offset, limit));
-            return new PageData<>(page, total, offset, limit);
-        });
+        return loadPagedUsers(offset, limit, Dao::countAllUsers, Dao::getPageOfAllUsers);
     }
 
     @Override
@@ -228,9 +178,9 @@ public final class JdbiUserStorage implements UserStorage {
                     .bindList("userIds", new ArrayList<>(ids))
                     .map(new Mapper())
                     .list();
-            applyNormalizedProfileDataBatch(handle, users);
+            hydrateUsers(handle, users);
 
-            Map<UUID, User> result = new HashMap<>();
+            java.util.HashMap<UUID, User> result = new java.util.HashMap<>();
             for (User user : users) {
                 result.put(user.getId(), user);
             }
@@ -302,94 +252,80 @@ public final class JdbiUserStorage implements UserStorage {
                 }));
     }
 
-    // ═══════════════════════════════════════════════════════════════
-    // Normalized table DAO methods (V3 schema)
-    // ═══════════════════════════════════════════════════════════════
-
-    /**
-     * Replaces all photo URLs for a user in the normalized {@code user_photos}
-     * table. Uses delete-then-insert within a transaction to ensure atomicity.
-     */
     public void saveUserPhotos(UUID userId, List<String> urls) {
         try {
-            jdbi.useTransaction(handle -> saveUserPhotos(handle, userId, urls));
+            normalizedProfileRepository.saveUserPhotos(userId, urls);
         } finally {
             invalidateCachedUser(userId);
         }
     }
 
-    /**
-     * Loads all photo URLs for a user from the normalized table, ordered by
-     * position.
-     */
     public List<String> loadUserPhotos(UUID userId) {
-        return jdbi.withHandle(
-                handle -> handle.createQuery("SELECT url FROM user_photos WHERE user_id = :userId ORDER BY position")
-                        .bind(USER_ID_BIND, userId)
-                        .mapTo(String.class)
-                        .list());
+        return normalizedProfileRepository.loadUserPhotos(userId);
     }
 
-    /**
-     * Replaces all interests for a user in the normalized {@code user_interests}
-     * table.
-     */
     public void saveUserInterests(UUID userId, Set<String> interests) {
         try {
-            jdbi.useTransaction(handle -> saveUserInterests(handle, userId, interests));
+            normalizedProfileRepository.saveUserInterests(userId, interests);
         } finally {
             invalidateCachedUser(userId);
         }
     }
 
-    /** Loads all interests for a user from the normalized table. */
     public Set<String> loadUserInterests(UUID userId) {
-        return jdbi.withHandle(handle ->
-                new HashSet<>(handle.createQuery("SELECT interest FROM user_interests WHERE user_id = :userId")
-                        .bind(USER_ID_BIND, userId)
-                        .mapTo(String.class)
-                        .list()));
+        return normalizedProfileRepository.loadUserInterests(userId);
     }
 
-    /**
-     * Replaces all gender preferences for a user in the normalized
-     * {@code user_interested_in} table.
-     */
     public void saveUserInterestedIn(UUID userId, Set<String> genders) {
         try {
-            jdbi.useTransaction(handle -> saveUserInterestedIn(handle, userId, genders));
+            normalizedProfileRepository.saveUserInterestedIn(userId, genders);
         } finally {
             invalidateCachedUser(userId);
         }
     }
 
-    /** Loads all gender preferences for a user from the normalized table. */
     public Set<String> loadUserInterestedIn(UUID userId) {
-        return jdbi.withHandle(handle ->
-                new HashSet<>(handle.createQuery("SELECT gender FROM user_interested_in WHERE user_id = :userId")
-                        .bind(USER_ID_BIND, userId)
-                        .mapTo(String.class)
-                        .list()));
+        return normalizedProfileRepository.loadUserInterestedIn(userId);
     }
 
-    /**
-     * Replaces all values for a single dealbreaker dimension in its normalized
-     * table. The {@code tableName} must be one of: {@code user_db_smoking},
-     * {@code user_db_drinking}, {@code user_db_wants_kids},
-     * {@code user_db_looking_for}, {@code user_db_education}.
-     */
     public void saveDealbreaker(UUID userId, String tableName, Set<String> values) {
-        validateNormalizedTable(tableName);
         try {
-            jdbi.useTransaction(handle -> saveDealbreaker(handle, userId, tableName, values));
+            normalizedProfileRepository.saveDealbreaker(userId, tableName, values);
         } finally {
             invalidateCachedUser(userId);
         }
+    }
+
+    public Set<String> loadDealbreaker(UUID userId, String tableName) {
+        return normalizedProfileRepository.loadDealbreaker(userId, tableName);
     }
 
     private Optional<User> loadUser(Handle handle, UUID id) {
-        return handle.attach(Dao.class).get(id).map(user -> applyNormalizedProfileDataBatch(handle, List.of(user))
-                .get(0));
+        return handle.attach(Dao.class).get(id).map(user -> hydrateUsers(handle, List.of(user))
+                .getFirst());
+    }
+
+    private List<User> hydrateUsers(Handle handle, List<User> users) {
+        if (users == null || users.isEmpty()) {
+            return users;
+        }
+        List<UUID> userIds = users.stream().map(User::getId).toList();
+        return normalizedProfileHydrator.hydrate(
+                users, normalizedProfileRepository.loadNormalizedProfileData(handle, userIds));
+    }
+
+    private PageData<User> loadPagedUsers(int offset, int limit, ToIntFunction<Dao> counter, PageFetcher pageFetcher) {
+        validatePageArguments(offset, limit);
+        return jdbi.withHandle(handle -> {
+            Dao localDao = handle.attach(Dao.class);
+            int total = counter.applyAsInt(localDao);
+            if (offset >= total) {
+                return PageData.empty(limit, total);
+            }
+
+            List<User> page = hydrateUsers(handle, pageFetcher.fetch(localDao, offset, limit));
+            return new PageData<>(page, total, offset, limit);
+        });
     }
 
     private Optional<User> getCachedUser(UUID id) {
@@ -435,246 +371,19 @@ public final class JdbiUserStorage implements UserStorage {
         }
     }
 
-    private static User copyUser(User source) {
-        return source.copy();
+    private void saveWithHandle(Handle handle, User user) {
+        handle.attach(Dao.class).save(new UserSqlBindings(user));
+        normalizedProfileRepository.saveNormalizedProfileData(handle, user);
     }
 
-    private record CacheEntry<T>(T value, Instant expiresAt) {
-
-        private boolean isExpired(Instant now) {
-            return !now.isBefore(expiresAt);
-        }
-    }
-
-    private void saveNormalizedProfileData(Handle handle, User user) {
-        UUID userId = user.getId();
-        saveUserPhotos(handle, userId, user.getPhotoUrls());
-        saveUserInterests(handle, userId, enumNames(user.getInterests()));
-        saveUserInterestedIn(handle, userId, enumNames(user.getInterestedIn()));
-
-        Dealbreakers dealbreakers = user.getDealbreakers();
-        saveDealbreaker(
-                handle,
-                userId,
-                USER_DB_SMOKING,
-                dealbreakers != null ? enumNames(dealbreakers.acceptableSmoking()) : Set.of());
-        saveDealbreaker(
-                handle,
-                userId,
-                USER_DB_DRINKING,
-                dealbreakers != null ? enumNames(dealbreakers.acceptableDrinking()) : Set.of());
-        saveDealbreaker(
-                handle,
-                userId,
-                USER_DB_WANTS_KIDS,
-                dealbreakers != null ? enumNames(dealbreakers.acceptableKidsStance()) : Set.of());
-        saveDealbreaker(
-                handle,
-                userId,
-                USER_DB_LOOKING_FOR,
-                dealbreakers != null ? enumNames(dealbreakers.acceptableLookingFor()) : Set.of());
-        saveDealbreaker(
-                handle,
-                userId,
-                USER_DB_EDUCATION,
-                dealbreakers != null ? enumNames(dealbreakers.acceptableEducation()) : Set.of());
-    }
-
-    private void saveUserPhotos(Handle handle, UUID userId, List<String> urls) {
-        replaceNormalizedCollection(
-                handle,
-                userId,
-                "DELETE FROM user_photos WHERE user_id = ?",
-                "INSERT INTO user_photos (user_id, position, url) VALUES (:userId, :position, :url)",
-                urls,
-                (batch, indexedValue) -> batch.bind(USER_ID_BIND, userId)
-                        .bind("position", indexedValue.index())
-                        .bind("url", indexedValue.value()));
-    }
-
-    private void saveUserInterests(Handle handle, UUID userId, Set<String> interests) {
-        replaceNormalizedCollection(
-                handle,
-                userId,
-                "DELETE FROM user_interests WHERE user_id = ?",
-                "INSERT INTO user_interests (user_id, interest) VALUES (:userId, :interest)",
-                interests,
-                (batch, indexedValue) -> batch.bind(USER_ID_BIND, userId).bind("interest", indexedValue.value()));
-    }
-
-    private void saveUserInterestedIn(Handle handle, UUID userId, Set<String> genders) {
-        replaceNormalizedCollection(
-                handle,
-                userId,
-                "DELETE FROM user_interested_in WHERE user_id = ?",
-                "INSERT INTO user_interested_in (user_id, gender) VALUES (:userId, :gender)",
-                genders,
-                (batch, indexedValue) -> batch.bind(USER_ID_BIND, userId).bind(GENDER_COLUMN, indexedValue.value()));
-    }
-
-    private void saveDealbreaker(Handle handle, UUID userId, String tableName, Set<String> values) {
-        DealbreakerTable dealbreakerTable = dealbreakerTableFromStorage(tableName);
-        replaceNormalizedCollection(
-                handle,
-                userId,
-                "DELETE FROM " + dealbreakerTable.storageName + " WHERE user_id = ?",
-                "INSERT INTO " + dealbreakerTable.storageName + " (user_id, \"value\") VALUES (:userId, :value)",
-                values,
-                (batch, indexedValue) ->
-                        batch.bind(USER_ID_BIND, userId).bind(NORMALIZED_VALUE_COLUMN, indexedValue.value()));
-    }
-
-    private List<User> applyNormalizedProfileDataBatch(Handle handle, List<User> users) {
-        if (users == null || users.isEmpty()) {
-            return users;
-        }
-
-        List<UUID> userIds = users.stream().map(User::getId).toList();
-        NormalizedProfileData normalizedProfileData = loadNormalizedProfileData(handle, userIds);
-
-        for (User user : users) {
-            UUID userId = user.getId();
-            user.setPhotoUrls(normalizedProfileData.photoUrlsByUserId().getOrDefault(userId, List.of()));
-            user.setInterests(parseEnumNames(
-                    normalizedProfileData.interestsByUserId().getOrDefault(userId, Set.of()), Interest.class));
-            user.setInterestedIn(parseEnumNames(
-                    normalizedProfileData.interestedInByUserId().getOrDefault(userId, Set.of()), Gender.class));
-            user.setDealbreakers(buildDealbreakers(user, userId, normalizedProfileData.dealbreakerValuesByUserId()));
-        }
-
-        return users;
-    }
-
-    private NormalizedProfileData loadNormalizedProfileData(Handle handle, Collection<UUID> userIds) {
-        if (userIds == null || userIds.isEmpty()) {
-            return NormalizedProfileData.empty();
-        }
-
-        String sql = """
-            SELECT user_id, group_name, group_key, item_value
-            FROM (
-            SELECT user_id, 'photos' AS group_name, NULL AS group_key, url AS item_value, position AS sort_order
-            FROM user_photos
-            WHERE user_id IN (<userIds>)
-            UNION ALL
-            SELECT user_id, 'interests' AS group_name, NULL AS group_key, interest AS item_value, NULL AS sort_order
-            FROM user_interests
-            WHERE user_id IN (<userIds>)
-            UNION ALL
-            SELECT user_id, 'interested_in' AS group_name, NULL AS group_key, gender AS item_value, NULL AS sort_order
-            FROM user_interested_in
-            WHERE user_id IN (<userIds>)
-            UNION ALL
-            SELECT user_id, 'dealbreaker' AS group_name, 'user_db_smoking' AS group_key, "value" AS item_value, NULL AS sort_order
-                FROM user_db_smoking
-                WHERE user_id IN (<userIds>)
-                UNION ALL
-            SELECT user_id, 'dealbreaker' AS group_name, 'user_db_drinking' AS group_key, "value" AS item_value, NULL AS sort_order
-                FROM user_db_drinking
-                WHERE user_id IN (<userIds>)
-                UNION ALL
-            SELECT user_id, 'dealbreaker' AS group_name, 'user_db_wants_kids' AS group_key, "value" AS item_value, NULL AS sort_order
-                FROM user_db_wants_kids
-                WHERE user_id IN (<userIds>)
-                UNION ALL
-            SELECT user_id, 'dealbreaker' AS group_name, 'user_db_looking_for' AS group_key, "value" AS item_value, NULL AS sort_order
-                FROM user_db_looking_for
-                WHERE user_id IN (<userIds>)
-                UNION ALL
-            SELECT user_id, 'dealbreaker' AS group_name, 'user_db_education' AS group_key, "value" AS item_value, NULL AS sort_order
-                FROM user_db_education
-                WHERE user_id IN (<userIds>)
-            ) AS normalized_profile_data
-            ORDER BY user_id, group_name, group_key, sort_order, item_value
-            """;
-
-        try (var query = handle.createQuery(sql)) {
-            List<NormalizedProfileRow> rows = query.bindList("userIds", new ArrayList<>(userIds))
-                    .map((rs, ctx) -> new NormalizedProfileRow(
-                            JdbiTypeCodecs.SqlRowReaders.readUuid(rs, "user_id"),
-                            rs.getString("group_name"),
-                            rs.getString("group_key"),
-                            rs.getString("item_value")))
-                    .list();
-
-            Map<UUID, List<String>> photoUrlsByUserId = new HashMap<>();
-            Map<UUID, Set<String>> interestsByUserId = new HashMap<>();
-            Map<UUID, Set<String>> interestedInByUserId = new HashMap<>();
-            Map<UUID, Map<DealbreakerTable, Set<String>>> dealbreakerValuesByUserId = new HashMap<>();
-            for (NormalizedProfileRow row : rows) {
-                switch (normalizedGroupFromStorage(row.groupName())) {
-                    case PHOTOS ->
-                        photoUrlsByUserId
-                                .computeIfAbsent(row.userId(), key -> new ArrayList<>())
-                                .add(row.itemValue());
-                    case INTERESTS ->
-                        interestsByUserId
-                                .computeIfAbsent(row.userId(), key -> new HashSet<>())
-                                .add(row.itemValue());
-                    case INTERESTED_IN ->
-                        interestedInByUserId
-                                .computeIfAbsent(row.userId(), key -> new HashSet<>())
-                                .add(row.itemValue());
-                    case DEALBREAKER ->
-                        dealbreakerValuesByUserId
-                                .computeIfAbsent(row.userId(), key -> new EnumMap<>(DealbreakerTable.class))
-                                .computeIfAbsent(dealbreakerTableFromStorage(row.groupKey()), key -> new HashSet<>())
-                                .add(row.itemValue());
-                    default ->
-                        throw new IllegalStateException(
-                                "Unhandled normalized group: " + normalizedGroupFromStorage(row.groupName()));
-                }
-            }
-            return new NormalizedProfileData(
-                    photoUrlsByUserId, interestsByUserId, interestedInByUserId, dealbreakerValuesByUserId);
-        }
-    }
-
-    private record NormalizedProfileRow(UUID userId, String groupName, String groupKey, String itemValue) {}
-
-    private record NormalizedProfileData(
-            Map<UUID, List<String>> photoUrlsByUserId,
-            Map<UUID, Set<String>> interestsByUserId,
-            Map<UUID, Set<String>> interestedInByUserId,
-            Map<UUID, Map<DealbreakerTable, Set<String>>> dealbreakerValuesByUserId) {
-
-        private static NormalizedProfileData empty() {
-            return new NormalizedProfileData(Map.of(), Map.of(), Map.of(), Map.of());
-        }
-    }
-
-    private static Dealbreakers buildDealbreakers(
-            User user, UUID userId, Map<UUID, Map<DealbreakerTable, Set<String>>> dealbreakerValuesByUserId) {
-        Dealbreakers existing = user != null ? user.getDealbreakers() : null;
-        Dealbreakers.Builder builder = (existing != null ? existing : Dealbreakers.none()).toBuilder();
-        Map<DealbreakerTable, Set<String>> valuesByTable = dealbreakerValuesByUserId.getOrDefault(userId, Map.of());
-
-        Set<Lifestyle.Smoking> smoking =
-                parseEnumNames(valuesByTable.getOrDefault(DealbreakerTable.SMOKING, Set.of()), Lifestyle.Smoking.class);
-        builder.clearSmoking();
-        builder.acceptSmoking(smoking.toArray(Lifestyle.Smoking[]::new));
-
-        Set<Lifestyle.Drinking> drinking = parseEnumNames(
-                valuesByTable.getOrDefault(DealbreakerTable.DRINKING, Set.of()), Lifestyle.Drinking.class);
-        builder.clearDrinking();
-        builder.acceptDrinking(drinking.toArray(Lifestyle.Drinking[]::new));
-
-        Set<Lifestyle.WantsKids> kids = parseEnumNames(
-                valuesByTable.getOrDefault(DealbreakerTable.WANTS_KIDS, Set.of()), Lifestyle.WantsKids.class);
-        builder.clearKids();
-        builder.acceptKidsStance(kids.toArray(Lifestyle.WantsKids[]::new));
-
-        Set<Lifestyle.LookingFor> lookingFor = parseEnumNames(
-                valuesByTable.getOrDefault(DealbreakerTable.LOOKING_FOR, Set.of()), Lifestyle.LookingFor.class);
-        builder.clearLookingFor();
-        builder.acceptLookingFor(lookingFor.toArray(Lifestyle.LookingFor[]::new));
-
-        Set<Lifestyle.Education> education = parseEnumNames(
-                valuesByTable.getOrDefault(DealbreakerTable.EDUCATION, Set.of()), Lifestyle.Education.class);
-        builder.clearEducation();
-        builder.requireEducation(education.toArray(Lifestyle.Education[]::new));
-
-        return builder.build();
+    private <T> T withLockedHandle(UUID userId, Function<Handle, T> operation) {
+        return jdbi.inTransaction(handle -> {
+            handle.createQuery("SELECT id FROM users WHERE id = :userId FOR UPDATE")
+                    .bind("userId", userId)
+                    .mapTo(UUID.class)
+                    .first();
+            return operation.apply(handle);
+        });
     }
 
     static NormalizedGroup normalizedGroupFromStorage(String groupName) {
@@ -689,11 +398,8 @@ public final class JdbiUserStorage implements UserStorage {
         throw new IllegalArgumentException("Unknown normalized group: " + groupName);
     }
 
-    private static Set<String> enumNames(Set<? extends Enum<?>> values) {
-        if (values == null || values.isEmpty()) {
-            return Set.of();
-        }
-        return values.stream().map(Enum::name).collect(Collectors.toSet());
+    private static User copyUser(User source) {
+        return source.copy();
     }
 
     private static void validatePageArguments(int offset, int limit) {
@@ -705,100 +411,20 @@ public final class JdbiUserStorage implements UserStorage {
         }
     }
 
-    private static <E extends Enum<E>> Set<E> parseEnumNames(Collection<String> values, Class<E> enumType) {
-        if (values == null || values.isEmpty()) {
-            return EnumSet.noneOf(enumType);
-        }
-        EnumSet<E> parsed = EnumSet.noneOf(enumType);
-        for (String value : values) {
-            if (value == null || value.isBlank()) {
-                continue;
-            }
-            try {
-                parsed.add(Enum.valueOf(enumType, value.trim()));
-            } catch (IllegalArgumentException _) {
-                if (LOGGER.isDebugEnabled()) {
-                    LOGGER.debug(
-                            "Ignoring invalid {} value '{}' during compatibility read",
-                            enumType.getSimpleName(),
-                            value);
-                }
-            }
-        }
-        return parsed;
+    @FunctionalInterface
+    private interface PageFetcher {
+        List<User> fetch(Dao dao, int offset, int limit);
     }
 
-    /**
-     * Loads all values for a single dealbreaker dimension from its normalized
-     * table.
-     */
-    public Set<String> loadDealbreaker(UUID userId, String tableName) {
-        validateNormalizedTable(tableName);
-        return jdbi.withHandle(handle ->
-                new HashSet<>(handle.createQuery("SELECT \"value\" FROM " + tableName + " WHERE user_id = :userId")
-                        .bind(USER_ID_BIND, userId)
-                        .mapTo(String.class)
-                        .list()));
-    }
-
-    private static void validateNormalizedTable(String tableName) {
-        dealbreakerTableFromStorage(tableName);
-    }
-
-    private static DealbreakerTable dealbreakerTableFromStorage(String tableName) {
-        if (tableName == null || tableName.isBlank()) {
-            throw new IllegalArgumentException("Invalid dealbreaker table: " + tableName);
-        }
-        for (DealbreakerTable dealbreakerTable : DealbreakerTable.values()) {
-            if (dealbreakerTable.storageName.equals(tableName)) {
-                return dealbreakerTable;
-            }
-        }
-        throw new IllegalArgumentException("Invalid dealbreaker table: " + tableName);
-    }
-
-    private <T> void replaceNormalizedCollection(
-            Handle handle,
-            UUID userId,
-            String deleteSql,
-            String insertSql,
-            Collection<T> values,
-            BiConsumer<org.jdbi.v3.core.statement.PreparedBatch, IndexedValue<T>> binder) {
-        handle.execute(deleteSql, userId);
-        if (values == null || values.isEmpty()) {
-            return;
-        }
-        try (var batch = handle.prepareBatch(insertSql)) {
-            int index = 0;
-            for (T value : values) {
-                binder.accept(batch, new IndexedValue<>(index, value));
-                index++;
-                batch.add();
-            }
-            batch.execute();
+    private record CacheEntry<T>(T value, Instant expiresAt) {
+        private boolean isExpired(Instant now) {
+            return !now.isBefore(expiresAt);
         }
     }
-
-    private <T> T withLockedHandle(UUID userId, Function<Handle, T> operation) {
-        return jdbi.inTransaction(handle -> {
-            handle.createQuery("SELECT id FROM users WHERE id = :userId FOR UPDATE")
-                    .bind(USER_ID_BIND, userId)
-                    .mapTo(UUID.class)
-                    .first();
-            return operation.apply(handle);
-        });
-    }
-
-    private void saveWithHandle(Handle handle, User user) {
-        handle.attach(Dao.class).save(new UserSqlBindings(user));
-        saveNormalizedProfileData(handle, user);
-    }
-
-    private record IndexedValue<T>(int index, T value) {}
 
     @RegisterRowMapper(Mapper.class)
     @RegisterRowMapper(ProfileNoteMapper.class)
-    private static interface Dao {
+    private interface Dao {
 
         @SqlUpdate("""
                 MERGE INTO users (
@@ -1075,24 +701,15 @@ public final class JdbiUserStorage implements UserStorage {
         }
 
         public Integer getDealbreakerMinHeightCm() {
-            if (dealbreakers == null) {
-                return null;
-            }
-            return dealbreakers.minHeightCm();
+            return dealbreakers == null ? null : dealbreakers.minHeightCm();
         }
 
         public Integer getDealbreakerMaxHeightCm() {
-            if (dealbreakers == null) {
-                return null;
-            }
-            return dealbreakers.maxHeightCm();
+            return dealbreakers == null ? null : dealbreakers.maxHeightCm();
         }
 
         public Integer getDealbreakerMaxAgeDiff() {
-            if (dealbreakers == null) {
-                return null;
-            }
-            return dealbreakers.maxAgeDifference();
+            return dealbreakers == null ? null : dealbreakers.maxAgeDifference();
         }
 
         public String getEmail() {

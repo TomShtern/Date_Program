@@ -12,7 +12,6 @@ import datingapp.app.usecase.profile.VerificationUseCases;
 import datingapp.app.usecase.social.SocialUseCases;
 import datingapp.core.connection.ConnectionService;
 import datingapp.core.matching.CandidateFinder;
-import datingapp.core.matching.CompatibilityCalculator;
 import datingapp.core.matching.DailyLimitService;
 import datingapp.core.matching.DailyPickService;
 import datingapp.core.matching.MatchQualityService;
@@ -57,7 +56,6 @@ public final class ServiceRegistry {
     private final DailyPickService dailyPickService;
     private final StandoutService standoutService;
     private final UndoService undoService;
-    private final CompatibilityCalculator compatibilityCalculator;
 
     private final TrustSafetyService trustSafetyService;
     private final ProfileService profileService;
@@ -110,8 +108,6 @@ public final class ServiceRegistry {
         this.dailyPickService = Objects.requireNonNull(builder.dailyPickService, "dailyPickService cannot be null");
         this.standoutService = Objects.requireNonNull(builder.standoutService, "standoutService cannot be null");
         this.undoService = Objects.requireNonNull(builder.undoService, "undoService cannot be null");
-        this.compatibilityCalculator =
-                Objects.requireNonNull(builder.compatibilityCalculator, "compatibilityCalculator cannot be null");
         this.connectionService = Objects.requireNonNull(builder.connectionService, "connectionService cannot be null");
         this.validationService = Objects.requireNonNull(builder.validationService, "validationService cannot be null");
         this.locationService = builder.locationService != null
@@ -196,7 +192,6 @@ public final class ServiceRegistry {
         private DailyPickService dailyPickService;
         private StandoutService standoutService;
         private UndoService undoService;
-        private CompatibilityCalculator compatibilityCalculator;
         private TrustSafetyService trustSafetyService;
         private ProfileService profileService;
         private ValidationService validationService;
@@ -290,11 +285,6 @@ public final class ServiceRegistry {
 
         public Builder undoService(UndoService undoService) {
             this.undoService = undoService;
-            return this;
-        }
-
-        public Builder compatibilityCalculator(CompatibilityCalculator compatibilityCalculator) {
-            this.compatibilityCalculator = compatibilityCalculator;
             return this;
         }
 
@@ -426,10 +416,6 @@ public final class ServiceRegistry {
 
     public UndoService getUndoService() {
         return undoService;
-    }
-
-    public CompatibilityCalculator getCompatibilityCalculator() {
-        return compatibilityCalculator;
     }
 
     public TrustSafetyService getTrustSafetyService() {

@@ -11,14 +11,15 @@ import datingapp.app.event.AppEvent;
 import datingapp.app.event.AppEventBus;
 import datingapp.app.testutil.TestEventBus;
 import datingapp.app.usecase.common.UserContext;
-import datingapp.app.usecase.profile.ProfileUseCases.AchievementsQuery;
-import datingapp.app.usecase.profile.ProfileUseCases.DeleteAccountCommand;
-import datingapp.app.usecase.profile.ProfileUseCases.DeleteProfileNoteCommand;
-import datingapp.app.usecase.profile.ProfileUseCases.SaveProfileCommand;
-import datingapp.app.usecase.profile.ProfileUseCases.SessionSummaryQuery;
-import datingapp.app.usecase.profile.ProfileUseCases.StatsQuery;
-import datingapp.app.usecase.profile.ProfileUseCases.UpdateDiscoveryPreferencesCommand;
-import datingapp.app.usecase.profile.ProfileUseCases.UpsertProfileNoteCommand;
+import datingapp.app.usecase.profile.ProfileInsightsUseCases.AchievementsQuery;
+import datingapp.app.usecase.profile.ProfileInsightsUseCases.SessionSummaryQuery;
+import datingapp.app.usecase.profile.ProfileInsightsUseCases.StatsQuery;
+import datingapp.app.usecase.profile.ProfileMutationUseCases.DeleteAccountCommand;
+import datingapp.app.usecase.profile.ProfileMutationUseCases.SaveProfileCommand;
+import datingapp.app.usecase.profile.ProfileMutationUseCases.UpdateDiscoveryPreferencesCommand;
+import datingapp.app.usecase.profile.ProfileMutationUseCases.UpdateProfileCommand;
+import datingapp.app.usecase.profile.ProfileNotesUseCases.DeleteProfileNoteCommand;
+import datingapp.app.usecase.profile.ProfileNotesUseCases.UpsertProfileNoteCommand;
 import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
 import datingapp.core.metrics.AchievementService;
@@ -533,7 +534,7 @@ class ProfileUseCasesTest {
                 new ProfileActivationPolicy(),
                 capturingEventBus(publishedEvents));
 
-        var result = eventUseCases.updateProfile(new ProfileUseCases.UpdateProfileCommand(
+        var result = eventUseCases.updateProfile(new UpdateProfileCommand(
                 UserContext.cli(user.getId()),
                 null,
                 null,
@@ -590,7 +591,7 @@ class ProfileUseCasesTest {
                 );
 
         // Act - updateProfile with dealbreakers
-        var result = useCases.updateProfile(new ProfileUseCases.UpdateProfileCommand(
+        var result = useCases.updateProfile(new UpdateProfileCommand(
                 UserContext.cli(user.getId()),
                 null, // bio
                 null, // birthDate
@@ -643,7 +644,7 @@ class ProfileUseCasesTest {
         user.setInterests(EnumSet.of(Interest.HIKING, Interest.COFFEE));
         userStorage.save(user);
 
-        var result = useCases.updateProfile(new ProfileUseCases.UpdateProfileCommand(
+        var result = useCases.updateProfile(new UpdateProfileCommand(
                 UserContext.cli(user.getId()),
                 null,
                 null,

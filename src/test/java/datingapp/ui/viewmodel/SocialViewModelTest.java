@@ -14,10 +14,6 @@ import datingapp.core.testutil.TestClock;
 import datingapp.core.testutil.TestStorages;
 import datingapp.core.testutil.TestUserFactory;
 import datingapp.ui.async.UiAsyncTestSupport;
-import datingapp.ui.viewmodel.UiDataAdapters.StorageUiSocialDataAccess;
-import datingapp.ui.viewmodel.UiDataAdapters.StorageUiUserStore;
-import datingapp.ui.viewmodel.UiDataAdapters.UiSocialDataAccess;
-import datingapp.ui.viewmodel.UiDataAdapters.UiUserStore;
 import java.time.Instant;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
@@ -64,14 +60,12 @@ class SocialViewModelTest {
 
         AppConfig config = AppConfig.defaults();
         ConnectionService connectionService = new ConnectionService(config, communications, interactions, users);
-        UiSocialDataAccess socialDataAccess = new StorageUiSocialDataAccess(communications);
-        UiUserStore userStore = new StorageUiUserStore(users);
         var socialUseCases = new datingapp.app.usecase.social.SocialUseCases(connectionService, null, communications);
 
         viewModel = new SocialViewModel(
                 connectionService,
-                socialDataAccess,
-                userStore,
+                new UiDataAdapters.StorageUiSocialDataAccess(communications),
+                new UiDataAdapters.StorageUiUserStore(users),
                 socialUseCases,
                 AppSession.getInstance(),
                 new UiAsyncTestSupport.TestUiThreadDispatcher());

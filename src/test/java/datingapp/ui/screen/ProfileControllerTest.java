@@ -18,7 +18,6 @@ import datingapp.core.testutil.TestStorages;
 import datingapp.ui.JavaFxTestSupport;
 import datingapp.ui.NavigationService;
 import datingapp.ui.viewmodel.ProfileViewModel;
-import datingapp.ui.viewmodel.UiDataAdapters.StorageUiUserStore;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.EnumSet;
@@ -72,16 +71,7 @@ class ProfileControllerTest {
             users.save(currentUser);
             AppSession.getInstance().setCurrentUser(currentUser);
 
-            ProfileViewModel viewModel = new ProfileViewModel(new ProfileViewModel.Dependencies(
-                    new StorageUiUserStore(users),
-                    profileService,
-                    null,
-                    config,
-                    AppSession.getInstance(),
-                    new ValidationService(config),
-                    new LocationService(new ValidationService(config)),
-                    TEST_DISPATCHER,
-                    new datingapp.core.workflow.ProfileActivationPolicy()));
+            ProfileViewModel viewModel = createViewModel(users, config, profileService);
 
             JavaFxTestSupport.LoadedFxml loaded =
                     JavaFxTestSupport.loadFxml("/fxml/profile.fxml", () -> new ProfileController(viewModel));
@@ -141,16 +131,7 @@ class ProfileControllerTest {
             users.save(currentUser);
             AppSession.getInstance().setCurrentUser(currentUser);
 
-            ProfileViewModel viewModel = new ProfileViewModel(new ProfileViewModel.Dependencies(
-                    new datingapp.ui.viewmodel.UiDataAdapters.StorageUiUserStore(users),
-                    profileService,
-                    null,
-                    config,
-                    AppSession.getInstance(),
-                    new ValidationService(config),
-                    new LocationService(new ValidationService(config)),
-                    TEST_DISPATCHER,
-                    new datingapp.core.workflow.ProfileActivationPolicy()));
+            ProfileViewModel viewModel = createViewModel(users, config, profileService);
 
             JavaFxTestSupport.LoadedFxml loaded =
                     JavaFxTestSupport.loadFxml("/fxml/profile.fxml", () -> new ProfileController(viewModel));
@@ -195,16 +176,7 @@ class ProfileControllerTest {
         users.save(currentUser);
         AppSession.getInstance().setCurrentUser(currentUser);
 
-        ProfileViewModel viewModel = new ProfileViewModel(new ProfileViewModel.Dependencies(
-                new StorageUiUserStore(users),
-                profileService,
-                null,
-                config,
-                AppSession.getInstance(),
-                new ValidationService(config),
-                new LocationService(new ValidationService(config)),
-                TEST_DISPATCHER,
-                new datingapp.core.workflow.ProfileActivationPolicy()));
+        ProfileViewModel viewModel = createViewModel(users, config, profileService);
         TrackingProfileController controller = new TrackingProfileController(viewModel);
 
         JavaFxTestSupport.LoadedFxml loaded = JavaFxTestSupport.loadFxml("/fxml/profile.fxml", () -> controller);
@@ -238,16 +210,7 @@ class ProfileControllerTest {
         users.save(currentUser);
         AppSession.getInstance().setCurrentUser(currentUser);
 
-        ProfileViewModel viewModel = new ProfileViewModel(new ProfileViewModel.Dependencies(
-                new StorageUiUserStore(users),
-                profileService,
-                null,
-                config,
-                AppSession.getInstance(),
-                new ValidationService(config),
-                new LocationService(new ValidationService(config)),
-                TEST_DISPATCHER,
-                new datingapp.core.workflow.ProfileActivationPolicy()));
+        ProfileViewModel viewModel = createViewModel(users, config, profileService);
         TrackingProfileController controller = new TrackingProfileController(viewModel);
 
         JavaFxTestSupport.LoadedFxml loaded = JavaFxTestSupport.loadFxml("/fxml/profile.fxml", () -> controller);
@@ -276,16 +239,7 @@ class ProfileControllerTest {
         users.save(currentUser);
         AppSession.getInstance().setCurrentUser(currentUser);
 
-        ProfileViewModel viewModel = new ProfileViewModel(new ProfileViewModel.Dependencies(
-                new StorageUiUserStore(users),
-                profileService,
-                null,
-                config,
-                AppSession.getInstance(),
-                new ValidationService(config),
-                new LocationService(new ValidationService(config)),
-                TEST_DISPATCHER,
-                new datingapp.core.workflow.ProfileActivationPolicy()));
+        ProfileViewModel viewModel = createViewModel(users, config, profileService);
         TrackingProfileController controller = new TrackingProfileController(viewModel);
 
         JavaFxTestSupport.LoadedFxml loaded = JavaFxTestSupport.loadFxml("/fxml/profile.fxml", () -> controller);
@@ -340,6 +294,28 @@ class ProfileControllerTest {
                         PacePreferences.CommunicationStyle.MIX_OF_EVERYTHING,
                         PacePreferences.DepthPreference.DEEP_CHAT))
                 .build();
+    }
+
+    private ProfileViewModel createViewModel(
+            TestStorages.Users users, AppConfig config, ProfileService profileService) {
+        ValidationService validationService = new ValidationService(config);
+        return new ProfileViewModel(new ProfileViewModel.Dependencies(
+                new datingapp.ui.viewmodel.UiDataAdapters.StorageUiUserStore(users),
+                profileService,
+                new datingapp.app.usecase.profile.ProfileMutationUseCases(
+                        users,
+                        validationService,
+                        datingapp.core.testutil.TestAchievementService.empty(),
+                        config,
+                        new datingapp.core.workflow.ProfileActivationPolicy(),
+                        new datingapp.app.testutil.TestEventBus()),
+                null,
+                config,
+                AppSession.getInstance(),
+                validationService,
+                new LocationService(validationService),
+                TEST_DISPATCHER,
+                new datingapp.core.workflow.ProfileActivationPolicy()));
     }
 
     private static final class TrackingProfileController extends ProfileController {

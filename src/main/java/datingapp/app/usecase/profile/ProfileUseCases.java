@@ -3,17 +3,10 @@ package datingapp.app.usecase.profile;
 import datingapp.app.event.AppEventBus;
 import datingapp.app.usecase.common.UseCaseError;
 import datingapp.app.usecase.common.UseCaseResult;
-import datingapp.app.usecase.common.UserContext;
 import datingapp.core.AppConfig;
 import datingapp.core.metrics.ActivityMetricsService;
-import datingapp.core.metrics.EngagementDomain.Achievement.UserAchievement;
-import datingapp.core.metrics.EngagementDomain.UserStats;
 import datingapp.core.model.ProfileNote;
 import datingapp.core.model.User;
-import datingapp.core.model.User.Gender;
-import datingapp.core.profile.MatchPreferences.Dealbreakers;
-import datingapp.core.profile.MatchPreferences.Interest;
-import datingapp.core.profile.MatchPreferences.Lifestyle;
 import datingapp.core.profile.ProfileService;
 import datingapp.core.profile.ValidationService;
 import datingapp.core.storage.AccountCleanupStorage;
@@ -224,15 +217,18 @@ public class ProfileUseCases {
         }
     }
 
-    public UseCaseResult<ProfileSaveResult> saveProfile(SaveProfileCommand command) {
+    public UseCaseResult<ProfileMutationUseCases.ProfileSaveResult> saveProfile(
+            ProfileMutationUseCases.SaveProfileCommand command) {
         return profileMutationUseCases.saveProfile(command);
     }
 
-    public UseCaseResult<User> updateDiscoveryPreferences(UpdateDiscoveryPreferencesCommand command) {
+    public UseCaseResult<User> updateDiscoveryPreferences(
+            ProfileMutationUseCases.UpdateDiscoveryPreferencesCommand command) {
         return profileMutationUseCases.updateDiscoveryPreferences(command);
     }
 
-    public UseCaseResult<ProfileSaveResult> updateProfile(UpdateProfileCommand command) {
+    public UseCaseResult<ProfileMutationUseCases.ProfileSaveResult> updateProfile(
+            ProfileMutationUseCases.UpdateProfileCommand command) {
         return profileMutationUseCases.updateProfile(command);
     }
 
@@ -297,35 +293,19 @@ public class ProfileUseCases {
         }
     }
 
-    public UseCaseResult<AchievementSnapshot> getAchievements(AchievementsQuery query) {
-        if (query == null) {
-            return UseCaseResult.failure(UseCaseError.validation("achievements query must not be null"));
-        }
-        var result = profileInsightsUseCases.getAchievements(toInsightsQuery(query));
-        if (!result.success()) {
-            return UseCaseResult.failure(result.error());
-        }
-        return UseCaseResult.success(
-                new AchievementSnapshot(result.data().unlocked(), result.data().newlyUnlocked()));
+    public UseCaseResult<ProfileInsightsUseCases.AchievementSnapshot> getAchievements(
+            ProfileInsightsUseCases.AchievementsQuery query) {
+        return profileInsightsUseCases.getAchievements(query);
     }
 
-    public UseCaseResult<UserStats> getOrComputeStats(StatsQuery query) {
-        var result = profileInsightsUseCases.getOrComputeStats(toInsightsQuery(query));
-        if (!result.success()) {
-            return UseCaseResult.failure(result.error());
-        }
-        return UseCaseResult.success(result.data());
+    public UseCaseResult<datingapp.core.metrics.EngagementDomain.UserStats> getOrComputeStats(
+            ProfileInsightsUseCases.StatsQuery query) {
+        return profileInsightsUseCases.getOrComputeStats(query);
     }
 
-    public UseCaseResult<SessionSummaryResult> getSessionSummary(SessionSummaryQuery query) {
-        var result = profileInsightsUseCases.getSessionSummary(toInsightsQuery(query));
-        if (!result.success()) {
-            return UseCaseResult.failure(result.error());
-        }
-        return UseCaseResult.success(new SessionSummaryResult(result.data()
-                .currentSession()
-                .map(session -> new CurrentSessionSnapshot(
-                        session.swipeCount(), session.likeCount(), session.passCount(), session.formattedDuration()))));
+    public UseCaseResult<ProfileInsightsUseCases.SessionSummaryResult> getSessionSummary(
+            ProfileInsightsUseCases.SessionSummaryQuery query) {
+        return profileInsightsUseCases.getSessionSummary(query);
     }
 
     public UseCaseResult<ProfileService.CompletionResult> calculateCompletion(User user) {
@@ -358,33 +338,24 @@ public class ProfileUseCases {
         }
     }
 
-    public UseCaseResult<Void> deleteAccount(DeleteAccountCommand command) {
+    public UseCaseResult<Void> deleteAccount(ProfileMutationUseCases.DeleteAccountCommand command) {
         return profileMutationUseCases.deleteAccount(command);
     }
 
-    public UseCaseResult<List<ProfileNote>> listProfileNotes(ProfileNotesQuery query) {
-        return profileNotesUseCases.listProfileNotes(
-                query == null ? null : new ProfileNotesUseCases.ProfileNotesQuery(query.context()));
+    public UseCaseResult<List<ProfileNote>> listProfileNotes(ProfileNotesUseCases.ProfileNotesQuery query) {
+        return profileNotesUseCases.listProfileNotes(query);
     }
 
-    public UseCaseResult<ProfileNote> getProfileNote(ProfileNoteQuery query) {
-        return profileNotesUseCases.getProfileNote(
-                query == null ? null : new ProfileNotesUseCases.ProfileNoteQuery(query.context(), query.subjectId()));
+    public UseCaseResult<ProfileNote> getProfileNote(ProfileNotesUseCases.ProfileNoteQuery query) {
+        return profileNotesUseCases.getProfileNote(query);
     }
 
-    public UseCaseResult<ProfileNote> upsertProfileNote(UpsertProfileNoteCommand command) {
-        return profileNotesUseCases.upsertProfileNote(
-                command == null
-                        ? null
-                        : new ProfileNotesUseCases.UpsertProfileNoteCommand(
-                                command.context(), command.subjectId(), command.content()));
+    public UseCaseResult<ProfileNote> upsertProfileNote(ProfileNotesUseCases.UpsertProfileNoteCommand command) {
+        return profileNotesUseCases.upsertProfileNote(command);
     }
 
-    public UseCaseResult<Void> deleteProfileNote(DeleteProfileNoteCommand command) {
-        return profileNotesUseCases.deleteProfileNote(
-                command == null
-                        ? null
-                        : new ProfileNotesUseCases.DeleteProfileNoteCommand(command.context(), command.subjectId()));
+    public UseCaseResult<Void> deleteProfileNote(ProfileNotesUseCases.DeleteProfileNoteCommand command) {
+        return profileNotesUseCases.deleteProfileNote(command);
     }
 
     public ProfileNotesUseCases getProfileNotesUseCases() {
@@ -403,69 +374,5 @@ public class ProfileUseCases {
         return validationService;
     }
 
-    public static record SaveProfileCommand(UserContext context, User user) {}
-
-    public static record ProfileSaveResult(User user, boolean activated, List<UserAchievement> newlyUnlocked) {}
-
-    public static record UpdateDiscoveryPreferencesCommand(
-            UserContext context, int minAge, int maxAge, int maxDistanceKm, Set<Gender> interestedIn) {}
-
-    public static record UpdateProfileCommand(
-            UserContext context,
-            String bio,
-            java.time.LocalDate birthDate,
-            Gender gender,
-            Set<Gender> interestedIn,
-            Double latitude,
-            Double longitude,
-            Integer maxDistanceKm,
-            Integer minAge,
-            Integer maxAge,
-            Integer heightCm,
-            Lifestyle.Smoking smoking,
-            Lifestyle.Drinking drinking,
-            Lifestyle.WantsKids wantsKids,
-            Lifestyle.LookingFor lookingFor,
-            Lifestyle.Education education,
-            Set<Interest> interests,
-            Dealbreakers dealbreakers) {}
-
-    public static record AchievementsQuery(UserContext context, boolean checkForNew) {}
-
-    public static record AchievementSnapshot(List<UserAchievement> unlocked, List<UserAchievement> newlyUnlocked) {}
-
-    public static record StatsQuery(UserContext context) {}
-
-    public static record SessionSummaryQuery(UserContext context) {}
-
-    public static record CurrentSessionSnapshot(
-            int swipeCount, int likeCount, int passCount, String formattedDuration) {}
-
-    public static record SessionSummaryResult(java.util.Optional<CurrentSessionSnapshot> currentSession) {}
-
-    public static record DeleteAccountCommand(
-            UserContext context, datingapp.app.event.AppEvent.DeletionReason reason) {}
-
-    public static record ProfileNotesQuery(UserContext context) {}
-
-    public static record ProfileNoteQuery(UserContext context, UUID subjectId) {}
-
-    public static record UpsertProfileNoteCommand(UserContext context, UUID subjectId, String content) {}
-
-    public static record DeleteProfileNoteCommand(UserContext context, UUID subjectId) {}
-
     public static record GetUsersByIdsQuery(List<UUID> userIds) {}
-
-    private static ProfileInsightsUseCases.AchievementsQuery toInsightsQuery(AchievementsQuery query) {
-        return new ProfileInsightsUseCases.AchievementsQuery(
-                query == null ? null : query.context(), query != null && query.checkForNew());
-    }
-
-    private static ProfileInsightsUseCases.StatsQuery toInsightsQuery(StatsQuery query) {
-        return new ProfileInsightsUseCases.StatsQuery(query == null ? null : query.context());
-    }
-
-    private static ProfileInsightsUseCases.SessionSummaryQuery toInsightsQuery(SessionSummaryQuery query) {
-        return new ProfileInsightsUseCases.SessionSummaryQuery(query == null ? null : query.context());
-    }
 }

@@ -2,9 +2,8 @@ package datingapp.ui.viewmodel;
 
 import datingapp.app.usecase.common.UserContext;
 import datingapp.app.usecase.profile.ProfileMutationUseCases;
+import datingapp.app.usecase.profile.ProfileMutationUseCases.SaveProfileCommand;
 import datingapp.app.usecase.profile.ProfileUseCases;
-import datingapp.app.usecase.profile.ProfileUseCases.SaveProfileCommand;
-import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
 import datingapp.core.AppSession;
 import datingapp.core.model.LocationModels.ResolvedLocation;
@@ -19,7 +18,6 @@ import datingapp.core.profile.ProfileService;
 import datingapp.core.profile.ProfileService.CompletionResult;
 import datingapp.core.profile.ValidationService;
 import datingapp.core.workflow.ProfileActivationPolicy;
-import datingapp.core.workflow.ProfileActivationPolicy.ActivationResult;
 import datingapp.ui.LocalPhotoStore;
 import datingapp.ui.UiFeedbackService;
 import datingapp.ui.async.UiThreadDispatcher;
@@ -27,7 +25,6 @@ import datingapp.ui.viewmodel.UiDataAdapters.UiUserStore;
 import java.io.File;
 import java.io.IOException;
 import java.time.LocalDate;
-import java.time.Period;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Locale;
@@ -63,15 +60,14 @@ public class ProfileViewModel extends BaseViewModel {
 
     private final AppConfig config;
 
-    private final UiUserStore userStore;
     private final ProfileService profileCompletionService;
-    private ProfileMutationUseCases profileMutationUseCases;
+    private final ProfileMutationUseCases profileMutationUseCases;
     private final ProfileUseCases profileUseCases;
     private final AppSession session;
-    private final ProfileActivationPolicy activationPolicy;
     private final LocationService locationService;
     private final ValidationService validationService;
-    private final LocalPhotoStore photoStore;
+    private final ProfileDraftAssembler draftAssembler;
+    private final PhotoMutationCoordinator photoMutationCoordinator;
 
     // Observable properties for form binding - Basic Info
     private final StringProperty name = new SimpleStringProperty("");
@@ -122,8 +118,6 @@ public class ProfileViewModel extends BaseViewModel {
     private final ObservableSet<Interest> selectedInterests =
             FXCollections.observableSet(EnumSet.noneOf(Interest.class));
 
-    private final Object photoMutationLock = new Object();
-
     private String lastSavedSnapshot = "";
 
     ProfileViewModel(
@@ -138,22 +132,42 @@ public class ProfileViewModel extends BaseViewModel {
                 userStore, profileCompletionService, profileUseCases, config, session, uiDispatcher, activationPolicy));
     }
 
+    ProfileViewModel(
+            UiUserStore userStore,
+            ProfileService profileCompletionService,
+            ProfileMutationUseCases profileMutationUseCases,
+            ProfileUseCases profileUseCases,
+            AppConfig config,
+            AppSession session,
+            UiThreadDispatcher uiDispatcher,
+            ProfileActivationPolicy activationPolicy) {
+        this(new Dependencies(
+                userStore,
+                profileCompletionService,
+                profileMutationUseCases,
+                profileUseCases,
+                config,
+                session,
+                new ValidationService(config),
+                new LocationService(new ValidationService(config)),
+                uiDispatcher,
+                activationPolicy));
+    }
+
     public ProfileViewModel(Dependencies dependencies) {
         super("profile", dependencies.uiDispatcher());
-        this.userStore = Objects.requireNonNull(dependencies.userStore(), "userStore cannot be null");
         this.profileCompletionService = Objects.requireNonNull(
                 dependencies.profileCompletionService(), "profileCompletionService cannot be null");
+        this.profileMutationUseCases = dependencies.profileMutationUseCases();
         this.profileUseCases = dependencies.profileUseCases();
-        this.profileMutationUseCases =
-                this.profileUseCases != null ? this.profileUseCases.getProfileMutationUseCases() : null;
         this.config = Objects.requireNonNull(dependencies.config(), "config cannot be null");
         this.session = Objects.requireNonNull(dependencies.session(), "session cannot be null");
         this.validationService =
                 Objects.requireNonNull(dependencies.validationService(), "validationService cannot be null");
         this.locationService = Objects.requireNonNull(dependencies.locationService(), "locationService cannot be null");
-        this.activationPolicy =
-                Objects.requireNonNull(dependencies.activationPolicy(), "activationPolicy cannot be null");
-        this.photoStore = new LocalPhotoStore();
+        this.draftAssembler = new ProfileDraftAssembler(config);
+        this.photoMutationCoordinator = new PhotoMutationCoordinator(
+                Objects.requireNonNull(dependencies.userStore(), "userStore cannot be null"), new LocalPhotoStore());
     }
 
     /**
@@ -395,12 +409,11 @@ public class ProfileViewModel extends BaseViewModel {
         try {
             if (isDisposed()) {
                 result = SaveOperationResult.failure(new IllegalStateException(PROFILE_EDITOR_INACTIVE));
-            } else if (profileMutationUseCases != null) {
-                result = persistProfileViaMutationUseCase(draftUser);
-            } else if (profileUseCases != null) {
-                result = persistProfileViaUseCase(draftUser);
+            } else if (profileMutationUseCases == null) {
+                result = SaveOperationResult.failure(
+                        new IllegalStateException("Profile mutation use cases are not configured"));
             } else {
-                result = persistProfileLegacy(draftUser);
+                result = persistProfileViaMutationUseCase(draftUser);
             }
         } catch (Exception e) {
             logError(SAVE_PROFILE_ERROR, e);
@@ -409,18 +422,6 @@ public class ProfileViewModel extends BaseViewModel {
 
         SaveOperationResult completedResult = result;
         asyncScope.dispatchToUi(() -> applySaveOperationResult(completedResult, onComplete));
-    }
-
-    private SaveOperationResult persistProfileViaUseCase(User user) {
-        var saveResult = profileUseCases.saveProfile(new SaveProfileCommand(UserContext.ui(user.getId()), user));
-        if (!saveResult.success()) {
-            return SaveOperationResult.failure(
-                    new IllegalStateException(saveResult.error().message()));
-        }
-
-        User savedUser = saveResult.data().user();
-        SaveOutcome outcome = resolveSaveOutcome(savedUser);
-        return SaveOperationResult.success(savedUser, outcome);
     }
 
     private SaveOperationResult persistProfileViaMutationUseCase(User user) {
@@ -434,21 +435,6 @@ public class ProfileViewModel extends BaseViewModel {
         User savedUser = saveResult.data().user();
         SaveOutcome outcome = resolveSaveOutcome(savedUser);
         return SaveOperationResult.success(savedUser, outcome);
-    }
-
-    private SaveOperationResult persistProfileLegacy(User user) {
-        persistUser(user);
-        if (isDisposed()) {
-            return SaveOperationResult.failure(new IllegalStateException(PROFILE_EDITOR_INACTIVE));
-        }
-
-        attemptActivation(user);
-        if (isDisposed()) {
-            return SaveOperationResult.failure(new IllegalStateException(PROFILE_EDITOR_INACTIVE));
-        }
-
-        SaveOutcome outcome = resolveSaveOutcome(user);
-        return SaveOperationResult.success(user, outcome);
     }
 
     private static SaveOutcome resolveSaveOutcome(User user) {
@@ -479,114 +465,6 @@ public class ProfileViewModel extends BaseViewModel {
         if (onComplete != null) {
             onComplete.accept(outcome);
         }
-    }
-
-    private void applyBasicFields(User user) {
-        user.setBio(bio.get());
-
-        if (gender.get() != null) {
-            user.setGender(gender.get());
-        }
-        user.setInterestedIn(interestedInGenders);
-        applyBirthDate(user, true);
-    }
-
-    private void applyLocation(User user) {
-        if (!hasLocation.get()) {
-            return;
-        }
-        user.setLocation(latitude.get(), longitude.get());
-    }
-
-    private void applyInterests(User user) {
-        user.setInterests(selectedInterests);
-    }
-
-    private void applyLifestyleFields(User user) {
-        if (height.get() != null) {
-            user.setHeightCm(height.get());
-        }
-        if (smoking.get() != null) {
-            user.setSmoking(smoking.get());
-        }
-        if (drinking.get() != null) {
-            user.setDrinking(drinking.get());
-        }
-        if (wantsKids.get() != null) {
-            user.setWantsKids(wantsKids.get());
-        }
-        if (lookingFor.get() != null) {
-            user.setLookingFor(lookingFor.get());
-        }
-    }
-
-    private void applySearchPreferences(User user, boolean notifyUser) {
-        applyAgeRangePreference(user, notifyUser);
-        applyMaxDistancePreference(user, notifyUser);
-    }
-
-    private void applyAgeRangePreference(User user, boolean notifyUser) {
-        try {
-            int min = Integer.parseInt(minAge.get());
-            int max = Integer.parseInt(maxAge.get());
-            if (min >= config.validation().minAge()
-                    && max <= config.validation().maxAge()
-                    && min <= max) {
-                user.setAgeRange(
-                        min,
-                        max,
-                        config.validation().minAge(),
-                        config.validation().maxAge());
-            } else {
-                logWarn("Invalid age range values: {}-{}", min, max);
-                if (notifyUser) {
-                    UiFeedbackService.showWarning("Please enter valid ages");
-                }
-            }
-        } catch (NumberFormatException _) {
-            logWarn("Invalid age range values");
-            if (notifyUser) {
-                UiFeedbackService.showWarning("Please enter valid ages");
-            }
-        }
-    }
-
-    private void applyMaxDistancePreference(User user, boolean notifyUser) {
-        try {
-            int dist = Integer.parseInt(maxDistance.get());
-            if (dist > 0 && dist <= config.matching().maxDistanceKm()) {
-                user.setMaxDistanceKm(dist, config.matching().maxDistanceKm());
-            } else {
-                logWarn("Invalid max distance value: {}", dist);
-                if (notifyUser) {
-                    UiFeedbackService.showWarning("Please enter a valid distance");
-                }
-            }
-        } catch (NumberFormatException _) {
-            logWarn("Invalid max distance value");
-            if (notifyUser) {
-                UiFeedbackService.showWarning("Please enter a valid distance");
-            }
-        }
-    }
-
-    private void applyDealbreakers(User user) {
-        if (dealbreakers.get() != null) {
-            user.setDealbreakers(dealbreakers.get());
-        }
-    }
-
-    private void persistUser(User user) {
-        userStore.save(user);
-    }
-
-    private ActivationResult attemptActivation(User user) {
-        ActivationResult activation = activationPolicy.tryActivate(user);
-        if (activation.activated()) {
-            userStore.save(user);
-            logInfo("User {} activated after profile completion", user.getName());
-        }
-        return activation;
     }
 
     private void updateSessionAndCompletion(User user) {
@@ -997,97 +875,81 @@ public class ProfileViewModel extends BaseViewModel {
     }
 
     private void processPhotoUpload(User user, File photoFile) {
-        synchronized (photoMutationLock) {
-            try {
-                if (isDisposed()) {
-                    return;
-                }
-                List<String> updatedPhotoUrls =
-                        photoStore.importPhoto(user.getId(), user.getPhotoUrls(), photoFile.toPath());
-                persistPhotoUrls(user, updatedPhotoUrls, updatedPhotoUrls.size() - 1, "Photo saved!");
-
-            } catch (IOException e) {
-                logError(SAVE_PHOTO_ERROR, e);
-                notifyError(SAVE_PHOTO_ERROR, e);
-            } catch (IllegalArgumentException e) {
-                logWarn("Invalid photo save request: {}", e.getMessage());
-                notifyError(SAVE_PHOTO_ERROR, e);
+        try {
+            if (isDisposed()) {
+                return;
             }
+            PhotoMutationCoordinator.PhotoMutationResult result = photoMutationCoordinator.savePhoto(user, photoFile);
+            asyncScope.dispatchToUi(() -> applyPhotoMutationResult(user, result));
+        } catch (IOException e) {
+            logError(SAVE_PHOTO_ERROR, e);
+            notifyError(SAVE_PHOTO_ERROR, e);
+        } catch (IllegalArgumentException e) {
+            logWarn("Invalid photo save request: {}", e.getMessage());
+            notifyError(SAVE_PHOTO_ERROR, e);
         }
     }
 
     private void processPhotoReplacement(User user, int index, File photoFile) {
-        synchronized (photoMutationLock) {
-            try {
-                if (isDisposed()) {
-                    return;
-                }
-                List<String> updatedPhotoUrls =
-                        photoStore.replacePhoto(user.getId(), user.getPhotoUrls(), index, photoFile.toPath());
-                persistPhotoUrls(user, updatedPhotoUrls, index, "Photo replaced.");
-            } catch (IOException e) {
-                logError(REPLACE_PHOTO_ERROR, e);
-                notifyError(REPLACE_PHOTO_ERROR, e);
-            } catch (IllegalArgumentException e) {
-                logWarn("Invalid photo replacement request: {}", e.getMessage());
-                notifyError(REPLACE_PHOTO_ERROR, e);
+        try {
+            if (isDisposed()) {
+                return;
             }
+            PhotoMutationCoordinator.PhotoMutationResult result =
+                    photoMutationCoordinator.replacePhoto(user, index, photoFile);
+            asyncScope.dispatchToUi(() -> applyPhotoMutationResult(user, result));
+        } catch (IOException e) {
+            logError(REPLACE_PHOTO_ERROR, e);
+            notifyError(REPLACE_PHOTO_ERROR, e);
+        } catch (IllegalArgumentException e) {
+            logWarn("Invalid photo replacement request: {}", e.getMessage());
+            notifyError(REPLACE_PHOTO_ERROR, e);
         }
     }
 
     private void processPhotoDeletion(User user, int index) {
-        synchronized (photoMutationLock) {
-            try {
-                if (isDisposed()) {
-                    return;
-                }
-                List<String> updatedPhotoUrls = photoStore.deletePhoto(user.getPhotoUrls(), index);
-                int selectedIndex = updatedPhotoUrls.isEmpty() ? 0 : Math.min(index, updatedPhotoUrls.size() - 1);
-                persistPhotoUrls(user, updatedPhotoUrls, selectedIndex, "Photo removed.");
-            } catch (IOException e) {
-                logError(DELETE_PHOTO_ERROR, e);
-                notifyError(DELETE_PHOTO_ERROR, e);
-            } catch (IllegalArgumentException e) {
-                logWarn("Invalid photo delete request: {}", e.getMessage());
-                notifyError(DELETE_PHOTO_ERROR, e);
+        try {
+            if (isDisposed()) {
+                return;
             }
+            PhotoMutationCoordinator.PhotoMutationResult result = photoMutationCoordinator.deletePhoto(user, index);
+            asyncScope.dispatchToUi(() -> applyPhotoMutationResult(user, result));
+        } catch (IOException e) {
+            logError(DELETE_PHOTO_ERROR, e);
+            notifyError(DELETE_PHOTO_ERROR, e);
+        } catch (IllegalArgumentException e) {
+            logWarn("Invalid photo delete request: {}", e.getMessage());
+            notifyError(DELETE_PHOTO_ERROR, e);
         }
     }
 
     private void processSetPrimaryPhoto(User user, int index) {
-        synchronized (photoMutationLock) {
-            try {
-                if (isDisposed()) {
-                    return;
-                }
-                List<String> updatedPhotoUrls = photoStore.setPrimaryPhoto(user.getPhotoUrls(), index);
-                persistPhotoUrls(user, updatedPhotoUrls, 0, "Primary photo updated.");
-            } catch (IllegalArgumentException e) {
-                logWarn("Invalid primary photo request: {}", e.getMessage());
-                notifyError(UPDATE_PRIMARY_PHOTO_ERROR, e);
-            }
-        }
-    }
-
-    private void persistPhotoUrls(User user, List<String> updatedPhotoUrls, int selectedIndex, String successMessage) {
-        user.setPhotoUrls(updatedPhotoUrls);
-        userStore.save(user);
-
-        asyncScope.dispatchToUi(() -> {
+        try {
             if (isDisposed()) {
                 return;
             }
-            photoUrls.setAll(updatedPhotoUrls);
-            photoCarousel.setPhotos(updatedPhotoUrls);
-            for (int i = 0; i < Math.max(0, selectedIndex); i++) {
-                photoCarousel.showNextPhoto();
-            }
-            syncPhotoCarousel();
-            session.setCurrentUser(user);
-            updateCompletion(user);
-            markCurrentStateSaved();
-            UiFeedbackService.showSuccess(successMessage);
-        });
+            PhotoMutationCoordinator.PhotoMutationResult result = photoMutationCoordinator.setPrimaryPhoto(user, index);
+            asyncScope.dispatchToUi(() -> applyPhotoMutationResult(user, result));
+        } catch (IllegalArgumentException e) {
+            logWarn("Invalid primary photo request: {}", e.getMessage());
+            notifyError(UPDATE_PRIMARY_PHOTO_ERROR, e);
+        }
+    }
+
+    private void applyPhotoMutationResult(User user, PhotoMutationCoordinator.PhotoMutationResult result) {
+        if (isDisposed()) {
+            return;
+        }
+        photoUrls.setAll(result.photoUrls());
+        photoCarousel.setPhotos(result.photoUrls());
+        for (int i = 0; i < Math.max(0, result.selectedIndex()); i++) {
+            photoCarousel.showNextPhoto();
+        }
+        syncPhotoCarousel();
+        session.setCurrentUser(user);
+        updateCompletion(user);
+        markCurrentStateSaved();
+        UiFeedbackService.showSuccess(result.successMessage());
     }
 
     private String buildCompletionDetails(CompletionResult result) {
@@ -1110,33 +972,6 @@ public class ProfileViewModel extends BaseViewModel {
             summary += " +" + (missing.size() - limit) + " more";
         }
         return "Missing: " + summary;
-    }
-
-    private void applyBirthDate(User user, boolean notifyUser) {
-        LocalDate selected = birthDate.get();
-        if (selected == null) {
-            return;
-        }
-        LocalDate today = AppClock.today();
-        if (selected.isAfter(today)) {
-            logWarn("Birth date cannot be in the future: {}", selected);
-            if (notifyUser) {
-                UiFeedbackService.showWarning("Birth date cannot be in the future");
-            }
-            return;
-        }
-        int age = Period.between(selected, today).getYears();
-        if (age < config.validation().minAge() || age > config.validation().maxAge()) {
-            logWarn("Birth date outside allowed age range: {}", selected);
-            if (notifyUser) {
-                UiFeedbackService.showWarning("Birth date must be for ages "
-                        + config.validation().minAge()
-                        + "-"
-                        + config.validation().maxAge());
-            }
-            return;
-        }
-        user.setBirthDate(selected);
     }
 
     public ProfilePreviewSnapshot buildPreviewSnapshot() {
@@ -1176,74 +1011,32 @@ public class ProfileViewModel extends BaseViewModel {
         if (currentUser == null) {
             throw new IllegalStateException("No current user available for preview.");
         }
-
-        User draftUser = copyCurrentUserToDraft(currentUser);
-
-        applyBasicFields(draftUser);
-        applyLocation(draftUser);
-        applyInterests(draftUser);
-        applyLifestyleFields(draftUser);
-        applySearchPreferences(draftUser, false);
-        applyDealbreakers(draftUser);
-        applyPacePreferences(draftUser, false);
-        return draftUser;
+        return draftAssembler.assemble(currentUser, createDraftState(), UiFeedbackService::showWarning);
     }
 
-    private static User copyCurrentUserToDraft(User currentUser) {
-        return User.StorageBuilder.create(currentUser.getId(), currentUser.getName(), currentUser.getCreatedAt())
-                .bio(currentUser.getBio())
-                .birthDate(currentUser.getBirthDate())
-                .gender(currentUser.getGender())
-                .interestedIn(currentUser.getInterestedIn())
-                .location(currentUser.getLat(), currentUser.getLon())
-                .hasLocationSet(currentUser.hasLocationSet())
-                .maxDistanceKm(currentUser.getMaxDistanceKm())
-                .ageRange(currentUser.getMinAge(), currentUser.getMaxAge())
-                .photoUrls(currentUser.getPhotoUrls())
-                .state(currentUser.getState())
-                .updatedAt(currentUser.getUpdatedAt())
-                .interests(currentUser.getInterests())
-                .smoking(currentUser.getSmoking())
-                .drinking(currentUser.getDrinking())
-                .wantsKids(currentUser.getWantsKids())
-                .lookingFor(currentUser.getLookingFor())
-                .education(currentUser.getEducation())
-                .heightCm(currentUser.getHeightCm())
-                .email(currentUser.getEmail())
-                .phone(currentUser.getPhone())
-                .verified(currentUser.isVerified())
-                .verificationMethod(currentUser.getVerificationMethod())
-                .verificationCode(currentUser.getVerificationCode())
-                .verificationSentAt(currentUser.getVerificationSentAt())
-                .verifiedAt(currentUser.getVerifiedAt())
-                .pacePreferences(currentUser.getPacePreferences())
-                .build();
-    }
-
-    private void applyPacePreferences(User user, boolean notifyUser) {
-        boolean anySet = messagingFrequency.get() != null
-                || timeToFirstDate.get() != null
-                || communicationStyle.get() != null
-                || depthPreference.get() != null;
-        boolean allSet = messagingFrequency.get() != null
-                && timeToFirstDate.get() != null
-                && communicationStyle.get() != null
-                && depthPreference.get() != null;
-
-        if (!anySet) {
-            user.setPacePreferences(null);
-            return;
-        }
-
-        if (!allSet) {
-            if (notifyUser) {
-                UiFeedbackService.showWarning("Complete all pace preferences or clear them all.");
-            }
-            throw new IllegalArgumentException("Complete all pace preferences or clear them all.");
-        }
-
-        user.setPacePreferences(new PacePreferences(
-                messagingFrequency.get(), timeToFirstDate.get(), communicationStyle.get(), depthPreference.get()));
+    private ProfileDraftAssembler.DraftState createDraftState() {
+        return new ProfileDraftAssembler.DraftState(
+                bio.get(),
+                birthDate.get(),
+                gender.get(),
+                interestedInGenders,
+                latitude.get(),
+                longitude.get(),
+                hasLocation.get(),
+                selectedInterests,
+                height.get(),
+                smoking.get(),
+                drinking.get(),
+                wantsKids.get(),
+                lookingFor.get(),
+                minAge.get(),
+                maxAge.get(),
+                maxDistance.get(),
+                dealbreakers.get(),
+                messagingFrequency.get(),
+                timeToFirstDate.get(),
+                communicationStyle.get(),
+                depthPreference.get());
     }
 
     private String createStateSnapshot() {
@@ -1307,6 +1100,7 @@ public class ProfileViewModel extends BaseViewModel {
     public record Dependencies(
             UiUserStore userStore,
             ProfileService profileCompletionService,
+            ProfileMutationUseCases profileMutationUseCases,
             ProfileUseCases profileUseCases,
             AppConfig config,
             AppSession session,
@@ -1327,6 +1121,7 @@ public class ProfileViewModel extends BaseViewModel {
         return new Dependencies(
                 userStore,
                 profileCompletionService,
+                profileUseCases != null ? profileUseCases.getProfileMutationUseCases() : null,
                 profileUseCases,
                 config,
                 session,

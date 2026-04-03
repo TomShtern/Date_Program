@@ -1,5 +1,6 @@
 package datingapp.app.cli;
 
+import datingapp.app.support.UserPresentationSupport;
 import datingapp.app.usecase.matching.MatchingUseCases.MatchQualitySnapshot;
 import datingapp.app.usecase.matching.MatchingUseCases.SwipeOutcome;
 import datingapp.core.TextUtil;
@@ -101,7 +102,7 @@ final class MatchingCliPresenter {
         List<String> lines = new ArrayList<>();
         lines.add(CliTextAndInput.BOX_TOP);
         boolean verified = candidate.isVerified();
-        int age = candidate.getAge(userTimeZone).orElse(0);
+        int age = UserPresentationSupport.safeAge(candidate, userTimeZone);
         lines.add("│ 💝 " + candidate.getName() + (verified ? " ✅ Verified" : "") + ", " + age + " years old");
         lines.add("│ 📍 " + String.format(Locale.ROOT, "%.1f", distance) + " km away");
         lines.add(CliTextAndInput.PROFILE_BIO_FORMAT.formatted(
@@ -128,7 +129,7 @@ final class MatchingCliPresenter {
         lines.add("         MATCH WITH " + nameUpper);
         lines.add(CliTextAndInput.SEPARATOR_LINE + "\n");
 
-        int age = otherUser.getAge(userTimeZone).orElse(0);
+        int age = UserPresentationSupport.safeAge(otherUser, userTimeZone);
         lines.add("  👤 " + otherUser.getName() + ", " + age);
         if (otherUser.getBio() != null) {
             lines.add("  📝 " + otherUser.getBio());
@@ -164,14 +165,12 @@ final class MatchingCliPresenter {
         User user = pending.user();
         String verifiedBadge = user.isVerified() ? " ✅ Verified" : "";
         String likedAgo = TextUtil.formatTimeAgo(pending.likedAt());
-        String bio = user.getBio() == null ? "" : user.getBio();
-        if (bio.length() > 50) {
-            bio = bio.substring(0, 47) + "...";
-        }
+        String bio = UserPresentationSupport.fallbackBio(user, "", 47);
 
         return List.of(
                 CliTextAndInput.BOX_TOP,
-                "│ 💝 " + user.getName() + ", " + user.getAge(userTimeZone).orElse(0) + " years old" + verifiedBadge,
+                "│ 💝 " + user.getName() + ", " + UserPresentationSupport.safeAge(user, userTimeZone) + " years old"
+                        + verifiedBadge,
                 "│ 🕒 Liked you " + likedAgo,
                 "│ 📍 Location: " + user.getLat() + ", " + user.getLon(),
                 CliTextAndInput.PROFILE_BIO_FORMAT.formatted(bio),

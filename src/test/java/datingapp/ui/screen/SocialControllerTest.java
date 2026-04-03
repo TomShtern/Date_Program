@@ -16,8 +16,6 @@ import datingapp.core.testutil.TestUserFactory;
 import datingapp.ui.JavaFxTestSupport;
 import datingapp.ui.viewmodel.SocialViewModel;
 import datingapp.ui.viewmodel.SocialViewModel.FriendRequestEntry;
-import datingapp.ui.viewmodel.UiDataAdapters.StorageUiSocialDataAccess;
-import datingapp.ui.viewmodel.UiDataAdapters.StorageUiUserStore;
 import java.time.Instant;
 import java.util.concurrent.TimeUnit;
 import javafx.scene.Parent;
@@ -188,8 +186,8 @@ class SocialControllerTest {
                     new datingapp.app.usecase.social.SocialUseCases(connectionService, null, communications);
             this.viewModel = new SocialViewModel(
                     connectionService,
-                    new StorageUiSocialDataAccess(communications),
-                    new StorageUiUserStore(users),
+                    new datingapp.ui.viewmodel.UiDataAdapters.StorageUiSocialDataAccess(communications),
+                    new datingapp.ui.viewmodel.UiDataAdapters.StorageUiUserStore(users),
                     socialUseCases,
                     AppSession.getInstance(),
                     JavaFxTestSupport.blockingUiDispatcher());

@@ -13,7 +13,6 @@ import datingapp.core.testutil.TestStorages;
 import datingapp.ui.JavaFxTestSupport;
 import datingapp.ui.NavigationService;
 import datingapp.ui.viewmodel.ProfileReadOnlyViewModel;
-import datingapp.ui.viewmodel.UiDataAdapters.StorageUiUserStore;
 import java.util.EnumSet;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -44,7 +43,9 @@ class ProfileViewControllerTest {
         NavigationService.getInstance()
                 .setNavigationContext(NavigationService.ViewType.PROFILE_VIEW, viewedUser.getId());
         ProfileReadOnlyViewModel viewModel = new ProfileReadOnlyViewModel(
-                new StorageUiUserStore(users), AppConfig.defaults(), JavaFxTestSupport.blockingUiDispatcher());
+                new datingapp.ui.viewmodel.UiDataAdapters.StorageUiUserStore(users),
+                AppConfig.defaults(),
+                JavaFxTestSupport.blockingUiDispatcher());
 
         JavaFxTestSupport.LoadedFxml loaded =
                 JavaFxTestSupport.loadFxml("/fxml/profile-view.fxml", () -> new ProfileViewController(viewModel));
@@ -70,7 +71,9 @@ class ProfileViewControllerTest {
         NavigationService.getInstance()
                 .setNavigationContext(NavigationService.ViewType.PROFILE_VIEW, viewedUser.getId());
         ProfileReadOnlyViewModel viewModel = new ProfileReadOnlyViewModel(
-                new StorageUiUserStore(users), AppConfig.defaults(), JavaFxTestSupport.blockingUiDispatcher());
+                new datingapp.ui.viewmodel.UiDataAdapters.StorageUiUserStore(users),
+                AppConfig.defaults(),
+                JavaFxTestSupport.blockingUiDispatcher());
 
         JavaFxTestSupport.LoadedFxml loaded =
                 JavaFxTestSupport.loadFxml("/fxml/profile-view.fxml", () -> new ProfileViewController(viewModel));

@@ -1,5 +1,6 @@
 package datingapp.ui.screen;
 
+import datingapp.app.support.UserPresentationSupport;
 import datingapp.core.AppClock;
 import datingapp.core.model.User;
 import datingapp.core.model.User.UserState;
@@ -366,7 +367,7 @@ public class LoginController extends BaseController implements Initializable {
                     container.setScaleY(1.0);
                 } else {
                     setText(null);
-                    int age = user.getAge(userTimeZone).orElse(0);
+                    int age = UserPresentationSupport.safeAge(user, userTimeZone);
                     nameLabel.setText(user.getName() + ", " + age);
 
                     StringBuilder sb = new StringBuilder(formatState(user.getState()));

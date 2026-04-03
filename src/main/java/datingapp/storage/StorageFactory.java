@@ -225,7 +225,6 @@ public final class StorageFactory {
                 .dailyPickService(domain.dailyPickService())
                 .standoutService(domain.standoutService())
                 .undoService(domain.undoService())
-                .compatibilityCalculator(domain.compatibilityCalculator())
                 .achievementService(domain.achievementService())
                 .connectionService(domain.connectionService())
                 .validationService(domain.validationService())

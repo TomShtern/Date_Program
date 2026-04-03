@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.app.testutil.TestEventBus;
+import datingapp.app.usecase.common.UserContext;
 import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
 import datingapp.core.model.User;
@@ -67,5 +68,34 @@ class ProfileMutationUseCasesTest {
 
         assertFalse(result.success());
         assertEquals("Name cannot be empty", result.error().message());
+    }
+
+    @Test
+    @DisplayName("saveProfile accepts slice-local command and returns slice-local result")
+    void saveProfileUsesSliceLocalContract() {
+        User user = new User(java.util.UUID.randomUUID(), "Slice Save User");
+
+        var result = useCases.saveProfile(
+                new ProfileMutationUseCases.SaveProfileCommand(UserContext.cli(user.getId()), user));
+
+        assertTrue(result.success());
+        assertNotNull(result.data().user());
+        assertEquals(user.getId(), result.data().user().getId());
+    }
+
+    @Test
+    @DisplayName("updateDiscoveryPreferences accepts slice-local command")
+    void updateDiscoveryPreferencesUsesSliceLocalContract() {
+        User user = new User(java.util.UUID.randomUUID(), "Slice Preference User");
+        userStorage.save(user);
+
+        var result = useCases.updateDiscoveryPreferences(new ProfileMutationUseCases.UpdateDiscoveryPreferencesCommand(
+                UserContext.cli(user.getId()), 18, 40, 25, java.util.Set.of(Gender.OTHER)));
+
+        assertTrue(result.success());
+        assertEquals(18, result.data().getMinAge());
+        assertEquals(40, result.data().getMaxAge());
+        assertEquals(25, result.data().getMaxDistanceKm());
+        assertEquals(java.util.Set.of(Gender.OTHER), result.data().getInterestedIn());
     }
 }

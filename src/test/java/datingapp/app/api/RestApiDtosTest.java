@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import datingapp.app.api.RestApiDtos.AchievementSnapshotDto;
 import datingapp.app.api.RestApiDtos.BlockedUsersResponse;
 import datingapp.app.api.RestApiDtos.ConfirmVerificationResponse;
 import datingapp.app.api.RestApiDtos.ErrorResponse;
@@ -12,7 +13,9 @@ import datingapp.app.api.RestApiDtos.MessageDto;
 import datingapp.app.api.RestApiDtos.StartVerificationResponse;
 import datingapp.app.api.RestApiDtos.UserDetail;
 import datingapp.app.api.RestApiDtos.UserSummary;
+import datingapp.app.usecase.profile.ProfileInsightsUseCases;
 import datingapp.app.usecase.profile.VerificationUseCases;
+import datingapp.core.metrics.EngagementDomain.Achievement;
 import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
 import datingapp.core.model.User.VerificationMethod;
@@ -182,6 +185,21 @@ class RestApiDtosTest {
 
             assertTrue(response.verified());
             assertNotNull(response.verifiedAt());
+        }
+
+        @Test
+        @DisplayName("AchievementSnapshotDto maps profile insights snapshots directly")
+        void achievementSnapshotDtoMapsProfileInsightsSnapshotsDirectly() {
+            UUID userId = UUID.randomUUID();
+            var unlocked = datingapp.core.metrics.EngagementDomain.Achievement.UserAchievement.create(
+                    userId, Achievement.FIRST_SPARK);
+            var snapshot = new ProfileInsightsUseCases.AchievementSnapshot(List.of(unlocked), List.of(unlocked));
+
+            AchievementSnapshotDto dto = AchievementSnapshotDto.from(snapshot);
+
+            assertEquals(1, dto.unlockedCount());
+            assertEquals(1, dto.newlyUnlockedCount());
+            assertEquals("First Spark", dto.unlocked().getFirst().achievementName());
         }
     }
 

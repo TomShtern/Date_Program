@@ -1,5 +1,6 @@
 package datingapp.ui.screen;
 
+import datingapp.app.support.UserPresentationSupport;
 import datingapp.core.i18n.I18n;
 import datingapp.core.model.Match;
 import datingapp.core.model.User;
@@ -554,7 +555,7 @@ public class MatchingController extends BaseController implements Initializable 
             return;
         }
 
-        int age = user.getAge(userTimeZone).orElse(0);
+        int age = UserPresentationSupport.safeAge(user, userTimeZone);
         nameLabel.setText(user.getName() + ", " + age);
         bioLabel.setText(user.getBio() != null ? user.getBio() : "No bio provided.");
         distanceLabel.setText("📍 " + viewModel.getDistanceDisplay(user));

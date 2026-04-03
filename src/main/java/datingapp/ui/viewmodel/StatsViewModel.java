@@ -286,8 +286,7 @@ public class StatsViewModel extends BaseViewModel {
             }
             earned = result.data().unlocked();
         } else if (profileUseCases != null) {
-            var result = profileUseCases.getAchievements(
-                    new ProfileUseCases.AchievementsQuery(UserContext.ui(userId), false));
+            var result = profileUseCases.getAchievements(new AchievementsQuery(UserContext.ui(userId), false));
             if (!result.success()) {
                 throw new IllegalStateException(
                         result.error() != null ? result.error().message() : "Failed to load achievements");
@@ -339,7 +338,7 @@ public class StatsViewModel extends BaseViewModel {
     }
 
     private UserStats resolveViaProfileUseCases(java.util.UUID userId) {
-        var result = profileUseCases.getOrComputeStats(new ProfileUseCases.StatsQuery(UserContext.ui(userId)));
+        var result = profileUseCases.getOrComputeStats(new StatsQuery(UserContext.ui(userId)));
         if (result.success()) {
             return result.data();
         }

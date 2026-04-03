@@ -38,31 +38,32 @@ class ProfileUseCasesNotesTest {
                 new ProfileActivationPolicy(),
                 new InProcessAppEventBus());
 
-        var createResult = useCases.upsertProfileNote(new ProfileUseCases.UpsertProfileNoteCommand(
+        var createResult = useCases.upsertProfileNote(new ProfileNotesUseCases.UpsertProfileNoteCommand(
                 UserContext.ui(authorId), subjectId, "Met at coffee shop"));
         assertTrue(createResult.success());
         assertEquals("Met at coffee shop", createResult.data().content());
 
         var getResult =
-                useCases.getProfileNote(new ProfileUseCases.ProfileNoteQuery(UserContext.ui(authorId), subjectId));
+                useCases.getProfileNote(new ProfileNotesUseCases.ProfileNoteQuery(UserContext.ui(authorId), subjectId));
         assertTrue(getResult.success());
         assertEquals("Met at coffee shop", getResult.data().content());
 
-        var updateResult = useCases.upsertProfileNote(new ProfileUseCases.UpsertProfileNoteCommand(
+        var updateResult = useCases.upsertProfileNote(new ProfileNotesUseCases.UpsertProfileNoteCommand(
                 UserContext.ui(authorId), subjectId, "Prefers weekend plans"));
         assertTrue(updateResult.success());
         assertEquals("Prefers weekend plans", updateResult.data().content());
 
-        var listResult = useCases.listProfileNotes(new ProfileUseCases.ProfileNotesQuery(UserContext.ui(authorId)));
+        var listResult =
+                useCases.listProfileNotes(new ProfileNotesUseCases.ProfileNotesQuery(UserContext.ui(authorId)));
         assertTrue(listResult.success());
         assertEquals(List.of(updateResult.data()), listResult.data());
 
         var deleteResult = useCases.deleteProfileNote(
-                new ProfileUseCases.DeleteProfileNoteCommand(UserContext.ui(authorId), subjectId));
+                new ProfileNotesUseCases.DeleteProfileNoteCommand(UserContext.ui(authorId), subjectId));
         assertTrue(deleteResult.success());
 
         var missingResult =
-                useCases.getProfileNote(new ProfileUseCases.ProfileNoteQuery(UserContext.ui(authorId), subjectId));
+                useCases.getProfileNote(new ProfileNotesUseCases.ProfileNoteQuery(UserContext.ui(authorId), subjectId));
         assertFalse(missingResult.success());
     }
 
@@ -82,8 +83,8 @@ class ProfileUseCasesNotesTest {
                 AppConfig.defaults(),
                 new ProfileActivationPolicy(),
                 new InProcessAppEventBus());
-        var result = useCases.upsertProfileNote(
-                new ProfileUseCases.UpsertProfileNoteCommand(UserContext.ui(authorId), UUID.randomUUID(), "Hello"));
+        var result = useCases.upsertProfileNote(new ProfileNotesUseCases.UpsertProfileNoteCommand(
+                UserContext.ui(authorId), UUID.randomUUID(), "Hello"));
 
         assertFalse(result.success());
         assertEquals("Subject user not found", result.error().message());
@@ -110,7 +111,7 @@ class ProfileUseCasesNotesTest {
                 new InProcessAppEventBus());
 
         var result = useCases.upsertProfileNote(
-                new ProfileUseCases.UpsertProfileNoteCommand(UserContext.ui(authorId), subjectId, "123456"));
+                new ProfileNotesUseCases.UpsertProfileNoteCommand(UserContext.ui(authorId), subjectId, "123456"));
 
         assertFalse(result.success());
         assertEquals(

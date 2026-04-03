@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import datingapp.app.testutil.TestEventBus;
 import datingapp.app.usecase.common.UseCaseError;
 import datingapp.app.usecase.common.UseCaseResult;
+import datingapp.app.usecase.profile.ProfileInsightsUseCases;
 import datingapp.app.usecase.profile.ProfileUseCases;
 import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
@@ -121,7 +122,8 @@ class StatsViewModelTest {
                         new datingapp.core.workflow.ProfileActivationPolicy(),
                         new TestEventBus()) {
                     @Override
-                    public UseCaseResult<ProfileUseCases.AchievementSnapshot> getAchievements(AchievementsQuery query) {
+                    public UseCaseResult<ProfileInsightsUseCases.AchievementSnapshot> getAchievements(
+                            ProfileInsightsUseCases.AchievementsQuery query) {
                         return UseCaseResult.failure(UseCaseError.internal("achievement load failed"));
                     }
                 };

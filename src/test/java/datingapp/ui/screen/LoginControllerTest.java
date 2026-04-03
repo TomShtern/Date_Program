@@ -35,7 +35,6 @@ import datingapp.core.testutil.TestUserFactory;
 import datingapp.ui.JavaFxTestSupport;
 import datingapp.ui.NavigationService;
 import datingapp.ui.viewmodel.LoginViewModel;
-import datingapp.ui.viewmodel.UiDataAdapters.StorageUiUserStore;
 import datingapp.ui.viewmodel.ViewModelFactory;
 import java.lang.reflect.Field;
 import java.util.Deque;
@@ -99,7 +98,7 @@ class LoginControllerTest {
         users.save(activeUser);
 
         LoginViewModel viewModel = new LoginViewModel(
-                new StorageUiUserStore(users),
+                new datingapp.ui.viewmodel.UiDataAdapters.StorageUiUserStore(users),
                 config,
                 AppSession.getInstance(),
                 JavaFxTestSupport.blockingUiDispatcher());
@@ -131,7 +130,7 @@ class LoginControllerTest {
         users.save(incompleteUser);
 
         LoginViewModel viewModel = new LoginViewModel(
-                new StorageUiUserStore(users),
+                new datingapp.ui.viewmodel.UiDataAdapters.StorageUiUserStore(users),
                 config,
                 AppSession.getInstance(),
                 JavaFxTestSupport.blockingUiDispatcher());
@@ -164,7 +163,7 @@ class LoginControllerTest {
         users.save(createActiveUser("Blair", Gender.FEMALE, EnumSet.of(Gender.MALE)));
 
         LoginViewModel viewModel = new LoginViewModel(
-                new StorageUiUserStore(users),
+                new datingapp.ui.viewmodel.UiDataAdapters.StorageUiUserStore(users),
                 config,
                 AppSession.getInstance(),
                 JavaFxTestSupport.blockingUiDispatcher());
@@ -222,7 +221,7 @@ class LoginControllerTest {
         ProfileService profileService = new ProfileService(users);
 
         LoginViewModel viewModel = new LoginViewModel(
-                new StorageUiUserStore(users),
+                new datingapp.ui.viewmodel.UiDataAdapters.StorageUiUserStore(users),
                 config,
                 AppSession.getInstance(),
                 JavaFxTestSupport.blockingUiDispatcher());
@@ -258,7 +257,7 @@ class LoginControllerTest {
     void createAccountDialogFactoryKeepsCreateDisabledUntilNameIsEntered() throws Exception {
         TestStorages.Users users = new TestStorages.Users();
         LoginViewModel viewModel = new LoginViewModel(
-                new StorageUiUserStore(users),
+                new datingapp.ui.viewmodel.UiDataAdapters.StorageUiUserStore(users),
                 AppConfig.defaults(),
                 AppSession.getInstance(),
                 JavaFxTestSupport.blockingUiDispatcher());
@@ -285,7 +284,7 @@ class LoginControllerTest {
     void createAccountDialogClampsManualAgeEditsIntoConfiguredBounds() throws Exception {
         TestStorages.Users users = new TestStorages.Users();
         LoginViewModel viewModel = new LoginViewModel(
-                new StorageUiUserStore(users),
+                new datingapp.ui.viewmodel.UiDataAdapters.StorageUiUserStore(users),
                 AppConfig.defaults(),
                 AppSession.getInstance(),
                 JavaFxTestSupport.blockingUiDispatcher());
@@ -413,7 +412,6 @@ class LoginControllerTest {
                 .dailyPickService(dailyPickService)
                 .standoutService(standoutService)
                 .undoService(undoService)
-                .compatibilityCalculator(compatibilityCalculator)
                 .achievementService(achievementService)
                 .connectionService(connectionService)
                 .validationService(validationService)

@@ -4,9 +4,10 @@ import datingapp.app.cli.CliTextAndInput.EnumMenu;
 import datingapp.app.cli.CliTextAndInput.InputReader;
 import datingapp.app.usecase.common.UserContext;
 import datingapp.app.usecase.profile.ProfileMutationUseCases;
+import datingapp.app.usecase.profile.ProfileMutationUseCases.SaveProfileCommand;
+import datingapp.app.usecase.profile.ProfileNormalizationSupport;
 import datingapp.app.usecase.profile.ProfileNotesUseCases;
 import datingapp.app.usecase.profile.ProfileUseCases;
-import datingapp.app.usecase.profile.ProfileUseCases.SaveProfileCommand;
 import datingapp.core.AppConfig;
 import datingapp.core.AppSession;
 import datingapp.core.EnumSetUtil;
@@ -639,7 +640,10 @@ public class ProfileHandler implements LoggingSupport {
                     result.errors().forEach(e -> logInfo(INDENTED_BULLET, e));
                     logInfo("    Keeping current value.");
                 } else {
-                    currentUser.setMaxDistanceKm(dist, config.matching().maxDistanceKm());
+                    int normalized = ProfileNormalizationSupport.normalizeDiscoveryPreferences(
+                                    config, currentUser.getMinAge(), currentUser.getMaxAge(), dist)
+                            .maxDistanceKm();
+                    currentUser.setMaxDistanceKm(normalized, config.matching().maxDistanceKm());
                 }
             } catch (NumberFormatException e) {
                 logTrace("Keeping current distance value, input was: {}", e.getMessage());
@@ -657,9 +661,11 @@ public class ProfileHandler implements LoggingSupport {
                 result.errors().forEach(e -> logInfo(INDENTED_BULLET, e));
                 logInfo("    Keeping current value.");
             } else {
+                var normalized = ProfileNormalizationSupport.normalizeDiscoveryPreferences(
+                        config, minAge, maxAge, currentUser.getMaxDistanceKm());
                 currentUser.setAgeRange(
-                        minAge,
-                        maxAge,
+                        normalized.minAge(),
+                        normalized.maxAge(),
                         config.validation().minAge(),
                         config.validation().maxAge());
             }

@@ -19,7 +19,6 @@ import datingapp.core.testutil.TestStorages;
 import datingapp.core.workflow.ProfileActivationPolicy;
 import datingapp.ui.JavaFxTestSupport;
 import datingapp.ui.async.UiThreadDispatcher;
-import datingapp.ui.viewmodel.UiDataAdapters.StorageUiUserStore;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -87,7 +86,7 @@ class NotesViewModelTest {
 
         NotesViewModel viewModel = new NotesViewModel(
                 profileUseCases,
-                new StorageUiUserStore(users),
+                new UiDataAdapters.StorageUiUserStore(users),
                 AppSession.getInstance(),
                 config.safety().userTimeZone(),
                 TEST_DISPATCHER);
@@ -137,7 +136,7 @@ class NotesViewModelTest {
 
             NotesViewModel viewModel = new NotesViewModel(
                     profileUseCases,
-                    new StorageUiUserStore(users),
+                    new UiDataAdapters.StorageUiUserStore(users),
                     AppSession.getInstance(),
                     configuredZone,
                     TEST_DISPATCHER);
@@ -181,7 +180,7 @@ class NotesViewModelTest {
 
         NotesViewModel viewModel = new NotesViewModel(
                 profileUseCases,
-                new StorageUiUserStore(users),
+                new UiDataAdapters.StorageUiUserStore(users),
                 AppSession.getInstance(),
                 config.safety().userTimeZone(),
                 TEST_DISPATCHER);
@@ -216,7 +215,7 @@ class NotesViewModelTest {
 
         NotesViewModel viewModel = new NotesViewModel(
                 profileUseCases,
-                new StorageUiUserStore(users),
+                new UiDataAdapters.StorageUiUserStore(users),
                 AppSession.getInstance(),
                 config.safety().userTimeZone(),
                 TEST_DISPATCHER);
@@ -263,7 +262,7 @@ class NotesViewModelTest {
 
         NotesViewModel viewModel = new NotesViewModel(
                 profileUseCases,
-                new StorageUiUserStore(users),
+                new UiDataAdapters.StorageUiUserStore(users),
                 AppSession.getInstance(),
                 config.safety().userTimeZone(),
                 TEST_DISPATCHER);

@@ -12,7 +12,6 @@ import datingapp.app.api.RestApiDtos.ConfirmVerificationResponse;
 import datingapp.app.api.RestApiDtos.ConversationSummary;
 import datingapp.app.api.RestApiDtos.ErrorResponse;
 import datingapp.app.api.RestApiDtos.FriendRequestsResponse;
-import datingapp.app.api.RestApiDtos.HealthResponse;
 import datingapp.app.api.RestApiDtos.LikeResponse;
 import datingapp.app.api.RestApiDtos.LocationCityDto;
 import datingapp.app.api.RestApiDtos.LocationCountryDto;
@@ -28,12 +27,9 @@ import datingapp.app.api.RestApiDtos.PagedMatchResponse;
 import datingapp.app.api.RestApiDtos.PassResponse;
 import datingapp.app.api.RestApiDtos.PendingLikerDto;
 import datingapp.app.api.RestApiDtos.PendingLikersResponse;
-import datingapp.app.api.RestApiDtos.ProfileNoteDto;
-import datingapp.app.api.RestApiDtos.ProfileNoteUpsertRequest;
 import datingapp.app.api.RestApiDtos.ProfileUpdateRequest;
 import datingapp.app.api.RestApiDtos.ProfileUpdateResponse;
 import datingapp.app.api.RestApiDtos.ReportResponse;
-import datingapp.app.api.RestApiDtos.ReportUserRequest;
 import datingapp.app.api.RestApiDtos.SendMessageRequest;
 import datingapp.app.api.RestApiDtos.StandoutDto;
 import datingapp.app.api.RestApiDtos.StandoutsResponse;
@@ -68,10 +64,10 @@ import datingapp.app.usecase.profile.ProfileInsightsUseCases;
 import datingapp.app.usecase.profile.ProfileInsightsUseCases.AchievementsQuery;
 import datingapp.app.usecase.profile.ProfileInsightsUseCases.StatsQuery;
 import datingapp.app.usecase.profile.ProfileMutationUseCases;
+import datingapp.app.usecase.profile.ProfileMutationUseCases.DeleteAccountCommand;
+import datingapp.app.usecase.profile.ProfileMutationUseCases.UpdateProfileCommand;
 import datingapp.app.usecase.profile.ProfileNotesUseCases;
 import datingapp.app.usecase.profile.ProfileUseCases;
-import datingapp.app.usecase.profile.ProfileUseCases.DeleteAccountCommand;
-import datingapp.app.usecase.profile.ProfileUseCases.UpdateProfileCommand;
 import datingapp.app.usecase.profile.VerificationUseCases;
 import datingapp.app.usecase.profile.VerificationUseCases.ConfirmVerificationCommand;
 import datingapp.app.usecase.profile.VerificationUseCases.StartVerificationCommand;
@@ -153,9 +149,6 @@ public class RestApiServer {
     private static final String PATH_NOTIFICATION_ID = "notificationId";
     private static final String PATH_SUBJECT_ID = "subjectId";
     private static final String PATH_TARGET_ID = "targetId";
-    private static final String NOTES_COLLECTION_ROUTE = "/api/users/{authorId}/notes";
-    private static final String NOTE_ITEM_ROUTE = "/api/users/{authorId}/notes/{subjectId}";
-    private static final String HEALTH_ROUTE = "/api/health";
     private static final Duration DEFAULT_RATE_LIMIT_WINDOW = Duration.ofMinutes(1);
     private static final int DEFAULT_RATE_LIMIT_REQUESTS = 240;
     /**
@@ -243,21 +236,7 @@ public class RestApiServer {
     // ── Route Registration ──────────────────────────────────────────────
 
     private void registerRoutes() {
-        // ────────────────────────────────────────────────────────────────────
-        // AUTHENTICATION NOTE: This REST API is intentionally unauthenticated.
-        // It is designed for local IPC use only (CLI tools, local admin scripts).
-        // Do NOT expose these endpoints over a public network without adding
-        // authentication middleware (e.g., app.before() with a shared secret).
-        // Mutating routes require X-User-Id; selected read routes may remain anonymous.
-        // ────────────────────────────────────────────────────────────────────
-
-        new HealthRoutes(app).register();
-        new LocationRoutes(app, this).register();
-        new UserRoutes(app, this).register();
-        new MatchingRoutes(app, this).register();
-        new SocialRoutes(app, this).register();
-        new MessagingRoutes(app, this).register();
-        new ProfileNoteRoutes(app, this).register();
+        new RestRouteSupport(app, this).registerRoutes();
     }
 
     private void registerRequestGuards() {
@@ -266,7 +245,7 @@ public class RestApiServer {
 
     // ── User Handlers ───────────────────────────────────────────────────
 
-    private void listUsers(Context ctx) {
+    void listUsers(Context ctx) {
         var result = profileUseCases.listUsers();
         if (!result.success()) {
             handleUseCaseFailure(ctx, result.error());
@@ -278,7 +257,7 @@ public class RestApiServer {
         ctx.json(users);
     }
 
-    private void getUser(Context ctx) {
+    void getUser(Context ctx) {
         UUID id = parseUuid(ctx.pathParam("id"));
         User user = loadUser(ctx, id);
         if (user == null) {
@@ -287,13 +266,13 @@ public class RestApiServer {
         ctx.json(UserDetail.from(user, userTimeZone, locationLabel(user)));
     }
 
-    private void listLocationCountries(Context ctx) {
+    void listLocationCountries(Context ctx) {
         ctx.json(locationService.getAvailableCountries().stream()
                 .map(LocationCountryDto::from)
                 .toList());
     }
 
-    private void listLocationCities(Context ctx) {
+    void listLocationCities(Context ctx) {
         String countryCode = Optional.ofNullable(ctx.queryParam("countryCode"))
                 .filter(value -> !value.isBlank())
                 .orElse(locationService.getDefaultCountry().code());
@@ -307,7 +286,7 @@ public class RestApiServer {
                 .toList());
     }
 
-    private void resolveLocationSelection(Context ctx) {
+    void resolveLocationSelection(Context ctx) {
         LocationResolveRequest request = ctx.bodyAsClass(LocationResolveRequest.class);
         var result = locationService.resolveSelection(
                 request.countryCode(),
@@ -322,7 +301,7 @@ public class RestApiServer {
                 result.resolvedLocation().orElseThrow(), result.approximate(), result.message()));
     }
 
-    private void browseCandidates(Context ctx) {
+    void browseCandidates(Context ctx) {
         UUID id = parseUuid(ctx.pathParam("id"));
         User user = loadUser(ctx, id);
         if (user == null) {
@@ -338,7 +317,7 @@ public class RestApiServer {
         ctx.json(BrowseCandidatesResponse.from(result.data(), userTimeZone));
     }
 
-    private void updateProfile(Context ctx) {
+    void updateProfile(Context ctx) {
         UUID userId = parseUuid(ctx.pathParam("id"));
         if (loadUser(ctx, userId) == null) {
             return;
@@ -388,7 +367,7 @@ public class RestApiServer {
                 locationLabel(result.data().user())));
     }
 
-    private void deleteUser(Context ctx) {
+    void deleteUser(Context ctx) {
         UUID userId = parseUuid(ctx.pathParam("id"));
         if (loadUser(ctx, userId) == null) {
             return;
@@ -403,7 +382,7 @@ public class RestApiServer {
         ctx.status(204);
     }
 
-    private void getCandidates(Context ctx) {
+    void getCandidates(Context ctx) {
         UUID id = parseUuid(ctx.pathParam("id"));
         User user = loadUser(ctx, id);
         if (user == null) {
@@ -444,7 +423,7 @@ public class RestApiServer {
 
     // ── Match Handlers ──────────────────────────────────────────────────
 
-    private void getMatches(Context ctx) {
+    void getMatches(Context ctx) {
         UUID userId = parseUuid(ctx.pathParam("id"));
         int limit = ctx.queryParamAsClass(PARAM_LIMIT, Integer.class).getOrDefault(DEFAULT_MATCHES_LIMIT);
         int offset = ctx.queryParamAsClass(PARAM_OFFSET, Integer.class).getOrDefault(0);
@@ -473,7 +452,7 @@ public class RestApiServer {
         ctx.json(new PagedMatchResponse(items, page.totalCount(), offset, limit, page.hasMore()));
     }
 
-    private void getFriendRequests(Context ctx) {
+    void getFriendRequests(Context ctx) {
         UUID userId = parseUuid(ctx.pathParam("id"));
         if (loadUser(ctx, userId) == null) {
             return;
@@ -487,7 +466,7 @@ public class RestApiServer {
         ctx.json(FriendRequestsResponse.from(result.data()));
     }
 
-    private void likeUser(Context ctx) {
+    void likeUser(Context ctx) {
         UUID userId = parseUuid(ctx.pathParam("id"));
         UUID targetId = parseUuid(ctx.pathParam(PATH_TARGET_ID));
         User currentUser = loadUser(ctx, userId);
@@ -520,7 +499,7 @@ public class RestApiServer {
         }
     }
 
-    private void passUser(Context ctx) {
+    void passUser(Context ctx) {
         UUID userId = parseUuid(ctx.pathParam("id"));
         UUID targetId = parseUuid(ctx.pathParam(PATH_TARGET_ID));
         if (loadUser(ctx, userId) == null || loadUser(ctx, targetId) == null) {
@@ -540,7 +519,7 @@ public class RestApiServer {
         ctx.json(new PassResponse("Passed"));
     }
 
-    private void undoSwipe(Context ctx) {
+    void undoSwipe(Context ctx) {
         UUID userId = parseUuid(ctx.pathParam("id"));
         if (loadUser(ctx, userId) == null) {
             return;
@@ -554,7 +533,7 @@ public class RestApiServer {
         ctx.json(UndoResponse.from(result.data()));
     }
 
-    private void getPendingLikers(Context ctx) {
+    void getPendingLikers(Context ctx) {
         UUID userId = parseUuid(ctx.pathParam("id"));
         if (loadUser(ctx, userId) == null) {
             return;
@@ -570,7 +549,7 @@ public class RestApiServer {
                 .toList()));
     }
 
-    private void getStandouts(Context ctx) {
+    void getStandouts(Context ctx) {
         UUID userId = parseUuid(ctx.pathParam("id"));
         User currentUser = loadUser(ctx, userId);
         if (currentUser == null) {
@@ -593,7 +572,7 @@ public class RestApiServer {
                 standoutResult.result().message()));
     }
 
-    private void archiveMatch(Context ctx) {
+    void archiveMatch(Context ctx) {
         UUID userId = parseUuid(ctx.pathParam("id"));
         String matchId = ctx.pathParam(PATH_MATCH_ID);
         if (loadUser(ctx, userId) == null) {
@@ -608,7 +587,7 @@ public class RestApiServer {
         ctx.status(204);
     }
 
-    private void getMatchQuality(Context ctx) {
+    void getMatchQuality(Context ctx) {
         UUID userId = parseUuid(ctx.pathParam("id"));
         String matchId = ctx.pathParam(PATH_MATCH_ID);
         if (loadUser(ctx, userId) == null) {
@@ -623,7 +602,7 @@ public class RestApiServer {
         ctx.json(MatchQualityDto.from(result.data()));
     }
 
-    private void getStats(Context ctx) {
+    void getStats(Context ctx) {
         UUID userId = parseUuid(ctx.pathParam("id"));
         if (loadUser(ctx, userId) == null) {
             return;
@@ -637,7 +616,7 @@ public class RestApiServer {
         ctx.json(UserStatsDto.from(result.data()));
     }
 
-    private void getAchievements(Context ctx) {
+    void getAchievements(Context ctx) {
         UUID userId = parseUuid(ctx.pathParam("id"));
         if (loadUser(ctx, userId) == null) {
             return;
@@ -651,11 +630,10 @@ public class RestApiServer {
             handleUseCaseFailure(ctx, result.error());
             return;
         }
-        ctx.json(AchievementSnapshotDto.from(new ProfileUseCases.AchievementSnapshot(
-                result.data().unlocked(), result.data().newlyUnlocked())));
+        ctx.json(AchievementSnapshotDto.from(result.data()));
     }
 
-    private void getNotifications(Context ctx) {
+    void getNotifications(Context ctx) {
         UUID userId = parseUuid(ctx.pathParam("id"));
         if (loadUser(ctx, userId) == null) {
             return;
@@ -670,7 +648,7 @@ public class RestApiServer {
         ctx.json(result.data().stream().map(NotificationDto::from).toList());
     }
 
-    private void markNotificationRead(Context ctx) {
+    void markNotificationRead(Context ctx) {
         UUID userId = parseUuid(ctx.pathParam("id"));
         UUID notificationId = parseUuid(ctx.pathParam(PATH_NOTIFICATION_ID));
         if (loadUser(ctx, userId) == null) {
@@ -686,7 +664,7 @@ public class RestApiServer {
         ctx.status(204);
     }
 
-    private void markAllNotificationsRead(Context ctx) {
+    void markAllNotificationsRead(Context ctx) {
         UUID userId = parseUuid(ctx.pathParam("id"));
         if (loadUser(ctx, userId) == null) {
             return;
@@ -701,7 +679,7 @@ public class RestApiServer {
         ctx.json(new MarkAllNotificationsReadResponse(result.data()));
     }
 
-    private void requestFriendZone(Context ctx) {
+    void requestFriendZone(Context ctx) {
         UUID userId = parseUuid(ctx.pathParam("id"));
         UUID targetId = parseUuid(ctx.pathParam(PATH_TARGET_ID));
         if (loadUser(ctx, userId) == null || loadUser(ctx, targetId) == null) {
@@ -717,11 +695,11 @@ public class RestApiServer {
         ctx.json(TransitionResponse.from(result.data()));
     }
 
-    private void acceptFriendRequest(Context ctx) {
+    void acceptFriendRequest(Context ctx) {
         respondToFriendRequest(ctx, FriendRequestAction.ACCEPT);
     }
 
-    private void declineFriendRequest(Context ctx) {
+    void declineFriendRequest(Context ctx) {
         respondToFriendRequest(ctx, FriendRequestAction.DECLINE);
     }
 
@@ -741,7 +719,7 @@ public class RestApiServer {
         ctx.json(TransitionResponse.from(result.data()));
     }
 
-    private void gracefulExit(Context ctx) {
+    void gracefulExit(Context ctx) {
         UUID userId = parseUuid(ctx.pathParam("id"));
         UUID targetId = parseUuid(ctx.pathParam(PATH_TARGET_ID));
         if (loadUser(ctx, userId) == null || loadUser(ctx, targetId) == null) {
@@ -756,7 +734,7 @@ public class RestApiServer {
         ctx.json(TransitionResponse.from(result.data()));
     }
 
-    private void unmatch(Context ctx) {
+    void unmatch(Context ctx) {
         UUID userId = parseUuid(ctx.pathParam("id"));
         UUID targetId = parseUuid(ctx.pathParam(PATH_TARGET_ID));
         if (loadUser(ctx, userId) == null || loadUser(ctx, targetId) == null) {
@@ -771,7 +749,7 @@ public class RestApiServer {
         ctx.json(TransitionResponse.from(result.data()));
     }
 
-    private void blockUser(Context ctx) {
+    void blockUser(Context ctx) {
         UUID userId = parseUuid(ctx.pathParam("id"));
         UUID targetId = parseUuid(ctx.pathParam(PATH_TARGET_ID));
         if (loadUser(ctx, userId) == null || loadUser(ctx, targetId) == null) {
@@ -787,7 +765,7 @@ public class RestApiServer {
                 result.data().success(), false, result.data().errorMessage()));
     }
 
-    private void getBlockedUsers(Context ctx) {
+    void getBlockedUsers(Context ctx) {
         UUID userId = parseUuid(ctx.pathParam("id"));
         if (loadUser(ctx, userId) == null) {
             return;
@@ -801,7 +779,7 @@ public class RestApiServer {
         ctx.json(BlockedUsersResponse.from(result.data()));
     }
 
-    private void unblockUser(Context ctx) {
+    void unblockUser(Context ctx) {
         UUID userId = parseUuid(ctx.pathParam("id"));
         UUID targetId = parseUuid(ctx.pathParam(PATH_TARGET_ID));
         if (loadUser(ctx, userId) == null || loadUser(ctx, targetId) == null) {
@@ -816,14 +794,14 @@ public class RestApiServer {
         ctx.status(204);
     }
 
-    private void reportUser(Context ctx) {
+    void reportUser(Context ctx) {
         UUID userId = parseUuid(ctx.pathParam("id"));
         UUID targetId = parseUuid(ctx.pathParam(PATH_TARGET_ID));
         if (loadUser(ctx, userId) == null || loadUser(ctx, targetId) == null) {
             return;
         }
 
-        ReportUserRequest request = ctx.bodyAsClass(ReportUserRequest.class);
+        RestApiDtos.ReportUserRequest request = ctx.bodyAsClass(RestApiDtos.ReportUserRequest.class);
         if (request.reason() == null) {
             throw new IllegalArgumentException("reason is required");
         }
@@ -838,7 +816,7 @@ public class RestApiServer {
                 true, result.data().autoBanned(), null, result.data().blockedByReporter()));
     }
 
-    private void startVerification(Context ctx) {
+    void startVerification(Context ctx) {
         UUID userId = parseUuid(ctx.pathParam("id"));
         if (loadUser(ctx, userId) == null) {
             return;
@@ -854,7 +832,7 @@ public class RestApiServer {
         ctx.json(StartVerificationResponse.from(result.data()));
     }
 
-    private void confirmVerification(Context ctx) {
+    void confirmVerification(Context ctx) {
         UUID userId = parseUuid(ctx.pathParam("id"));
         if (loadUser(ctx, userId) == null) {
             return;
@@ -872,7 +850,7 @@ public class RestApiServer {
 
     // ── Messaging Handlers ──────────────────────────────────────────────
 
-    private void getConversations(Context ctx) {
+    void getConversations(Context ctx) {
         UUID userId = parseUuid(ctx.pathParam("id"));
         int limit = ctx.queryParamAsClass(PARAM_LIMIT, Integer.class).getOrDefault(DEFAULT_MESSAGE_LIMIT);
         int offset = ctx.queryParamAsClass(PARAM_OFFSET, Integer.class).getOrDefault(0);
@@ -909,7 +887,7 @@ public class RestApiServer {
         ctx.json(conversations);
     }
 
-    private void deleteConversation(Context ctx) {
+    void deleteConversation(Context ctx) {
         UUID userId = parseUuid(ctx.pathParam("id"));
         String conversationId = ctx.pathParam(PATH_CONVERSATION_ID);
         if (loadUser(ctx, userId) == null) {
@@ -925,7 +903,7 @@ public class RestApiServer {
         ctx.status(204);
     }
 
-    private void archiveConversation(Context ctx) {
+    void archiveConversation(Context ctx) {
         UUID userId = parseUuid(ctx.pathParam("id"));
         String conversationId = ctx.pathParam(PATH_CONVERSATION_ID);
         if (loadUser(ctx, userId) == null) {
@@ -948,7 +926,7 @@ public class RestApiServer {
         ctx.status(204);
     }
 
-    private void getMessages(Context ctx) {
+    void getMessages(Context ctx) {
         String conversationId = ctx.pathParam(PATH_CONVERSATION_ID);
         int limit = ctx.queryParamAsClass(PARAM_LIMIT, Integer.class).getOrDefault(DEFAULT_MESSAGE_LIMIT);
         int offset = ctx.queryParamAsClass(PARAM_OFFSET, Integer.class).getOrDefault(0);
@@ -975,7 +953,7 @@ public class RestApiServer {
         ctx.json(messages);
     }
 
-    private void deleteMessage(Context ctx) {
+    void deleteMessage(Context ctx) {
         String conversationId = ctx.pathParam(PATH_CONVERSATION_ID);
         UUID messageId = parseUuid(ctx.pathParam(PATH_MESSAGE_ID));
         UUID actingUserId = requireActingUserId(ctx);
@@ -989,7 +967,7 @@ public class RestApiServer {
         ctx.status(204);
     }
 
-    private void sendMessage(Context ctx) {
+    void sendMessage(Context ctx) {
         String conversationId = ctx.pathParam(PATH_CONVERSATION_ID);
         SendMessageRequest request = ctx.bodyAsClass(SendMessageRequest.class);
 
@@ -1014,7 +992,7 @@ public class RestApiServer {
         }
     }
 
-    private void listProfileNotes(Context ctx) {
+    void listProfileNotes(Context ctx) {
         UUID authorId = parseUuid(ctx.pathParam(PATH_AUTHOR_ID));
         if (loadUser(ctx, authorId) == null) {
             return;
@@ -1025,10 +1003,10 @@ public class RestApiServer {
             handleUseCaseFailure(ctx, result.error());
             return;
         }
-        ctx.json(result.data().stream().map(ProfileNoteDto::from).toList());
+        ctx.json(result.data().stream().map(RestApiDtos.ProfileNoteDto::from).toList());
     }
 
-    private void getProfileNote(Context ctx) {
+    void getProfileNote(Context ctx) {
         UUID authorId = parseUuid(ctx.pathParam(PATH_AUTHOR_ID));
         UUID subjectId = parseUuid(ctx.pathParam(PATH_SUBJECT_ID));
         if (loadUser(ctx, authorId) == null) {
@@ -1040,16 +1018,16 @@ public class RestApiServer {
             handleUseCaseFailure(ctx, result.error());
             return;
         }
-        ctx.json(ProfileNoteDto.from(result.data()));
+        ctx.json(RestApiDtos.ProfileNoteDto.from(result.data()));
     }
 
-    private void upsertProfileNote(Context ctx) {
+    void upsertProfileNote(Context ctx) {
         UUID authorId = parseUuid(ctx.pathParam(PATH_AUTHOR_ID));
         UUID subjectId = parseUuid(ctx.pathParam(PATH_SUBJECT_ID));
         if (loadUser(ctx, authorId) == null || loadUser(ctx, subjectId) == null) {
             return;
         }
-        ProfileNoteUpsertRequest request = ctx.bodyAsClass(ProfileNoteUpsertRequest.class);
+        RestApiDtos.ProfileNoteUpsertRequest request = ctx.bodyAsClass(RestApiDtos.ProfileNoteUpsertRequest.class);
         if (request.content() == null) {
             throw new IllegalArgumentException("content is required");
         }
@@ -1060,10 +1038,10 @@ public class RestApiServer {
             handleUseCaseFailure(ctx, result.error());
             return;
         }
-        ctx.json(ProfileNoteDto.from(result.data()));
+        ctx.json(RestApiDtos.ProfileNoteDto.from(result.data()));
     }
 
-    private void deleteProfileNote(Context ctx) {
+    void deleteProfileNote(Context ctx) {
         UUID authorId = parseUuid(ctx.pathParam(PATH_AUTHOR_ID));
         UUID subjectId = parseUuid(ctx.pathParam(PATH_SUBJECT_ID));
         if (loadUser(ctx, authorId) == null || loadUser(ctx, subjectId) == null) {
@@ -1231,151 +1209,6 @@ public class RestApiServer {
             ctx.status(500);
             ctx.json(new ErrorResponse(INTERNAL_ERROR, "An unexpected error occurred"));
         });
-    }
-
-    private interface RouteModule {
-        void register();
-    }
-
-    private static final class HealthRoutes implements RouteModule {
-        private final Javalin app;
-
-        private HealthRoutes(Javalin app) {
-            this.app = app;
-        }
-
-        @Override
-        public void register() {
-            app.get(HEALTH_ROUTE, ctx -> ctx.json(new HealthResponse("ok", System.currentTimeMillis())));
-        }
-    }
-
-    private static final class UserRoutes implements RouteModule {
-        private final Javalin app;
-        private final RestApiServer server;
-
-        private UserRoutes(Javalin app, RestApiServer server) {
-            this.app = app;
-            this.server = server;
-        }
-
-        @Override
-        public void register() {
-            app.get("/api/users", server::listUsers);
-            app.get("/api/users/{id}", server::getUser);
-            app.get("/api/users/{id}/browse", server::browseCandidates);
-            app.put("/api/users/{id}/profile", server::updateProfile);
-            app.get("/api/users/{id}/candidates", server::getCandidates);
-            app.delete("/api/users/{id}", server::deleteUser);
-        }
-    }
-
-    private static final class LocationRoutes implements RouteModule {
-        private final Javalin app;
-        private final RestApiServer server;
-
-        private LocationRoutes(Javalin app, RestApiServer server) {
-            this.app = app;
-            this.server = server;
-        }
-
-        @Override
-        public void register() {
-            app.get("/api/location/countries", server::listLocationCountries);
-            app.get("/api/location/cities", server::listLocationCities);
-            app.post("/api/location/resolve", server::resolveLocationSelection);
-        }
-    }
-
-    private static final class MatchingRoutes implements RouteModule {
-        private final Javalin app;
-        private final RestApiServer server;
-
-        private MatchingRoutes(Javalin app, RestApiServer server) {
-            this.app = app;
-            this.server = server;
-        }
-
-        @Override
-        public void register() {
-            app.get("/api/users/{id}/matches", server::getMatches);
-            app.get("/api/users/{id}/pending-likers", server::getPendingLikers);
-            app.get("/api/users/{id}/standouts", server::getStandouts);
-            app.get("/api/users/{id}/match-quality/{matchId}", server::getMatchQuality);
-            app.post("/api/users/{id}/like/{targetId}", server::likeUser);
-            app.post("/api/users/{id}/pass/{targetId}", server::passUser);
-            app.post("/api/users/{id}/matches/{matchId}/archive", server::archiveMatch);
-            app.post("/api/users/{id}/undo", server::undoSwipe);
-            app.get("/api/users/{id}/stats", server::getStats);
-            app.get("/api/users/{id}/achievements", server::getAchievements);
-        }
-    }
-
-    private static final class SocialRoutes implements RouteModule {
-        private final Javalin app;
-        private final RestApiServer server;
-
-        private SocialRoutes(Javalin app, RestApiServer server) {
-            this.app = app;
-            this.server = server;
-        }
-
-        @Override
-        public void register() {
-            app.get("/api/users/{id}/notifications", server::getNotifications);
-            app.post("/api/users/{id}/notifications/read-all", server::markAllNotificationsRead);
-            app.post("/api/users/{id}/notifications/{notificationId}/read", server::markNotificationRead);
-            app.get("/api/users/{id}/friend-requests", server::getFriendRequests);
-            app.post("/api/users/{id}/friend-requests/{targetId}", server::requestFriendZone);
-            app.post("/api/users/{id}/friend-requests/{requestId}/accept", server::acceptFriendRequest);
-            app.post("/api/users/{id}/friend-requests/{requestId}/decline", server::declineFriendRequest);
-            app.post("/api/users/{id}/relationships/{targetId}/graceful-exit", server::gracefulExit);
-            app.post("/api/users/{id}/relationships/{targetId}/unmatch", server::unmatch);
-            app.get("/api/users/{id}/blocked-users", server::getBlockedUsers);
-            app.post("/api/users/{id}/block/{targetId}", server::blockUser);
-            app.delete("/api/users/{id}/block/{targetId}", server::unblockUser);
-            app.post("/api/users/{id}/report/{targetId}", server::reportUser);
-            app.post("/api/users/{id}/verification/start", server::startVerification);
-            app.post("/api/users/{id}/verification/confirm", server::confirmVerification);
-        }
-    }
-
-    private static final class MessagingRoutes implements RouteModule {
-        private final Javalin app;
-        private final RestApiServer server;
-
-        private MessagingRoutes(Javalin app, RestApiServer server) {
-            this.app = app;
-            this.server = server;
-        }
-
-        @Override
-        public void register() {
-            app.get("/api/users/{id}/conversations", server::getConversations);
-            app.delete("/api/users/{id}/conversations/{conversationId}", server::deleteConversation);
-            app.post("/api/users/{id}/conversations/{conversationId}/archive", server::archiveConversation);
-            app.get("/api/conversations/{conversationId}/messages", server::getMessages);
-            app.delete("/api/conversations/{conversationId}/messages/{messageId}", server::deleteMessage);
-            app.post("/api/conversations/{conversationId}/messages", server::sendMessage);
-        }
-    }
-
-    private static final class ProfileNoteRoutes implements RouteModule {
-        private final Javalin app;
-        private final RestApiServer server;
-
-        private ProfileNoteRoutes(Javalin app, RestApiServer server) {
-            this.app = app;
-            this.server = server;
-        }
-
-        @Override
-        public void register() {
-            app.get(NOTES_COLLECTION_ROUTE, server::listProfileNotes);
-            app.get(NOTE_ITEM_ROUTE, server::getProfileNote);
-            app.put(NOTE_ITEM_ROUTE, server::upsertProfileNote);
-            app.delete(NOTE_ITEM_ROUTE, server::deleteProfileNote);
-        }
     }
 
     /** Main entry point for standalone REST API server. */

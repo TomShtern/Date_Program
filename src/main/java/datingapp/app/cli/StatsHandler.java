@@ -4,6 +4,7 @@ import datingapp.app.cli.CliTextAndInput.InputReader;
 import datingapp.app.usecase.common.UseCaseResult;
 import datingapp.app.usecase.common.UserContext;
 import datingapp.app.usecase.profile.ProfileInsightsUseCases;
+import datingapp.app.usecase.profile.ProfileInsightsUseCases.AchievementSnapshot;
 import datingapp.app.usecase.profile.ProfileInsightsUseCases.AchievementsQuery;
 import datingapp.app.usecase.profile.ProfileInsightsUseCases.StatsQuery;
 import datingapp.app.usecase.profile.ProfileUseCases;
@@ -249,20 +250,13 @@ public class StatsHandler implements LoggingSupport {
         if (profileInsightsUseCases != null) {
             return profileInsightsUseCases.getOrComputeStats(new StatsQuery(UserContext.cli(userId)));
         }
-        return profileUseCases.getOrComputeStats(new ProfileUseCases.StatsQuery(UserContext.cli(userId)));
+        return profileUseCases.getOrComputeStats(new StatsQuery(UserContext.cli(userId)));
     }
 
-    private UseCaseResult<ProfileInsightsUseCases.AchievementSnapshot> loadAchievements(
-            java.util.UUID userId, boolean checkForNew) {
+    private UseCaseResult<AchievementSnapshot> loadAchievements(java.util.UUID userId, boolean checkForNew) {
         if (profileInsightsUseCases != null) {
             return profileInsightsUseCases.getAchievements(new AchievementsQuery(UserContext.cli(userId), checkForNew));
         }
-        var legacyResult = profileUseCases.getAchievements(
-                new ProfileUseCases.AchievementsQuery(UserContext.cli(userId), checkForNew));
-        if (!legacyResult.success()) {
-            return UseCaseResult.failure(legacyResult.error());
-        }
-        return UseCaseResult.success(new ProfileInsightsUseCases.AchievementSnapshot(
-                legacyResult.data().unlocked(), legacyResult.data().newlyUnlocked()));
+        return profileUseCases.getAchievements(new AchievementsQuery(UserContext.cli(userId), checkForNew));
     }
 }

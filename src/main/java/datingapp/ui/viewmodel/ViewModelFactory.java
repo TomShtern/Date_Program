@@ -198,6 +198,7 @@ public class ViewModelFactory {
                 () -> new ProfileViewModel(new ProfileViewModel.Dependencies(
                         createUiUserStore(),
                         services.getProfileService(),
+                        services.getProfileMutationUseCases(),
                         services.getProfileUseCases(),
                         services.getConfig(),
                         session,
@@ -234,9 +235,6 @@ public class ViewModelFactory {
                 MatchesViewModel.class,
                 () -> new MatchesViewModel(
                         new MatchesViewModel.Dependencies(
-                                null,
-                                null,
-                                null,
                                 services.getRecommendationService(),
                                 services.getMatchingUseCases(),
                                 services.getProfileUseCases(),
@@ -279,9 +277,7 @@ public class ViewModelFactory {
         return getViewModel(
                 PreferencesViewModel.class,
                 () -> new PreferencesViewModel(
-                        createUiUserStore(),
                         services.getProfileMutationUseCases(),
-                        services.getProfileUseCases(),
                         new UiThemeService(uiPreferencesStore, NavigationService.getInstance()),
                         services.getConfig(),
                         session,

@@ -28,10 +28,9 @@ import java.util.UUID;
  * UI-layer adapter interfaces and implementations for data access.
  *
  * <p>
- * Decouples ViewModels from {@code datingapp.core.storage.*} interfaces.
- * ViewModels depend on the inner interfaces ({@link UiUserStore},
- * {@link UiMatchDataAccess}),
- * while the inner implementations bridge to core storage.
+ * Decouples ViewModels from storage types that need UI-specific shape adaptation.
+ * ViewModels depend on the inner interfaces that still add behavior or shape,
+ * while the inner implementations bridge to core storage where needed.
  */
 @SuppressWarnings("PMD.MissingStaticMethodInNonInstantiatableClass")
 public final class UiDataAdapters {
@@ -96,8 +95,8 @@ public final class UiDataAdapters {
         /**
          * Returns notifications for the user.
          *
-         * @param userId     the user to fetch notifications for
-         * @param unreadOnly if {@code true}, only returns unread notifications
+         * @param userId the user to fetch notifications for
+         * @param unreadOnly whether to limit to unread notifications
          */
         List<Notification> getNotifications(UUID userId, boolean unreadOnly);
 
@@ -197,30 +196,6 @@ public final class UiDataAdapters {
         }
     }
 
-    /** Bridges the UI layer to the core {@link CommunicationStorage} interface. */
-    public static final class StorageUiSocialDataAccess implements UiSocialDataAccess {
-
-        private final CommunicationStorage communicationStorage;
-
-        public StorageUiSocialDataAccess(CommunicationStorage communicationStorage) {
-            this.communicationStorage =
-                    Objects.requireNonNull(communicationStorage, "communicationStorage cannot be null");
-        }
-
-        @Override
-        public List<Notification> getNotifications(UUID userId, boolean unreadOnly) {
-            return communicationStorage.getNotificationsForUser(userId, unreadOnly);
-        }
-
-        @Override
-        public void markNotificationRead(UUID notificationId) {
-            communicationStorage
-                    .getNotification(notificationId)
-                    .ifPresent(notification ->
-                            communicationStorage.markNotificationAsRead(notification.userId(), notificationId));
-        }
-    }
-
     /** Bridges the UI layer to the core match/like/block storage interfaces. */
     public static final class StorageUiMatchDataAccess implements UiMatchDataAccess {
 
@@ -270,6 +245,30 @@ public final class UiDataAdapters {
         @Override
         public boolean deleteLike(UUID ownerUserId, UUID likeId) {
             return interactionStorage.deleteLikeOwnedBy(ownerUserId, likeId);
+        }
+    }
+
+    /** Bridges the UI layer to the core {@link CommunicationStorage} interface. */
+    public static final class StorageUiSocialDataAccess implements UiSocialDataAccess {
+
+        private final CommunicationStorage communicationStorage;
+
+        public StorageUiSocialDataAccess(CommunicationStorage communicationStorage) {
+            this.communicationStorage =
+                    Objects.requireNonNull(communicationStorage, "communicationStorage cannot be null");
+        }
+
+        @Override
+        public List<Notification> getNotifications(UUID userId, boolean unreadOnly) {
+            return communicationStorage.getNotificationsForUser(userId, unreadOnly);
+        }
+
+        @Override
+        public void markNotificationRead(UUID notificationId) {
+            communicationStorage
+                    .getNotification(notificationId)
+                    .ifPresent(notification ->
+                            communicationStorage.markNotificationAsRead(notification.userId(), notificationId));
         }
     }
 

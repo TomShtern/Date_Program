@@ -16,7 +16,6 @@ import datingapp.ui.UiPreferencesStore.ThemeMode;
 import datingapp.ui.UiThemeService;
 import datingapp.ui.async.UiThreadDispatcher;
 import datingapp.ui.viewmodel.PreferencesViewModel;
-import datingapp.ui.viewmodel.UiDataAdapters.StorageUiUserStore;
 import java.util.EnumSet;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -72,13 +71,7 @@ class PreferencesControllerTest {
         store.saveThemeMode(ThemeMode.LIGHT);
         UiThemeService themeService = new UiThemeService(store, NavigationService.getInstance());
 
-        viewModel = new PreferencesViewModel(
-                new StorageUiUserStore(userStorage),
-                null,
-                themeService,
-                AppConfig.defaults(),
-                session,
-                TEST_DISPATCHER);
+        viewModel = createViewModel(userStorage, AppConfig.defaults(), themeService);
 
         JavaFxTestSupport.LoadedFxml loaded =
                 JavaFxTestSupport.loadFxml("/fxml/preferences.fxml", () -> new PreferencesController(viewModel));
@@ -114,13 +107,7 @@ class PreferencesControllerTest {
         store.saveThemeMode(ThemeMode.DARK);
         UiThemeService themeService = new UiThemeService(store, NavigationService.getInstance());
 
-        viewModel = new PreferencesViewModel(
-                new StorageUiUserStore(userStorage),
-                null,
-                themeService,
-                AppConfig.defaults(),
-                session,
-                TEST_DISPATCHER);
+        viewModel = createViewModel(userStorage, AppConfig.defaults(), themeService);
 
         JavaFxTestSupport.LoadedFxml loaded =
                 JavaFxTestSupport.loadFxml("/fxml/preferences.fxml", () -> new PreferencesController(viewModel));
@@ -141,5 +128,21 @@ class PreferencesControllerTest {
                         && viewModel.interestedInProperty().get() == PreferencesViewModel.GenderPreference.MEN,
                 5000));
         assertEquals(ThemeMode.LIGHT, store.loadThemeMode());
+    }
+
+    private PreferencesViewModel createViewModel(
+            TestStorages.Users userStorage, AppConfig config, UiThemeService themeService) {
+        return new PreferencesViewModel(
+                new datingapp.app.usecase.profile.ProfileMutationUseCases(
+                        userStorage,
+                        new datingapp.core.profile.ValidationService(config),
+                        datingapp.core.testutil.TestAchievementService.empty(),
+                        config,
+                        new datingapp.core.workflow.ProfileActivationPolicy(),
+                        new datingapp.app.testutil.TestEventBus()),
+                themeService,
+                config,
+                session,
+                TEST_DISPATCHER);
     }
 }

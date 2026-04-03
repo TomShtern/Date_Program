@@ -22,7 +22,6 @@ import datingapp.ui.JavaFxTestSupport;
 import datingapp.ui.NavigationService;
 import datingapp.ui.async.UiThreadDispatcher;
 import datingapp.ui.viewmodel.NotesViewModel;
-import datingapp.ui.viewmodel.UiDataAdapters.StorageUiUserStore;
 import java.util.EnumSet;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -197,7 +196,7 @@ class NotesControllerTest {
 
         viewModel = new NotesViewModel(
                 profileUseCases,
-                new StorageUiUserStore(users),
+                new datingapp.ui.viewmodel.UiDataAdapters.StorageUiUserStore(users),
                 session,
                 config.safety().userTimeZone(),
                 TEST_DISPATCHER);
@@ -241,7 +240,7 @@ class NotesControllerTest {
 
         viewModel = new NotesViewModel(
                 profileUseCases,
-                new StorageUiUserStore(users),
+                new datingapp.ui.viewmodel.UiDataAdapters.StorageUiUserStore(users),
                 session,
                 config.safety().userTimeZone(),
                 TEST_DISPATCHER);
@@ -364,7 +363,7 @@ class NotesControllerTest {
         private NotesViewModel createViewModel() {
             return new NotesViewModel(
                     profileUseCases,
-                    new StorageUiUserStore(users),
+                    new datingapp.ui.viewmodel.UiDataAdapters.StorageUiUserStore(users),
                     session,
                     config.safety().userTimeZone(),
                     TEST_DISPATCHER);

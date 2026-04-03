@@ -1,19 +1,17 @@
 package datingapp.ui.viewmodel;
 
-import datingapp.core.AppClock;
+import datingapp.app.support.UserPresentationSupport;
+import datingapp.app.usecase.profile.ProfileNormalizationSupport;
 import datingapp.core.AppConfig;
 import datingapp.core.AppSession;
 import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
 import datingapp.core.model.User.UserState;
-import datingapp.core.profile.MatchPreferences.Dealbreakers;
 import datingapp.core.workflow.ProfileActivationPolicy;
 import datingapp.ui.NavigationService;
 import datingapp.ui.async.JavaFxUiThreadDispatcher;
 import datingapp.ui.async.UiThreadDispatcher;
 import datingapp.ui.viewmodel.UiDataAdapters.UiUserStore;
-import java.time.LocalDate;
-import java.util.EnumSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
@@ -196,7 +194,7 @@ public class LoginViewModel extends BaseViewModel {
 
         try {
             User newUser = new User(UUID.randomUUID(), name.trim());
-            applyDefaultCreateProfile(newUser, age, gender, interestedIn);
+            ProfileNormalizationSupport.applyMinimalBootstrap(newUser, config, age, gender, interestedIn);
             userStore.save(newUser);
 
             // Refresh the user list
@@ -239,26 +237,6 @@ public class LoginViewModel extends BaseViewModel {
         }
 
         return true;
-    }
-
-    private void applyDefaultCreateProfile(User user, int age, Gender gender, Gender interestedIn) {
-        LocalDate birthDate = AppClock.today().minusYears(age);
-        user.setBirthDate(birthDate);
-        user.setGender(gender);
-        user.setInterestedIn(EnumSet.of(interestedIn));
-        user.setBio("");
-
-        int minAge = Math.max(config.validation().minAge(), age - 5);
-        int maxAge = Math.min(config.validation().maxAge(), age + 5);
-        user.setAgeRange(
-                minAge,
-                maxAge,
-                config.validation().minAge(),
-                config.validation().maxAge());
-        user.setMaxDistanceKm(50, config.matching().maxDistanceKm());
-        user.setPhotoUrls(List.of());
-        user.setPacePreferences(null);
-        user.setDealbreakers(Dealbreakers.none());
     }
 
     /**
@@ -308,7 +286,7 @@ public class LoginViewModel extends BaseViewModel {
     private static String buildSearchable(User user, java.time.ZoneId zone) {
         String name = user.getName() == null ? "" : user.getName().toLowerCase(Locale.ROOT);
         String state = user.getState() == null ? "" : user.getState().name().toLowerCase(Locale.ROOT);
-        int age = user.getAge(zone).orElse(0);
+        int age = UserPresentationSupport.safeAge(user, zone);
         String ageText = age > 0 ? String.valueOf(age) : "";
         String verifiedTag = user.isVerified() ? "verified" : "";
         return String.join(" ", name, state, ageText, verifiedTag);

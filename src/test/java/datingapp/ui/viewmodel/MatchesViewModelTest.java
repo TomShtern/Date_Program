@@ -5,7 +5,9 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.app.event.InProcessAppEventBus;
+import datingapp.app.usecase.matching.MatchingUseCases;
 import datingapp.app.usecase.profile.ProfileUseCases;
+import datingapp.app.usecase.social.SocialUseCases;
 import datingapp.core.AppConfig;
 import datingapp.core.AppSession;
 import datingapp.core.connection.ConnectionModels.Like;
@@ -26,16 +28,10 @@ import datingapp.core.testutil.TestClock;
 import datingapp.core.testutil.TestStorages;
 import datingapp.core.testutil.TestUserFactory;
 import datingapp.ui.async.UiAsyncTestSupport;
-import datingapp.ui.viewmodel.UiDataAdapters.StorageUiMatchDataAccess;
-import datingapp.ui.viewmodel.UiDataAdapters.StorageUiUserStore;
-import datingapp.ui.viewmodel.UiDataAdapters.UiMatchDataAccess;
-import datingapp.ui.viewmodel.UiDataAdapters.UiPage;
-import datingapp.ui.viewmodel.UiDataAdapters.UiUserStore;
 import java.lang.reflect.Field;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.EnumSet;
-import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -56,12 +52,12 @@ class MatchesViewModelTest {
     private TestStorages.Interactions interactions;
     private TestStorages.Communications communications;
     private TestStorages.TrustSafety trustSafetyStorage;
-    private UiMatchDataAccess matchData;
-    private UiUserStore userStore;
+    private MatchingUseCases matchingUseCases;
+    private ProfileUseCases profileUseCases;
+    private SocialUseCases socialUseCases;
     private MatchingService matchingService;
     private RecommendationService dailyService;
     private AppConfig config;
-    private datingapp.app.usecase.social.SocialUseCases socialUseCases;
     private MatchesViewModel viewModel;
     private User currentUser;
 
@@ -94,9 +90,6 @@ class MatchesViewModelTest {
                 .config(config)
                 .build();
 
-        matchData = new StorageUiMatchDataAccess(interactions, trustSafetyStorage);
-        userStore = new StorageUiUserStore(users);
-
         var undoService = new datingapp.core.matching.UndoService(interactions, new TestStorages.Undos(), config);
 
         matchingService = MatchingService.builder()
@@ -109,7 +102,7 @@ class MatchesViewModelTest {
                 .build();
 
         var matchQualityService = new MatchQualityService(users, interactions, config);
-        var matchingUseCases = new datingapp.app.usecase.matching.MatchingUseCases(
+        matchingUseCases = new datingapp.app.usecase.matching.MatchingUseCases(
                 candidateFinder,
                 matchingService,
                 datingapp.app.usecase.matching.MatchingUseCases.wrapDailyLimitService(dailyService),
@@ -121,12 +114,7 @@ class MatchesViewModelTest {
                 matchQualityService,
                 new InProcessAppEventBus(),
                 dailyService);
-        TrustSafetyService trustSafetyService = TrustSafetyService.builder(
-                        trustSafetyStorage, interactions, users, config, communications)
-                .build();
-        socialUseCases = new datingapp.app.usecase.social.SocialUseCases(
-                new ConnectionService(config, communications, interactions, users), trustSafetyService, communications);
-        ProfileUseCases profileUseCases = new ProfileUseCases(
+        profileUseCases = new ProfileUseCases(
                 users,
                 profileService,
                 new ValidationService(config),
@@ -135,17 +123,15 @@ class MatchesViewModelTest {
                 config,
                 new datingapp.core.workflow.ProfileActivationPolicy(),
                 new InProcessAppEventBus());
+        TrustSafetyService trustSafetyService = TrustSafetyService.builder(
+                        trustSafetyStorage, interactions, users, config, communications)
+                .build();
+        socialUseCases = new datingapp.app.usecase.social.SocialUseCases(
+                new ConnectionService(config, communications, interactions, users), trustSafetyService, communications);
 
         viewModel = new MatchesViewModel(
                 new MatchesViewModel.Dependencies(
-                        matchData,
-                        userStore,
-                        matchingService,
-                        dailyService,
-                        matchingUseCases,
-                        profileUseCases,
-                        socialUseCases,
-                        config),
+                        dailyService, matchingUseCases, profileUseCases, socialUseCases, config),
                 AppSession.getInstance(),
                 new UiAsyncTestSupport.TestUiThreadDispatcher());
         currentUser = createActiveUser("Current");
@@ -183,28 +169,14 @@ class MatchesViewModelTest {
                 .build();
 
         MatchesViewModel limitViewModel = new MatchesViewModel(
-                matchData,
-                userStore,
-                matchingService,
-                zeroLimitRecommendationService,
-                new datingapp.app.usecase.matching.MatchingUseCases(
-                        candidateFinder,
-                        matchingService,
-                        datingapp.app.usecase.matching.MatchingUseCases.wrapDailyLimitService(
-                                zeroLimitRecommendationService),
-                        datingapp.app.usecase.matching.MatchingUseCases.wrapDailyPickService(
-                                zeroLimitRecommendationService),
-                        datingapp.app.usecase.matching.MatchingUseCases.wrapStandoutService(
-                                zeroLimitRecommendationService),
-                        new datingapp.core.matching.UndoService(
-                                interactions, new TestStorages.Undos(), zeroLimitConfig),
-                        interactions,
-                        users,
-                        new MatchQualityService(users, interactions, zeroLimitConfig),
-                        new datingapp.app.event.InProcessAppEventBus(),
-                        zeroLimitRecommendationService),
-                zeroLimitConfig,
-                AppSession.getInstance());
+                new MatchesViewModel.Dependencies(
+                        zeroLimitRecommendationService,
+                        buildMatchingUseCases(interactions, zeroLimitRecommendationService, zeroLimitConfig),
+                        profileUseCases,
+                        socialUseCases,
+                        zeroLimitConfig),
+                AppSession.getInstance(),
+                new UiAsyncTestSupport.TestUiThreadDispatcher());
 
         User otherUser = createActiveUser("Other");
         users.save(otherUser);
@@ -255,50 +227,8 @@ class MatchesViewModelTest {
     @Test
     @DisplayName("refresh failures are surfaced instead of collapsing to empty data")
     void refreshFailuresAreSurfaced() {
-        UiMatchDataAccess failingMatchData = new UiMatchDataAccess() {
-            @Override
-            public UiPage<Match> getPageOfActiveMatchesFor(UUID userId, int offset, int limit) {
-                throw new IllegalStateException("match load failed");
-            }
-
-            @Override
-            public List<Match> getActiveMatchesFor(UUID userId) {
-                throw new IllegalStateException("match load failed");
-            }
-
-            @Override
-            public List<Match> getAllMatchesFor(UUID userId) {
-                throw new IllegalStateException("match load failed");
-            }
-
-            @Override
-            public java.util.Optional<Like> getLike(UUID from, UUID to) {
-                throw new IllegalStateException("match load failed");
-            }
-
-            @Override
-            public java.util.Set<UUID> getBlockedUserIds(UUID userId) {
-                throw new IllegalStateException("match load failed");
-            }
-
-            @Override
-            public java.util.Set<UUID> getLikedOrPassedUserIds(UUID userId) {
-                throw new IllegalStateException("match load failed");
-            }
-
-            @Override
-            public boolean deleteLike(UUID ownerUserId, UUID likeId) {
-                throw new IllegalStateException("match load failed");
-            }
-
-            @Override
-            public int countActiveMatchesFor(UUID userId) {
-                throw new IllegalStateException("match load failed");
-            }
-        };
-
-        MatchesViewModel failingViewModel = new MatchesViewModel(
-                failingMatchData, userStore, matchingService, dailyService, config, AppSession.getInstance());
+        MatchesViewModel failingViewModel = buildViewModel(
+                buildMatchingUseCases(failingInteractions(), dailyService, config), dailyService, config);
 
         failingViewModel.initialize();
 
@@ -310,50 +240,8 @@ class MatchesViewModelTest {
     @Test
     @DisplayName("late-bound error handler receives refresh failures")
     void lateBoundErrorHandlerReceivesRefreshFailures() throws InterruptedException {
-        UiMatchDataAccess failingMatchData = new UiMatchDataAccess() {
-            @Override
-            public UiPage<Match> getPageOfActiveMatchesFor(UUID userId, int offset, int limit) {
-                throw new IllegalStateException("match load failed");
-            }
-
-            @Override
-            public List<Match> getActiveMatchesFor(UUID userId) {
-                throw new IllegalStateException("match load failed");
-            }
-
-            @Override
-            public List<Match> getAllMatchesFor(UUID userId) {
-                throw new IllegalStateException("match load failed");
-            }
-
-            @Override
-            public java.util.Optional<Like> getLike(UUID from, UUID to) {
-                throw new IllegalStateException("match load failed");
-            }
-
-            @Override
-            public java.util.Set<UUID> getBlockedUserIds(UUID userId) {
-                throw new IllegalStateException("match load failed");
-            }
-
-            @Override
-            public java.util.Set<UUID> getLikedOrPassedUserIds(UUID userId) {
-                throw new IllegalStateException("match load failed");
-            }
-
-            @Override
-            public boolean deleteLike(UUID ownerUserId, UUID likeId) {
-                throw new IllegalStateException("match load failed");
-            }
-
-            @Override
-            public int countActiveMatchesFor(UUID userId) {
-                throw new IllegalStateException("match load failed");
-            }
-        };
-
-        MatchesViewModel failingViewModel = new MatchesViewModel(
-                failingMatchData, userStore, matchingService, dailyService, config, AppSession.getInstance());
+        MatchesViewModel failingViewModel = buildViewModel(
+                buildMatchingUseCases(failingInteractions(), dailyService, config), dailyService, config);
 
         AtomicReference<String> routedMessage = new AtomicReference<>();
         CountDownLatch latch = new CountDownLatch(1);
@@ -540,60 +428,24 @@ class MatchesViewModelTest {
         final AtomicBoolean raceTriggered = new AtomicBoolean(false);
         final AtomicReference<MatchesViewModel> vmRef = new AtomicReference<>();
 
-        // Custom wrapper to inject a refreshAll() call mid-fetch in
-        // fetchMatchesFromStorage
-        UiMatchDataAccess raceMatchData = new UiMatchDataAccess() {
+        TestStorages.Interactions raceInteractions = new TestStorages.Interactions(communications) {
             @Override
-            public UiPage<Match> getPageOfActiveMatchesFor(UUID userId, int offset, int limit) {
+            public datingapp.core.storage.PageData<Match> getPageOfActiveMatchesFor(
+                    UUID userId, int offset, int limit) {
                 if (raceTriggered.compareAndSet(false, true)) {
-                    // Simulate refreshAll() happening after offset reservation
-                    // but before the downward adjustment in fetchMatchesFromStorage.
+                    // Simulate refreshAll() happening after offset reservation but before the downward
+                    // adjustment in fetchMatchesFromUseCases.
                     vmRef.get().refreshAll();
                 }
-                return matchData.getPageOfActiveMatchesFor(userId, offset, limit);
-            }
-
-            @Override
-            public List<Match> getActiveMatchesFor(UUID userId) {
-                return matchData.getActiveMatchesFor(userId);
-            }
-
-            @Override
-            public List<Match> getAllMatchesFor(UUID userId) {
-                return matchData.getAllMatchesFor(userId);
-            }
-
-            @Override
-            public java.util.Optional<Like> getLike(UUID from, UUID to) {
-                return matchData.getLike(from, to);
-            }
-
-            @Override
-            public java.util.Set<UUID> getBlockedUserIds(UUID userId) {
-                return matchData.getBlockedUserIds(userId);
-            }
-
-            @Override
-            public java.util.Set<UUID> getLikedOrPassedUserIds(UUID userId) {
-                return matchData.getLikedOrPassedUserIds(userId);
-            }
-
-            @Override
-            public boolean deleteLike(UUID ownerUserId, UUID likeId) {
-                return matchData.deleteLike(ownerUserId, likeId);
-            }
-
-            @Override
-            public int countActiveMatchesFor(UUID userId) {
-                return matchData.countActiveMatchesFor(userId);
+                return interactions.getPageOfActiveMatchesFor(userId, offset, limit);
             }
         };
 
-        MatchesViewModel raceViewModel = new MatchesViewModel(
-                raceMatchData, userStore, matchingService, dailyService, config, AppSession.getInstance());
+        MatchesViewModel raceViewModel =
+                buildViewModel(buildMatchingUseCases(raceInteractions, dailyService, config), dailyService, config);
         vmRef.set(raceViewModel);
 
-        // 1. Trigger the race via initialize -> refreshAll -> fetchMatchesFromStorage
+        // 1. Trigger the race via initialize -> refreshAll -> fetchMatchesFromUseCases
         // -> nested refreshAll
         raceViewModel.initialize();
 
@@ -610,6 +462,54 @@ class MatchesViewModelTest {
         // Outer refresh adjustment executes: 5 + (5 - 20) = -10.
         assertTrue(offset.get() >= 0, "Offset should not be negative: " + offset.get());
         assertEquals(5, offset.get(), "Offset should reflect the state of the latest successful refresh");
+    }
+
+    private MatchesViewModel buildViewModel(
+            MatchingUseCases matchingUseCases, RecommendationService recommendationService, AppConfig appConfig) {
+        return new MatchesViewModel(
+                new MatchesViewModel.Dependencies(
+                        recommendationService, matchingUseCases, profileUseCases, socialUseCases, appConfig),
+                AppSession.getInstance(),
+                new UiAsyncTestSupport.TestUiThreadDispatcher());
+    }
+
+    private MatchingUseCases buildMatchingUseCases(
+            TestStorages.Interactions interactionStorage,
+            RecommendationService recommendationService,
+            AppConfig appConfig) {
+        var candidateFinder = new CandidateFinder(users, interactionStorage, trustSafetyStorage, ZoneId.of("UTC"));
+        var undoService =
+                new datingapp.core.matching.UndoService(interactionStorage, new TestStorages.Undos(), appConfig);
+        var localMatchingService = MatchingService.builder()
+                .interactionStorage(interactionStorage)
+                .trustSafetyStorage(trustSafetyStorage)
+                .userStorage(users)
+                .undoService(undoService)
+                .dailyService(recommendationService)
+                .candidateFinder(candidateFinder)
+                .build();
+        return new MatchingUseCases(
+                candidateFinder,
+                localMatchingService,
+                MatchingUseCases.wrapDailyLimitService(recommendationService),
+                MatchingUseCases.wrapDailyPickService(recommendationService),
+                MatchingUseCases.wrapStandoutService(recommendationService),
+                undoService,
+                interactionStorage,
+                users,
+                new MatchQualityService(users, interactionStorage, appConfig),
+                new InProcessAppEventBus(),
+                recommendationService);
+    }
+
+    private TestStorages.Interactions failingInteractions() {
+        return new TestStorages.Interactions(communications) {
+            @Override
+            public datingapp.core.storage.PageData<Match> getPageOfActiveMatchesFor(
+                    UUID userId, int offset, int limit) {
+                throw new IllegalStateException("match load failed");
+            }
+        };
     }
 
     private static User createActiveUser(String name) {

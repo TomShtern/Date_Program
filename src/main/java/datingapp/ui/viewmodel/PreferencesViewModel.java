@@ -3,8 +3,8 @@ package datingapp.ui.viewmodel;
 import datingapp.app.usecase.common.UseCaseResult;
 import datingapp.app.usecase.common.UserContext;
 import datingapp.app.usecase.profile.ProfileMutationUseCases;
-import datingapp.app.usecase.profile.ProfileUseCases;
-import datingapp.app.usecase.profile.ProfileUseCases.UpdateDiscoveryPreferencesCommand;
+import datingapp.app.usecase.profile.ProfileMutationUseCases.UpdateDiscoveryPreferencesCommand;
+import datingapp.app.usecase.profile.ProfileNormalizationSupport;
 import datingapp.core.AppConfig;
 import datingapp.core.AppSession;
 import datingapp.core.model.User;
@@ -12,7 +12,6 @@ import datingapp.core.model.User.Gender;
 import datingapp.ui.UiPreferencesStore.ThemeMode;
 import datingapp.ui.UiThemeService;
 import datingapp.ui.async.UiThreadDispatcher;
-import datingapp.ui.viewmodel.UiDataAdapters.UiUserStore;
 import java.util.EnumSet;
 import java.util.Objects;
 import java.util.Set;
@@ -29,9 +28,7 @@ public class PreferencesViewModel extends BaseViewModel {
 
     private final AppConfig config;
     private final AppSession session;
-    private final UiUserStore userStore;
-    private ProfileMutationUseCases profileMutationUseCases;
-    private final ProfileUseCases profileUseCases;
+    private final ProfileMutationUseCases profileMutationUseCases;
     private final UiThemeService uiThemeService;
     private User currentUser;
 
@@ -48,34 +45,14 @@ public class PreferencesViewModel extends BaseViewModel {
     private final ObjectProperty<ThemeMode> themeMode = new SimpleObjectProperty<>(ThemeMode.DARK);
 
     public PreferencesViewModel(
-            UiUserStore userStore,
-            ProfileUseCases profileUseCases,
-            UiThemeService uiThemeService,
-            AppConfig config,
-            AppSession session,
-            UiThreadDispatcher uiDispatcher) {
-        this(
-                userStore,
-                profileUseCases != null ? profileUseCases.getProfileMutationUseCases() : null,
-                profileUseCases,
-                uiThemeService,
-                config,
-                session,
-                uiDispatcher);
-    }
-
-    public PreferencesViewModel(
-            UiUserStore userStore,
             ProfileMutationUseCases profileMutationUseCases,
-            ProfileUseCases profileUseCases,
             UiThemeService uiThemeService,
             AppConfig config,
             AppSession session,
             UiThreadDispatcher uiDispatcher) {
         super("preferences", uiDispatcher);
-        this.userStore = Objects.requireNonNull(userStore, "userStore cannot be null");
-        this.profileMutationUseCases = profileMutationUseCases;
-        this.profileUseCases = profileUseCases;
+        this.profileMutationUseCases =
+                Objects.requireNonNull(profileMutationUseCases, "profileMutationUseCases cannot be null");
         this.uiThemeService = Objects.requireNonNull(uiThemeService, "uiThemeService cannot be null");
         this.config = Objects.requireNonNull(config, "config cannot be null");
         this.session = Objects.requireNonNull(session, "session cannot be null");
@@ -162,20 +139,12 @@ public class PreferencesViewModel extends BaseViewModel {
                 interestedIn.get(),
                 themeMode.get());
 
-        int normalizedMinAge = Math.clamp(
-                minAge.get(), config.validation().minAge(), config.validation().maxAge());
-        int normalizedMaxAge = Math.clamp(
-                maxAge.get(), config.validation().minAge(), config.validation().maxAge());
-        if (normalizedMinAge > normalizedMaxAge) {
-            logWarn("Invalid age range: {}>{}, swapping values", normalizedMinAge, normalizedMaxAge);
-            int temp = normalizedMinAge;
-            normalizedMinAge = normalizedMaxAge;
-            normalizedMaxAge = temp;
-        }
-        final int minAgeVal = normalizedMinAge;
-        final int maxAgeVal = normalizedMaxAge;
-        final int maxDistVal =
-                Math.clamp(maxDistance.get(), 1, config.matching().maxDistanceKm());
+        ProfileNormalizationSupport.DiscoveryPreferences discoveryPreferences =
+                ProfileNormalizationSupport.normalizeDiscoveryPreferences(
+                        config, minAge.get(), maxAge.get(), maxDistance.get());
+        final int minAgeVal = discoveryPreferences.minAge();
+        final int maxAgeVal = discoveryPreferences.maxAge();
+        final int maxDistVal = discoveryPreferences.maxDistanceKm();
 
         currentUser.setAgeRange(
                 minAgeVal,
@@ -222,22 +191,13 @@ public class PreferencesViewModel extends BaseViewModel {
 
     private ThemeMode persistDiscoveryPreferences(
             int minAgeVal, int maxAgeVal, int maxDistVal, Set<Gender> newInterests) {
-        if (profileMutationUseCases != null || profileUseCases != null) {
-            UseCaseResult<User> result;
-            if (profileMutationUseCases != null) {
-                result = profileMutationUseCases.updateDiscoveryPreferences(new UpdateDiscoveryPreferencesCommand(
+        UseCaseResult<User> result =
+                profileMutationUseCases.updateDiscoveryPreferences(new UpdateDiscoveryPreferencesCommand(
                         UserContext.ui(currentUser.getId()), minAgeVal, maxAgeVal, maxDistVal, newInterests));
-            } else {
-                result = profileUseCases.updateDiscoveryPreferences(new UpdateDiscoveryPreferencesCommand(
-                        UserContext.ui(currentUser.getId()), minAgeVal, maxAgeVal, maxDistVal, newInterests));
-            }
-            if (!result.success()) {
-                logWarn(
-                        "Failed to save preferences via use-case: {}",
-                        result.error().message());
-            }
-        } else {
-            userStore.save(currentUser);
+        if (!result.success()) {
+            logWarn(
+                    "Failed to save preferences via use-case: {}",
+                    result.error().message());
         }
         return themeMode.get() == null ? ThemeMode.DARK : themeMode.get();
     }
