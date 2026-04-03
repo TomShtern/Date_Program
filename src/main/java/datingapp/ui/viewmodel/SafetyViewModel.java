@@ -6,6 +6,12 @@ import datingapp.app.usecase.profile.ProfileMutationUseCases;
 import datingapp.app.usecase.profile.ProfileUseCases;
 import datingapp.app.usecase.profile.ProfileUseCases.DeleteAccountCommand;
 import datingapp.app.usecase.profile.ProfileUseCases.SaveProfileCommand;
+import datingapp.app.usecase.profile.VerificationUseCases;
+import datingapp.app.usecase.profile.VerificationUseCases.ConfirmVerificationCommand;
+import datingapp.app.usecase.profile.VerificationUseCases.StartVerificationCommand;
+import datingapp.app.usecase.social.SocialUseCases;
+import datingapp.app.usecase.social.SocialUseCases.ListBlockedUsersQuery;
+import datingapp.app.usecase.social.SocialUseCases.RelationshipCommand;
 import datingapp.core.AppSession;
 import datingapp.core.matching.TrustSafetyService;
 import datingapp.core.model.User;
@@ -35,6 +41,8 @@ public final class SafetyViewModel extends BaseViewModel {
     private static final String ACCOUNT_DELETION_UNAVAILABLE = "Account deletion is unavailable right now.";
 
     private final TrustSafetyService trustSafetyService;
+    private final SocialUseCases socialUseCases;
+    private final VerificationUseCases verificationUseCases;
     private ProfileMutationUseCases profileMutationUseCases;
     private final ProfileUseCases profileUseCases;
     private final AppSession session;
@@ -46,14 +54,21 @@ public final class SafetyViewModel extends BaseViewModel {
     private final StringProperty verificationCode = new SimpleStringProperty("");
     private final SimpleBooleanProperty accountDeleted = new SimpleBooleanProperty(false);
 
-    public record BlockedUserEntry(UUID userId, String name, String blockedAtLabel) {}
+    public record BlockedUserEntry(UUID userId, String name, String statusLabel) {}
 
     public SafetyViewModel(TrustSafetyService trustSafetyService, AppSession session) {
-        this(trustSafetyService, null, session, new JavaFxUiThreadDispatcher());
+        this(
+                trustSafetyService,
+                new SocialUseCases(trustSafetyService),
+                null,
+                null,
+                null,
+                session,
+                new JavaFxUiThreadDispatcher());
     }
 
     public SafetyViewModel(TrustSafetyService trustSafetyService, AppSession session, UiThreadDispatcher uiDispatcher) {
-        this(trustSafetyService, null, session, uiDispatcher);
+        this(trustSafetyService, new SocialUseCases(trustSafetyService), null, null, null, session, uiDispatcher);
     }
 
     public SafetyViewModel(
@@ -63,7 +78,9 @@ public final class SafetyViewModel extends BaseViewModel {
             UiThreadDispatcher uiDispatcher) {
         this(
                 trustSafetyService,
+                new SocialUseCases(trustSafetyService),
                 profileUseCases != null ? profileUseCases.getProfileMutationUseCases() : null,
+                null,
                 profileUseCases,
                 session,
                 uiDispatcher);
@@ -71,15 +88,28 @@ public final class SafetyViewModel extends BaseViewModel {
 
     public SafetyViewModel(
             TrustSafetyService trustSafetyService,
+            SocialUseCases socialUseCases,
             ProfileMutationUseCases profileMutationUseCases,
+            VerificationUseCases verificationUseCases,
             ProfileUseCases profileUseCases,
             AppSession session,
             UiThreadDispatcher uiDispatcher) {
         super("safety", uiDispatcher);
-        this.trustSafetyService = Objects.requireNonNull(trustSafetyService, "trustSafetyService cannot be null");
+        this.trustSafetyService = trustSafetyService;
+        this.socialUseCases = Objects.requireNonNull(socialUseCases, "socialUseCases cannot be null");
+        this.verificationUseCases = verificationUseCases;
         this.profileMutationUseCases = profileMutationUseCases;
         this.profileUseCases = profileUseCases;
         this.session = Objects.requireNonNull(session, "session cannot be null");
+    }
+
+    public SafetyViewModel(
+            SocialUseCases socialUseCases,
+            VerificationUseCases verificationUseCases,
+            ProfileMutationUseCases profileMutationUseCases,
+            AppSession session,
+            UiThreadDispatcher uiDispatcher) {
+        this(null, socialUseCases, profileMutationUseCases, verificationUseCases, null, session, uiDispatcher);
     }
 
     public void initialize() {
@@ -133,7 +163,12 @@ public final class SafetyViewModel extends BaseViewModel {
                 "load blocked users",
                 () -> {
                     try {
-                        return mapBlockedUsers(trustSafetyService.getBlockedUsers(currentUser.getId()));
+                        var result = socialUseCases.listBlockedUsers(
+                                new ListBlockedUsersQuery(UserContext.ui(currentUser.getId())));
+                        if (!result.success()) {
+                            throw new IllegalStateException(result.error().message());
+                        }
+                        return mapBlockedUsers(result.data());
                     } catch (RuntimeException ex) {
                         reportError(ex.getMessage());
                         return List.of();
@@ -157,19 +192,20 @@ public final class SafetyViewModel extends BaseViewModel {
                 "unblock user",
                 () -> {
                     try {
-                        boolean success = trustSafetyService.unblock(currentUser.getId(), blockedUserId);
-                        if (!success) {
-                            throw new IllegalStateException("Unable to unblock that user right now.");
+                        var result = socialUseCases.unblockUser(
+                                new RelationshipCommand(UserContext.ui(currentUser.getId()), blockedUserId));
+                        if (!result.success()) {
+                            throw new IllegalStateException(result.error().message());
                         }
-                        List<BlockedUserEntry> updatedEntries =
-                                mapBlockedUsers(trustSafetyService.getBlockedUsers(currentUser.getId()));
+                        List<BlockedUserEntry> updatedEntries = mapBlockedUsers(socialUseCases
+                                .listBlockedUsers(new ListBlockedUsersQuery(UserContext.ui(currentUser.getId())))
+                                .data());
                         String blockedUserName = blockedUsers.stream()
                                 .filter(entry -> entry.userId().equals(blockedUserId))
                                 .map(BlockedUserEntry::name)
                                 .findFirst()
                                 .orElse("User");
-                        return new UnblockResult(
-                                updatedEntries, "[SIMULATED] " + blockedUserName + " has been unblocked.");
+                        return new UnblockResult(updatedEntries, blockedUserName + " has been unblocked.");
                     } catch (RuntimeException ex) {
                         reportError(ex.getMessage());
                         return new UnblockResult(blockedUsers.stream().toList(), "");
@@ -194,6 +230,20 @@ public final class SafetyViewModel extends BaseViewModel {
         }
 
         try {
+            if (verificationUseCases != null) {
+                var startResult = verificationUseCases.startVerification(new StartVerificationCommand(
+                        UserContext.ui(currentUser.getId()), verificationMethod.get(), verificationContact.get()));
+                if (!startResult.success()) {
+                    reportError(startResult.error().message());
+                    return;
+                }
+                session.setCurrentUser(startResult.data().user());
+                syncVerificationFieldsFromSession();
+                statusMessage.set("Verification code generated. Local/dev code: "
+                        + startResult.data().generatedCode());
+                return;
+            }
+
             applyVerificationContact(currentUser);
             String generatedCode = trustSafetyService.generateVerificationCode();
             currentUser.startVerification(verificationMethod.get(), generatedCode);
@@ -210,7 +260,7 @@ public final class SafetyViewModel extends BaseViewModel {
             }
             session.setCurrentUser(result.data().user());
             syncVerificationFieldsFromSession();
-            statusMessage.set("[SIMULATED] Verification code generated. Local/dev code: " + generatedCode);
+            statusMessage.set("Verification code generated. Local/dev code: " + generatedCode);
         } catch (IllegalArgumentException e) {
             reportError(e.getMessage());
         }
@@ -223,6 +273,19 @@ public final class SafetyViewModel extends BaseViewModel {
         User currentUser = session.getCurrentUser();
         if (currentUser == null) {
             reportError(PROFILE_VERIFICATION_UNAVAILABLE);
+            return;
+        }
+        if (verificationUseCases != null) {
+            var confirmResult = verificationUseCases.confirmVerification(
+                    new ConfirmVerificationCommand(UserContext.ui(currentUser.getId()), verificationCode.get()));
+            if (!confirmResult.success()) {
+                reportError(confirmResult.error().message());
+                return;
+            }
+            session.setCurrentUser(confirmResult.data().user());
+            verificationCode.set("");
+            syncVerificationFieldsFromSession();
+            statusMessage.set("Profile verified successfully.");
             return;
         }
         if (!trustSafetyService.verifyCode(currentUser, verificationCode.get())) {
@@ -245,7 +308,7 @@ public final class SafetyViewModel extends BaseViewModel {
         session.setCurrentUser(result.data().user());
         verificationCode.set("");
         syncVerificationFieldsFromSession();
-        statusMessage.set("[SIMULATED] Profile verified successfully.");
+        statusMessage.set("Profile verified successfully.");
     }
 
     public void deleteCurrentAccount() {
@@ -272,7 +335,7 @@ public final class SafetyViewModel extends BaseViewModel {
         blockedUsers.clear();
         session.reset();
         accountDeleted.set(true);
-        statusMessage.set("[SIMULATED] Account deleted. You have been signed out.");
+        statusMessage.set("Account deleted. You have been signed out.");
     }
 
     @Override
@@ -323,9 +386,9 @@ public final class SafetyViewModel extends BaseViewModel {
         return null;
     }
 
-    private List<BlockedUserEntry> mapBlockedUsers(List<User> blocked) {
+    private List<BlockedUserEntry> mapBlockedUsers(List<SocialUseCases.BlockedUserSummary> blocked) {
         return blocked.stream()
-                .map(user -> new BlockedUserEntry(user.getId(), user.getName(), "Blocked profile"))
+                .map(user -> new BlockedUserEntry(user.userId(), user.name(), "Blocked profile"))
                 .toList();
     }
 

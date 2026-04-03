@@ -1,6 +1,7 @@
 package datingapp.app.api;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -30,6 +31,21 @@ import org.junit.jupiter.api.Test;
 class RestApiRelationshipRoutesTest {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
+    private static final String BASE_URL = "http://localhost:";
+    private static final String USERS_PATH = "/api/users/";
+    private static final String FRIEND_REQUESTS_SEGMENT = "/friend-requests/";
+    private static final String RELATIONSHIPS_SEGMENT = "/relationships/";
+    private static final String BLOCK_SEGMENT = "/block/";
+    private static final String REPORT_SEGMENT = "/report/";
+    private static final String CONVERSATIONS_PATH = "/api/conversations/";
+    private static final String MESSAGES_SEGMENT = "/messages";
+    private static final String USER_ID_HEADER = "X-User-Id";
+    private static final String CONTENT_TYPE_HEADER = "Content-Type";
+    private static final String APPLICATION_JSON = "application/json";
+    private static final String FRIEND_REQUESTS_KEY = "friendRequests";
+    private static final String BLOCKED_USERS_KEY = "blockedUsers";
+    private static final String ALICE_NAME = "Alice";
+    private static final String MALLORY_NAME = "Mallory";
 
     private RestApiServer server;
 
@@ -51,7 +67,7 @@ class RestApiRelationshipRoutesTest {
 
         UUID userA = UUID.randomUUID();
         UUID userB = UUID.randomUUID();
-        userStorage.save(activeUser(userA, "Alice"));
+        userStorage.save(activeUser(userA, ALICE_NAME));
         userStorage.save(activeUser(userB, "Bob"));
         interactionStorage.save(Match.create(userA, userB));
 
@@ -61,9 +77,9 @@ class RestApiRelationshipRoutesTest {
         HttpClient client = HttpClient.newHttpClient();
 
         HttpResponse<String> requestResponse = client.send(
-                HttpRequest.newBuilder(URI.create(
-                                "http://localhost:" + port + "/api/users/" + userA + "/friend-requests/" + userB))
-                        .header("X-User-Id", userA.toString())
+                HttpRequest.newBuilder(
+                                URI.create(BASE_URL + port + USERS_PATH + userA + FRIEND_REQUESTS_SEGMENT + userB))
+                        .header(USER_ID_HEADER, userA.toString())
                         .POST(HttpRequest.BodyPublishers.noBody())
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
@@ -72,9 +88,9 @@ class RestApiRelationshipRoutesTest {
                 MAPPER.readTree(requestResponse.body()).get("friendRequestId").asText());
 
         HttpResponse<String> acceptResponse = client.send(
-                HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/users/" + userB
-                                + "/friend-requests/" + requestId + "/accept"))
-                        .header("X-User-Id", userB.toString())
+                HttpRequest.newBuilder(URI.create(
+                                BASE_URL + port + USERS_PATH + userB + FRIEND_REQUESTS_SEGMENT + requestId + "/accept"))
+                        .header(USER_ID_HEADER, userB.toString())
                         .POST(HttpRequest.BodyPublishers.noBody())
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
@@ -90,9 +106,9 @@ class RestApiRelationshipRoutesTest {
         interactionStorage.save(Match.create(userA, userC));
 
         HttpResponse<String> secondRequest = client.send(
-                HttpRequest.newBuilder(URI.create(
-                                "http://localhost:" + port + "/api/users/" + userA + "/friend-requests/" + userC))
-                        .header("X-User-Id", userA.toString())
+                HttpRequest.newBuilder(
+                                URI.create(BASE_URL + port + USERS_PATH + userA + FRIEND_REQUESTS_SEGMENT + userC))
+                        .header(USER_ID_HEADER, userA.toString())
                         .POST(HttpRequest.BodyPublishers.noBody())
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
@@ -100,9 +116,9 @@ class RestApiRelationshipRoutesTest {
                 MAPPER.readTree(secondRequest.body()).get("friendRequestId").asText());
 
         HttpResponse<String> declineResponse = client.send(
-                HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/users/" + userC
-                                + "/friend-requests/" + secondRequestId + "/decline"))
-                        .header("X-User-Id", userC.toString())
+                HttpRequest.newBuilder(URI.create(BASE_URL + port + USERS_PATH + userC + FRIEND_REQUESTS_SEGMENT
+                                + secondRequestId + "/decline"))
+                        .header(USER_ID_HEADER, userC.toString())
                         .POST(HttpRequest.BodyPublishers.noBody())
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
@@ -123,7 +139,7 @@ class RestApiRelationshipRoutesTest {
 
         UUID userA = UUID.randomUUID();
         UUID userB = UUID.randomUUID();
-        userStorage.save(activeUser(userA, "Alice"));
+        userStorage.save(activeUser(userA, ALICE_NAME));
         userStorage.save(activeUser(userB, "Bob"));
         interactionStorage.save(Match.create(userA, userB));
 
@@ -135,20 +151,19 @@ class RestApiRelationshipRoutesTest {
         HttpClient client = HttpClient.newHttpClient();
 
         HttpResponse<String> listResponse = client.send(
-                HttpRequest.newBuilder(
-                                URI.create("http://localhost:" + port + "/api/users/" + userB + "/friend-requests"))
+                HttpRequest.newBuilder(URI.create(BASE_URL + port + USERS_PATH + userB + "/friend-requests"))
                         .GET()
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
         assertEquals(200, listResponse.statusCode());
         JsonNode json = MAPPER.readTree(listResponse.body());
-        assertEquals(1, json.get("friendRequests").size());
+        assertEquals(1, json.get(FRIEND_REQUESTS_KEY).size());
         assertEquals(
                 userA.toString(),
-                json.get("friendRequests").get(0).get("fromUserId").asText());
+                json.get(FRIEND_REQUESTS_KEY).get(0).get("fromUserId").asText());
         assertEquals(
                 userB.toString(),
-                json.get("friendRequests").get(0).get("toUserId").asText());
+                json.get(FRIEND_REQUESTS_KEY).get(0).get("toUserId").asText());
     }
 
     @Test
@@ -163,7 +178,7 @@ class RestApiRelationshipRoutesTest {
 
         UUID userA = UUID.randomUUID();
         UUID userB = UUID.randomUUID();
-        userStorage.save(activeUser(userA, "Alice"));
+        userStorage.save(activeUser(userA, ALICE_NAME));
         userStorage.save(activeUser(userB, "Bob"));
         interactionStorage.save(Match.create(userA, userB));
         interactionStorage.save(ConnectionModels.Like.create(userA, userB, ConnectionModels.Like.Direction.LIKE));
@@ -176,9 +191,9 @@ class RestApiRelationshipRoutesTest {
         HttpClient client = HttpClient.newHttpClient();
 
         HttpResponse<String> gracefulExitResponse = client.send(
-                HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/users/" + userA + "/relationships/"
-                                + userB + "/graceful-exit"))
-                        .header("X-User-Id", userA.toString())
+                HttpRequest.newBuilder(URI.create(BASE_URL + port + USERS_PATH + userA + RELATIONSHIPS_SEGMENT + userB
+                                + "/graceful-exit"))
+                        .header(USER_ID_HEADER, userA.toString())
                         .POST(HttpRequest.BodyPublishers.noBody())
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
@@ -196,9 +211,9 @@ class RestApiRelationshipRoutesTest {
         communicationStorage.saveConversation(ConnectionModels.Conversation.create(userA, userB));
 
         HttpResponse<String> unmatchResponse = client.send(
-                HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/users/" + userA + "/relationships/"
-                                + userB + "/unmatch"))
-                        .header("X-User-Id", userA.toString())
+                HttpRequest.newBuilder(URI.create(
+                                BASE_URL + port + USERS_PATH + userA + RELATIONSHIPS_SEGMENT + userB + "/unmatch"))
+                        .header(USER_ID_HEADER, userA.toString())
                         .POST(HttpRequest.BodyPublishers.noBody())
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
@@ -211,9 +226,8 @@ class RestApiRelationshipRoutesTest {
                         .getState());
 
         HttpResponse<String> blockResponse = client.send(
-                HttpRequest.newBuilder(
-                                URI.create("http://localhost:" + port + "/api/users/" + userA + "/block/" + userB))
-                        .header("X-User-Id", userA.toString())
+                HttpRequest.newBuilder(URI.create(BASE_URL + port + USERS_PATH + userA + BLOCK_SEGMENT + userB))
+                        .header(USER_ID_HEADER, userA.toString())
                         .POST(HttpRequest.BodyPublishers.noBody())
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
@@ -221,10 +235,9 @@ class RestApiRelationshipRoutesTest {
         assertTrue(trustSafetyStorage.isBlocked(userA, userB));
 
         HttpResponse<String> reportResponse = client.send(
-                HttpRequest.newBuilder(
-                                URI.create("http://localhost:" + port + "/api/users/" + userA + "/report/" + userB))
-                        .header("X-User-Id", userA.toString())
-                        .header("Content-Type", "application/json")
+                HttpRequest.newBuilder(URI.create(BASE_URL + port + USERS_PATH + userA + REPORT_SEGMENT + userB))
+                        .header(USER_ID_HEADER, userA.toString())
+                        .header(CONTENT_TYPE_HEADER, APPLICATION_JSON)
                         .POST(
                                 HttpRequest.BodyPublishers.ofString(
                                         "{\"reason\":\"HARASSMENT\",\"description\":\"Inappropriate messages\",\"blockUser\":true}"))
@@ -237,6 +250,105 @@ class RestApiRelationshipRoutesTest {
     }
 
     @Test
+    @DisplayName("blocked users route lists blocked users and unblock route removes them")
+    void blockedUsersRouteListsBlockedUsersAndUnblockRouteRemovesThem() throws Exception {
+        TestStorages.Users userStorage = new TestStorages.Users();
+        TestStorages.Communications communicationStorage = new TestStorages.Communications();
+        TestStorages.Interactions interactionStorage = new TestStorages.Interactions(communicationStorage);
+        TestStorages.TrustSafety trustSafetyStorage = new TestStorages.TrustSafety();
+        ServiceRegistry services =
+                createServices(userStorage, interactionStorage, communicationStorage, trustSafetyStorage);
+
+        UUID userA = UUID.randomUUID();
+        UUID userB = UUID.randomUUID();
+        userStorage.save(activeUser(userA, ALICE_NAME));
+        userStorage.save(activeUser(userB, "Bob"));
+
+        server = new RestApiServer(services, 0);
+        server.start();
+        int port = server.getApp().port();
+        HttpClient client = HttpClient.newHttpClient();
+
+        HttpResponse<String> blockResponse = client.send(
+                HttpRequest.newBuilder(URI.create(BASE_URL + port + USERS_PATH + userA + BLOCK_SEGMENT + userB))
+                        .header(USER_ID_HEADER, userA.toString())
+                        .POST(HttpRequest.BodyPublishers.noBody())
+                        .build(),
+                HttpResponse.BodyHandlers.ofString());
+        assertEquals(200, blockResponse.statusCode());
+
+        HttpResponse<String> blockedUsersResponse = client.send(
+                HttpRequest.newBuilder(URI.create(BASE_URL + port + USERS_PATH + userA + "/blocked-users"))
+                        .header(USER_ID_HEADER, userA.toString())
+                        .GET()
+                        .build(),
+                HttpResponse.BodyHandlers.ofString());
+        assertEquals(200, blockedUsersResponse.statusCode());
+        JsonNode blockedUsersJson = MAPPER.readTree(blockedUsersResponse.body());
+        assertEquals(1, blockedUsersJson.get(BLOCKED_USERS_KEY).size());
+        assertEquals(
+                userB.toString(),
+                blockedUsersJson.get(BLOCKED_USERS_KEY).get(0).get("userId").asText());
+        assertEquals(
+                "Blocked profile",
+                blockedUsersJson
+                        .get(BLOCKED_USERS_KEY)
+                        .get(0)
+                        .get("statusLabel")
+                        .asText());
+
+        HttpResponse<String> unblockResponse = client.send(
+                HttpRequest.newBuilder(URI.create(BASE_URL + port + USERS_PATH + userA + BLOCK_SEGMENT + userB))
+                        .header(USER_ID_HEADER, userA.toString())
+                        .DELETE()
+                        .build(),
+                HttpResponse.BodyHandlers.ofString());
+        assertEquals(204, unblockResponse.statusCode());
+        assertFalse(trustSafetyStorage.isBlocked(userA, userB));
+    }
+
+    @Test
+    @DisplayName("unblock route rejects mismatched acting users and missing targets")
+    void unblockRouteRejectsMismatchedActingUsersAndMissingTargets() throws Exception {
+        TestStorages.Users userStorage = new TestStorages.Users();
+        TestStorages.Communications communicationStorage = new TestStorages.Communications();
+        TestStorages.Interactions interactionStorage = new TestStorages.Interactions(communicationStorage);
+        TestStorages.TrustSafety trustSafetyStorage = new TestStorages.TrustSafety();
+        ServiceRegistry services =
+                createServices(userStorage, interactionStorage, communicationStorage, trustSafetyStorage);
+
+        UUID userA = UUID.randomUUID();
+        UUID userB = UUID.randomUUID();
+        UUID outsider = UUID.randomUUID();
+        userStorage.save(activeUser(userA, ALICE_NAME));
+        userStorage.save(activeUser(userB, "Bob"));
+        userStorage.save(activeUser(outsider, MALLORY_NAME));
+        trustSafetyStorage.save(ConnectionModels.Block.create(userA, userB));
+
+        server = new RestApiServer(services, 0);
+        server.start();
+        int port = server.getApp().port();
+        HttpClient client = HttpClient.newHttpClient();
+
+        HttpResponse<String> forbiddenResponse = client.send(
+                HttpRequest.newBuilder(URI.create(BASE_URL + port + USERS_PATH + userA + BLOCK_SEGMENT + userB))
+                        .header(USER_ID_HEADER, outsider.toString())
+                        .DELETE()
+                        .build(),
+                HttpResponse.BodyHandlers.ofString());
+        assertEquals(403, forbiddenResponse.statusCode());
+
+        HttpResponse<String> missingTargetResponse = client.send(
+                HttpRequest.newBuilder(
+                                URI.create(BASE_URL + port + USERS_PATH + userA + BLOCK_SEGMENT + UUID.randomUUID()))
+                        .header(USER_ID_HEADER, userA.toString())
+                        .DELETE()
+                        .build(),
+                HttpResponse.BodyHandlers.ofString());
+        assertEquals(404, missingTargetResponse.statusCode());
+    }
+
+    @Test
     @DisplayName("unmatch clears old pair likes atomically")
     void unmatchClearsOldPairLikesAtomically() throws Exception {
         TestStorages.Users userStorage = new TestStorages.Users();
@@ -246,7 +358,7 @@ class RestApiRelationshipRoutesTest {
 
         UUID userA = UUID.randomUUID();
         UUID userB = UUID.randomUUID();
-        userStorage.save(activeUser(userA, "Alice"));
+        userStorage.save(activeUser(userA, ALICE_NAME));
         userStorage.save(activeUser(userB, "Bob"));
         interactionStorage.save(Match.create(userA, userB));
         interactionStorage.save(ConnectionModels.Like.create(userA, userB, ConnectionModels.Like.Direction.LIKE));
@@ -259,9 +371,9 @@ class RestApiRelationshipRoutesTest {
         HttpClient client = HttpClient.newHttpClient();
 
         HttpResponse<String> unmatchResponse = client.send(
-                HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/users/" + userA + "/relationships/"
-                                + userB + "/unmatch"))
-                        .header("X-User-Id", userA.toString())
+                HttpRequest.newBuilder(URI.create(
+                                BASE_URL + port + USERS_PATH + userA + RELATIONSHIPS_SEGMENT + userB + "/unmatch"))
+                        .header(USER_ID_HEADER, userA.toString())
                         .POST(HttpRequest.BodyPublishers.noBody())
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
@@ -347,9 +459,9 @@ class RestApiRelationshipRoutesTest {
         UUID userA = UUID.randomUUID();
         UUID userB = UUID.randomUUID();
         UUID outsiderId = UUID.randomUUID();
-        userStorage.save(activeUser(userA, "Alice"));
+        userStorage.save(activeUser(userA, ALICE_NAME));
         userStorage.save(activeUser(userB, "Bob"));
-        userStorage.save(activeUser(outsiderId, "Mallory"));
+        userStorage.save(activeUser(outsiderId, MALLORY_NAME));
         interactionStorage.save(Match.create(userA, userB));
 
         ConnectionModels.Conversation conversation = ConnectionModels.Conversation.create(userA, userB);
@@ -362,26 +474,26 @@ class RestApiRelationshipRoutesTest {
         HttpClient client = HttpClient.newHttpClient();
 
         HttpResponse<String> anonymousResponse = client.send(
-                HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/conversations/"
-                                + conversation.getId() + "/messages"))
+                HttpRequest.newBuilder(URI.create(
+                                BASE_URL + port + CONVERSATIONS_PATH + conversation.getId() + MESSAGES_SEGMENT))
                         .GET()
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
         assertEquals(400, anonymousResponse.statusCode(), anonymousResponse.body());
 
         HttpResponse<String> participantResponse = client.send(
-                HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/conversations/"
-                                + conversation.getId() + "/messages"))
-                        .header("X-User-Id", userA.toString())
+                HttpRequest.newBuilder(URI.create(
+                                BASE_URL + port + CONVERSATIONS_PATH + conversation.getId() + MESSAGES_SEGMENT))
+                        .header(USER_ID_HEADER, userA.toString())
                         .GET()
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
         assertEquals(200, participantResponse.statusCode(), participantResponse.body());
 
         HttpResponse<String> forbiddenResponse = client.send(
-                HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/conversations/"
-                                + conversation.getId() + "/messages"))
-                        .header("X-User-Id", outsiderId.toString())
+                HttpRequest.newBuilder(URI.create(
+                                BASE_URL + port + CONVERSATIONS_PATH + conversation.getId() + MESSAGES_SEGMENT))
+                        .header(USER_ID_HEADER, outsiderId.toString())
                         .GET()
                         .build(),
                 HttpResponse.BodyHandlers.ofString());

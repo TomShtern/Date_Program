@@ -5,7 +5,10 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import datingapp.app.api.RestApiDtos.AchievementSnapshotDto;
 import datingapp.app.api.RestApiDtos.ArchiveConversationRequest;
+import datingapp.app.api.RestApiDtos.BlockedUsersResponse;
 import datingapp.app.api.RestApiDtos.BrowseCandidatesResponse;
+import datingapp.app.api.RestApiDtos.ConfirmVerificationRequest;
+import datingapp.app.api.RestApiDtos.ConfirmVerificationResponse;
 import datingapp.app.api.RestApiDtos.ConversationSummary;
 import datingapp.app.api.RestApiDtos.ErrorResponse;
 import datingapp.app.api.RestApiDtos.FriendRequestsResponse;
@@ -34,6 +37,8 @@ import datingapp.app.api.RestApiDtos.ReportUserRequest;
 import datingapp.app.api.RestApiDtos.SendMessageRequest;
 import datingapp.app.api.RestApiDtos.StandoutDto;
 import datingapp.app.api.RestApiDtos.StandoutsResponse;
+import datingapp.app.api.RestApiDtos.StartVerificationRequest;
+import datingapp.app.api.RestApiDtos.StartVerificationResponse;
 import datingapp.app.api.RestApiDtos.TransitionResponse;
 import datingapp.app.api.RestApiDtos.UndoResponse;
 import datingapp.app.api.RestApiDtos.UserDetail;
@@ -67,9 +72,13 @@ import datingapp.app.usecase.profile.ProfileNotesUseCases;
 import datingapp.app.usecase.profile.ProfileUseCases;
 import datingapp.app.usecase.profile.ProfileUseCases.DeleteAccountCommand;
 import datingapp.app.usecase.profile.ProfileUseCases.UpdateProfileCommand;
+import datingapp.app.usecase.profile.VerificationUseCases;
+import datingapp.app.usecase.profile.VerificationUseCases.ConfirmVerificationCommand;
+import datingapp.app.usecase.profile.VerificationUseCases.StartVerificationCommand;
 import datingapp.app.usecase.social.SocialUseCases;
 import datingapp.app.usecase.social.SocialUseCases.FriendRequestAction;
 import datingapp.app.usecase.social.SocialUseCases.FriendRequestsQuery;
+import datingapp.app.usecase.social.SocialUseCases.ListBlockedUsersQuery;
 import datingapp.app.usecase.social.SocialUseCases.MarkAllNotificationsReadCommand;
 import datingapp.app.usecase.social.SocialUseCases.MarkNotificationReadCommand;
 import datingapp.app.usecase.social.SocialUseCases.NotificationsQuery;
@@ -163,6 +172,7 @@ public class RestApiServer {
     private final ProfileMutationUseCases profileMutationUseCases;
     private final ProfileInsightsUseCases profileInsightsUseCases;
     private final ProfileNotesUseCases profileNotesUseCases;
+    private final VerificationUseCases verificationUseCases;
     private final SocialUseCases socialUseCases;
     private final LocationService locationService;
     private final ZoneId userTimeZone;
@@ -185,6 +195,7 @@ public class RestApiServer {
         this.profileMutationUseCases = services.getProfileMutationUseCases();
         this.profileInsightsUseCases = services.getProfileInsightsUseCases();
         this.profileNotesUseCases = services.getProfileNotesUseCases();
+        this.verificationUseCases = services.getVerificationUseCases();
         this.socialUseCases = services.getSocialUseCases();
         this.locationService = services.getLocationService();
         this.userTimeZone = services.getConfig().safety().userTimeZone();
@@ -399,6 +410,8 @@ public class RestApiServer {
             return;
         }
         ensureActiveCandidateBrowser(user);
+        // Deliberate sprint exception: /browse remains the app-layer browse/daily-pick flow,
+        // while /candidates continues to expose the raw candidate projection directly.
         List<UserSummary> candidates = readCandidateSummaries(user).stream()
                 .map(candidate -> UserSummary.from(candidate, userTimeZone))
                 .toList();
@@ -774,6 +787,35 @@ public class RestApiServer {
                 result.data().success(), false, result.data().errorMessage()));
     }
 
+    private void getBlockedUsers(Context ctx) {
+        UUID userId = parseUuid(ctx.pathParam("id"));
+        if (loadUser(ctx, userId) == null) {
+            return;
+        }
+
+        var result = socialUseCases.listBlockedUsers(new ListBlockedUsersQuery(UserContext.api(userId)));
+        if (!result.success()) {
+            handleUseCaseFailure(ctx, result.error());
+            return;
+        }
+        ctx.json(BlockedUsersResponse.from(result.data()));
+    }
+
+    private void unblockUser(Context ctx) {
+        UUID userId = parseUuid(ctx.pathParam("id"));
+        UUID targetId = parseUuid(ctx.pathParam(PATH_TARGET_ID));
+        if (loadUser(ctx, userId) == null || loadUser(ctx, targetId) == null) {
+            return;
+        }
+
+        var result = socialUseCases.unblockUser(new RelationshipCommand(UserContext.api(userId), targetId));
+        if (!result.success()) {
+            handleUseCaseFailure(ctx, result.error());
+            return;
+        }
+        ctx.status(204);
+    }
+
     private void reportUser(Context ctx) {
         UUID userId = parseUuid(ctx.pathParam("id"));
         UUID targetId = parseUuid(ctx.pathParam(PATH_TARGET_ID));
@@ -794,6 +836,38 @@ public class RestApiServer {
         }
         ctx.json(new ReportResponse(
                 true, result.data().autoBanned(), null, result.data().blockedByReporter()));
+    }
+
+    private void startVerification(Context ctx) {
+        UUID userId = parseUuid(ctx.pathParam("id"));
+        if (loadUser(ctx, userId) == null) {
+            return;
+        }
+
+        StartVerificationRequest request = ctx.bodyAsClass(StartVerificationRequest.class);
+        var result = verificationUseCases.startVerification(
+                new StartVerificationCommand(UserContext.api(userId), request.method(), request.contact()));
+        if (!result.success()) {
+            handleUseCaseFailure(ctx, result.error());
+            return;
+        }
+        ctx.json(StartVerificationResponse.from(result.data()));
+    }
+
+    private void confirmVerification(Context ctx) {
+        UUID userId = parseUuid(ctx.pathParam("id"));
+        if (loadUser(ctx, userId) == null) {
+            return;
+        }
+
+        ConfirmVerificationRequest request = ctx.bodyAsClass(ConfirmVerificationRequest.class);
+        var result = verificationUseCases.confirmVerification(
+                new ConfirmVerificationCommand(UserContext.api(userId), request.verificationCode()));
+        if (!result.success()) {
+            handleUseCaseFailure(ctx, result.error());
+            return;
+        }
+        ctx.json(ConfirmVerificationResponse.from(result.data()));
     }
 
     // ── Messaging Handlers ──────────────────────────────────────────────
@@ -1024,9 +1098,11 @@ public class RestApiServer {
     }
 
     private List<User> readCandidateSummaries(User user) {
-        // Deliberate exception: this is the remaining direct-read adapter.
-        // The route intentionally exposes the raw candidate projection rather than
-        // the browseCandidates() daily-pick flow.
+        // Deliberate direct-read exception for this sprint only.
+        // /api/users/{id}/browse stays on MatchingUseCases.browseCandidates(...)
+        // so it can carry browse-only state like daily-pick metadata.
+        // /api/users/{id}/candidates stays on CandidateFinder directly because it
+        // intentionally returns the raw candidate projection without that browse flow.
         return candidateFinder.findCandidatesForUser(user);
     }
 
@@ -1255,8 +1331,12 @@ public class RestApiServer {
             app.post("/api/users/{id}/friend-requests/{requestId}/decline", server::declineFriendRequest);
             app.post("/api/users/{id}/relationships/{targetId}/graceful-exit", server::gracefulExit);
             app.post("/api/users/{id}/relationships/{targetId}/unmatch", server::unmatch);
+            app.get("/api/users/{id}/blocked-users", server::getBlockedUsers);
             app.post("/api/users/{id}/block/{targetId}", server::blockUser);
+            app.delete("/api/users/{id}/block/{targetId}", server::unblockUser);
             app.post("/api/users/{id}/report/{targetId}", server::reportUser);
+            app.post("/api/users/{id}/verification/start", server::startVerification);
+            app.post("/api/users/{id}/verification/confirm", server::confirmVerification);
         }
     }
 

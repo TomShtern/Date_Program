@@ -524,6 +524,11 @@ public final class TestStorages {
         }
 
         @Override
+        public boolean supportsAtomicBlockTransition() {
+            return communicationStorage != null;
+        }
+
+        @Override
         public boolean acceptFriendZoneTransition(
                 Match updatedMatch, FriendRequest acceptedRequest, Notification notification) {
             update(updatedMatch);
@@ -557,6 +562,48 @@ public final class TestStorages {
                 archivedConversation.ifPresent(communicationStorage::saveConversation);
             }
             return true;
+        }
+
+        @Override
+        public boolean blockTransition(
+                UUID blockerId,
+                UUID blockedId,
+                Optional<Match> updatedMatch,
+                Optional<Conversation> archivedConversation) {
+            Objects.requireNonNull(blockerId, "blockerId cannot be null");
+            Objects.requireNonNull(blockedId, "blockedId cannot be null");
+            Objects.requireNonNull(updatedMatch, "updatedMatch cannot be null");
+            Objects.requireNonNull(archivedConversation, "archivedConversation cannot be null");
+
+            Match originalMatch =
+                    updatedMatch.map(match -> matches.get(match.getId())).orElse(null);
+            Conversation originalConversation = null;
+            if (communicationStorage != null) {
+                originalConversation = communicationStorage
+                        .getConversationByUsers(blockerId, blockedId)
+                        .map(Conversation::copyOf)
+                        .orElse(null);
+            }
+
+            try {
+                updatedMatch.ifPresent(this::update);
+                if (communicationStorage != null) {
+                    archivedConversation.ifPresent(conversation -> {
+                        communicationStorage.archiveConversation(
+                                conversation.getId(), blockerId, MatchArchiveReason.BLOCK);
+                        communicationStorage.setConversationVisibility(conversation.getId(), blockerId, false);
+                    });
+                }
+                return true;
+            } catch (RuntimeException exception) {
+                if (originalMatch != null) {
+                    matches.put(originalMatch.getId(), originalMatch);
+                }
+                if (originalConversation != null && communicationStorage != null) {
+                    communicationStorage.saveConversation(originalConversation);
+                }
+                throw exception;
+            }
         }
 
         public void clear() {

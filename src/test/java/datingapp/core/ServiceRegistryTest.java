@@ -1,13 +1,16 @@
 package datingapp.core;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import datingapp.app.usecase.common.UserContext;
 import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
 import datingapp.core.model.User.UserState;
+import datingapp.core.testutil.TestUserFactory;
 import datingapp.storage.DatabaseManager;
 import datingapp.storage.StorageFactory;
 import java.time.LocalDate;
@@ -181,6 +184,12 @@ class ServiceRegistryTest {
         void getConnectionService() {
             assertNotNull(registry.getConnectionService());
         }
+
+        @Test
+        @DisplayName("getDashboardUseCases returns non-null")
+        void getDashboardUseCases() {
+            assertNotNull(registry.getDashboardUseCases());
+        }
     }
 
     @Nested
@@ -217,6 +226,20 @@ class ServiceRegistryTest {
 
             assertTrue(locationService.findCountry("IL").isPresent());
             assertTrue(locationService.findCityByName("IL", "Tel Aviv").isPresent());
+        }
+
+        @Test
+        @DisplayName("getDashboardUseCases can read a dashboard summary for a saved user")
+        void getDashboardUseCasesCanReadADashboardSummaryForASavedUser() {
+            User user = TestUserFactory.createActiveUser(UUID.randomUUID(), "DashboardUser");
+            registry.getUserStorage().save(user);
+
+            var result = registry.getDashboardUseCases()
+                    .getDashboardSummary(new datingapp.app.usecase.dashboard.DashboardUseCases.DashboardSummaryQuery(
+                            UserContext.cli(user.getId())));
+
+            assertTrue(result.success());
+            assertEquals(user.getName(), result.data().userName());
         }
     }
 

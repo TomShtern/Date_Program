@@ -33,25 +33,37 @@ public class MessagingHandler implements LoggingSupport {
     private static final int MESSAGES_PER_PAGE = 20;
     private static final int CONVERSATIONS_PER_PAGE = 50;
     private static final int PREVIEW_MAX_LENGTH = 28;
-    private static final DateTimeFormatter TIME_FORMATTER =
-            DateTimeFormatter.ofPattern("MMM d, h:mm a").withZone(ZoneId.systemDefault());
+    private static final String USER_TIME_ZONE_NULL = "userTimeZone cannot be null";
 
     private final MessagingUseCases messagingUseCases;
     private final SocialUseCases socialUseCases;
     private final InputReader input;
     private final AppSession session;
+    private final ZoneId userTimeZone;
+    private final DateTimeFormatter timeFormatter;
 
     public MessagingHandler(
-            MessagingUseCases messagingUseCases, SocialUseCases socialUseCases, InputReader input, AppSession session) {
+            MessagingUseCases messagingUseCases,
+            SocialUseCases socialUseCases,
+            InputReader input,
+            AppSession session,
+            ZoneId userTimeZone) {
         this.messagingUseCases = Objects.requireNonNull(messagingUseCases, "messagingUseCases cannot be null");
         this.socialUseCases = Objects.requireNonNull(socialUseCases, "socialUseCases cannot be null");
         this.input = Objects.requireNonNull(input, "input cannot be null");
         this.session = Objects.requireNonNull(session, "session cannot be null");
+        this.userTimeZone = Objects.requireNonNull(userTimeZone, USER_TIME_ZONE_NULL);
+        this.timeFormatter = DateTimeFormatter.ofPattern("MMM d, h:mm a").withZone(this.userTimeZone);
     }
 
     public static MessagingHandler fromServices(ServiceRegistry services, AppSession session, InputReader input) {
         Objects.requireNonNull(services, "services cannot be null");
-        return new MessagingHandler(services.getMessagingUseCases(), services.getSocialUseCases(), input, session);
+        return new MessagingHandler(
+                services.getMessagingUseCases(),
+                services.getSocialUseCases(),
+                input,
+                session,
+                services.getConfig().safety().userTimeZone());
     }
 
     @Override
@@ -412,7 +424,7 @@ public class MessagingHandler implements LoggingSupport {
     private void displayMessage(Message message, User currentUser) {
         boolean isFromMe = message.senderId().equals(currentUser.getId());
         String sender = isFromMe ? "You" : "Them";
-        String timestamp = TIME_FORMATTER.format(message.createdAt());
+        String timestamp = timeFormatter.format(message.createdAt());
 
         logInfo("\n   [{}] {}:", timestamp, sender);
         logInfo("   {}", message.content());

@@ -5,8 +5,10 @@ import datingapp.core.AppConfig;
 import datingapp.core.AppSession;
 import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
+import datingapp.core.model.User.UserState;
 import datingapp.core.profile.MatchPreferences.Dealbreakers;
 import datingapp.core.workflow.ProfileActivationPolicy;
+import datingapp.ui.NavigationService;
 import datingapp.ui.async.JavaFxUiThreadDispatcher;
 import datingapp.ui.async.UiThreadDispatcher;
 import datingapp.ui.viewmodel.UiDataAdapters.UiUserStore;
@@ -33,6 +35,7 @@ public class LoginViewModel extends BaseViewModel {
     private final AppConfig config;
     private final AppSession session;
     private final UiUserStore userStore;
+    private final ProfileActivationPolicy activationPolicy;
     private final ObservableList<User> users = FXCollections.observableArrayList();
     private final ObservableList<User> filteredUsers = FXCollections.observableArrayList();
     private final ObservableList<User> readOnlyUsers = FXCollections.unmodifiableObservableList(users);
@@ -46,18 +49,12 @@ public class LoginViewModel extends BaseViewModel {
     private User selectedUser;
 
     public LoginViewModel(UiUserStore userStore, AppConfig config, AppSession session) {
-        this(userStore, config, session, new JavaFxUiThreadDispatcher());
+        this(userStore, config, session, new JavaFxUiThreadDispatcher(), new ProfileActivationPolicy());
     }
 
     public LoginViewModel(
             UiUserStore userStore, AppConfig config, AppSession session, UiThreadDispatcher uiDispatcher) {
-        super("login", uiDispatcher);
-        this.userStore = Objects.requireNonNull(userStore, "userStore cannot be null");
-        this.config = Objects.requireNonNull(config, "config cannot be null");
-        this.session = Objects.requireNonNull(session, "session cannot be null");
-
-        this.filterText.addListener((obs, oldVal, newVal) -> applyFilter(newVal));
-        loadUsers();
+        this(userStore, config, session, uiDispatcher, new ProfileActivationPolicy());
     }
 
     public LoginViewModel(
@@ -66,7 +63,14 @@ public class LoginViewModel extends BaseViewModel {
             AppSession session,
             UiThreadDispatcher uiDispatcher,
             ProfileActivationPolicy activationPolicy) {
-        this(userStore, config, session, uiDispatcher);
+        super("login", uiDispatcher);
+        this.userStore = Objects.requireNonNull(userStore, "userStore cannot be null");
+        this.config = Objects.requireNonNull(config, "config cannot be null");
+        this.session = Objects.requireNonNull(session, "session cannot be null");
+        this.activationPolicy = Objects.requireNonNull(activationPolicy, "activationPolicy cannot be null");
+
+        this.filterText.addListener((obs, oldVal, newVal) -> applyFilter(newVal));
+        loadUsers();
     }
 
     public void setErrorHandler(ViewModelErrorSink handler) {
@@ -162,6 +166,20 @@ public class LoginViewModel extends BaseViewModel {
         session.setCurrentUser(selectedUser);
 
         return true;
+    }
+
+    public NavigationService.ViewType resolvePostLoginDestination() {
+        if (selectedUser == null) {
+            return NavigationService.ViewType.PROFILE;
+        }
+
+        var activationDecision = activationPolicy.canActivate(selectedUser);
+        if (selectedUser.getState() == UserState.ACTIVE
+                || (activationDecision instanceof datingapp.core.workflow.WorkflowDecision.Denied denied
+                        && "ALREADY_ACTIVE".equals(denied.reasonCode()))) {
+            return NavigationService.ViewType.DASHBOARD;
+        }
+        return NavigationService.ViewType.PROFILE;
     }
 
     /**

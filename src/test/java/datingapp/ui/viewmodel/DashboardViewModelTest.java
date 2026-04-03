@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import datingapp.app.usecase.dashboard.DashboardUseCases;
 import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
 import datingapp.core.AppSession;
@@ -21,9 +22,8 @@ import datingapp.core.testutil.TestAchievementService;
 import datingapp.core.testutil.TestClock;
 import datingapp.core.testutil.TestStorages;
 import datingapp.ui.JavaFxTestSupport;
+import datingapp.ui.UiPreferencesStore;
 import datingapp.ui.async.UiAsyncTestSupport;
-import datingapp.ui.viewmodel.UiDataAdapters.StorageUiMatchDataAccess;
-import datingapp.ui.viewmodel.UiDataAdapters.UiMatchDataAccess;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -89,14 +89,19 @@ class DashboardViewModelTest {
                 .config(config)
                 .build();
 
-        UiMatchDataAccess matchData = new StorageUiMatchDataAccess(interactions, trustSafetyStorage);
         achievementService = TestAchievementService.empty();
 
         ConnectionService messagingService = new ConnectionService(config, communications, interactions, users);
 
         viewModel = new DashboardViewModel(
-                new DashboardViewModel.Dependencies(
-                        dailyService, matchData, achievementService, messagingService, profileService, config),
+                new DashboardViewModel.Dependencies(new DashboardUseCases(
+                        users,
+                        dailyService,
+                        interactions,
+                        achievementService,
+                        messagingService,
+                        profileService,
+                        config)),
                 AppSession.getInstance(),
                 new UiAsyncTestSupport.TestUiThreadDispatcher());
 
@@ -214,6 +219,28 @@ class DashboardViewModelTest {
     void dependenciesNoLongerExposeSecondaryFromServicesCompositionRoot() {
         assertFalse(Arrays.stream(DashboardViewModel.Dependencies.class.getDeclaredMethods())
                 .anyMatch(method -> method.getName().equals("fromServices")));
+    }
+
+    @Test
+    @DisplayName("refresh maps dashboard summary fields from DashboardUseCases")
+    void refreshMapsDashboardSummaryFieldsFromDashboardUseCases() throws InterruptedException {
+        DashboardUseCases dashboardUseCases = new DashboardUseCases(
+                users,
+                dailyService,
+                interactions,
+                achievementService,
+                new ConnectionService(AppConfig.defaults(), communications, interactions, users),
+                new ProfileService(users),
+                AppConfig.defaults());
+        viewModel = new DashboardViewModel(
+                new DashboardViewModel.Dependencies(dashboardUseCases),
+                AppSession.getInstance(),
+                new UiAsyncTestSupport.TestUiThreadDispatcher(),
+                new UiPreferencesStore());
+
+        performRefreshAndDrainUntilIdle();
+
+        assertEquals(currentUser.getName(), viewModel.userNameProperty().get());
     }
 
     private void performRefreshAndDrainUntilIdle() throws InterruptedException {

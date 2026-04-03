@@ -6,7 +6,6 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Set;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -22,18 +21,6 @@ class TimePolicyArchitectureTest {
     static final Set<String> CONFIG_DEFAULTS_ALLOWLIST = Set.of("ApplicationStartup.java", "StorageFactory.java");
 
     @Test
-    // Keep this guard disabled until the live source tree actually satisfies the rule.
-    // The current codebase still has runtime ZoneId.systemDefault() call sites in
-    // presentation-layer code, and there is no src/main/java/datingapp/core/time/TimePolicy.java
-    // implementation to route them through yet. Re-enable only after the remaining
-    // runtime call sites are migrated and the allowlist can be reduced to the genuine
-    // bootstrap-only exceptions.
-    @Disabled("TRACKER: WU-14 | owner: TimePolicy rollout owner | "
-            + "current state: src/main/java still contains runtime ZoneId.systemDefault() call sites in UI/CLI "
-            + "presentation code and no TimePolicy implementation exists yet; "
-            + "exit criteria: all runtime timezone lookups route through the dedicated policy layer and only approved "
-            + "bootstrap exceptions remain | "
-            + "TODO deadline: 2026-04-30")
     void noFeatureCodeUsesZoneIdSystemDefault() throws IOException {
         List<String> violations = findViolations("ZoneId.systemDefault()", ZONE_DEFAULT_ALLOWLIST);
         assertTrue(violations.isEmpty(), "ZoneId.systemDefault() violations found:\n" + String.join("\n", violations));

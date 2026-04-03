@@ -46,6 +46,11 @@ import org.junit.jupiter.api.Timeout;
 @DisplayName("ChatController wiring and binding tests")
 class ChatControllerTest {
 
+    private static final String CHAT_FXML = "/fxml/chat.fxml";
+    private static final String CONVERSATION_LIST_SELECTOR = "#conversationListView";
+    private static final String KNOWN_CHAT_NOTE = "Known chat note";
+    private static final String KEEP_THIS_DRAFT = "Keep this draft";
+
     @BeforeAll
     static void initJfx() throws InterruptedException {
         JavaFxTestSupport.initJfx();
@@ -55,14 +60,16 @@ class ChatControllerTest {
     @DisplayName("initial state uses empty counter and reveals note panel only after selection")
     void initialStateUsesEmptyCounterAndRevealsNotePanelOnlyAfterSelection() throws Exception {
         Fixture fixture = new Fixture();
-        fixture.seedConversationWithNote("Known chat note");
+        fixture.seedConversationWithNote(KNOWN_CHAT_NOTE);
 
-        JavaFxTestSupport.LoadedFxml loaded =
-                JavaFxTestSupport.loadFxml("/fxml/chat.fxml", () -> new ChatController(fixture.viewModel));
+        JavaFxTestSupport.LoadedFxml loaded = JavaFxTestSupport.loadFxml(
+                CHAT_FXML,
+                () -> new ChatController(
+                        fixture.viewModel, fixture.config.safety().userTimeZone()));
         Parent root = loaded.root();
         @SuppressWarnings("unchecked")
         ListView<ConnectionService.ConversationPreview> conversationListView =
-                JavaFxTestSupport.lookup(root, "#conversationListView", ListView.class);
+                JavaFxTestSupport.lookup(root, CONVERSATION_LIST_SELECTOR, ListView.class);
         Label messageLengthLabel = JavaFxTestSupport.lookup(root, "#messageLengthLabel", Label.class);
         VBox notePanelContainer = JavaFxTestSupport.lookup(root, "#notePanelContainer", VBox.class);
         Button friendZoneButton = JavaFxTestSupport.lookup(root, "#friendZoneButton", Button.class);
@@ -83,8 +90,8 @@ class ChatControllerTest {
                     try {
                         return !JavaFxTestSupport.callOnFxAndWait(
                                 () -> conversationListView.getItems().isEmpty());
-                    } catch (InterruptedException e) {
-                        throw new IllegalStateException(e);
+                    } catch (InterruptedException _) {
+                        throw new IllegalStateException("Interrupted while awaiting conversations");
                     }
                 },
                 8000));
@@ -96,8 +103,8 @@ class ChatControllerTest {
                 () -> {
                     try {
                         return JavaFxTestSupport.callOnFxAndWait(notePanelContainer::isVisible);
-                    } catch (InterruptedException e) {
-                        throw new IllegalStateException(e);
+                    } catch (InterruptedException _) {
+                        throw new IllegalStateException("Interrupted while awaiting note panel visibility");
                     }
                 },
                 8000));
@@ -111,14 +118,16 @@ class ChatControllerTest {
     @DisplayName("FXML selection toggles chat state and note buttons remain wired")
     void selectionTogglesChatStateAndNoteButtonsRemainWired() throws Exception {
         Fixture fixture = new Fixture();
-        fixture.seedConversationWithNote("Known chat note");
+        fixture.seedConversationWithNote(KNOWN_CHAT_NOTE);
 
-        JavaFxTestSupport.LoadedFxml loaded =
-                JavaFxTestSupport.loadFxml("/fxml/chat.fxml", () -> new ChatController(fixture.viewModel));
+        JavaFxTestSupport.LoadedFxml loaded = JavaFxTestSupport.loadFxml(
+                CHAT_FXML,
+                () -> new ChatController(
+                        fixture.viewModel, fixture.config.safety().userTimeZone()));
         Parent root = loaded.root();
         @SuppressWarnings("unchecked")
         ListView<ConnectionService.ConversationPreview> conversationListView =
-                JavaFxTestSupport.lookup(root, "#conversationListView", ListView.class);
+                JavaFxTestSupport.lookup(root, CONVERSATION_LIST_SELECTOR, ListView.class);
         TextArea profileNoteArea = JavaFxTestSupport.lookup(root, "#profileNoteArea", TextArea.class);
         Button saveNoteButton = JavaFxTestSupport.lookup(root, "#saveProfileNoteButton", Button.class);
         Button deleteNoteButton = JavaFxTestSupport.lookup(root, "#deleteProfileNoteButton", Button.class);
@@ -128,8 +137,8 @@ class ChatControllerTest {
                     try {
                         return !JavaFxTestSupport.callOnFxAndWait(
                                 () -> conversationListView.getItems().isEmpty());
-                    } catch (InterruptedException e) {
-                        throw new IllegalStateException(e);
+                    } catch (InterruptedException _) {
+                        throw new IllegalStateException("Interrupted while awaiting conversation list");
                     }
                 },
                 8000));
@@ -145,8 +154,8 @@ class ChatControllerTest {
                 () -> {
                     try {
                         return !JavaFxTestSupport.callOnFxAndWait(saveNoteButton::isDisabled);
-                    } catch (InterruptedException e) {
-                        throw new IllegalStateException(e);
+                    } catch (InterruptedException _) {
+                        throw new IllegalStateException("Interrupted while awaiting save note enablement");
                     }
                 },
                 5000));
@@ -167,8 +176,8 @@ class ChatControllerTest {
                 () -> {
                     try {
                         return !JavaFxTestSupport.callOnFxAndWait(deleteNoteButton::isDisabled);
-                    } catch (InterruptedException e) {
-                        throw new IllegalStateException(e);
+                    } catch (InterruptedException _) {
+                        throw new IllegalStateException("Interrupted while awaiting delete note enablement");
                     }
                 },
                 8000));
@@ -181,8 +190,8 @@ class ChatControllerTest {
                         return fixture.lookupNote().isEmpty()
                                 && JavaFxTestSupport.callOnFxAndWait(profileNoteArea::getText)
                                         .isEmpty();
-                    } catch (InterruptedException e) {
-                        throw new IllegalStateException(e);
+                    } catch (InterruptedException _) {
+                        throw new IllegalStateException("Interrupted while awaiting note editor clear");
                     }
                 },
                 5000));
@@ -196,14 +205,16 @@ class ChatControllerTest {
     @DisplayName("send clears input only after confirmed success and preserves failed text")
     void sendClearsInputOnlyAfterSuccessAndPreservesFailedText() throws Exception {
         Fixture fixture = new Fixture();
-        fixture.seedConversationWithNote("Known chat note");
+        fixture.seedConversationWithNote(KNOWN_CHAT_NOTE);
 
-        JavaFxTestSupport.LoadedFxml loaded =
-                JavaFxTestSupport.loadFxml("/fxml/chat.fxml", () -> new ChatController(fixture.viewModel));
+        JavaFxTestSupport.LoadedFxml loaded = JavaFxTestSupport.loadFxml(
+                CHAT_FXML,
+                () -> new ChatController(
+                        fixture.viewModel, fixture.config.safety().userTimeZone()));
         Parent root = loaded.root();
         @SuppressWarnings("unchecked")
         ListView<ConnectionService.ConversationPreview> conversationListView =
-                JavaFxTestSupport.lookup(root, "#conversationListView", ListView.class);
+                JavaFxTestSupport.lookup(root, CONVERSATION_LIST_SELECTOR, ListView.class);
         TextArea messageArea = JavaFxTestSupport.lookup(root, "#messageArea", TextArea.class);
         Button sendButton = JavaFxTestSupport.lookup(root, "#sendButton", Button.class);
         Label messageLengthLabel = JavaFxTestSupport.lookup(root, "#messageLengthLabel", Label.class);
@@ -214,8 +225,8 @@ class ChatControllerTest {
                     try {
                         return !JavaFxTestSupport.callOnFxAndWait(
                                 () -> conversationListView.getItems().isEmpty());
-                    } catch (InterruptedException e) {
-                        throw new IllegalStateException(e);
+                    } catch (InterruptedException _) {
+                        throw new IllegalStateException("Interrupted while awaiting send target selection");
                     }
                 },
                 5000));
@@ -232,8 +243,8 @@ class ChatControllerTest {
                     try {
                         return JavaFxTestSupport.callOnFxAndWait(messageArea::getText)
                                 .isEmpty();
-                    } catch (InterruptedException e) {
-                        throw new IllegalStateException(e);
+                    } catch (InterruptedException _) {
+                        throw new IllegalStateException("Interrupted while awaiting send clear");
                     }
                 },
                 5000));
@@ -251,8 +262,8 @@ class ChatControllerTest {
                 () -> {
                     try {
                         return oversized.equals(JavaFxTestSupport.callOnFxAndWait(messageArea::getText));
-                    } catch (InterruptedException e) {
-                        throw new IllegalStateException(e);
+                    } catch (InterruptedException _) {
+                        throw new IllegalStateException("Interrupted while awaiting draft preservation");
                     }
                 },
                 5000));
@@ -269,14 +280,16 @@ class ChatControllerTest {
     @DisplayName("enter sends while shift enter keeps draft text intact")
     void enterSendsWhileShiftEnterKeepsDraftIntact() throws Exception {
         Fixture fixture = new Fixture();
-        fixture.seedConversationWithNote("Known chat note");
+        fixture.seedConversationWithNote(KNOWN_CHAT_NOTE);
 
-        JavaFxTestSupport.LoadedFxml loaded =
-                JavaFxTestSupport.loadFxml("/fxml/chat.fxml", () -> new ChatController(fixture.viewModel));
+        JavaFxTestSupport.LoadedFxml loaded = JavaFxTestSupport.loadFxml(
+                CHAT_FXML,
+                () -> new ChatController(
+                        fixture.viewModel, fixture.config.safety().userTimeZone()));
         Parent root = loaded.root();
         @SuppressWarnings("unchecked")
         ListView<ConnectionService.ConversationPreview> conversationListView =
-                JavaFxTestSupport.lookup(root, "#conversationListView", ListView.class);
+                JavaFxTestSupport.lookup(root, CONVERSATION_LIST_SELECTOR, ListView.class);
         TextArea messageArea = JavaFxTestSupport.lookup(root, "#messageArea", TextArea.class);
 
         assertTrue(JavaFxTestSupport.waitUntil(
@@ -284,8 +297,8 @@ class ChatControllerTest {
                     try {
                         return !JavaFxTestSupport.callOnFxAndWait(
                                 () -> conversationListView.getItems().isEmpty());
-                    } catch (InterruptedException e) {
-                        throw new IllegalStateException(e);
+                    } catch (InterruptedException _) {
+                        throw new IllegalStateException("Interrupted while awaiting enter send selection");
                     }
                 },
                 5000));
@@ -303,8 +316,8 @@ class ChatControllerTest {
                     try {
                         return JavaFxTestSupport.callOnFxAndWait(messageArea::getText)
                                 .isEmpty();
-                    } catch (InterruptedException e) {
-                        throw new IllegalStateException(e);
+                    } catch (InterruptedException _) {
+                        throw new IllegalStateException("Interrupted while awaiting enter send clear");
                     }
                 },
                 5000));
@@ -312,13 +325,13 @@ class ChatControllerTest {
 
         int messageCountAfterEnter = fixture.messageCount();
         JavaFxTestSupport.runOnFxAndWait(() -> {
-            messageArea.setText("Keep this draft");
+            messageArea.setText(KEEP_THIS_DRAFT);
             messageArea.fireEvent(new KeyEvent(KeyEvent.KEY_PRESSED, "", "", KeyCode.ENTER, true, false, false, false));
         });
 
-        assertEquals("Keep this draft", JavaFxTestSupport.callOnFxAndWait(messageArea::getText));
+        assertEquals(KEEP_THIS_DRAFT, JavaFxTestSupport.callOnFxAndWait(messageArea::getText));
         assertEquals(messageCountAfterEnter, fixture.messageCount());
-        assertNotEquals("Keep this draft", fixture.latestMessageContent().orElse(""));
+        assertNotEquals(KEEP_THIS_DRAFT, fixture.latestMessageContent().orElse(""));
 
         fixture.dispose();
         NavigationService.getInstance().clearHistory();
@@ -329,10 +342,12 @@ class ChatControllerTest {
     @DisplayName("cleanup is safe and idempotent")
     void cleanupIsSafeAndIdempotent() throws Exception {
         Fixture fixture = new Fixture();
-        fixture.seedConversationWithNote("Known chat note");
+        fixture.seedConversationWithNote(KNOWN_CHAT_NOTE);
 
-        JavaFxTestSupport.LoadedFxml loaded =
-                JavaFxTestSupport.loadFxml("/fxml/chat.fxml", () -> new ChatController(fixture.viewModel));
+        JavaFxTestSupport.LoadedFxml loaded = JavaFxTestSupport.loadFxml(
+                CHAT_FXML,
+                () -> new ChatController(
+                        fixture.viewModel, fixture.config.safety().userTimeZone()));
         ChatController controller = (ChatController) loaded.controller();
 
         JavaFxTestSupport.runOnFxAndWait(() -> {

@@ -4,11 +4,13 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
+import datingapp.core.connection.ConnectionModels.Conversation;
 import datingapp.core.connection.ConnectionModels.Report;
 import datingapp.core.model.Match;
 import datingapp.core.model.User;
@@ -110,6 +112,108 @@ class TrustSafetyServiceSecurityTest {
         assertFalse(trustSafetyStorage.isBlocked(blockerId, blockedId));
     }
 
+    @Test
+    void block_doesNotPersistBlockWhenBlockSaveFails() {
+        FailingTrustSafetyStorage trustSafetyStorage = new FailingTrustSafetyStorage();
+        TestStorages.Communications communications = new TestStorages.Communications();
+        TestStorages.Interactions interactions = new TestStorages.Interactions(communications);
+        TrustSafetyService service = TrustSafetyService.builder(trustSafetyStorage, interactions, userStorage, config)
+                .communicationStorage(communications)
+                .build();
+
+        User blocker = createActiveUser("Blocker");
+        User blocked = createActiveUser("Blocked");
+        userStorage.save(blocker);
+        userStorage.save(blocked);
+        interactions.save(Match.create(blocker.getId(), blocked.getId()));
+        communications.saveConversation(Conversation.create(blocker.getId(), blocked.getId()));
+
+        UUID blockerId = blocker.getId();
+        UUID blockedId = blocked.getId();
+
+        assertThrows(RuntimeException.class, () -> service.block(blockerId, blockedId));
+        assertFalse(trustSafetyStorage.isBlocked(blockerId, blockedId));
+
+        Match persistedMatch =
+                interactions.get(Match.generateId(blockerId, blockedId)).orElseThrow();
+        assertEquals(Match.MatchState.ACTIVE, persistedMatch.getState());
+
+        Conversation conversation =
+                communications.getConversationByUsers(blockerId, blockedId).orElseThrow();
+        assertTrue(conversation.isVisibleTo(blockerId));
+        assertTrue(conversation.isVisibleTo(blockedId));
+        assertNull(conversation.getUserAArchivedAt());
+        assertNull(conversation.getUserBArchivedAt());
+    }
+
+    @Test
+    void block_doesNotPersistPartialStateWhenConversationArchiveFails() {
+        TestStorages.TrustSafety trustSafetyStorage = new TestStorages.TrustSafety();
+        FailingArchiveCommunications communications = new FailingArchiveCommunications();
+        TestStorages.Interactions interactions = new TestStorages.Interactions(communications);
+        TrustSafetyService service = TrustSafetyService.builder(trustSafetyStorage, interactions, userStorage, config)
+                .communicationStorage(communications)
+                .build();
+
+        User blocker = createActiveUser("Blocker");
+        User blocked = createActiveUser("Blocked");
+        userStorage.save(blocker);
+        userStorage.save(blocked);
+        interactions.save(Match.create(blocker.getId(), blocked.getId()));
+        communications.saveConversation(Conversation.create(blocker.getId(), blocked.getId()));
+
+        UUID blockerId = blocker.getId();
+        UUID blockedId = blocked.getId();
+
+        assertThrows(RuntimeException.class, () -> service.block(blockerId, blockedId));
+        assertFalse(trustSafetyStorage.isBlocked(blockerId, blockedId));
+
+        Match persistedMatch =
+                interactions.get(Match.generateId(blockerId, blockedId)).orElseThrow();
+        assertEquals(Match.MatchState.ACTIVE, persistedMatch.getState());
+
+        Conversation conversation =
+                communications.getConversationByUsers(blockerId, blockedId).orElseThrow();
+        assertTrue(conversation.isVisibleTo(blockerId));
+        assertTrue(conversation.isVisibleTo(blockedId));
+        assertNull(conversation.getUserAArchivedAt());
+        assertNull(conversation.getUserBArchivedAt());
+    }
+
+    @Test
+    void block_doesNotPersistPartialStateWhenConversationVisibilityFails() {
+        TestStorages.TrustSafety trustSafetyStorage = new TestStorages.TrustSafety();
+        FailingVisibilityCommunications communications = new FailingVisibilityCommunications();
+        TestStorages.Interactions interactions = new TestStorages.Interactions(communications);
+        TrustSafetyService service = TrustSafetyService.builder(trustSafetyStorage, interactions, userStorage, config)
+                .communicationStorage(communications)
+                .build();
+
+        User blocker = createActiveUser("Blocker");
+        User blocked = createActiveUser("Blocked");
+        userStorage.save(blocker);
+        userStorage.save(blocked);
+        interactions.save(Match.create(blocker.getId(), blocked.getId()));
+        communications.saveConversation(Conversation.create(blocker.getId(), blocked.getId()));
+
+        UUID blockerId = blocker.getId();
+        UUID blockedId = blocked.getId();
+
+        assertThrows(RuntimeException.class, () -> service.block(blockerId, blockedId));
+        assertFalse(trustSafetyStorage.isBlocked(blockerId, blockedId));
+
+        Match persistedMatch =
+                interactions.get(Match.generateId(blockerId, blockedId)).orElseThrow();
+        assertEquals(Match.MatchState.ACTIVE, persistedMatch.getState());
+
+        Conversation conversation =
+                communications.getConversationByUsers(blockerId, blockedId).orElseThrow();
+        assertTrue(conversation.isVisibleTo(blockerId));
+        assertTrue(conversation.isVisibleTo(blockedId));
+        assertNull(conversation.getUserAArchivedAt());
+        assertNull(conversation.getUserBArchivedAt());
+    }
+
     private static User createActiveUser(String name) {
         return User.StorageBuilder.create(UUID.randomUUID(), name, AppClock.now())
                 .bio("Test user")
@@ -144,6 +248,28 @@ class TrustSafetyServiceSecurityTest {
         public void update(Match match) {
             super.update(match);
             throw new RuntimeException("match update failed");
+        }
+    }
+
+    private static final class FailingTrustSafetyStorage extends TestStorages.TrustSafety {
+        @Override
+        public void save(datingapp.core.connection.ConnectionModels.Block block) {
+            throw new RuntimeException("block save failed");
+        }
+    }
+
+    private static final class FailingArchiveCommunications extends TestStorages.Communications {
+        @Override
+        public void archiveConversation(
+                String conversationId, UUID userId, datingapp.core.model.Match.MatchArchiveReason reason) {
+            throw new RuntimeException("conversation archive failed");
+        }
+    }
+
+    private static final class FailingVisibilityCommunications extends TestStorages.Communications {
+        @Override
+        public void setConversationVisibility(String conversationId, UUID userId, boolean visible) {
+            throw new RuntimeException("conversation visibility update failed");
         }
     }
 }

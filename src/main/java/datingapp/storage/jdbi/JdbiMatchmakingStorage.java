@@ -48,10 +48,18 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
     private static final String PARAM_ENDED_BY = "endedBy";
     private static final String PARAM_END_REASON = "endReason";
     private static final String PARAM_DELETED_AT = "deletedAt";
+    private static final String PARAM_CONVERSATION_ID = "conversationId";
+    private static final String PARAM_ARCHIVED_AT_A = "archivedAtA";
+    private static final String PARAM_ARCHIVE_REASON_A = "archiveReasonA";
+    private static final String PARAM_ARCHIVED_AT_B = "archivedAtB";
+    private static final String PARAM_ARCHIVE_REASON_B = "archiveReasonB";
+    private static final String PARAM_VISIBLE_TO_USER_A = "visibleToUserA";
+    private static final String PARAM_VISIBLE_TO_USER_B = "visibleToUserB";
     private static final String COLUMN_WHO_LIKES = "who_likes";
     private static final String COLUMN_CREATED_AT = "created_at";
     private static final String ERR_USER_ID_NULL = "userId cannot be null";
     private static final String ERR_UPDATED_MATCH_NULL = "updatedMatch cannot be null";
+    private static final String ERR_ARCHIVED_CONVERSATION_NULL = "archivedConversation cannot be null";
 
     private static final String SQL_ACTIVE_LIKE_EXISTS = """
             SELECT EXISTS (
@@ -160,6 +168,14 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
                 archive_reason_b = :archiveReasonB
                         WHERE id = :conversationId
                             AND deleted_at IS NULL
+            """;
+
+    private static final String SQL_UPDATE_CONVERSATION_VISIBILITY = """
+            UPDATE conversations
+            SET visible_to_user_a = :visibleToUserA,
+                visible_to_user_b = :visibleToUserB
+            WHERE id = :conversationId
+                AND deleted_at IS NULL
             """;
 
     private static final String SQL_INSERT_NOTIFICATION = """
@@ -492,6 +508,11 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
     }
 
     @Override
+    public boolean supportsAtomicBlockTransition() {
+        return true;
+    }
+
+    @Override
     public boolean acceptFriendZoneTransition(
             Match updatedMatch, FriendRequest acceptedRequest, Notification notification) {
         Objects.requireNonNull(updatedMatch, ERR_UPDATED_MATCH_NULL);
@@ -541,7 +562,7 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
     public boolean gracefulExitTransition(
             Match updatedMatch, Optional<Conversation> archivedConversation, Notification notification) {
         Objects.requireNonNull(updatedMatch, ERR_UPDATED_MATCH_NULL);
-        Objects.requireNonNull(archivedConversation, "archivedConversation cannot be null");
+        Objects.requireNonNull(archivedConversation, ERR_ARCHIVED_CONVERSATION_NULL);
 
         try {
             return jdbi.inTransaction(handle -> {
@@ -565,11 +586,11 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
                 if (archivedConversation.isPresent()) {
                     Conversation conversation = archivedConversation.get();
                     int conversationRows = handle.createUpdate(SQL_ARCHIVE_CONVERSATION)
-                            .bind("conversationId", conversation.getId())
-                            .bind("archivedAtA", conversation.getUserAArchivedAt())
-                            .bind("archiveReasonA", conversation.getUserAArchiveReason())
-                            .bind("archivedAtB", conversation.getUserBArchivedAt())
-                            .bind("archiveReasonB", conversation.getUserBArchiveReason())
+                            .bind(PARAM_CONVERSATION_ID, conversation.getId())
+                            .bind(PARAM_ARCHIVED_AT_A, conversation.getUserAArchivedAt())
+                            .bind(PARAM_ARCHIVE_REASON_A, conversation.getUserAArchiveReason())
+                            .bind(PARAM_ARCHIVED_AT_B, conversation.getUserBArchivedAt())
+                            .bind(PARAM_ARCHIVE_REASON_B, conversation.getUserBArchiveReason())
                             .execute();
                     if (conversationRows != 1) {
                         throw new StorageException("Failed to archive conversation atomically");
@@ -591,7 +612,7 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
     @Override
     public boolean unmatchTransition(Match updatedMatch, Optional<Conversation> archivedConversation) {
         Objects.requireNonNull(updatedMatch, ERR_UPDATED_MATCH_NULL);
-        Objects.requireNonNull(archivedConversation, "archivedConversation cannot be null");
+        Objects.requireNonNull(archivedConversation, ERR_ARCHIVED_CONVERSATION_NULL);
 
         try {
             return jdbi.inTransaction(handle -> {
@@ -621,11 +642,11 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
                 if (archivedConversation.isPresent()) {
                     Conversation conversation = archivedConversation.get();
                     int conversationRows = handle.createUpdate(SQL_ARCHIVE_CONVERSATION)
-                            .bind("conversationId", conversation.getId())
-                            .bind("archivedAtA", conversation.getUserAArchivedAt())
-                            .bind("archiveReasonA", conversation.getUserAArchiveReason())
-                            .bind("archivedAtB", conversation.getUserBArchivedAt())
-                            .bind("archiveReasonB", conversation.getUserBArchiveReason())
+                            .bind(PARAM_CONVERSATION_ID, conversation.getId())
+                            .bind(PARAM_ARCHIVED_AT_A, conversation.getUserAArchivedAt())
+                            .bind(PARAM_ARCHIVE_REASON_A, conversation.getUserAArchiveReason())
+                            .bind(PARAM_ARCHIVED_AT_B, conversation.getUserBArchivedAt())
+                            .bind(PARAM_ARCHIVE_REASON_B, conversation.getUserBArchiveReason())
                             .execute();
                     if (conversationRows != 1) {
                         throw new StorageException("Failed to archive conversation during atomic unmatch");
@@ -638,6 +659,84 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
             throw e;
         } catch (Exception e) {
             throw new StorageException("Atomic unmatch transition failed", e);
+        }
+    }
+
+    @Override
+    public boolean blockTransition(
+            UUID blockerId, UUID blockedId, Optional<Match> updatedMatch, Optional<Conversation> archivedConversation) {
+        Objects.requireNonNull(blockerId, "blockerId cannot be null");
+        Objects.requireNonNull(blockedId, "blockedId cannot be null");
+        Objects.requireNonNull(updatedMatch, ERR_UPDATED_MATCH_NULL);
+        Objects.requireNonNull(archivedConversation, ERR_ARCHIVED_CONVERSATION_NULL);
+
+        try {
+            return jdbi.inTransaction(handle -> {
+                if (!persistBlockMatch(handle, updatedMatch)) {
+                    return false;
+                }
+
+                persistBlockedConversation(handle, archivedConversation);
+                return true;
+            });
+        } catch (StorageException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new StorageException("Atomic block transition failed", e);
+        }
+    }
+
+    private static boolean persistBlockMatch(org.jdbi.v3.core.Handle handle, Optional<Match> updatedMatch) {
+        if (updatedMatch.isEmpty()) {
+            return true;
+        }
+
+        Match match = updatedMatch.get();
+        int matchRows;
+        try (var update = handle.createUpdate(SQL_UPDATE_MATCH_TRANSITION)) {
+            matchRows = update.bind(PARAM_ID, match.getId())
+                    .bind(PARAM_STATE, match.getState().name())
+                    .bind(PARAM_UPDATED_AT, match.getUpdatedAt())
+                    .bind(PARAM_ENDED_AT, match.getEndedAt())
+                    .bind(PARAM_ENDED_BY, match.getEndedBy())
+                    .bind(
+                            PARAM_END_REASON,
+                            match.getEndReason() != null ? match.getEndReason().name() : null)
+                    .bind(PARAM_DELETED_AT, match.getDeletedAt())
+                    .execute();
+        }
+        return matchRows == 1;
+    }
+
+    private static void persistBlockedConversation(
+            org.jdbi.v3.core.Handle handle, Optional<Conversation> archivedConversation) {
+        if (archivedConversation.isEmpty()) {
+            return;
+        }
+
+        Conversation conversation = archivedConversation.get();
+        int conversationRows;
+        try (var update = handle.createUpdate(SQL_ARCHIVE_CONVERSATION)) {
+            conversationRows = update.bind(PARAM_CONVERSATION_ID, conversation.getId())
+                    .bind(PARAM_ARCHIVED_AT_A, conversation.getUserAArchivedAt())
+                    .bind(PARAM_ARCHIVE_REASON_A, conversation.getUserAArchiveReason())
+                    .bind(PARAM_ARCHIVED_AT_B, conversation.getUserBArchivedAt())
+                    .bind(PARAM_ARCHIVE_REASON_B, conversation.getUserBArchiveReason())
+                    .execute();
+        }
+        if (conversationRows != 1) {
+            throw new StorageException("Failed to archive conversation atomically during block transition");
+        }
+
+        int visibilityRows;
+        try (var update = handle.createUpdate(SQL_UPDATE_CONVERSATION_VISIBILITY)) {
+            visibilityRows = update.bind(PARAM_CONVERSATION_ID, conversation.getId())
+                    .bind(PARAM_VISIBLE_TO_USER_A, conversation.isVisibleToUserA())
+                    .bind(PARAM_VISIBLE_TO_USER_B, conversation.isVisibleToUserB())
+                    .execute();
+        }
+        if (visibilityRows != 1) {
+            throw new StorageException("Failed to update conversation visibility atomically during block transition");
         }
     }
 

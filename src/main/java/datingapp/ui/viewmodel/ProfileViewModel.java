@@ -357,10 +357,10 @@ public class ProfileViewModel extends BaseViewModel {
         saveAsync(null);
     }
 
-    public void saveAsync(Consumer<Boolean> onComplete) {
+    public void saveAsync(Consumer<SaveOutcome> onComplete) {
         if (isDisposed()) {
             logWarn("ProfileViewModel is disposed; skipping save");
-            completeSave(onComplete, false);
+            completeSave(onComplete, SaveOutcome.FAILED);
             return;
         }
         if (saving.get()) {
@@ -371,7 +371,7 @@ public class ProfileViewModel extends BaseViewModel {
         User currentUser = session.getCurrentUser();
         if (currentUser == null) {
             logWarn("No current user to save");
-            completeSave(onComplete, false);
+            completeSave(onComplete, SaveOutcome.FAILED);
             return;
         }
 
@@ -381,7 +381,7 @@ public class ProfileViewModel extends BaseViewModel {
         } catch (Exception e) {
             logError("Failed to prepare profile draft", e);
             notifyError(SAVE_PROFILE_ERROR, e);
-            completeSave(onComplete, false);
+            completeSave(onComplete, SaveOutcome.FAILED);
             return;
         }
 
@@ -390,7 +390,7 @@ public class ProfileViewModel extends BaseViewModel {
         asyncScope.runFireAndForget("profile-save", () -> persistProfileInBackground(draftUser, onComplete));
     }
 
-    private void persistProfileInBackground(User draftUser, Consumer<Boolean> onComplete) {
+    private void persistProfileInBackground(User draftUser, Consumer<SaveOutcome> onComplete) {
         SaveOperationResult result;
         try {
             if (isDisposed()) {
@@ -419,7 +419,8 @@ public class ProfileViewModel extends BaseViewModel {
         }
 
         User savedUser = saveResult.data().user();
-        return SaveOperationResult.success(savedUser);
+        SaveOutcome outcome = resolveSaveOutcome(savedUser);
+        return SaveOperationResult.success(savedUser, outcome);
     }
 
     private SaveOperationResult persistProfileViaMutationUseCase(User user) {
@@ -431,7 +432,8 @@ public class ProfileViewModel extends BaseViewModel {
         }
 
         User savedUser = saveResult.data().user();
-        return SaveOperationResult.success(savedUser);
+        SaveOutcome outcome = resolveSaveOutcome(savedUser);
+        return SaveOperationResult.success(savedUser, outcome);
     }
 
     private SaveOperationResult persistProfileLegacy(User user) {
@@ -445,30 +447,37 @@ public class ProfileViewModel extends BaseViewModel {
             return SaveOperationResult.failure(new IllegalStateException(PROFILE_EDITOR_INACTIVE));
         }
 
-        return SaveOperationResult.success(user);
+        SaveOutcome outcome = resolveSaveOutcome(user);
+        return SaveOperationResult.success(user, outcome);
     }
 
-    private void applySaveOperationResult(SaveOperationResult result, Consumer<Boolean> onComplete) {
+    private static SaveOutcome resolveSaveOutcome(User user) {
+        return user != null && user.getState() == User.UserState.ACTIVE
+                ? SaveOutcome.ACTIVATED
+                : SaveOutcome.SAVED_DRAFT;
+    }
+
+    private void applySaveOperationResult(SaveOperationResult result, Consumer<SaveOutcome> onComplete) {
         saving.set(false);
         if (isDisposed()) {
-            completeSave(onComplete, false);
+            completeSave(onComplete, SaveOutcome.FAILED);
             return;
         }
 
         if (!result.success()) {
             notifyError(SAVE_PROFILE_ERROR, result.error());
-            completeSave(onComplete, false);
+            completeSave(onComplete, SaveOutcome.FAILED);
             return;
         }
 
         updateSessionAndCompletion(result.savedUser());
         logInfo("Profile saved successfully");
-        completeSave(onComplete, true);
+        completeSave(onComplete, result.outcome());
     }
 
-    private void completeSave(Consumer<Boolean> onComplete, boolean success) {
+    private void completeSave(Consumer<SaveOutcome> onComplete, SaveOutcome outcome) {
         if (onComplete != null) {
-            onComplete.accept(success);
+            onComplete.accept(outcome);
         }
     }
 
@@ -571,12 +580,13 @@ public class ProfileViewModel extends BaseViewModel {
         userStore.save(user);
     }
 
-    private void attemptActivation(User user) {
+    private ActivationResult attemptActivation(User user) {
         ActivationResult activation = activationPolicy.tryActivate(user);
         if (activation.activated()) {
             userStore.save(user);
             logInfo("User {} activated after profile completion", user.getName());
         }
+        return activation;
     }
 
     private void updateSessionAndCompletion(User user) {
@@ -1288,6 +1298,12 @@ public class ProfileViewModel extends BaseViewModel {
         }
     }
 
+    public enum SaveOutcome {
+        FAILED,
+        SAVED_DRAFT,
+        ACTIVATED
+    }
+
     public record Dependencies(
             UiUserStore userStore,
             ProfileService profileCompletionService,
@@ -1320,13 +1336,13 @@ public class ProfileViewModel extends BaseViewModel {
                 activationPolicy);
     }
 
-    private record SaveOperationResult(boolean success, User savedUser, Exception error) {
-        private static SaveOperationResult success(User savedUser) {
-            return new SaveOperationResult(true, savedUser, null);
+    private record SaveOperationResult(boolean success, User savedUser, SaveOutcome outcome, Exception error) {
+        private static SaveOperationResult success(User savedUser, SaveOutcome outcome) {
+            return new SaveOperationResult(true, savedUser, outcome, null);
         }
 
         private static SaveOperationResult failure(Exception error) {
-            return new SaveOperationResult(false, null, error);
+            return new SaveOperationResult(false, null, SaveOutcome.FAILED, error);
         }
     }
 }

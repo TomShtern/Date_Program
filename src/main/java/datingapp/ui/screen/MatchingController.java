@@ -10,6 +10,7 @@ import datingapp.ui.UiDialogs;
 import datingapp.ui.UiFeedbackService;
 import datingapp.ui.viewmodel.MatchingViewModel;
 import java.net.URL;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Objects;
 import java.util.ResourceBundle;
@@ -136,9 +137,11 @@ public class MatchingController extends BaseController implements Initializable 
     private static final double DRAG_THRESHOLD = 150;
 
     private final MatchingViewModel viewModel;
+    private final ZoneId userTimeZone;
 
-    public MatchingController(MatchingViewModel viewModel) {
+    public MatchingController(MatchingViewModel viewModel, ZoneId userTimeZone) {
         this.viewModel = viewModel;
+        this.userTimeZone = Objects.requireNonNull(userTimeZone, "userTimeZone cannot be null");
     }
 
     @Override
@@ -551,7 +554,7 @@ public class MatchingController extends BaseController implements Initializable 
             return;
         }
 
-        int age = user.getAge(java.time.ZoneId.systemDefault()).orElse(0);
+        int age = user.getAge(userTimeZone).orElse(0);
         nameLabel.setText(user.getName() + ", " + age);
         bioLabel.setText(user.getBio() != null ? user.getBio() : "No bio provided.");
         distanceLabel.setText("📍 " + viewModel.getDistanceDisplay(user));

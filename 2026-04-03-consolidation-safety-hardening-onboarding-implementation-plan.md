@@ -130,6 +130,8 @@ Do not start onboarding before the profile/login boundaries are cleaned up. Do n
 
 ## Task 1: Add boundary-support app-layer seams
 
+> **Status:** ✅ Steps 1-6 completed on 2026-04-03 in the working tree. Focused Task 1 tests passed. Commit step intentionally deferred for now.
+
 **Files:**
 - Create: `src/main/java/datingapp/app/usecase/dashboard/DashboardUseCases.java`
 - Modify: `src/main/java/datingapp/app/usecase/profile/ProfileUseCases.java`
@@ -150,17 +152,18 @@ Do not start onboarding before the profile/login boundaries are cleaned up. Do n
   - aggregated fields for completion text, total matches, unread count, daily status, daily pick summary, achievement summary, and nudge message.
 - Add `ServiceRegistry.getDashboardUseCases()`.
 
-- [ ] **Step 1: Add failing tests for the new app-layer seams**
+- [x] **Step 1: Add failing tests for the new app-layer seams**
   - Add `ProfileUseCasesTest` coverage for batched user lookup.
   - Add `DashboardUseCasesTest` for summary aggregation using existing services/test doubles.
   - Add `ServiceRegistryTest` coverage proving the new use case is wired.
+  - Added focused `ProfileMutationUseCasesTest` coverage for minimal incomplete-user creation semantics.
 
-- [ ] **Step 2: Implement `ProfileUseCases.GetUsersByIdsQuery`**
+- [x] **Step 2: Implement `ProfileUseCases.GetUsersByIdsQuery`**
   - Reuse existing user lookup semantics.
   - Return a stable `Map<UUID, User>` and ignore unknown IDs instead of failing the whole query.
   - Keep the method read-only.
 
-- [ ] **Step 3: Implement `ProfileMutationUseCases.CreateUserCommand`**
+- [x] **Step 3: Implement `ProfileMutationUseCases.CreateUserCommand`**
   - Preserve the current minimal-create semantics already used in `LoginViewModel`:
     - blank bio
     - no photos
@@ -169,16 +172,16 @@ Do not start onboarding before the profile/login boundaries are cleaned up. Do n
     - state remains incomplete until activation policy passes later
   - Move validation and defaulting into the use-case layer, not the controller/viewmodel.
 
-- [ ] **Step 4: Implement `DashboardUseCases`**
+- [x] **Step 4: Implement `DashboardUseCases`**
   - Aggregate exactly the data `DashboardViewModel` already needs.
   - Do not add UI formatting beyond what the ViewModel already expects.
   - Keep this class app-layer only; it may orchestrate services but must not import JavaFX types.
 
-- [ ] **Step 5: Wire `DashboardUseCases` through `ServiceRegistry`**
+- [x] **Step 5: Wire `DashboardUseCases` through `ServiceRegistry`**
   - Instantiate it once in the registry.
   - Expose a getter and keep naming aligned with existing `get*UseCases()` methods.
 
-- [ ] **Step 6: Run targeted tests**
+- [x] **Step 6: Run targeted tests**
 
 Run:
 `mvn --% -Dcheckstyle.skip=true -Dtest=ProfileUseCasesTest,DashboardUseCasesTest,ServiceRegistryTest test`
@@ -186,6 +189,10 @@ Run:
 Expected:
 - new tests pass
 - no unrelated constructor wiring regressions
+
+Observed:
+- `mvn --% -Dcheckstyle.skip=true -Dtest=ProfileUseCasesTest,ProfileMutationUseCasesTest,DashboardUseCasesTest,ServiceRegistryTest test` ✅
+- Result: **51 tests run, 0 failures, 0 errors, 0 skipped**
 
 - [ ] **Step 7: Commit**
 
@@ -195,6 +202,8 @@ Suggested commit message:
 ---
 
 ## Task 2: Migrate `ProfileHandler` and `DashboardViewModel` onto the new seams
+
+> **Status:** ✅ Steps 1-5 completed on 2026-04-03 in the working tree. Focused Task 2 tests passed. Commit step intentionally deferred for now.
 
 **Files:**
 - Modify: `src/main/java/datingapp/app/cli/ProfileHandler.java`
@@ -213,30 +222,34 @@ Suggested commit message:
   - an app-layer mutation for dealbreaker persistence instead of `userStorage.save(currentUser)`
 - `DashboardViewModel` must depend on `DashboardUseCases`, not directly on `RecommendationService`, `AchievementService`, `ConnectionService`, `ProfileService`, or `UiMatchDataAccess`.
 
-- [ ] **Step 1: Add failing characterization tests**
+- [x] **Step 1: Add failing characterization tests**
   - `ProfileHandlerTest` should prove create/select/note subject lookup/dealbreaker save go through the use-case layer.
   - `DashboardViewModelTest` should prove summary fields come from `DashboardUseCases`, not direct service composition.
 
-- [ ] **Step 2: Refactor `ProfileHandler`**
+- [x] **Step 2: Refactor `ProfileHandler`**
   - Remove direct `UserStorage` use from user creation and selection paths.
   - Replace note subject per-ID lookups with batched `getUsersByIds(...)` where practical.
   - Preserve existing CLI prompts and output text unless a behavior change is intentional.
 
-- [ ] **Step 3: Refactor `DashboardViewModel`**
+- [x] **Step 3: Refactor `DashboardViewModel`**
   - Replace direct service dependencies with one `DashboardUseCases` dependency.
   - Keep existing observable properties and UI-facing strings stable.
 
-- [ ] **Step 4: Update `ViewModelFactory`**
+- [x] **Step 4: Update `ViewModelFactory`**
   - Inject `DashboardUseCases` into `DashboardViewModel`.
   - Keep factory cache/reset behavior unchanged.
 
-- [ ] **Step 5: Run targeted tests**
+- [x] **Step 5: Run targeted tests**
 
 Run:
 `mvn --% -Dcheckstyle.skip=true -Dtest=ProfileHandlerTest,DashboardViewModelTest,ViewModelFactoryTest test`
 
 Expected:
 - CLI and dashboard tests pass with no direct-storage assumptions left in the modified code paths
+
+Observed:
+- `mvn --% -Dcheckstyle.skip=true -Dtest=ProfileHandlerTest,DashboardViewModelTest,ViewModelFactoryTest test` ✅
+- Result: **28 tests run, 0 failures, 0 errors, 0 skipped**
 
 - [ ] **Step 6: Commit**
 
@@ -246,6 +259,8 @@ Suggested commit message:
 ---
 
 ## Task 3: Refactor `MatchesViewModel` to consume app-layer reads only
+
+> **Status:** ✅ Steps 1-5 completed on 2026-04-03 in the working tree. Focused Task 3 tests passed. Commit step intentionally deferred for now.
 
 **Files:**
 - Modify: `src/main/java/datingapp/ui/viewmodel/MatchesViewModel.java`
@@ -263,7 +278,7 @@ Suggested commit message:
 - Reuse `MatchingUseCases.listPagedMatches(...)` and `pendingLikers(...)`.
 - Reuse `ProfileUseCases.getUsersByIds(...)` for counterpart lookup.
 
-- [ ] **Step 1: Add failing tests**
+- [x] **Step 1: Add failing tests**
   - `MatchesViewModelTest` should prove the viewmodel can render:
     - paged match cards
     - pending likers
@@ -271,20 +286,24 @@ Suggested commit message:
     - counterpart names/ages
     using use cases instead of `UiMatchDataAccess` / `UiUserStore` reads.
 
-- [ ] **Step 2: Add `SocialUseCases.listBlockedUsers(...)`**
+- [x] **Step 2: Add `SocialUseCases.listBlockedUsers(...)`**
   - Use existing `TrustSafetyService.getBlockedUsers(...)` internally.
   - Return an app-layer result type, not raw storage DTOs.
 
-- [ ] **Step 3: Refactor `MatchesViewModel`**
+- [x] **Step 3: Refactor `MatchesViewModel`**
   - Remove production-path fallback reads from `UiMatchDataAccess` and `UiUserStore`.
   - Build UI cards from `MatchingUseCases`, `ProfileUseCases`, and `SocialUseCases` only.
   - Keep note-related functionality untouched unless it is directly affected.
 
-- [ ] **Step 4: Update `ViewModelFactory`**
+  Notes:
+  - Added a small `MatchingUseCases.sentLikes(...)` query to eliminate the remaining sent-like adapter read gap.
+  - Corrected `MatchingUseCases.listPagedMatches(...)` to page **active** matches so the matches screen contract stays truthful after unmatch transitions.
+
+- [x] **Step 4: Update `ViewModelFactory`**
   - Inject the newly required use-case slices.
   - Remove raw adapter dependencies from the production constructor path where possible.
 
-- [ ] **Step 5: Run targeted tests**
+- [x] **Step 5: Run targeted tests**
 
 Run:
 `mvn --% -Dcheckstyle.skip=true -Dtest=MatchesViewModelTest,ViewModelFactoryTest,SocialUseCasesTest test`
@@ -292,6 +311,10 @@ Run:
 Expected:
 - match list rendering and pending liker behavior remain stable
 - blocking/friend-zone/unmatch actions still work
+
+Observed:
+- `mvn --% -Dcheckstyle.skip=true -Dtest=MatchesViewModelTest,ViewModelFactoryTest,SocialUseCasesTest test` ✅
+- Result: **38 tests run, 0 failures, 0 errors, 0 skipped**
 
 - [ ] **Step 6: Commit**
 
@@ -302,30 +325,36 @@ Suggested commit message:
 
 ## Task 4: Keep the remaining intentional boundary exceptions explicit
 
+> **Status:** ✅ Steps 1-4 completed on 2026-04-03 in the working tree. Focused Task 4 test passed. Commit step intentionally deferred for now.
+
 **Files:**
 - Modify: `src/main/java/datingapp/app/api/RestApiServer.java`
 - Test: `src/test/java/datingapp/app/api/RestApiReadRoutesTest.java`
 
 **Purpose:** Do not let cleanup work accidentally blur the existing documented exception around raw candidate reads.
 
-- [ ] **Step 1: Decide and document the scope line**
+- [x] **Step 1: Decide and document the scope line**
   - Keep `/api/users/{id}/candidates` as the deliberate direct-read route for this sprint.
   - Do not replace it unless a new app-layer raw-candidate query is introduced in the same change.
 
-- [ ] **Step 2: Tighten the in-source comment**
+- [x] **Step 2: Tighten the in-source comment**
   - Make the exception explicit and narrow.
   - State that `browseCandidates` remains the app-layer daily-pick flow and `getCandidates` remains the raw projection route.
 
-- [ ] **Step 3: Add or update a regression test**
+- [x] **Step 3: Add or update a regression test**
   - `RestApiReadRoutesTest` should continue to assert the raw candidate route behavior.
 
-- [ ] **Step 4: Run targeted tests**
+- [x] **Step 4: Run targeted tests**
 
 Run:
 `mvn --% -Dcheckstyle.skip=true -Dtest=RestApiReadRoutesTest test`
 
 Expected:
 - the documented exception remains explicit and unchanged
+
+Observed:
+- `mvn --% -Dcheckstyle.skip=true -Dtest=RestApiReadRoutesTest test` ✅
+- Result: **10 tests run, 0 failures, 0 errors, 0 skipped**
 
 - [ ] **Step 5: Commit**
 
@@ -335,6 +364,8 @@ Suggested commit message:
 ---
 
 ## Task 5: Normalize safety use-case boundaries and truthful wording in CLI/JavaFX
+
+> **Status:** ✅ Steps 1-6 completed on 2026-04-03 in the working tree. Focused Task 5 tests passed. Commit step intentionally deferred for now.
 
 **Files:**
 - Modify: `src/main/java/datingapp/app/cli/SafetyHandler.java`
@@ -357,30 +388,30 @@ Suggested commit message:
 - Persisted actions are no longer labeled `[SIMULATED]`.
 - If a blocked-user UI subtitle is not a real timestamp, rename it from `blockedAtLabel` to a truthful name such as `statusLabel`.
 
-- [ ] **Step 1: Add failing tests around wording and delegated flows**
+- [x] **Step 1: Add failing tests around wording and delegated flows**
   - Update or add tests proving:
     - verification start/confirm go through `VerificationUseCases`
     - list blocked users and unblock go through `SocialUseCases`
     - persisted actions no longer advertise simulation
 
-- [ ] **Step 2: Extend `SocialUseCases`**
+- [x] **Step 2: Extend `SocialUseCases`**
   - Add `listBlockedUsers(...)` and `unblockUser(...)` app-layer operations.
   - Keep report and block semantics unchanged.
 
-- [ ] **Step 3: Refactor `SafetyViewModel`**
+- [x] **Step 3: Refactor `SafetyViewModel`**
   - Replace inline verification-code generation and direct user mutation with `VerificationUseCases`.
   - Replace direct `TrustSafetyService` reads/writes with `SocialUseCases` where appropriate.
   - Rename misleading UI fields/messages if timestamps are not actually available.
 
-- [ ] **Step 4: Refactor `SafetyHandler`**
+- [x] **Step 4: Refactor `SafetyHandler`**
   - Route unblock/list-blocked/report/block through use cases.
   - Keep the one truthful local/dev note about verification code delivery if the code is intentionally shown directly.
 
-- [ ] **Step 5: Update `ViewModelFactory` and `SafetyController`**
+- [x] **Step 5: Update `ViewModelFactory` and `SafetyController`**
   - Inject any new dependencies.
   - Keep the controller binding-only; do not move business logic there.
 
-- [ ] **Step 6: Run targeted tests**
+- [x] **Step 6: Run targeted tests**
 
 Run:
 `mvn --% -Dcheckstyle.skip=true -Dtest=SafetyHandlerTest,SafetyViewModelTest,SafetyControllerTest,VerificationUseCasesTest,SocialUseCasesTest test`
@@ -388,6 +419,10 @@ Run:
 Expected:
 - no `[SIMULATED]` text remains for persisted actions
 - CLI and JavaFX use the same underlying flows
+
+Observed:
+- `mvn --% -Dcheckstyle.skip=true -Dtest=SafetyHandlerTest,SafetyViewModelTest,SafetyControllerTest,VerificationUseCasesTest,SocialUseCasesTest test` ✅
+- Result: **54 tests run, 0 failures, 0 errors, 0 skipped**
 
 - [ ] **Step 7: Commit**
 
@@ -397,6 +432,8 @@ Suggested commit message:
 ---
 
 ## Task 6: Add REST safety parity
+
+> **Status:** ✅ Steps 1-5 completed on 2026-04-03 in the working tree. Focused Task 6 tests passed. Commit step intentionally deferred for now.
 
 **Files:**
 - Modify: `src/main/java/datingapp/app/api/RestApiServer.java`
@@ -426,7 +463,7 @@ Suggested commit message:
 **Important response contract note:**
 - Because the current verification flow is local/dev-only and has no external provider, return the generated code only in a clearly named dev-only field such as `devVerificationCode`. Do **not** imply production-safe delivery.
 
-- [ ] **Step 1: Add failing REST tests first**
+- [x] **Step 1: Add failing REST tests first**
   - New verification route tests:
     - start verification success
     - confirm verification success
@@ -436,25 +473,29 @@ Suggested commit message:
     - unblock success
     - unblock forbidden/not-found cases
 
-- [ ] **Step 2: Add DTOs to `RestApiDtos.java`**
+- [x] **Step 2: Add DTOs to `RestApiDtos.java`**
   - Keep naming aligned with the existing DTO style.
   - Reuse current user/match/notification DTO conventions.
 
-- [ ] **Step 3: Add the new routes to `RestApiServer`**
+- [x] **Step 3: Add the new routes to `RestApiServer`**
   - Route list-blocked and unblock through `SocialUseCases`.
   - Route verification start/confirm through `VerificationUseCases`.
   - Keep all identity checks and request validation consistent with the existing REST adapter style.
 
-- [ ] **Step 4: Update DTO and route tests**
+- [x] **Step 4: Update DTO and route tests**
   - Ensure malformed JSON and invalid enum handling remain consistent with existing error responses.
 
-- [ ] **Step 5: Run targeted tests**
+- [x] **Step 5: Run targeted tests**
 
 Run:
 `mvn --% -Dcheckstyle.skip=true -Dtest=RestApiRelationshipRoutesTest,RestApiVerificationRoutesTest,RestApiDtosTest test`
 
 Expected:
 - new routes behave consistently with existing REST error handling and identity rules
+
+Observed:
+- `mvn --% -Dcheckstyle.skip=true -Dtest=RestApiRelationshipRoutesTest,RestApiVerificationRoutesTest,RestApiDtosTest test` ✅
+- Result: **20 tests run, 0 failures, 0 errors, 0 skipped**
 
 - [ ] **Step 6: Commit**
 
@@ -464,6 +505,8 @@ Suggested commit message:
 ---
 
 ## Task 7: Lock down request-guard and identity-policy behavior with direct tests
+
+> **Status:** ✅ Steps 1-3 completed on 2026-04-03 in the working tree. Focused Task 7 tests passed. Commit step intentionally deferred for now.
 
 **Files:**
 - Create: `src/test/java/datingapp/app/api/RestApiRequestGuardsTest.java`
@@ -487,20 +530,24 @@ Suggested commit message:
   - path-param match validation for `id` and `authorId`
   - conversation membership parsing and rejection
 
-- [ ] **Step 1: Add the two new direct test classes**
+- [x] **Step 1: Add the two new direct test classes**
   - Keep them unit-level where possible.
   - Avoid over-relying on reflection now that direct tests exist.
 
-- [ ] **Step 2: Stabilize or update route-level tests if contracts shift**
+- [x] **Step 2: Stabilize or update route-level tests if contracts shift**
   - If response codes become stricter (for example, 400 vs 403), update the route tests intentionally rather than papering over the change.
 
-- [ ] **Step 3: Run targeted tests**
+- [x] **Step 3: Run targeted tests**
 
 Run:
 `mvn --% -Dcheckstyle.skip=true -Dtest=RestApiRequestGuardsTest,RestApiIdentityPolicyTest,RestApiRateLimitTest,RestApiHealthRoutesTest,RestApiPhaseTwoRoutesTest test`
 
 Expected:
 - direct helper behavior is pinned down independent of route smoke tests
+
+Observed:
+- `mvn --% -Dcheckstyle.skip=true -Dtest=RestApiRequestGuardsTest,RestApiIdentityPolicyTest,RestApiRateLimitTest,RestApiHealthRoutesTest,RestApiPhaseTwoRoutesTest test` ✅
+- Result: **21 tests run, 0 failures, 0 errors, 0 skipped**
 
 - [ ] **Step 4: Commit**
 
@@ -510,6 +557,8 @@ Suggested commit message:
 ---
 
 ## Task 8: Harden moderation/blocking atomicity
+
+> **Status:** ✅ Steps 1-6 completed on 2026-04-03 in the working tree. Focused Task 8 tests passed. Commit step intentionally deferred for now.
 
 **Files:**
 - Modify: `src/main/java/datingapp/core/matching/TrustSafetyService.java`
@@ -536,7 +585,7 @@ Suggested commit message:
 - If a non-atomic fallback remains for unsupported storages, it must be explicit, logged, and covered by tests.
 - Keep `report(...)` success semantics explicit: reporting success does not imply follow-up block success unless the block succeeded.
 
-- [ ] **Step 1: Add failing security/atomicity tests**
+- [x] **Step 1: Add failing security/atomicity tests**
   - Add failure injection for:
     - `trustSafetyStorage.save(block)` failure
     - conversation archive failure
@@ -544,27 +593,31 @@ Suggested commit message:
     - report succeeded but follow-up block failed
   - Ensure `TestStorages` can model these failures deterministically.
 
-- [ ] **Step 2: Extend `InteractionStorage` with atomic block-transition methods**
+- [x] **Step 2: Extend `InteractionStorage` with atomic block-transition methods**
   - Follow the same contract style used by existing relationship transition methods.
 
-- [ ] **Step 3: Implement the atomic path in `JdbiMatchmakingStorage`**
+- [x] **Step 3: Implement the atomic path in `JdbiMatchmakingStorage`**
   - Keep transaction rollback semantics correct.
   - Do not return false after partial mutations inside a transaction; throw to force rollback where necessary.
 
-- [ ] **Step 4: Update `TestStorages` to match the new semantics**
+- [x] **Step 4: Update `TestStorages` to match the new semantics**
   - In-memory behavior must stay semantically aligned with the JDBI path.
 
-- [ ] **Step 5: Refactor `TrustSafetyService.block(...)` to use the atomic path**
+- [x] **Step 5: Refactor `TrustSafetyService.block(...)` to use the atomic path**
   - Maintain audit logging.
   - Preserve existing block/report rules.
 
-- [ ] **Step 6: Run targeted tests**
+- [x] **Step 6: Run targeted tests**
 
 Run:
 `mvn --% -Dcheckstyle.skip=true -Dtest=TrustSafetyServiceSecurityTest,TrustSafetyServiceAuditTest,JdbiMatchmakingStorageTransitionAtomicityTest test`
 
 Expected:
 - failures no longer leave partial persisted moderation state
+
+Observed:
+- `mvn --% -Dcheckstyle.skip=true -Dtest=TrustSafetyServiceSecurityTest,TrustSafetyServiceAuditTest,JdbiMatchmakingStorageTransitionAtomicityTest test` ✅
+- Result: **21 tests run, 0 failures, 0 errors, 0 skipped**
 
 - [ ] **Step 7: Commit**
 
@@ -574,6 +627,8 @@ Suggested commit message:
 ---
 
 ## Task 9: Remove remaining runtime `ZoneId.systemDefault()` usage and re-enable the architecture guard
+
+> **Status:** ✅ Steps 1-4 completed on 2026-04-03 in the working tree. Focused Task 9 tests passed. Commit step intentionally deferred for now.
 
 **Files:**
 - Modify: `src/test/java/datingapp/architecture/TimePolicyArchitectureTest.java`
@@ -592,17 +647,17 @@ Suggested commit message:
 - Replace runtime `ZoneId.systemDefault()` usage with `config.safety().userTimeZone()` or an already-injected zone source.
 - Do not introduce a new ad-hoc time source in UI/CLI code.
 
-- [ ] **Step 1: Add or update tests around time-sensitive formatting where needed**
+- [x] **Step 1: Add or update tests around time-sensitive formatting where needed**
   - Pin any changed age/timestamp formatting behavior before modifying the production code.
 
-- [ ] **Step 2: Replace remaining `ZoneId.systemDefault()` call sites**
+- [x] **Step 2: Replace remaining `ZoneId.systemDefault()` call sites**
   - Thread the configured zone through existing helpers or constructors rather than using globals.
 
-- [ ] **Step 3: Remove `@Disabled` from `TimePolicyArchitectureTest`**
+- [x] **Step 3: Remove `@Disabled` from `TimePolicyArchitectureTest`**
   - Keep the allowlist minimal.
   - Update the class comment to reflect the now-enforced state.
 
-- [ ] **Step 4: Run targeted tests**
+- [x] **Step 4: Run targeted tests**
 
 Run:
 `mvn --% -Dcheckstyle.skip=true -Dtest=TimePolicyArchitectureTest,LoginControllerTest,NotesViewModelTest,StatsHandlerTest,MessagingHandlerTest test`
@@ -610,6 +665,10 @@ Run:
 Expected:
 - the architecture test passes without `@Disabled`
 - time formatting remains deterministic
+
+Observed:
+- `mvn --% -Dcheckstyle.skip=true -Dtest=TimePolicyArchitectureTest,NotesViewModelTest,StatsHandlerTest,MessagingHandlerTest,LoginViewModelTest,LoginControllerTest,ProfileViewModelTest,ProfileControllerTest,DashboardViewModelTest test` ✅
+- Result: **64 tests run, 0 failures, 0 errors, 0 skipped**
 
 - [ ] **Step 5: Commit**
 
@@ -619,6 +678,8 @@ Suggested commit message:
 ---
 
 ## Task 10: Add post-login onboarding routing
+
+> **Status:** ✅ Steps 1-4 completed on 2026-04-03 in the working tree. Focused Task 10 tests passed. Commit step intentionally deferred for now.
 
 **Files:**
 - Modify: `src/main/java/datingapp/ui/viewmodel/LoginViewModel.java`
@@ -633,26 +694,30 @@ Suggested commit message:
 - Add a post-login routing helper such as `resolvePostLoginDestination()` or equivalent.
 - Use existing profile readiness truth (`User` state and `ProfileActivationPolicy`) rather than inventing a new heuristic.
 
-- [ ] **Step 1: Add failing tests**
+- [x] **Step 1: Add failing tests**
   - complete user login → `DASHBOARD`
   - incomplete user login → `PROFILE`
   - login still sets `AppSession.currentUser`
 
-- [ ] **Step 2: Add the routing helper to `LoginViewModel`**
+- [x] **Step 2: Add the routing helper to `LoginViewModel`**
   - Reuse the already-injected `ProfileActivationPolicy`.
   - Do not make the controller decide readiness rules itself.
 
-- [ ] **Step 3: Update `LoginController` navigation**
+- [x] **Step 3: Update `LoginController` navigation**
   - After successful login, navigate based on the new helper.
   - Keep the login screen behavior unchanged on failure.
 
-- [ ] **Step 4: Run targeted tests**
+- [x] **Step 4: Run targeted tests**
 
 Run:
 `mvn --% -Dcheckstyle.skip=true -Dtest=LoginViewModelTest,LoginControllerTest test`
 
 Expected:
 - incomplete users are routed to profile immediately after login
+
+Observed:
+- `mvn --% -Dcheckstyle.skip=true -Dtest=TimePolicyArchitectureTest,NotesViewModelTest,StatsHandlerTest,MessagingHandlerTest,LoginViewModelTest,LoginControllerTest,ProfileViewModelTest,ProfileControllerTest,DashboardViewModelTest test` ✅
+- Included Task 10 coverage via `LoginViewModelTest` and `LoginControllerTest`
 
 - [ ] **Step 5: Commit**
 
@@ -662,6 +727,8 @@ Suggested commit message:
 ---
 
 ## Task 11: Make profile save onboarding-aware
+
+> **Status:** ✅ Steps 1-4 completed on 2026-04-03 in the working tree. Focused Task 11 tests passed. Commit step intentionally deferred for now.
 
 **Files:**
 - Modify: `src/main/java/datingapp/ui/viewmodel/ProfileViewModel.java`
@@ -679,26 +746,30 @@ Suggested commit message:
   - save succeeded but profile remains incomplete
   - save succeeded and profile activated
 
-- [ ] **Step 1: Add failing tests**
+- [x] **Step 1: Add failing tests**
   - `ProfileViewModelTest`: save result distinguishes activated vs saved-draft
   - `ProfileControllerTest`: successful incomplete save keeps user on profile; activated save goes to dashboard
   - `ProfileUseCasesTest`: `ProfileCompleted` event only fires when activation succeeds
 
-- [ ] **Step 2: Add the richer save outcome to `ProfileViewModel`**
+- [x] **Step 2: Add the richer save outcome to `ProfileViewModel`**
   - Keep existing observable completion state intact.
   - Do not move activation logic into the controller.
 
-- [ ] **Step 3: Update `ProfileController`**
+- [x] **Step 3: Update `ProfileController`**
   - Activated save → navigate to dashboard
   - Incomplete save → remain on profile and surface completion guidance using existing `completionStatus` / `completionDetails`
 
-- [ ] **Step 4: Run targeted tests**
+- [x] **Step 4: Run targeted tests**
 
 Run:
 `mvn --% -Dcheckstyle.skip=true -Dtest=ProfileViewModelTest,ProfileControllerTest,ProfileUseCasesTest test`
 
 Expected:
 - onboarding completion is based on activation success, not merely save success
+
+Observed:
+- `mvn --% -Dcheckstyle.skip=true -Dtest=ProfileViewModelTest,ProfileControllerTest,ProfileUseCasesTest test` ✅
+- Result: **38 tests run, 0 failures, 0 errors, 0 skipped**
 
 - [ ] **Step 5: Commit**
 
@@ -709,27 +780,33 @@ Suggested commit message:
 
 ## Task 12: Keep dashboard guidance as the soft fallback
 
+> **Status:** ✅ Steps 1-3 completed on 2026-04-03 in the working tree. Focused Task 12 tests passed. Commit step intentionally deferred for now.
+
 **Files:**
 - Modify: `src/main/java/datingapp/ui/viewmodel/DashboardViewModel.java` (only if needed after Task 2)
 - Test: `src/test/java/datingapp/ui/viewmodel/DashboardViewModelTest.java`
 
 **Purpose:** Ensure users who reach the dashboard while still incomplete still get clear guidance, even after onboarding routing is added.
 
-- [ ] **Step 1: Review `DashboardViewModel` after Tasks 2, 10, and 11**
+- [x] **Step 1: Review `DashboardViewModel` after Tasks 2, 10, and 11**
   - Confirm `profileNudgeMessage` remains correct for incomplete users.
   - Confirm completed users do not get stale onboarding nudges.
 
-- [ ] **Step 2: Add or update tests if behavior changed**
+- [x] **Step 2: Add or update tests if behavior changed**
   - incomplete user → non-empty nudge
   - complete user → empty or non-onboarding nudge
 
-- [ ] **Step 3: Run targeted tests**
+- [x] **Step 3: Run targeted tests**
 
 Run:
 `mvn --% -Dcheckstyle.skip=true -Dtest=DashboardViewModelTest test`
 
 Expected:
 - dashboard remains a clean fallback surface, not the primary onboarding driver
+
+Observed:
+- `mvn --% -Dcheckstyle.skip=true -Dtest=TimePolicyArchitectureTest,NotesViewModelTest,StatsHandlerTest,MessagingHandlerTest,LoginViewModelTest,LoginControllerTest,ProfileViewModelTest,ProfileControllerTest,DashboardViewModelTest test` ✅
+- Included Task 12 coverage via `DashboardViewModelTest`
 
 - [ ] **Step 4: Commit**
 
@@ -740,12 +817,14 @@ Suggested commit message:
 
 ## Task 13: Final verification and cleanup pass
 
+> **Status:** ✅ Steps 1-3 completed on 2026-04-03 in the working tree. Final verification and code-review sweep passed. Commit step intentionally deferred for now.
+
 **Files:**
 - Modify only if tests or quality gates expose necessary fixes.
 
 **Purpose:** Prove the full sprint works end to end and leave the repository in a green, understandable state.
 
-- [ ] **Step 1: Run focused regression suites by workstream**
+- [x] **Step 1: Run focused regression suites by workstream**
 
 Boundary:
 `mvn --% -Dcheckstyle.skip=true -Dtest=ProfileHandlerTest,MatchesViewModelTest,DashboardViewModelTest,ViewModelFactoryTest,ProfileUseCasesTest,ServiceRegistryTest test`
@@ -762,7 +841,16 @@ Onboarding:
 Expected:
 - all focused suites pass
 
-- [ ] **Step 2: Run compile/build quality gate**
+Observed:
+- Boundary: `mvn --% -Dcheckstyle.skip=true -Dtest=ProfileHandlerTest,MatchesViewModelTest,DashboardViewModelTest,ViewModelFactoryTest,ProfileUseCasesTest,ServiceRegistryTest test` ✅ — **92 tests run, 0 failures, 0 errors, 0 skipped**
+- Safety/REST parity: `mvn --% -Dcheckstyle.skip=true -Dtest=SafetyHandlerTest,SafetyViewModelTest,SafetyControllerTest,VerificationUseCasesTest,SocialUseCasesTest,RestApiRelationshipRoutesTest,RestApiVerificationRoutesTest test` ✅ — **66 tests run, 0 failures, 0 errors, 0 skipped**
+- Hardening: `mvn --% -Dcheckstyle.skip=true -Dtest=TrustSafetyServiceSecurityTest,TrustSafetyServiceAuditTest,RestApiRequestGuardsTest,RestApiIdentityPolicyTest,TimePolicyArchitectureTest test` ✅ — **21 tests run, 0 failures, 0 errors, 0 skipped**
+- Onboarding: `mvn --% -Dcheckstyle.skip=true -Dtest=LoginViewModelTest,LoginControllerTest,ProfileViewModelTest,ProfileControllerTest,DashboardViewModelTest test` ✅ — **35 tests run, 0 failures, 0 errors, 0 skipped**
+- Additional focused final-regression reruns after full-gate feedback:
+  - `mvn --% -Dcheckstyle.skip=true -Dtest=TrustSafetyServiceTest,NotesControllerTest,MatchesControllerTest test` ✅ — **29 tests run, 0 failures, 0 errors, 0 skipped**
+  - `mvn --% -Dcheckstyle.skip=true -Dtest=LoginViewModelTest,ProfileViewModelTest,ProfileControllerTest,TrustSafetyServiceTest,NotesControllerTest,MatchesControllerTest test` ✅ — **53 tests run, 0 failures, 0 errors, 0 skipped**
+
+- [x] **Step 2: Run compile/build quality gate**
 
 Run:
 `mvn spotless:apply verify`
@@ -771,11 +859,21 @@ Expected:
 - build success
 - formatting, checkstyle, PMD, and JaCoCo all pass
 
-- [ ] **Step 3: Perform a final code review sweep**
+Observed:
+- `mvn spotless:apply verify` ✅
+- Result: **BUILD SUCCESS** with **1701 tests run, 0 failures, 0 errors, 0 skipped**, Checkstyle clean, PMD clean, and JaCoCo gate satisfied.
+
+- [x] **Step 3: Perform a final code review sweep**
   - confirm there are no stale `[SIMULATED]` labels for persisted actions
   - confirm no new direct-storage bypasses were introduced
   - confirm `ZoneId.systemDefault()` is gone from feature code
   - confirm onboarding navigation is understandable and test-covered
+
+Observed:
+- Removed the stale simulation-mode comment in `MainMenuRegistry`.
+- Verified no `[SIMULATED]` matches remain under `src/main/java`.
+- Verified the only remaining `ZoneId.systemDefault()` match in `src/main/java` is the allowed config default in `AppConfig.java`.
+- Confirmed the cleaned onboarding flows are test-covered, including paused-user login routing and already-active profile save behavior.
 
 - [ ] **Step 4: Commit**
 
@@ -788,17 +886,17 @@ Suggested commit message:
 
 Before marking the sprint done, confirm all of the following:
 
-- [ ] `ProfileHandler` no longer creates/selects/saves users through raw `UserStorage` in the cleaned code paths.
-- [ ] `DashboardViewModel` no longer aggregates directly from raw core services.
-- [ ] `MatchesViewModel` no longer uses raw UI adapters for production-path match/block/user reads.
-- [ ] `SafetyViewModel` and `SafetyHandler` use the same app-layer safety and verification seams.
-- [ ] REST exposes blocked-users, unblock, verification-start, and verification-confirm flows.
-- [ ] Direct unit tests exist for `RestApiRequestGuards` and `RestApiIdentityPolicy`.
-- [ ] Blocking no longer leaves partial persisted state on failure paths covered by tests.
-- [ ] `TimePolicyArchitectureTest` is enabled and passing.
-- [ ] Incomplete users go to `PROFILE` after login.
-- [ ] Profile save stays on onboarding until activation succeeds.
-- [ ] `mvn spotless:apply verify` passes.
+- [x] `ProfileHandler` no longer creates/selects/saves users through raw `UserStorage` in the cleaned code paths.
+- [x] `DashboardViewModel` no longer aggregates directly from raw core services.
+- [x] `MatchesViewModel` no longer uses raw UI adapters for production-path match/block/user reads.
+- [x] `SafetyViewModel` and `SafetyHandler` use the same app-layer safety and verification seams.
+- [x] REST exposes blocked-users, unblock, verification-start, and verification-confirm flows.
+- [x] Direct unit tests exist for `RestApiRequestGuards` and `RestApiIdentityPolicy`.
+- [x] Blocking no longer leaves partial persisted state on failure paths covered by tests.
+- [x] `TimePolicyArchitectureTest` is enabled and passing.
+- [x] Incomplete users go to `PROFILE` after login.
+- [x] Profile save stays on onboarding until activation succeeds.
+- [x] `mvn spotless:apply verify` passes.
 
 ---
 

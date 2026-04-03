@@ -10,6 +10,7 @@ import datingapp.core.AppSession;
 import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
 import datingapp.core.testutil.TestStorages;
+import datingapp.ui.NavigationService;
 import datingapp.ui.async.UiAsyncTestSupport;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.LockSupport;
@@ -87,11 +88,57 @@ class LoginViewModelTest {
 
         assertTrue(viewModel.login());
         assertEquals(incomplete, AppSession.getInstance().getCurrentUser());
+        assertEquals(NavigationService.ViewType.PROFILE, viewModel.resolvePostLoginDestination());
         assertEquals(User.UserState.INCOMPLETE, incomplete.getState());
         assertTrue(incomplete.getBio() == null || incomplete.getBio().isBlank());
         assertTrue(incomplete.getPhotoUrls().isEmpty());
         assertTrue(!incomplete.hasLocation());
         assertEquals(null, incomplete.getPacePreferences());
+
+        viewModel.dispose();
+    }
+
+    @Test
+    @DisplayName("login routes complete profiles to dashboard and keeps the session user set")
+    void loginRoutesCompleteProfilesToDashboardAndKeepsTheSessionUserSet() {
+        TestStorages.Users users = new TestStorages.Users();
+        LoginViewModel viewModel = new LoginViewModel(
+                new UiDataAdapters.StorageUiUserStore(users),
+                AppConfig.defaults(),
+                AppSession.getInstance(),
+                new UiAsyncTestSupport.TestUiThreadDispatcher());
+
+        User complete = createUser("Jordan", Gender.MALE);
+        users.save(complete);
+
+        viewModel.setSelectedUser(complete);
+
+        assertTrue(viewModel.login());
+        assertEquals(complete, AppSession.getInstance().getCurrentUser());
+        assertEquals(NavigationService.ViewType.DASHBOARD, viewModel.resolvePostLoginDestination());
+
+        viewModel.dispose();
+    }
+
+    @Test
+    @DisplayName("login routes paused profiles to profile instead of dashboard")
+    void loginRoutesPausedProfilesToProfile() {
+        TestStorages.Users users = new TestStorages.Users();
+        LoginViewModel viewModel = new LoginViewModel(
+                new UiDataAdapters.StorageUiUserStore(users),
+                AppConfig.defaults(),
+                AppSession.getInstance(),
+                new UiAsyncTestSupport.TestUiThreadDispatcher());
+
+        User paused = createUser("Casey", Gender.OTHER);
+        paused.pause();
+        users.save(paused);
+
+        viewModel.setSelectedUser(paused);
+
+        assertTrue(viewModel.login());
+        assertEquals(paused, AppSession.getInstance().getCurrentUser());
+        assertEquals(NavigationService.ViewType.PROFILE, viewModel.resolvePostLoginDestination());
 
         viewModel.dispose();
     }

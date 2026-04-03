@@ -4,6 +4,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import datingapp.app.event.InProcessAppEventBus;
+import datingapp.app.usecase.profile.ProfileUseCases;
 import datingapp.core.AppConfig;
 import datingapp.core.AppSession;
 import datingapp.core.connection.ConnectionModels.Like;
@@ -18,6 +20,8 @@ import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
 import datingapp.core.model.User.UserState;
 import datingapp.core.profile.ProfileService;
+import datingapp.core.profile.ValidationService;
+import datingapp.core.testutil.TestAchievementService;
 import datingapp.core.testutil.TestClock;
 import datingapp.core.testutil.TestStorages;
 import datingapp.core.testutil.TestUserFactory;
@@ -57,6 +61,7 @@ class MatchesViewModelTest {
     private MatchingService matchingService;
     private RecommendationService dailyService;
     private AppConfig config;
+    private datingapp.app.usecase.social.SocialUseCases socialUseCases;
     private MatchesViewModel viewModel;
     private User currentUser;
 
@@ -114,17 +119,33 @@ class MatchesViewModelTest {
                 interactions,
                 users,
                 matchQualityService,
-                new datingapp.app.event.InProcessAppEventBus(),
+                new InProcessAppEventBus(),
                 dailyService);
         TrustSafetyService trustSafetyService = TrustSafetyService.builder(
                         trustSafetyStorage, interactions, users, config, communications)
                 .build();
-        var socialUseCases = new datingapp.app.usecase.social.SocialUseCases(
+        socialUseCases = new datingapp.app.usecase.social.SocialUseCases(
                 new ConnectionService(config, communications, interactions, users), trustSafetyService, communications);
+        ProfileUseCases profileUseCases = new ProfileUseCases(
+                users,
+                profileService,
+                new ValidationService(config),
+                null,
+                TestAchievementService.empty(),
+                config,
+                new datingapp.core.workflow.ProfileActivationPolicy(),
+                new InProcessAppEventBus());
 
         viewModel = new MatchesViewModel(
                 new MatchesViewModel.Dependencies(
-                        matchData, userStore, matchingService, dailyService, matchingUseCases, socialUseCases, config),
+                        matchData,
+                        userStore,
+                        matchingService,
+                        dailyService,
+                        matchingUseCases,
+                        profileUseCases,
+                        socialUseCases,
+                        config),
                 AppSession.getInstance(),
                 new UiAsyncTestSupport.TestUiThreadDispatcher());
         currentUser = createActiveUser("Current");
@@ -394,6 +415,20 @@ class MatchesViewModelTest {
         viewModel.initialize();
 
         assertEquals(0, viewModel.getLikesSent().size(), "Matched users should not appear in likes sent");
+    }
+
+    @Test
+    @DisplayName("refreshLikesSent excludes blocked users from SocialUseCases")
+    void refreshLikesSentExcludesBlockedUsersFromSocialUseCases() {
+        User otherUser = createActiveUser("BlockedUser");
+        users.save(otherUser);
+        interactions.save(Like.create(currentUser.getId(), otherUser.getId(), Like.Direction.LIKE));
+        socialUseCases.blockUser(new datingapp.app.usecase.social.SocialUseCases.RelationshipCommand(
+                datingapp.app.usecase.common.UserContext.ui(currentUser.getId()), otherUser.getId()));
+
+        viewModel.initialize();
+
+        assertEquals(0, viewModel.getLikesSent().size(), "Blocked users should not appear in likes sent");
     }
 
     @Test

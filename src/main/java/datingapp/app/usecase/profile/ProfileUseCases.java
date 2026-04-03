@@ -19,7 +19,11 @@ import datingapp.core.profile.ValidationService;
 import datingapp.core.storage.AccountCleanupStorage;
 import datingapp.core.storage.UserStorage;
 import datingapp.core.workflow.ProfileActivationPolicy;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 
@@ -260,6 +264,39 @@ public class ProfileUseCases {
         }
     }
 
+    public UseCaseResult<Map<UUID, User>> getUsersByIds(GetUsersByIdsQuery query) {
+        if (query == null || query.userIds() == null) {
+            return UseCaseResult.failure(UseCaseError.validation("User IDs are required"));
+        }
+        if (userStorage == null) {
+            return UseCaseResult.failure(UseCaseError.dependency(USER_STORAGE_REQUIRED));
+        }
+
+        try {
+            if (query.userIds().isEmpty()) {
+                return UseCaseResult.success(Map.of());
+            }
+
+            List<UUID> requestedIds =
+                    query.userIds().stream().filter(Objects::nonNull).toList();
+            if (requestedIds.isEmpty()) {
+                return UseCaseResult.success(Map.of());
+            }
+
+            Map<UUID, User> usersById = userStorage.findByIds(Set.copyOf(requestedIds));
+            LinkedHashMap<UUID, User> stableUsers = new LinkedHashMap<>();
+            for (UUID userId : requestedIds) {
+                User user = usersById.get(userId);
+                if (user != null) {
+                    stableUsers.put(userId, user);
+                }
+            }
+            return UseCaseResult.success(Collections.unmodifiableMap(stableUsers));
+        } catch (Exception e) {
+            return UseCaseResult.failure(UseCaseError.internal("Failed to load users: " + e.getMessage()));
+        }
+    }
+
     public UseCaseResult<AchievementSnapshot> getAchievements(AchievementsQuery query) {
         if (query == null) {
             return UseCaseResult.failure(UseCaseError.validation("achievements query must not be null"));
@@ -416,6 +453,8 @@ public class ProfileUseCases {
     public static record UpsertProfileNoteCommand(UserContext context, UUID subjectId, String content) {}
 
     public static record DeleteProfileNoteCommand(UserContext context, UUID subjectId) {}
+
+    public static record GetUsersByIdsQuery(List<UUID> userIds) {}
 
     private static ProfileInsightsUseCases.AchievementsQuery toInsightsQuery(AchievementsQuery query) {
         return new ProfileInsightsUseCases.AchievementsQuery(

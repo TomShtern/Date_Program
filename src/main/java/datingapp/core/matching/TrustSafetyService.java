@@ -3,7 +3,9 @@ package datingapp.core.matching;
 import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
 import datingapp.core.connection.ConnectionModels.Block;
+import datingapp.core.connection.ConnectionModels.Conversation;
 import datingapp.core.connection.ConnectionModels.Report;
+import datingapp.core.model.Match;
 import datingapp.core.model.Match.MatchArchiveReason;
 import datingapp.core.model.User;
 import datingapp.core.model.User.UserState;
@@ -12,6 +14,7 @@ import datingapp.core.storage.InteractionStorage;
 import datingapp.core.storage.TrustSafetyStorage;
 import datingapp.core.storage.UserStorage;
 import datingapp.core.workflow.RelationshipWorkflowPolicy;
+import datingapp.storage.DatabaseManager.StorageException;
 import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.Instant;
@@ -343,14 +346,25 @@ public final class TrustSafetyService {
             return;
         }
 
-        BlockResult blockResult = block(reporterId, reportedUserId);
-        if (!blockResult.success() && logger.isWarnEnabled()) {
-            logger.warn(
-                    "Report succeeded but follow-up block failed (reporterId={}, reportedUserId={}, blockUser={}) with error={}",
-                    reporterId,
-                    reportedUserId,
-                    blockUser,
-                    blockResult.errorMessage());
+        try {
+            BlockResult blockResult = block(reporterId, reportedUserId);
+            if (!blockResult.success() && logger.isWarnEnabled()) {
+                logger.warn(
+                        "Report succeeded but follow-up block failed (reporterId={}, reportedUserId={}, blockUser={}) with error={}",
+                        reporterId,
+                        reportedUserId,
+                        blockUser,
+                        blockResult.errorMessage());
+            }
+        } catch (RuntimeException exception) {
+            if (logger.isWarnEnabled()) {
+                logger.warn(
+                        "Report succeeded but follow-up block failed (reporterId={}, reportedUserId={}, blockUser={})",
+                        reporterId,
+                        reportedUserId,
+                        blockUser,
+                        exception);
+            }
         }
     }
 
@@ -455,42 +469,85 @@ public final class TrustSafetyService {
         return user.copy();
     }
 
-    /**
-     * Updates the match state to BLOCKED if a match exists between the two users,
-     * and archives any existing conversation from the blocker's perspective.
-     * Silently succeeds if no match exists.
-     */
-    private boolean updateMatchStateForBlock(UUID blockerId, UUID blockedId) {
-        boolean[] matchUpdated = {false};
-        interactionStorage.getByUsers(blockerId, blockedId).ifPresent(match -> {
-            if (workflowPolicy.canBlock(match).isAllowed()) {
-                match.block(blockerId);
-                interactionStorage.update(match);
-                matchUpdated[0] = true;
-                if (logger.isInfoEnabled()) {
-                    logger.info("Match {} transitioned to BLOCKED by user {}", match.getId(), blockerId);
-                }
-            }
-        });
+    private static Match copyMatch(Match match) {
+        return new Match(
+                match.getId(),
+                match.getUserA(),
+                match.getUserB(),
+                match.getCreatedAt(),
+                match.getUpdatedAt(),
+                match.getState(),
+                match.getEndedAt(),
+                match.getEndedBy(),
+                match.getEndReason(),
+                match.getDeletedAt());
+    }
 
+    private record BlockTransitionData(Optional<Match> updatedMatch, Optional<Conversation> archivedConversation) {}
+
+    private BlockTransitionData prepareBlockTransition(UUID blockerId, UUID blockedId) {
+        Optional<Match> updatedMatch = interactionStorage
+                .getByUsers(blockerId, blockedId)
+                .filter(match -> workflowPolicy.canBlock(match).isAllowed())
+                .map(TrustSafetyService::copyMatch)
+                .map(match -> {
+                    match.block(blockerId);
+                    return match;
+                });
+
+        Optional<Conversation> archivedConversation = Optional.empty();
         if (communicationStorage != null) {
-            communicationStorage.getConversationByUsers(blockerId, blockedId).ifPresent(convo -> {
-                communicationStorage.archiveConversation(convo.getId(), blockerId, MatchArchiveReason.BLOCK);
-                communicationStorage.setConversationVisibility(convo.getId(), blockerId, false);
+            archivedConversation = communicationStorage
+                    .getConversationByUsers(blockerId, blockedId)
+                    .map(Conversation::copyOf)
+                    .map(conversation -> {
+                        conversation.archive(blockerId, MatchArchiveReason.BLOCK);
+                        conversation.setVisibility(blockerId, false);
+                        return conversation;
+                    });
+        }
+
+        return new BlockTransitionData(updatedMatch, archivedConversation);
+    }
+
+    private void applyBlockTransition(UUID blockerId, UUID blockedId, BlockTransitionData transitionData) {
+        if (interactionStorage.supportsAtomicBlockTransition()) {
+            boolean persisted = interactionStorage.blockTransition(
+                    blockerId, blockedId, transitionData.updatedMatch(), transitionData.archivedConversation());
+            if (!persisted) {
+                throw new StorageException("Atomic block transition could not be persisted");
+            }
+            invalidateCandidateCaches(blockerId, blockedId);
+            return;
+        }
+
+        if (logger.isWarnEnabled()) {
+            logger.warn(
+                    "Interaction storage {} does not support atomic block transitions; using explicit fallback",
+                    interactionStorage.getClass().getSimpleName());
+        }
+
+        transitionData.updatedMatch().ifPresent(interactionStorage::update);
+        if (communicationStorage != null) {
+            transitionData.archivedConversation().ifPresent(conversation -> {
+                communicationStorage.archiveConversation(conversation.getId(), blockerId, MatchArchiveReason.BLOCK);
+                communicationStorage.setConversationVisibility(conversation.getId(), blockerId, false);
             });
         }
 
         invalidateCandidateCaches(blockerId, blockedId);
-        return matchUpdated[0];
+    }
+
+    private void rollbackBlockSave(UUID blockerId, UUID blockedId) {
+        if (!trustSafetyStorage.deleteBlock(blockerId, blockedId) && logger.isWarnEnabled()) {
+            logger.warn("Failed to roll back persisted block for blockerId={} blockedId={}", blockerId, blockedId);
+        }
     }
 
     /**
-     * Blocks a user without filing a report. Updates both the block storage and
-     * any existing match state.
-     *
-     * @param blockerId the user initiating the block
-     * @param blockedId the user being blocked
-     * @return result of the block operation
+     * Updates the match state to BLOCKED if a match exists between the two users,
+     * and archives any existing conversation from the blocker's perspective.
+     * Silently succeeds if no match exists.
      */
     public BlockResult block(UUID blockerId, UUID blockedId) {
         Objects.requireNonNull(blockerId, "blockerId cannot be null");
@@ -538,23 +595,30 @@ public final class TrustSafetyService {
             return new BlockResult(false, "User is already blocked");
         }
 
-        boolean matchUpdated = updateMatchStateForBlock(blockerId, blockedId);
+        BlockTransitionData transitionData = prepareBlockTransition(blockerId, blockedId);
         Block block = Block.create(blockerId, blockedId);
-        trustSafetyStorage.save(block);
 
-        auditModeration(
-                ModerationAuditEvent.Action.BLOCK,
-                ModerationAuditEvent.Outcome.SUCCESS,
-                blockerId,
-                blockedId,
-                contextOf(
-                        AUDIT_KEY_MATCH_UPDATED,
-                        matchUpdated,
-                        AUDIT_KEY_CONVERSATION_STORAGE_CONFIGURED,
-                        communicationStorage != null));
+        try {
+            trustSafetyStorage.save(block);
+            applyBlockTransition(blockerId, blockedId, transitionData);
 
-        logger.info("User {} blocked user {}", blockerId, blockedId);
-        return new BlockResult(true, null);
+            auditModeration(
+                    ModerationAuditEvent.Action.BLOCK,
+                    ModerationAuditEvent.Outcome.SUCCESS,
+                    blockerId,
+                    blockedId,
+                    contextOf(
+                            AUDIT_KEY_MATCH_UPDATED,
+                            transitionData.updatedMatch().isPresent(),
+                            AUDIT_KEY_CONVERSATION_STORAGE_CONFIGURED,
+                            communicationStorage != null));
+
+            logger.info("User {} blocked user {}", blockerId, blockedId);
+            return new BlockResult(true, null);
+        } catch (RuntimeException exception) {
+            rollbackBlockSave(blockerId, blockedId);
+            throw exception;
+        }
     }
 
     public void setCandidateFinder(CandidateFinder candidateFinder) {

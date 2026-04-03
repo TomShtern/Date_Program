@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import datingapp.app.usecase.dashboard.DashboardUseCases;
 import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
 import datingapp.core.AppSession;
@@ -21,7 +22,6 @@ import datingapp.core.testutil.TestStorages;
 import datingapp.ui.JavaFxTestSupport;
 import datingapp.ui.NavigationService;
 import datingapp.ui.viewmodel.DashboardViewModel;
-import datingapp.ui.viewmodel.UiDataAdapters.StorageUiMatchDataAccess;
 import java.lang.reflect.Field;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -97,13 +97,14 @@ class DashboardControllerTest {
         AppSession.getInstance().setCurrentUser(currentUser);
 
         DashboardViewModel viewModel = new DashboardViewModel(
-                new DashboardViewModel.Dependencies(
+                new DashboardViewModel.Dependencies(new DashboardUseCases(
+                        users,
                         dailyService,
-                        new StorageUiMatchDataAccess(interactions, trustSafetyStorage),
+                        interactions,
                         achievementService,
                         messagingService,
                         profileService,
-                        config),
+                        config)),
                 AppSession.getInstance(),
                 JavaFxTestSupport.blockingUiDispatcher());
 
@@ -177,13 +178,14 @@ class DashboardControllerTest {
         AppSession.getInstance().setCurrentUser(currentUser);
 
         DashboardViewModel viewModel = new DashboardViewModel(
-                new DashboardViewModel.Dependencies(
+                new DashboardViewModel.Dependencies(new DashboardUseCases(
+                        users,
                         dailyService,
-                        new StorageUiMatchDataAccess(interactions, trustSafetyStorage),
+                        interactions,
                         achievementService,
                         messagingService,
                         profileService,
-                        config),
+                        config)),
                 AppSession.getInstance(),
                 JavaFxTestSupport.blockingUiDispatcher());
 
@@ -263,13 +265,14 @@ class DashboardControllerTest {
         AppSession.getInstance().setCurrentUser(currentUser);
 
         DashboardViewModel viewModel = new DashboardViewModel(
-                new DashboardViewModel.Dependencies(
+                new DashboardViewModel.Dependencies(new DashboardUseCases(
+                        users,
                         dailyService,
-                        new StorageUiMatchDataAccess(interactions, trustSafetyStorage),
+                        interactions,
                         achievementService,
                         messagingService,
                         profileService,
-                        config),
+                        config)),
                 AppSession.getInstance(),
                 JavaFxTestSupport.blockingUiDispatcher());
 

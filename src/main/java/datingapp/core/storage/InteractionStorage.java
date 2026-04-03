@@ -279,6 +279,14 @@ public interface InteractionStorage {
     }
 
     /**
+     * Indicates whether this storage can execute block transitions atomically
+     * across the touched interaction and conversation rows.
+     */
+    default boolean supportsAtomicBlockTransition() {
+        return false;
+    }
+
+    /**
      * Atomically persists the "accept friend zone" transition (match + request +
      * notification).
      *
@@ -314,6 +322,19 @@ public interface InteractionStorage {
      * operation.
      */
     default boolean unmatchTransition(Match updatedMatch, Optional<Conversation> archivedConversation) {
+        return false;
+    }
+
+    /**
+     * Atomically persists a block transition (match + optional archived
+     * conversation).
+     *
+     * <p>
+     * Default implementation returns {@code false}, signaling unsupported
+     * operation.
+     */
+    default boolean blockTransition(
+            UUID blockerId, UUID blockedId, Optional<Match> updatedMatch, Optional<Conversation> archivedConversation) {
         return false;
     }
 

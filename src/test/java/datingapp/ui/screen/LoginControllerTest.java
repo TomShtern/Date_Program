@@ -6,18 +6,39 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import datingapp.app.event.InProcessAppEventBus;
 import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
 import datingapp.core.AppSession;
+import datingapp.core.ServiceRegistry;
+import datingapp.core.connection.ConnectionService;
+import datingapp.core.matching.CandidateFinder;
+import datingapp.core.matching.CompatibilityCalculator;
+import datingapp.core.matching.DefaultCompatibilityCalculator;
+import datingapp.core.matching.DefaultDailyLimitService;
+import datingapp.core.matching.DefaultDailyPickService;
+import datingapp.core.matching.DefaultStandoutService;
+import datingapp.core.matching.MatchQualityService;
+import datingapp.core.matching.MatchingService;
+import datingapp.core.matching.RecommendationService;
+import datingapp.core.matching.TrustSafetyService;
+import datingapp.core.matching.UndoService;
+import datingapp.core.metrics.ActivityMetricsService;
+import datingapp.core.metrics.DefaultAchievementService;
 import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
 import datingapp.core.profile.MatchPreferences.PacePreferences;
 import datingapp.core.profile.ProfileService;
+import datingapp.core.profile.ValidationService;
 import datingapp.core.testutil.TestStorages;
+import datingapp.core.testutil.TestUserFactory;
 import datingapp.ui.JavaFxTestSupport;
 import datingapp.ui.NavigationService;
 import datingapp.ui.viewmodel.LoginViewModel;
 import datingapp.ui.viewmodel.UiDataAdapters.StorageUiUserStore;
+import datingapp.ui.viewmodel.ViewModelFactory;
+import java.lang.reflect.Field;
+import java.util.Deque;
 import java.util.EnumSet;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -29,8 +50,10 @@ import javafx.scene.control.ListView;
 import javafx.scene.control.Spinner;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.StackPane;
+import javafx.stage.Stage;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -39,15 +62,95 @@ import org.junit.jupiter.api.Timeout;
 @DisplayName("LoginController wiring and filter behavior")
 class LoginControllerTest {
 
+    private static final String LOGIN_FXML = "/fxml/login.fxml";
+    private static final String LOGIN_BUTTON_SELECTOR = "#loginButton";
+
     @BeforeAll
     static void initJfx() throws InterruptedException {
         JavaFxTestSupport.initJfx();
+    }
+
+    @BeforeEach
+    void setUpNavigation() throws Exception {
+        NavigationService navigationService = NavigationService.getInstance();
+        if (navigationService.getRootStack() == null) {
+            ServiceRegistry services = buildTestServiceRegistry();
+            JavaFxTestSupport.runOnFxAndWait(() -> {
+                navigationService.setViewModelFactory(new ViewModelFactory(services, AppSession.getInstance()));
+                navigationService.initialize(new Stage());
+            });
+        }
+        navigationService.resetNavigationState();
     }
 
     @AfterEach
     void tearDown() {
         NavigationService.getInstance().clearHistory();
         AppSession.getInstance().reset();
+    }
+
+    @Test
+    @DisplayName("successful login routes complete users to dashboard")
+    void successfulLoginRoutesCompleteUsersToDashboard() throws Exception {
+        TestStorages.Users users = new TestStorages.Users();
+        AppConfig config = AppConfig.defaults();
+        ProfileService profileService = new ProfileService(users);
+        User activeUser = createActiveUser("Alex", Gender.MALE, EnumSet.of(Gender.FEMALE));
+        users.save(activeUser);
+
+        LoginViewModel viewModel = new LoginViewModel(
+                new StorageUiUserStore(users),
+                config,
+                AppSession.getInstance(),
+                JavaFxTestSupport.blockingUiDispatcher());
+
+        JavaFxTestSupport.LoadedFxml loaded = JavaFxTestSupport.loadFxml(
+                LOGIN_FXML,
+                () -> new LoginController(
+                        viewModel, profileService, config.safety().userTimeZone()));
+        Parent root = loaded.root();
+        Button loginButton = JavaFxTestSupport.lookup(root, LOGIN_BUTTON_SELECTOR, Button.class);
+
+        JavaFxTestSupport.runOnFxAndWait(() -> viewModel.setSelectedUser(activeUser));
+        NavigationService.getInstance().clearHistory();
+        JavaFxTestSupport.runOnFxAndWait(loginButton::fire);
+
+        assertEquals(activeUser, AppSession.getInstance().getCurrentUser());
+        assertEquals(NavigationService.ViewType.DASHBOARD, peekNavigationHistory());
+
+        viewModel.dispose();
+    }
+
+    @Test
+    @DisplayName("successful login routes incomplete users to profile")
+    void successfulLoginRoutesIncompleteUsersToProfile() throws Exception {
+        TestStorages.Users users = new TestStorages.Users();
+        AppConfig config = AppConfig.defaults();
+        ProfileService profileService = new ProfileService(users);
+        User incompleteUser = TestUserFactory.createIncompleteUser("Jamie");
+        users.save(incompleteUser);
+
+        LoginViewModel viewModel = new LoginViewModel(
+                new StorageUiUserStore(users),
+                config,
+                AppSession.getInstance(),
+                JavaFxTestSupport.blockingUiDispatcher());
+
+        JavaFxTestSupport.LoadedFxml loaded = JavaFxTestSupport.loadFxml(
+                LOGIN_FXML,
+                () -> new LoginController(
+                        viewModel, profileService, config.safety().userTimeZone()));
+        Parent root = loaded.root();
+        Button loginButton = JavaFxTestSupport.lookup(root, LOGIN_BUTTON_SELECTOR, Button.class);
+
+        JavaFxTestSupport.runOnFxAndWait(() -> viewModel.setSelectedUser(incompleteUser));
+        NavigationService.getInstance().clearHistory();
+        JavaFxTestSupport.runOnFxAndWait(loginButton::fire);
+
+        assertEquals(incompleteUser, AppSession.getInstance().getCurrentUser());
+        assertEquals(NavigationService.ViewType.PROFILE, peekNavigationHistory());
+
+        viewModel.dispose();
     }
 
     @Test
@@ -66,11 +169,13 @@ class LoginControllerTest {
                 AppSession.getInstance(),
                 JavaFxTestSupport.blockingUiDispatcher());
 
-        JavaFxTestSupport.LoadedFxml loaded =
-                JavaFxTestSupport.loadFxml("/fxml/login.fxml", () -> new LoginController(viewModel, profileService));
+        JavaFxTestSupport.LoadedFxml loaded = JavaFxTestSupport.loadFxml(
+                LOGIN_FXML,
+                () -> new LoginController(
+                        viewModel, profileService, config.safety().userTimeZone()));
         Parent root = loaded.root();
         TextField filterField = JavaFxTestSupport.lookup(root, "#filterField", TextField.class);
-        Button loginButton = JavaFxTestSupport.lookup(root, "#loginButton", Button.class);
+        Button loginButton = JavaFxTestSupport.lookup(root, LOGIN_BUTTON_SELECTOR, Button.class);
         @SuppressWarnings("unchecked")
         ListView<User> userListView = JavaFxTestSupport.lookup(root, "#userListView", ListView.class);
 
@@ -80,8 +185,8 @@ class LoginControllerTest {
                         return JavaFxTestSupport.callOnFxAndWait(
                                         () -> userListView.getItems().size())
                                 == 2;
-                    } catch (InterruptedException e) {
-                        throw new IllegalStateException(e);
+                    } catch (InterruptedException _) {
+                        throw new IllegalStateException("Interrupted while awaiting login list");
                     }
                 },
                 5000));
@@ -98,13 +203,13 @@ class LoginControllerTest {
                                         .getItems()
                                         .getFirst()
                                         .getName()));
-                    } catch (InterruptedException e) {
-                        throw new IllegalStateException(e);
+                    } catch (InterruptedException _) {
+                        throw new IllegalStateException("Interrupted while awaiting filtered login list");
                     }
                 },
                 5000));
 
-        assertEquals(false, JavaFxTestSupport.callOnFxAndWait(loginButton::isDisabled));
+        assertFalse(JavaFxTestSupport.callOnFxAndWait(loginButton::isDisabled));
 
         viewModel.dispose();
     }
@@ -116,35 +221,34 @@ class LoginControllerTest {
         AppConfig config = AppConfig.defaults();
         ProfileService profileService = new ProfileService(users);
 
-        // No users saved - repository is empty
-
         LoginViewModel viewModel = new LoginViewModel(
                 new StorageUiUserStore(users),
                 config,
                 AppSession.getInstance(),
                 JavaFxTestSupport.blockingUiDispatcher());
 
-        JavaFxTestSupport.LoadedFxml loaded =
-                JavaFxTestSupport.loadFxml("/fxml/login.fxml", () -> new LoginController(viewModel, profileService));
+        JavaFxTestSupport.LoadedFxml loaded = JavaFxTestSupport.loadFxml(
+                LOGIN_FXML,
+                () -> new LoginController(
+                        viewModel, profileService, config.safety().userTimeZone()));
         Parent root = loaded.root();
-        Button loginButton = JavaFxTestSupport.lookup(root, "#loginButton", Button.class);
+        Button loginButton = JavaFxTestSupport.lookup(root, LOGIN_BUTTON_SELECTOR, Button.class);
         @SuppressWarnings("unchecked")
         ListView<User> userListView = JavaFxTestSupport.lookup(root, "#userListView", ListView.class);
 
-        // Wait briefly to allow any async initialization
         assertTrue(JavaFxTestSupport.waitUntil(
                 () -> {
                     try {
                         return JavaFxTestSupport.callOnFxAndWait(
                                         () -> userListView.getItems().size())
                                 == 0;
-                    } catch (InterruptedException e) {
-                        throw new IllegalStateException(e);
+                    } catch (InterruptedException _) {
+                        throw new IllegalStateException("Interrupted while awaiting empty user list");
                     }
                 },
                 5000));
 
-        assertEquals(true, JavaFxTestSupport.callOnFxAndWait(loginButton::isDisabled));
+        assertTrue(JavaFxTestSupport.callOnFxAndWait(loginButton::isDisabled));
 
         viewModel.dispose();
     }
@@ -188,6 +292,7 @@ class LoginControllerTest {
 
         Dialog<User> dialog =
                 JavaFxTestSupport.callOnFxAndWait(() -> CreateAccountDialogFactory.create(new StackPane(), viewModel));
+        @SuppressWarnings("unchecked")
         Spinner<Integer> ageSpinner = JavaFxTestSupport.callOnFxAndWait(
                 () -> JavaFxTestSupport.lookup(dialog.getDialogPane(), "#createAccountAgeSpinner", Spinner.class));
 
@@ -233,6 +338,88 @@ class LoginControllerTest {
             }
         }
         return null;
+    }
+
+    private static NavigationService.ViewType peekNavigationHistory() throws Exception {
+        Field field = NavigationService.class.getDeclaredField("navigationHistory");
+        field.setAccessible(true);
+        @SuppressWarnings("unchecked")
+        Deque<NavigationService.ViewType> history =
+                (Deque<NavigationService.ViewType>) field.get(NavigationService.getInstance());
+        return history.peek();
+    }
+
+    private static ServiceRegistry buildTestServiceRegistry() {
+        TestStorages.Users users = new TestStorages.Users();
+        TestStorages.Interactions interactions = new TestStorages.Interactions();
+        TestStorages.Communications communications = new TestStorages.Communications();
+        TestStorages.TrustSafety trustSafety = new TestStorages.TrustSafety();
+        TestStorages.Analytics analytics = new TestStorages.Analytics();
+
+        AppConfig config = AppConfig.defaults();
+        InProcessAppEventBus eventBus = new InProcessAppEventBus();
+        ValidationService validationService = new ValidationService(config);
+
+        CandidateFinder candidateFinder =
+                new CandidateFinder(users, interactions, trustSafety, java.time.ZoneId.of("UTC"));
+        ActivityMetricsService activityMetricsService =
+                new ActivityMetricsService(interactions, trustSafety, analytics, config);
+        ProfileService profileService = new ProfileService(users);
+        CompatibilityCalculator compatibilityCalculator = new DefaultCompatibilityCalculator(config);
+        datingapp.core.matching.DailyLimitService dailyLimitService =
+                new DefaultDailyLimitService(interactions, config);
+        datingapp.core.matching.DailyPickService dailyPickService =
+                new DefaultDailyPickService(analytics, candidateFinder, config);
+        datingapp.core.matching.StandoutService standoutService = new DefaultStandoutService(
+                compatibilityCalculator, users, candidateFinder, new TestStorages.Standouts(), profileService, config);
+        RecommendationService recommendationService =
+                new RecommendationService(dailyLimitService, dailyPickService, standoutService);
+        UndoService undoService = new UndoService(interactions, new TestStorages.Undos(), config);
+        MatchingService matchingService = MatchingService.builder()
+                .interactionStorage(interactions)
+                .trustSafetyStorage(trustSafety)
+                .userStorage(users)
+                .activityMetricsService(activityMetricsService)
+                .dailyService(recommendationService)
+                .undoService(undoService)
+                .candidateFinder(candidateFinder)
+                .build();
+        TrustSafetyService trustSafetyService = TrustSafetyService.builder(
+                        trustSafety, interactions, users, config, communications)
+                .build();
+        ConnectionService connectionService = new ConnectionService(config, communications, interactions, users);
+        MatchQualityService matchQualityService =
+                new MatchQualityService(users, interactions, config, compatibilityCalculator);
+        datingapp.core.profile.LocationService locationService =
+                new datingapp.core.profile.LocationService(validationService);
+        datingapp.core.metrics.AchievementService achievementService =
+                new DefaultAchievementService(config, analytics, interactions, trustSafety, users, profileService);
+
+        return ServiceRegistry.builder()
+                .config(config)
+                .userStorage(users)
+                .interactionStorage(interactions)
+                .communicationStorage(communications)
+                .analyticsStorage(analytics)
+                .trustSafetyStorage(trustSafety)
+                .candidateFinder(candidateFinder)
+                .matchingService(matchingService)
+                .trustSafetyService(trustSafetyService)
+                .activityMetricsService(activityMetricsService)
+                .matchQualityService(matchQualityService)
+                .profileService(profileService)
+                .recommendationService(recommendationService)
+                .dailyLimitService(dailyLimitService)
+                .dailyPickService(dailyPickService)
+                .standoutService(standoutService)
+                .undoService(undoService)
+                .compatibilityCalculator(compatibilityCalculator)
+                .achievementService(achievementService)
+                .connectionService(connectionService)
+                .validationService(validationService)
+                .locationService(locationService)
+                .eventBus(eventBus)
+                .build();
     }
 
     private static User createActiveUser(String name, Gender gender, EnumSet<Gender> interestedIn) {

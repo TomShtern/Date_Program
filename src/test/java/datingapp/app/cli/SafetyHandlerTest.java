@@ -418,6 +418,39 @@ class SafetyHandlerTest {
             // Block should still exist
             assertTrue(trustSafetyStorage.isBlocked(testUser.getId(), blocked.getId()));
         }
+
+        @Test
+        @DisplayName("manageBlockedUsers delegates list and unblock through SocialUseCases")
+        void manageBlockedUsersDelegatesListAndUnblockThroughSocialUseCases() {
+            User blocked = createActiveUser("BlockedUser");
+            userStorage.save(blocked);
+
+            TrustSafetyService trustSafetyService = createTrustSafetyService(AppConfig.defaults(), new SecureRandom());
+            RecordingSocialUseCases socialUseCases = new RecordingSocialUseCases(trustSafetyService, blocked);
+            ProfileUseCases profileUseCases = new ProfileUseCases(
+                    userStorage,
+                    new ProfileService(userStorage),
+                    new ValidationService(AppConfig.defaults()),
+                    null,
+                    TestAchievementService.empty(),
+                    AppConfig.defaults(),
+                    new datingapp.core.workflow.ProfileActivationPolicy(),
+                    new TestEventBus());
+
+            SafetyHandler handler = new SafetyHandler(
+                    trustSafetyService,
+                    socialUseCases,
+                    profileUseCases,
+                    new VerificationUseCases(userStorage, trustSafetyService),
+                    session,
+                    new InputReader(new Scanner(new StringReader("1\ny\n"))),
+                    AppConfig.defaults());
+
+            handler.manageBlockedUsers();
+
+            assertTrue(socialUseCases.listBlockedUsersCalled);
+            assertTrue(socialUseCases.unblockUserCalled);
+        }
     }
 
     @SuppressWarnings("unused")
@@ -571,6 +604,29 @@ class SafetyHandlerTest {
         public UseCaseResult<ConfirmVerificationResult> confirmVerification(ConfirmVerificationCommand command) {
             confirmCalled = true;
             return super.confirmVerification(command);
+        }
+    }
+
+    private static final class RecordingSocialUseCases extends SocialUseCases {
+        private final User blockedUser;
+        private boolean listBlockedUsersCalled;
+        private boolean unblockUserCalled;
+
+        private RecordingSocialUseCases(TrustSafetyService trustSafetyService, User blockedUser) {
+            super(trustSafetyService);
+            this.blockedUser = blockedUser;
+        }
+
+        @Override
+        public UseCaseResult<List<BlockedUserSummary>> listBlockedUsers(ListBlockedUsersQuery query) {
+            listBlockedUsersCalled = true;
+            return UseCaseResult.success(List.of(new BlockedUserSummary(blockedUser.getId(), blockedUser.getName())));
+        }
+
+        @Override
+        public UseCaseResult<Void> unblockUser(RelationshipCommand command) {
+            unblockUserCalled = true;
+            return UseCaseResult.success(null);
         }
     }
 

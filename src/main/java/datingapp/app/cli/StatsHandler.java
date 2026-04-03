@@ -24,34 +24,49 @@ import org.slf4j.LoggerFactory;
 public class StatsHandler implements LoggingSupport {
     private static final Logger logger = LoggerFactory.getLogger(StatsHandler.class);
     private static final String PRESS_ENTER_PROMPT = "Press Enter to return...";
-    private static final DateTimeFormatter DATE_TIME_FORMATTER =
-            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").withZone(ZoneId.systemDefault());
-    private static final DateTimeFormatter DATE_FORMATTER =
-            DateTimeFormatter.ofPattern("yyyy-MM-dd").withZone(ZoneId.systemDefault());
+    private static final String USER_TIME_ZONE_NULL = "userTimeZone cannot be null";
 
     private final ProfileUseCases profileUseCases;
     private final ProfileInsightsUseCases profileInsightsUseCases;
     private final AppSession session;
     private final InputReader inputReader;
+    private final ZoneId userTimeZone;
+    private final DateTimeFormatter dateTimeFormatter;
+    private final DateTimeFormatter dateFormatter;
 
-    public StatsHandler(ProfileInsightsUseCases profileInsightsUseCases, AppSession session, InputReader inputReader) {
+    public StatsHandler(
+            ProfileInsightsUseCases profileInsightsUseCases,
+            AppSession session,
+            InputReader inputReader,
+            ZoneId userTimeZone) {
         this.profileInsightsUseCases =
                 java.util.Objects.requireNonNull(profileInsightsUseCases, "profileInsightsUseCases cannot be null");
         this.profileUseCases = null;
         this.session = java.util.Objects.requireNonNull(session, "session cannot be null");
         this.inputReader = java.util.Objects.requireNonNull(inputReader, "inputReader cannot be null");
+        this.userTimeZone = java.util.Objects.requireNonNull(userTimeZone, USER_TIME_ZONE_NULL);
+        this.dateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").withZone(this.userTimeZone);
+        this.dateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd").withZone(this.userTimeZone);
     }
 
-    public StatsHandler(ProfileUseCases profileUseCases, AppSession session, InputReader inputReader) {
+    public StatsHandler(
+            ProfileUseCases profileUseCases, AppSession session, InputReader inputReader, ZoneId userTimeZone) {
         this.profileUseCases = java.util.Objects.requireNonNull(profileUseCases, "profileUseCases cannot be null");
         this.profileInsightsUseCases = null;
         this.session = java.util.Objects.requireNonNull(session, "session cannot be null");
         this.inputReader = java.util.Objects.requireNonNull(inputReader, "inputReader cannot be null");
+        this.userTimeZone = java.util.Objects.requireNonNull(userTimeZone, USER_TIME_ZONE_NULL);
+        this.dateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").withZone(this.userTimeZone);
+        this.dateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd").withZone(this.userTimeZone);
     }
 
     public static StatsHandler fromServices(ServiceRegistry services, AppSession session, InputReader inputReader) {
         java.util.Objects.requireNonNull(services, "services cannot be null");
-        return new StatsHandler(services.getProfileInsightsUseCases(), session, inputReader);
+        return new StatsHandler(
+                services.getProfileInsightsUseCases(),
+                session,
+                inputReader,
+                services.getConfig().safety().userTimeZone());
     }
 
     @Override
@@ -78,7 +93,7 @@ public class StatsHandler implements LoggingSupport {
             }
 
             UserStats stats = statsResult.data();
-            String computedAt = stats.computedAt() == null ? "N/A" : DATE_TIME_FORMATTER.format(stats.computedAt());
+            String computedAt = stats.computedAt() == null ? "N/A" : dateTimeFormatter.format(stats.computedAt());
             logInfo("  Last updated: {}\n", computedAt);
 
             printActivitySection(stats);
@@ -120,7 +135,7 @@ public class StatsHandler implements LoggingSupport {
                             ua.achievement().getDisplayName(),
                             ua.achievement().getDescription());
                     // Date formatting?
-                    String dateStr = ua.unlockedAt() == null ? "N/A" : DATE_FORMATTER.format(ua.unlockedAt());
+                    String dateStr = ua.unlockedAt() == null ? "N/A" : dateFormatter.format(ua.unlockedAt());
                     logInfo("     (Unlocked: {})", dateStr);
                 }
                 logInfo("");

@@ -7,6 +7,7 @@ import datingapp.ui.viewmodel.NotesViewModel;
 import java.net.URL;
 import java.util.Objects;
 import java.util.ResourceBundle;
+import java.util.UUID;
 import javafx.application.Platform;
 import javafx.beans.binding.Bindings;
 import javafx.fxml.FXML;
@@ -26,7 +27,7 @@ import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 
 /** Controller for the notes browser screen. */
-public final class NotesController extends BaseController implements Initializable {
+public class NotesController extends BaseController implements Initializable {
 
     private static final int NOTE_PREVIEW_MAX_CODE_POINTS = 120;
 
@@ -96,8 +97,12 @@ public final class NotesController extends BaseController implements Initializab
             UiFeedbackService.showInfo("Select a note first, then open it.");
             return;
         }
+        navigateToMatching(entry.userId());
+    }
+
+    protected void navigateToMatching(UUID userId) {
         NavigationService navigationService = NavigationService.getInstance();
-        navigationService.setNavigationContext(NavigationService.ViewType.MATCHING, entry.userId());
+        navigationService.setNavigationContext(NavigationService.ViewType.MATCHING, userId);
         navigationService.navigateTo(NavigationService.ViewType.MATCHING);
     }
 

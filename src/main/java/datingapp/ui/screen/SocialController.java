@@ -49,9 +49,11 @@ public class SocialController extends BaseController implements Initializable {
     private ListView<FriendRequestEntry> requestsListView;
 
     private final SocialViewModel viewModel;
+    private final ZoneId userTimeZone;
 
-    public SocialController(SocialViewModel viewModel) {
+    public SocialController(SocialViewModel viewModel, ZoneId userTimeZone) {
         this.viewModel = viewModel;
+        this.userTimeZone = userTimeZone;
     }
 
     @Override
@@ -81,7 +83,7 @@ public class SocialController extends BaseController implements Initializable {
     }
 
     private ListCell<Notification> createNotificationCell() {
-        return new NotificationListCell(viewModel);
+        return new NotificationListCell(viewModel, userTimeZone);
     }
 
     private ListCell<FriendRequestEntry> createRequestCell() {
@@ -103,8 +105,10 @@ public class SocialController extends BaseController implements Initializable {
         private final Label bodyLabel = new Label();
         private final Label timeLabel = new Label();
         private final Region unreadDot = new Region();
+        private final ZoneId userTimeZone;
 
-        public NotificationListCell(SocialViewModel viewModel) {
+        public NotificationListCell(SocialViewModel viewModel, ZoneId userTimeZone) {
+            this.userTimeZone = userTimeZone;
             unreadDot.setPrefSize(8, 8);
             unreadDot.setMinSize(8, 8);
             unreadDot.setStyle("-fx-background-color: #3b82f6; -fx-background-radius: 4;");
@@ -146,8 +150,7 @@ public class SocialController extends BaseController implements Initializable {
                 titleLabel.setText(notification.title());
                 bodyLabel.setText(notification.message());
 
-                String time =
-                        notification.createdAt().atZone(ZoneId.systemDefault()).format(TIME_FORMAT);
+                String time = notification.createdAt().atZone(userTimeZone).format(TIME_FORMAT);
                 timeLabel.setText(time);
 
                 boolean unread = !notification.isRead();

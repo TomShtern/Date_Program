@@ -297,6 +297,10 @@ public class ProfileController extends BaseController implements Initializable {
         this.formValidator = new ProfileFormValidator(viewModel.getValidationService());
     }
 
+    protected void navigateToDashboard() {
+        NavigationService.getInstance().navigateTo(NavigationService.ViewType.DASHBOARD);
+    }
+
     @Override
     public void initialize(URL location, ResourceBundle resources) {
         viewModel.setErrorHandler(UiFeedbackService::showError);
@@ -742,6 +746,15 @@ public class ProfileController extends BaseController implements Initializable {
         saveStatusLabel.setManaged(true);
     }
 
+    private void showSaveSuccessStatus(String message) {
+        if (saveStatusLabel == null) {
+            return;
+        }
+        saveStatusLabel.setText(message);
+        saveStatusLabel.setVisible(true);
+        saveStatusLabel.setManaged(true);
+    }
+
     private void clearSaveStatus() {
         if (saveStatusLabel == null) {
             return;
@@ -856,14 +869,22 @@ public class ProfileController extends BaseController implements Initializable {
             return;
         }
         clearSaveStatus();
-        viewModel.saveAsync(success -> {
-            if (Boolean.TRUE.equals(success)) {
-                UiFeedbackService.showSuccess("Profile saved!");
-                cleanup();
-                NavigationService.getInstance().navigateTo(NavigationService.ViewType.DASHBOARD);
+        viewModel.saveAsync(outcome -> {
+            if (outcome == null) {
+                showSaveFailureStatus();
                 return;
             }
-            showSaveFailureStatus();
+            switch (outcome) {
+                case FAILED -> showSaveFailureStatus();
+                case SAVED_DRAFT ->
+                    showSaveSuccessStatus("Profile saved. Complete the remaining sections to activate your profile.");
+                case ACTIVATED -> {
+                    showSaveSuccessStatus("Profile saved and activated!");
+                    cleanup();
+                    navigateToDashboard();
+                }
+                default -> showSaveFailureStatus();
+            }
         });
     }
 

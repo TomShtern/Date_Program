@@ -7,6 +7,8 @@ import datingapp.app.usecase.profile.VerificationUseCases;
 import datingapp.app.usecase.profile.VerificationUseCases.ConfirmVerificationCommand;
 import datingapp.app.usecase.profile.VerificationUseCases.StartVerificationCommand;
 import datingapp.app.usecase.social.SocialUseCases;
+import datingapp.app.usecase.social.SocialUseCases.BlockedUserSummary;
+import datingapp.app.usecase.social.SocialUseCases.ListBlockedUsersQuery;
 import datingapp.app.usecase.social.SocialUseCases.RelationshipCommand;
 import datingapp.app.usecase.social.SocialUseCases.ReportCommand;
 import datingapp.core.AppConfig;
@@ -14,7 +16,6 @@ import datingapp.core.AppSession;
 import datingapp.core.LoggingSupport;
 import datingapp.core.ServiceRegistry;
 import datingapp.core.connection.ConnectionModels.Report;
-import datingapp.core.matching.TrustSafetyService;
 import datingapp.core.model.User;
 import datingapp.core.model.User.UserState;
 import datingapp.core.model.User.VerificationMethod;
@@ -28,18 +29,13 @@ import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/**
- * Handles user blocking, reporting, and profile verification operations in the CLI.
- *
- * <p><b>Simulation Mode:</b> All moderation operations (block, unblock, report, verification) are
- * simulated and do not persist beyond the current session. See operation messages for [SIMULATED]
- * markers.
- */
+/** Handles user blocking, reporting, and profile verification operations in the CLI. */
 public class SafetyHandler implements LoggingSupport {
     private static final Logger logger = LoggerFactory.getLogger(SafetyHandler.class);
     private static final String ERROR_MESSAGE_FORMAT = "❌ {}\n";
+    private static final String NUMBERED_LIST_LOG_FORMAT = "  {}. {}";
+    private static final String EMPTY_INPUT_META = "empty";
 
-    private final TrustSafetyService trustSafetyService;
     private final SocialUseCases socialUseCases;
     private final ProfileUseCases profileUseCases;
     private final VerificationUseCases verificationUseCases;
@@ -48,14 +44,14 @@ public class SafetyHandler implements LoggingSupport {
     private final AppConfig config;
 
     public SafetyHandler(
-            TrustSafetyService trustSafetyService,
+            datingapp.core.matching.TrustSafetyService trustSafetyService,
             SocialUseCases socialUseCases,
             ProfileUseCases profileUseCases,
             VerificationUseCases verificationUseCases,
             AppSession session,
             InputReader inputReader,
             AppConfig config) {
-        this.trustSafetyService = Objects.requireNonNull(trustSafetyService);
+        Objects.requireNonNull(trustSafetyService, "trustSafetyService cannot be null");
         this.socialUseCases = Objects.requireNonNull(socialUseCases);
         this.profileUseCases = Objects.requireNonNull(profileUseCases);
         this.verificationUseCases = Objects.requireNonNull(verificationUseCases);
@@ -104,7 +100,7 @@ public class SafetyHandler implements LoggingSupport {
                 var result = socialUseCases.blockUser(
                         new RelationshipCommand(UserContext.cli(currentUser.getId()), toBlock.getId()));
                 if (result.success()) {
-                    logInfo("🚫 [SIMULATED] Blocked {}.", toBlock.getName());
+                    logInfo("🚫 Blocked {}.", toBlock.getName());
                 } else {
                     logInfo(ERROR_MESSAGE_FORMAT, result.error().message());
                 }
@@ -167,7 +163,7 @@ public class SafetyHandler implements LoggingSupport {
         logInfo("\nReason for report:");
         Report.Reason[] reasons = Report.Reason.values();
         for (int i = 0; i < reasons.length; i++) {
-            logInfo("  {}. {}", i + 1, reasons[i]);
+            logInfo(NUMBERED_LIST_LOG_FORMAT, i + 1, reasons[i]);
         }
 
         String reasonInput = inputReader.readLine("Select reason: ");
@@ -179,7 +175,7 @@ public class SafetyHandler implements LoggingSupport {
             }
             return reasons[reasonIdx];
         } catch (NumberFormatException _) {
-            String lengthMeta = reasonInput == null ? "empty" : String.valueOf(reasonInput.length());
+            String lengthMeta = reasonInput == null ? EMPTY_INPUT_META : String.valueOf(reasonInput.length());
             logger.debug("Invalid report reason input; length={}", lengthMeta);
             logInfo("❌ Invalid input.\n");
             return null;
@@ -192,7 +188,13 @@ public class SafetyHandler implements LoggingSupport {
     public void manageBlockedUsers() {
         CliTextAndInput.requireLogin(session, () -> {
             User currentUser = session.getCurrentUser();
-            List<User> blockedUsers = trustSafetyService.getBlockedUsers(currentUser.getId());
+            var blockedUsersResult =
+                    socialUseCases.listBlockedUsers(new ListBlockedUsersQuery(UserContext.cli(currentUser.getId())));
+            if (!blockedUsersResult.success()) {
+                logInfo(ERROR_MESSAGE_FORMAT, blockedUsersResult.error().message());
+                return;
+            }
+            List<BlockedUserSummary> blockedUsers = blockedUsersResult.data();
 
             if (blockedUsers.isEmpty()) {
                 logInfo("No blocked users.\n");
@@ -200,19 +202,20 @@ public class SafetyHandler implements LoggingSupport {
             }
 
             logInfo(CliTextAndInput.HEADER_BLOCKED_USERS);
-            User toUnblock = selectUserFromList(blockedUsers, "\nEnter number to unblock (or 0 to go back): ", true);
+            BlockedUserSummary toUnblock =
+                    selectBlockedUserFromList(blockedUsers, "\nEnter number to unblock (or 0 to go back): ");
             if (toUnblock == null) {
                 return;
             }
 
-            String confirm = inputReader.readLine("Unblock " + toUnblock.getName() + CliTextAndInput.CONFIRM_SUFFIX);
+            String confirm = inputReader.readLine("Unblock " + toUnblock.name() + CliTextAndInput.CONFIRM_SUFFIX);
             if ("y".equalsIgnoreCase(confirm)) {
-                boolean success = trustSafetyService.unblock(currentUser.getId(), toUnblock.getId());
-
-                if (success) {
-                    logInfo("✅ [SIMULATED] Unblocked {}.", toUnblock.getName());
+                var result = socialUseCases.unblockUser(
+                        new RelationshipCommand(UserContext.cli(currentUser.getId()), toUnblock.userId()));
+                if (result.success()) {
+                    logInfo("✅ Unblocked {}.", toUnblock.name());
                 } else {
-                    logInfo("❌ Failed to unblock user.\n");
+                    logInfo(ERROR_MESSAGE_FORMAT, result.error().message());
                 }
             } else {
                 logInfo(CliTextAndInput.CANCELLED);
@@ -222,8 +225,14 @@ public class SafetyHandler implements LoggingSupport {
 
     private List<User> getBlockableUsers(User currentUser) {
         List<User> allUsers = loadSelectableUsers();
-        Set<UUID> alreadyBlocked = trustSafetyService.getBlockedUsers(currentUser.getId()).stream()
-                .map(User::getId)
+        var blockedUsersResult =
+                socialUseCases.listBlockedUsers(new ListBlockedUsersQuery(UserContext.cli(currentUser.getId())));
+        if (!blockedUsersResult.success()) {
+            logInfo(ERROR_MESSAGE_FORMAT, blockedUsersResult.error().message());
+            return List.of();
+        }
+        Set<UUID> alreadyBlocked = blockedUsersResult.data().stream()
+                .map(BlockedUserSummary::userId)
                 .collect(java.util.stream.Collectors.toCollection(HashSet::new));
 
         return allUsers.stream()
@@ -268,7 +277,11 @@ public class SafetyHandler implements LoggingSupport {
         }
 
         SocialUseCases.ReportOutcome reportResult = result.data();
-        logInfo("\n✅ [SIMULATED] Report submitted. {} has been blocked.", reportedUser.getName());
+        if (reportResult.blockedByReporter()) {
+            logInfo("\n✅ Report submitted. {} has been blocked.", reportedUser.getName());
+        } else {
+            logInfo("\n✅ Report submitted for {}.", reportedUser.getName());
+        }
         if (reportResult.userWasBanned()) {
             logInfo("⚠️  This user has been automatically BANNED due to multiple reports.");
         }
@@ -280,9 +293,9 @@ public class SafetyHandler implements LoggingSupport {
         for (int i = 0; i < users.size(); i++) {
             User user = users.get(i);
             if (showState) {
-                logInfo("  {}. {} ({})", i + 1, user.getName(), user.getState());
+                logInfo(NUMBERED_LIST_LOG_FORMAT + " ({})", i + 1, user.getName(), user.getState());
             } else {
-                logInfo("  {}. {}", i + 1, user.getName());
+                logInfo(NUMBERED_LIST_LOG_FORMAT, i + 1, user.getName());
             }
         }
 
@@ -298,7 +311,33 @@ public class SafetyHandler implements LoggingSupport {
             return users.get(idx);
         } catch (NumberFormatException _) {
             logger.warn("Invalid safety handler selection input");
-            String lengthMeta = input == null ? "empty" : String.valueOf(input.length());
+            String lengthMeta = input == null ? EMPTY_INPUT_META : String.valueOf(input.length());
+            logger.debug("Invalid safety input length={}", lengthMeta);
+            logInfo(CliTextAndInput.INVALID_INPUT);
+            return null;
+        }
+    }
+
+    @Nullable
+    private BlockedUserSummary selectBlockedUserFromList(List<BlockedUserSummary> blockedUsers, String prompt) {
+        for (int i = 0; i < blockedUsers.size(); i++) {
+            BlockedUserSummary blockedUser = blockedUsers.get(i);
+            logInfo(NUMBERED_LIST_LOG_FORMAT, i + 1, blockedUser.name());
+        }
+
+        String input = inputReader.readLine(prompt);
+        try {
+            int idx = Integer.parseInt(input) - 1;
+            if (idx < 0 || idx >= blockedUsers.size()) {
+                if (idx != -1) {
+                    logInfo(CliTextAndInput.INVALID_INPUT);
+                }
+                return null;
+            }
+            return blockedUsers.get(idx);
+        } catch (NumberFormatException _) {
+            logger.warn("Invalid safety handler selection input");
+            String lengthMeta = input == null ? EMPTY_INPUT_META : String.valueOf(input.length());
             logger.debug("Invalid safety input length={}", lengthMeta);
             logInfo(CliTextAndInput.INVALID_INPUT);
             return null;
@@ -315,7 +354,7 @@ public class SafetyHandler implements LoggingSupport {
             User currentUser = session.getCurrentUser();
 
             if (currentUser.isVerified()) {
-                logInfo("\n✅ [SIMULATED] Profile already verified ({}).\n", currentUser.getVerifiedAt());
+                logInfo("\n✅ Profile already verified ({}).\n", currentUser.getVerifiedAt());
                 return;
             }
 
@@ -352,7 +391,7 @@ public class SafetyHandler implements LoggingSupport {
         }
 
         logInfo(
-                "\n[SIMULATED DELIVERY] Your verification code is: {}\n",
+                "\n[LOCAL/DEV DELIVERY] Your verification code is: {}\n",
                 startResult.data().generatedCode());
 
         String inputCode = inputReader.readLine("Enter the code: ");
@@ -363,6 +402,6 @@ public class SafetyHandler implements LoggingSupport {
             return;
         }
 
-        logInfo("✅ [SIMULATED] Profile verified!\n");
+        logInfo("✅ Profile verified!\n");
     }
 }

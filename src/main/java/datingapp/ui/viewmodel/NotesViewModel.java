@@ -32,12 +32,11 @@ import javafx.collections.ObservableList;
 /** ViewModel for the notes browser screen. */
 public final class NotesViewModel extends BaseViewModel {
 
-    private static final DateTimeFormatter DATE_FORMATTER =
-            DateTimeFormatter.ofPattern("MMM d, yyyy").withZone(ZoneId.systemDefault());
-
     private final ProfileNotesUseCases profileNotesUseCases;
     private final UiUserStore userStore;
     private final AppSession session;
+    private final ZoneId userTimeZone;
+    private final DateTimeFormatter dateFormatter;
     private final ObservableList<NoteEntry> notes = FXCollections.observableArrayList();
     private final ObjectProperty<NoteEntry> selectedNote = new SimpleObjectProperty<>();
     private final StringProperty selectedNoteContent = new SimpleStringProperty("");
@@ -45,35 +44,42 @@ public final class NotesViewModel extends BaseViewModel {
 
     public record NoteEntry(UUID userId, String userName, String content, Instant updatedAt, String lastModified) {}
 
-    public NotesViewModel(ProfileNotesUseCases profileNotesUseCases, UiUserStore userStore, AppSession session) {
-        this(profileNotesUseCases, userStore, session, new JavaFxUiThreadDispatcher());
+    public NotesViewModel(
+            ProfileNotesUseCases profileNotesUseCases, UiUserStore userStore, AppSession session, ZoneId userTimeZone) {
+        this(profileNotesUseCases, userStore, session, userTimeZone, new JavaFxUiThreadDispatcher());
     }
 
     public NotesViewModel(
             ProfileNotesUseCases profileNotesUseCases,
             UiUserStore userStore,
             AppSession session,
+            ZoneId userTimeZone,
             UiThreadDispatcher uiDispatcher) {
         super("notes", uiDispatcher);
         this.profileNotesUseCases = Objects.requireNonNull(profileNotesUseCases, "profileNotesUseCases cannot be null");
         this.userStore = Objects.requireNonNull(userStore, "userStore cannot be null");
         this.session = Objects.requireNonNull(session, "session cannot be null");
+        this.userTimeZone = Objects.requireNonNull(userTimeZone, "userTimeZone cannot be null");
+        this.dateFormatter = DateTimeFormatter.ofPattern("MMM d, yyyy").withZone(this.userTimeZone);
     }
 
-    public NotesViewModel(ProfileUseCases profileUseCases, UiUserStore userStore, AppSession session) {
-        this(profileUseCases, userStore, session, new JavaFxUiThreadDispatcher());
+    public NotesViewModel(
+            ProfileUseCases profileUseCases, UiUserStore userStore, AppSession session, ZoneId userTimeZone) {
+        this(profileUseCases, userStore, session, userTimeZone, new JavaFxUiThreadDispatcher());
     }
 
     public NotesViewModel(
             ProfileUseCases profileUseCases,
             UiUserStore userStore,
             AppSession session,
+            ZoneId userTimeZone,
             UiThreadDispatcher uiDispatcher) {
         this(
                 Objects.requireNonNull(profileUseCases, "profileUseCases cannot be null")
                         .getProfileNotesUseCases(),
                 userStore,
                 session,
+                userTimeZone,
                 uiDispatcher);
     }
 
@@ -230,7 +236,7 @@ public final class NotesViewModel extends BaseViewModel {
 
     private NoteEntry createNoteEntry(ProfileNote note, String userName) {
         return new NoteEntry(
-                note.subjectId(), userName, note.content(), note.updatedAt(), DATE_FORMATTER.format(note.updatedAt()));
+                note.subjectId(), userName, note.content(), note.updatedAt(), dateFormatter.format(note.updatedAt()));
     }
 
     private String resolveUserName(UUID subjectId) {

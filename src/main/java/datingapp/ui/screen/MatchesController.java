@@ -21,6 +21,7 @@ import java.util.Objects;
 import java.util.Random;
 import java.util.ResourceBundle;
 import java.util.Set;
+import java.util.UUID;
 import javafx.animation.Animation;
 import javafx.animation.FadeTransition;
 import javafx.animation.Interpolator;
@@ -724,9 +725,13 @@ public class MatchesController extends BaseController implements Initializable {
     /** Navigate to chat with selected match. */
     private void handleStartChat(MatchCardData match) {
         logInfo("Starting chat with match: {}", match.userName());
+        navigateToChat(match.userId());
+    }
+
+    protected void navigateToChat(UUID userId) {
         // Set navigation context so ChatController knows which user to chat with
         NavigationService nav = NavigationService.getInstance();
-        nav.setNavigationContext(NavigationService.ViewType.CHAT, match.userId());
+        nav.setNavigationContext(NavigationService.ViewType.CHAT, userId);
         nav.navigateTo(NavigationService.ViewType.CHAT);
     }
 

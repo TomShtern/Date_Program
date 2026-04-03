@@ -9,6 +9,8 @@ import datingapp.core.AppConfig;
 import datingapp.core.metrics.AchievementService;
 import datingapp.core.metrics.EngagementDomain.Achievement.UserAchievement;
 import datingapp.core.model.User;
+import datingapp.core.model.User.Gender;
+import datingapp.core.profile.MatchPreferences.Dealbreakers;
 import datingapp.core.profile.SanitizerUtils;
 import datingapp.core.profile.ValidationService;
 import datingapp.core.storage.AccountCleanupStorage;
@@ -64,6 +66,44 @@ public final class ProfileMutationUseCases {
         this.config = Objects.requireNonNull(config, "config cannot be null");
         this.activationPolicy = Objects.requireNonNull(activationPolicy, "activationPolicy cannot be null");
         this.eventBus = Objects.requireNonNull(eventBus, "eventBus cannot be null");
+    }
+
+    public UseCaseResult<CreateUserResult> createUser(CreateUserCommand command) {
+        if (command == null) {
+            return UseCaseResult.failure(UseCaseError.validation("Create user command is required"));
+        }
+        if (userStorage == null) {
+            return UseCaseResult.failure(UseCaseError.dependency(USER_STORAGE_REQUIRED));
+        }
+
+        String trimmedName = command.name() == null ? "" : command.name().trim();
+        if (trimmedName.isEmpty()) {
+            return UseCaseResult.failure(UseCaseError.validation("Name cannot be empty"));
+        }
+        try {
+            User user = new User(UUID.randomUUID(), trimmedName);
+            if (command.age() == null && command.gender() == null && command.interestedIn() == null) {
+                userStorage.save(user);
+                return UseCaseResult.success(new CreateUserResult(user));
+            }
+
+            if (command.age() == null || command.gender() == null || command.interestedIn() == null) {
+                return UseCaseResult.failure(UseCaseError.validation(
+                        "Age, gender, and InterestedIn must either all be provided or all be omitted"));
+            }
+            if (command.age() < config.validation().minAge()
+                    || command.age() > config.validation().maxAge()) {
+                return UseCaseResult.failure(UseCaseError.validation(
+                        "Age must be between " + config.validation().minAge() + " and "
+                                + config.validation().maxAge()));
+            }
+
+            applyMinimalCreateProfile(user, command.age(), command.gender(), command.interestedIn());
+            userStorage.save(user);
+            return UseCaseResult.success(new CreateUserResult(user));
+        } catch (Exception e) {
+            return UseCaseResult.failure(UseCaseError.internal("Failed to create user: " + e.getMessage()));
+        }
     }
 
     public UseCaseResult<ProfileUseCases.ProfileSaveResult> saveProfile(ProfileUseCases.SaveProfileCommand command) {
@@ -358,6 +398,25 @@ public final class ProfileMutationUseCases {
         }
     }
 
+    private void applyMinimalCreateProfile(User user, int age, Gender gender, Gender interestedIn) {
+        user.setBirthDate(AppClock.today().minusYears(age));
+        user.setGender(gender);
+        user.setInterestedIn(java.util.EnumSet.of(interestedIn));
+        user.setBio("");
+
+        int minAge = Math.max(config.validation().minAge(), age - 5);
+        int maxAge = Math.min(config.validation().maxAge(), age + 5);
+        user.setAgeRange(
+                minAge,
+                maxAge,
+                config.validation().minAge(),
+                config.validation().maxAge());
+        user.setMaxDistanceKm(50, config.matching().maxDistanceKm());
+        user.setPhotoUrls(List.of());
+        user.setPacePreferences(null);
+        user.setDealbreakers(Dealbreakers.none());
+    }
+
     private static void assertValid(ValidationService.ValidationResult validationResult) {
         if (!validationResult.valid()) {
             String message = validationResult.errors().isEmpty()
@@ -366,4 +425,8 @@ public final class ProfileMutationUseCases {
             throw new IllegalArgumentException(message);
         }
     }
+
+    public static record CreateUserCommand(String name, Integer age, Gender gender, Gender interestedIn) {}
+
+    public static record CreateUserResult(User user) {}
 }

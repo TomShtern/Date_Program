@@ -1,6 +1,7 @@
 package datingapp.ui.screen;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -181,6 +182,127 @@ class ProfileControllerTest {
         }
     }
 
+    @Test
+    @DisplayName("successful incomplete save keeps user on profile and shows completion guidance")
+    void successfulIncompleteSaveKeepsUserOnProfileAndShowsCompletionGuidance() throws Exception {
+        TestStorages.Users users = new TestStorages.Users();
+        AppConfig config = AppConfig.defaults();
+        ProfileService profileService = new ProfileService(users);
+
+        User currentUser = User.StorageBuilder.create(UUID.randomUUID(), "Draft User", AppClock.now())
+                .state(User.UserState.INCOMPLETE)
+                .build();
+        users.save(currentUser);
+        AppSession.getInstance().setCurrentUser(currentUser);
+
+        ProfileViewModel viewModel = new ProfileViewModel(new ProfileViewModel.Dependencies(
+                new StorageUiUserStore(users),
+                profileService,
+                null,
+                config,
+                AppSession.getInstance(),
+                new ValidationService(config),
+                new LocationService(new ValidationService(config)),
+                TEST_DISPATCHER,
+                new datingapp.core.workflow.ProfileActivationPolicy()));
+        TrackingProfileController controller = new TrackingProfileController(viewModel);
+
+        JavaFxTestSupport.LoadedFxml loaded = JavaFxTestSupport.loadFxml("/fxml/profile.fxml", () -> controller);
+        Parent root = loaded.root();
+        Button saveButton = JavaFxTestSupport.lookup(root, "#saveButton", Button.class);
+
+        viewModel.bioProperty().set("Draft bio updated");
+
+        JavaFxTestSupport.runOnFxAndWait(saveButton::fire);
+
+        assertTrue(JavaFxTestSupport.waitUntil(
+                () -> "Draft bio updated"
+                        .equals(AppSession.getInstance().getCurrentUser().getBio()),
+                5000));
+        assertFalse(controller.navigatedToDashboard());
+        assertTrue(viewModel.completionDetailsProperty().get().contains("Missing"));
+
+        controller.cleanup();
+        NavigationService.getInstance().clearHistory();
+        AppSession.getInstance().reset();
+    }
+
+    @Test
+    @DisplayName("successful activated save navigates to dashboard")
+    void successfulActivatedSaveNavigatesToDashboard() throws Exception {
+        TestStorages.Users users = new TestStorages.Users();
+        AppConfig config = AppConfig.defaults();
+        ProfileService profileService = new ProfileService(users);
+
+        User currentUser = createActivatableIncompleteUser("Activated User");
+        users.save(currentUser);
+        AppSession.getInstance().setCurrentUser(currentUser);
+
+        ProfileViewModel viewModel = new ProfileViewModel(new ProfileViewModel.Dependencies(
+                new StorageUiUserStore(users),
+                profileService,
+                null,
+                config,
+                AppSession.getInstance(),
+                new ValidationService(config),
+                new LocationService(new ValidationService(config)),
+                TEST_DISPATCHER,
+                new datingapp.core.workflow.ProfileActivationPolicy()));
+        TrackingProfileController controller = new TrackingProfileController(viewModel);
+
+        JavaFxTestSupport.LoadedFxml loaded = JavaFxTestSupport.loadFxml("/fxml/profile.fxml", () -> controller);
+        Parent root = loaded.root();
+        Button saveButton = JavaFxTestSupport.lookup(root, "#saveButton", Button.class);
+
+        viewModel.bioProperty().set("Activated bio updated");
+
+        JavaFxTestSupport.runOnFxAndWait(saveButton::fire);
+
+        assertTrue(JavaFxTestSupport.waitUntil(controller::navigatedToDashboard, 5000));
+
+        controller.cleanup();
+        NavigationService.getInstance().clearHistory();
+        AppSession.getInstance().reset();
+    }
+
+    @Test
+    @DisplayName("successful save for an already active profile still navigates to dashboard")
+    void successfulSaveForAlreadyActiveProfileNavigatesToDashboard() throws Exception {
+        TestStorages.Users users = new TestStorages.Users();
+        AppConfig config = AppConfig.defaults();
+        ProfileService profileService = new ProfileService(users);
+
+        User currentUser = createActiveUser("Active User");
+        users.save(currentUser);
+        AppSession.getInstance().setCurrentUser(currentUser);
+
+        ProfileViewModel viewModel = new ProfileViewModel(new ProfileViewModel.Dependencies(
+                new StorageUiUserStore(users),
+                profileService,
+                null,
+                config,
+                AppSession.getInstance(),
+                new ValidationService(config),
+                new LocationService(new ValidationService(config)),
+                TEST_DISPATCHER,
+                new datingapp.core.workflow.ProfileActivationPolicy()));
+        TrackingProfileController controller = new TrackingProfileController(viewModel);
+
+        JavaFxTestSupport.LoadedFxml loaded = JavaFxTestSupport.loadFxml("/fxml/profile.fxml", () -> controller);
+        Parent root = loaded.root();
+        Button saveButton = JavaFxTestSupport.lookup(root, "#saveButton", Button.class);
+
+        viewModel.bioProperty().set("Active user bio updated");
+
+        JavaFxTestSupport.runOnFxAndWait(saveButton::fire);
+
+        assertTrue(JavaFxTestSupport.waitUntil(controller::navigatedToDashboard, 5000));
+
+        controller.cleanup();
+        NavigationService.getInstance().clearHistory();
+        AppSession.getInstance().reset();
+    }
+
     private static User createActiveUser(String name) {
         User user = new User(UUID.randomUUID(), name);
         user.setBirthDate(AppClock.today().minusYears(25));
@@ -189,12 +311,51 @@ class ProfileControllerTest {
         user.setAgeRange(18, 60, 18, 120);
         user.setMaxDistanceKm(50, 500);
         user.setLocation(40.7128, -74.0060);
+        user.addPhotoUrl("https://example.com/profile-active.jpg");
         user.setBio("Bio");
         user.setPacePreferences(new PacePreferences(
                 PacePreferences.MessagingFrequency.OFTEN,
                 PacePreferences.TimeToFirstDate.FEW_DAYS,
                 PacePreferences.CommunicationStyle.MIX_OF_EVERYTHING,
                 PacePreferences.DepthPreference.DEEP_CHAT));
+        user.activate();
         return user;
+    }
+
+    private static User createActivatableIncompleteUser(String name) {
+        return User.StorageBuilder.create(UUID.randomUUID(), name, AppClock.now())
+                .state(User.UserState.INCOMPLETE)
+                .bio("Draft bio")
+                .birthDate(AppClock.today().minusYears(25))
+                .gender(Gender.OTHER)
+                .interestedIn(EnumSet.of(Gender.OTHER))
+                .location(40.7128, -74.0060)
+                .hasLocationSet(true)
+                .ageRange(18, 60)
+                .maxDistanceKm(50)
+                .photoUrls(List.of("http://example.com/photo.jpg"))
+                .pacePreferences(new PacePreferences(
+                        PacePreferences.MessagingFrequency.OFTEN,
+                        PacePreferences.TimeToFirstDate.FEW_DAYS,
+                        PacePreferences.CommunicationStyle.MIX_OF_EVERYTHING,
+                        PacePreferences.DepthPreference.DEEP_CHAT))
+                .build();
+    }
+
+    private static final class TrackingProfileController extends ProfileController {
+        private boolean navigatedToDashboard;
+
+        TrackingProfileController(ProfileViewModel viewModel) {
+            super(viewModel);
+        }
+
+        @Override
+        protected void navigateToDashboard() {
+            navigatedToDashboard = true;
+        }
+
+        boolean navigatedToDashboard() {
+            return navigatedToDashboard;
+        }
     }
 }

@@ -1,11 +1,14 @@
 package datingapp.ui.viewmodel;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.app.event.InProcessAppEventBus;
 import datingapp.app.usecase.profile.ProfileUseCases;
+import datingapp.app.usecase.profile.VerificationUseCases;
+import datingapp.app.usecase.social.SocialUseCases;
 import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
 import datingapp.core.AppSession;
@@ -86,6 +89,7 @@ class SafetyViewModelTest {
 
         assertTrue(waitUntil(viewModel.getBlockedUsers()::isEmpty, 5000));
         assertTrue(viewModel.statusMessageProperty().get().contains("unblocked"));
+        assertFalse(viewModel.statusMessageProperty().get().contains("[SIMULATED]"));
 
         viewModel.dispose();
     }
@@ -140,8 +144,19 @@ class SafetyViewModelTest {
                 config,
                 new ProfileActivationPolicy(),
                 new InProcessAppEventBus());
+        SocialUseCases socialUseCases = new SocialUseCases(
+                new datingapp.core.connection.ConnectionService(config, communications, interactions, users),
+                trustSafetyService,
+                communications,
+                new InProcessAppEventBus());
+        VerificationUseCases verificationUseCases = new VerificationUseCases(users, trustSafetyService);
 
-        viewModel = new SafetyViewModel(trustSafetyService, profileUseCases, AppSession.getInstance(), TEST_DISPATCHER);
+        viewModel = new SafetyViewModel(
+                socialUseCases,
+                verificationUseCases,
+                profileUseCases.getProfileMutationUseCases(),
+                AppSession.getInstance(),
+                TEST_DISPATCHER);
         viewModel.initialize();
         viewModel.verificationMethodProperty().set(VerificationMethod.EMAIL);
         viewModel.verificationContactProperty().set("verified@example.com");
@@ -152,12 +167,14 @@ class SafetyViewModelTest {
         String generatedCode = afterStart.getVerificationCode();
         assertTrue(generatedCode != null && generatedCode.length() == 6);
         assertTrue(viewModel.statusMessageProperty().get().contains(generatedCode));
+        assertFalse(viewModel.statusMessageProperty().get().contains("[SIMULATED]"));
 
         viewModel.verificationCodeProperty().set(generatedCode);
         viewModel.confirmVerification();
 
         assertTrue(AppSession.getInstance().getCurrentUser().isVerified());
         assertTrue(viewModel.statusMessageProperty().get().contains("verified"));
+        assertFalse(viewModel.statusMessageProperty().get().contains("[SIMULATED]"));
     }
 
     @Test
@@ -192,6 +209,7 @@ class SafetyViewModelTest {
         assertTrue(viewModel.accountDeletedProperty().get());
         assertTrue(users.get(currentUser.getId()).orElseThrow().isDeleted());
         assertNull(AppSession.getInstance().getCurrentUser());
+        assertFalse(viewModel.statusMessageProperty().get().contains("[SIMULATED]"));
     }
 
     private static boolean waitUntil(BooleanSupplier condition, long timeoutMillis) throws InterruptedException {

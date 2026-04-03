@@ -138,7 +138,7 @@ public final class SafetyController extends BaseController implements Initializa
             Label nameLabel = new Label(item.name());
             nameLabel.getStyleClass().add("stat-label-primary");
 
-            Label subtitleLabel = new Label(item.blockedAtLabel());
+            Label subtitleLabel = new Label(item.statusLabel());
             subtitleLabel.getStyleClass().add("text-secondary");
 
             VBox textBox = new VBox(4, nameLabel, subtitleLabel);

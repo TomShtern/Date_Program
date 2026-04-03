@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
 import datingapp.core.AppSession;
 import datingapp.core.model.User;
@@ -13,6 +14,7 @@ import datingapp.core.profile.ProfileService;
 import datingapp.core.testutil.TestStorages;
 import datingapp.core.testutil.TestUserFactory;
 import datingapp.ui.async.UiThreadDispatcher;
+import datingapp.ui.viewmodel.ProfileViewModel.SaveOutcome;
 import java.lang.reflect.Modifier;
 import java.net.URI;
 import java.nio.file.Files;
@@ -23,7 +25,6 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.LockSupport;
 import java.util.function.BooleanSupplier;
@@ -193,8 +194,9 @@ class ProfileViewModelTest {
         AppConfig config = AppConfig.defaults();
         ProfileService profileService = new ProfileService(users);
 
-        User currentUser = createActiveUser("SaveUser");
-        currentUser.setBio("Original bio");
+        User currentUser = User.StorageBuilder.create(UUID.randomUUID(), "SaveUser", AppClock.now())
+                .state(User.UserState.INCOMPLETE)
+                .build();
         users.save(currentUser);
         session.setCurrentUser(currentUser);
 
@@ -210,18 +212,91 @@ class ProfileViewModelTest {
         viewModel.bioProperty().set("Updated bio");
         viewModel.setLocationCoordinates(12.3456, -45.6789);
 
-        AtomicBoolean saveResult = new AtomicBoolean(false);
+        AtomicReference<SaveOutcome> saveResult = new AtomicReference<>();
         CountDownLatch latch = new CountDownLatch(1);
-        viewModel.saveAsync(success -> {
-            saveResult.set(success);
+        viewModel.saveAsync(outcome -> {
+            saveResult.set(outcome);
             latch.countDown();
         });
 
         assertTrue(latch.await(5, TimeUnit.SECONDS));
-        assertTrue(saveResult.get());
+        assertEquals(SaveOutcome.SAVED_DRAFT, saveResult.get());
         assertFalse(viewModel.savingProperty().get());
         assertEquals("Updated bio", session.getCurrentUser().getBio());
         assertEquals("12.3456, -45.6789", viewModel.locationDisplayProperty().get());
+
+        viewModel.dispose();
+    }
+
+    @Test
+    @DisplayName("saveAsync reports activation when a complete incomplete profile is saved")
+    void saveAsyncReportsActivationWhenProfileCompletes() throws Exception {
+        TestStorages.Users users = new TestStorages.Users();
+        AppConfig config = AppConfig.defaults();
+        ProfileService profileService = new ProfileService(users);
+
+        User currentUser = createActivatableIncompleteUser("ActivateUser");
+        users.save(currentUser);
+        session.setCurrentUser(currentUser);
+
+        ProfileViewModel viewModel = new ProfileViewModel(
+                new UiDataAdapters.StorageUiUserStore(users),
+                profileService,
+                (datingapp.app.usecase.profile.ProfileUseCases) null,
+                config,
+                session,
+                TEST_DISPATCHER,
+                new datingapp.core.workflow.ProfileActivationPolicy());
+        viewModel.loadCurrentUser();
+        viewModel.bioProperty().set("Updated bio for activation");
+
+        AtomicReference<SaveOutcome> saveResult = new AtomicReference<>();
+        CountDownLatch latch = new CountDownLatch(1);
+        viewModel.saveAsync(outcome -> {
+            saveResult.set(outcome);
+            latch.countDown();
+        });
+
+        assertTrue(latch.await(5, TimeUnit.SECONDS));
+        assertEquals(SaveOutcome.ACTIVATED, saveResult.get());
+        assertEquals(User.UserState.ACTIVE, session.getCurrentUser().getState());
+
+        viewModel.dispose();
+    }
+
+    @Test
+    @DisplayName("saveAsync keeps already active profiles on the activated outcome path")
+    void saveAsyncKeepsAlreadyActiveProfilesOnActivatedOutcomePath() throws Exception {
+        TestStorages.Users users = new TestStorages.Users();
+        AppConfig config = AppConfig.defaults();
+        ProfileService profileService = new ProfileService(users);
+
+        User currentUser = createActiveUser("AlreadyActiveUser");
+        users.save(currentUser);
+        session.setCurrentUser(currentUser);
+
+        ProfileViewModel viewModel = new ProfileViewModel(
+                new UiDataAdapters.StorageUiUserStore(users),
+                profileService,
+                (datingapp.app.usecase.profile.ProfileUseCases) null,
+                config,
+                session,
+                TEST_DISPATCHER,
+                new datingapp.core.workflow.ProfileActivationPolicy());
+        viewModel.loadCurrentUser();
+        viewModel.bioProperty().set("Updated active bio");
+
+        AtomicReference<SaveOutcome> saveResult = new AtomicReference<>();
+        CountDownLatch latch = new CountDownLatch(1);
+        viewModel.saveAsync(outcome -> {
+            saveResult.set(outcome);
+            latch.countDown();
+        });
+
+        assertTrue(latch.await(5, TimeUnit.SECONDS));
+        assertEquals(SaveOutcome.ACTIVATED, saveResult.get());
+        assertEquals(User.UserState.ACTIVE, session.getCurrentUser().getState());
+        assertEquals("Updated active bio", session.getCurrentUser().getBio());
 
         viewModel.dispose();
     }
@@ -268,15 +343,15 @@ class ProfileViewModelTest {
         viewModel.loadCurrentUser();
         viewModel.bioProperty().set("Should not persist");
 
-        AtomicBoolean saveResult = new AtomicBoolean(true);
+        AtomicReference<SaveOutcome> saveResult = new AtomicReference<>();
         CountDownLatch latch = new CountDownLatch(1);
-        viewModel.saveAsync(success -> {
-            saveResult.set(success);
+        viewModel.saveAsync(outcome -> {
+            saveResult.set(outcome);
             latch.countDown();
         });
 
         assertTrue(latch.await(5, TimeUnit.SECONDS));
-        assertFalse(saveResult.get());
+        assertEquals(SaveOutcome.FAILED, saveResult.get());
         assertFalse(viewModel.savingProperty().get());
         assertEquals("Original bio", session.getCurrentUser().getBio());
         assertTrue(errorMessage.get().contains("Failed to save profile"));
@@ -458,15 +533,15 @@ class ProfileViewModelTest {
         viewModel.getInterestedInGenders().clear();
         viewModel.getSelectedInterests().clear();
 
-        AtomicBoolean saveResult = new AtomicBoolean(false);
+        AtomicReference<SaveOutcome> saveResult = new AtomicReference<>();
         CountDownLatch latch = new CountDownLatch(1);
-        viewModel.saveAsync(success -> {
-            saveResult.set(success);
+        viewModel.saveAsync(outcome -> {
+            saveResult.set(outcome);
             latch.countDown();
         });
 
         assertTrue(latch.await(5, TimeUnit.SECONDS));
-        assertTrue(saveResult.get());
+        assertEquals(SaveOutcome.ACTIVATED, saveResult.get());
         assertTrue(session.getCurrentUser().getInterestedIn().isEmpty());
         assertTrue(session.getCurrentUser().getInterests().isEmpty());
 
@@ -512,5 +587,25 @@ class ProfileViewModelTest {
         user.setPhotoUrls(List.of());
         user.setBio("Photo test user");
         return user;
+    }
+
+    private static User createActivatableIncompleteUser(String name) {
+        return User.StorageBuilder.create(UUID.randomUUID(), name, AppClock.now())
+                .state(User.UserState.INCOMPLETE)
+                .bio("Draft bio")
+                .birthDate(AppClock.today().minusYears(25))
+                .gender(Gender.OTHER)
+                .interestedIn(EnumSet.of(Gender.OTHER))
+                .location(40.7128, -74.0060)
+                .hasLocationSet(true)
+                .ageRange(18, 60)
+                .maxDistanceKm(50)
+                .photoUrls(List.of("http://example.com/photo.jpg"))
+                .pacePreferences(new datingapp.core.profile.MatchPreferences.PacePreferences(
+                        datingapp.core.profile.MatchPreferences.PacePreferences.MessagingFrequency.OFTEN,
+                        datingapp.core.profile.MatchPreferences.PacePreferences.TimeToFirstDate.FEW_DAYS,
+                        datingapp.core.profile.MatchPreferences.PacePreferences.CommunicationStyle.MIX_OF_EVERYTHING,
+                        datingapp.core.profile.MatchPreferences.PacePreferences.DepthPreference.DEEP_CHAT))
+                .build();
     }
 }

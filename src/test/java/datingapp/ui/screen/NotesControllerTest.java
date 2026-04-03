@@ -56,8 +56,8 @@ class NotesControllerTest {
 
         viewModel = fixture.createViewModel();
 
-        JavaFxTestSupport.LoadedFxml loaded =
-                JavaFxTestSupport.loadFxml("/fxml/notes.fxml", () -> new NotesController(viewModel));
+        TrackingNotesController controller = new TrackingNotesController(viewModel);
+        JavaFxTestSupport.LoadedFxml loaded = JavaFxTestSupport.loadFxml("/fxml/notes.fxml", () -> controller);
         Parent root = loaded.root();
         @SuppressWarnings("unchecked")
         ListView<NotesViewModel.NoteEntry> notesListView =
@@ -195,7 +195,12 @@ class NotesControllerTest {
         users.saveProfileNote(ProfileNote.create(author.getId(), subject.getId(), "Thoughtful and funny"));
         session.setCurrentUser(author);
 
-        viewModel = new NotesViewModel(profileUseCases, new StorageUiUserStore(users), session, TEST_DISPATCHER);
+        viewModel = new NotesViewModel(
+                profileUseCases,
+                new StorageUiUserStore(users),
+                session,
+                config.safety().userTimeZone(),
+                TEST_DISPATCHER);
 
         JavaFxTestSupport.LoadedFxml loaded =
                 JavaFxTestSupport.loadFxml("/fxml/notes.fxml", () -> new NotesController(viewModel));
@@ -234,7 +239,12 @@ class NotesControllerTest {
         users.save(subject);
         session.setCurrentUser(author);
 
-        viewModel = new NotesViewModel(profileUseCases, new StorageUiUserStore(users), session, TEST_DISPATCHER);
+        viewModel = new NotesViewModel(
+                profileUseCases,
+                new StorageUiUserStore(users),
+                session,
+                config.safety().userTimeZone(),
+                TEST_DISPATCHER);
 
         JavaFxTestSupport.LoadedFxml loaded =
                 JavaFxTestSupport.loadFxml("/fxml/notes.fxml", () -> new NotesController(viewModel));
@@ -275,9 +285,9 @@ class NotesControllerTest {
         fixture.saveNote("Test note for keyboard navigation");
 
         viewModel = fixture.createViewModel();
+        TrackingNotesController controller = new TrackingNotesController(viewModel);
 
-        JavaFxTestSupport.LoadedFxml loaded =
-                JavaFxTestSupport.loadFxml("/fxml/notes.fxml", () -> new NotesController(viewModel));
+        JavaFxTestSupport.LoadedFxml loaded = JavaFxTestSupport.loadFxml("/fxml/notes.fxml", () -> controller);
         Parent root = loaded.root();
         @SuppressWarnings("unchecked")
         ListView<NotesViewModel.NoteEntry> notesListView =
@@ -291,20 +301,13 @@ class NotesControllerTest {
                 JavaFxTestSupport.callOnFxAndWait(notesListView.getSelectionModel()::getSelectedItem);
         assertNotNull(selectedNote);
 
-        // Clear navigation history and record the view before
-        NavigationService navigationService = NavigationService.getInstance();
-        navigationService.clearHistory();
-        navigationService.setNavigationContext(NavigationService.ViewType.MATCHING, null);
-
         // Fire Enter key event on the list view - this should trigger openSelectedNote
         JavaFxTestSupport.runOnFxAndWait(() -> {
             KeyEvent enterEvent = new KeyEvent(KeyEvent.KEY_PRESSED, "", "", KeyCode.ENTER, false, false, false, false);
             notesListView.fireEvent(enterEvent);
         });
 
-        UUID openedUserId = JavaFxTestSupport.callOnFxAndWait(() -> navigationService
-                .consumeNavigationContext(NavigationService.ViewType.MATCHING, UUID.class)
-                .orElse(null));
+        UUID openedUserId = JavaFxTestSupport.callOnFxAndWait(controller::openedUserId);
         assertNotNull(openedUserId);
         assertEquals(selectedNote.userId(), openedUserId);
     }
@@ -359,7 +362,29 @@ class NotesControllerTest {
         }
 
         private NotesViewModel createViewModel() {
-            return new NotesViewModel(profileUseCases, new StorageUiUserStore(users), session, TEST_DISPATCHER);
+            return new NotesViewModel(
+                    profileUseCases,
+                    new StorageUiUserStore(users),
+                    session,
+                    config.safety().userTimeZone(),
+                    TEST_DISPATCHER);
+        }
+    }
+
+    private static final class TrackingNotesController extends NotesController {
+        private UUID openedUserId;
+
+        private TrackingNotesController(NotesViewModel viewModel) {
+            super(viewModel);
+        }
+
+        @Override
+        protected void navigateToMatching(UUID userId) {
+            openedUserId = userId;
+        }
+
+        private UUID openedUserId() {
+            return openedUserId;
         }
     }
 }

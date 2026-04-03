@@ -34,6 +34,16 @@ import org.junit.jupiter.api.Test;
 class RestApiReadRoutesTest {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
+    private static final String BASE_URL = "http://localhost:";
+    private static final String USERS_PATH = "/api/users/";
+    private static final String USER_ID_HEADER = "X-User-Id";
+    private static final String CANDIDATES_SEGMENT = "/candidates";
+    private static final String BROWSE_SEGMENT = "/browse";
+    private static final String CANDIDATES_KEY = "candidates";
+    private static final String LOCATION_MISSING_KEY = "locationMissing";
+    private static final String ALICE_NAME = "Alice";
+    private static final String CANDIDATE_NAME = "Candidate";
+    private static final String SEEKER_NAME = "Seeker";
 
     private RestApiServer server;
 
@@ -55,7 +65,7 @@ class RestApiReadRoutesTest {
 
         UUID aliceId = UUID.randomUUID();
         UUID bobId = UUID.randomUUID();
-        User alice = activeUser(aliceId, "Alice", Gender.FEMALE, EnumSet.of(Gender.MALE));
+        User alice = activeUser(aliceId, ALICE_NAME, Gender.FEMALE, EnumSet.of(Gender.MALE));
         alice.setLocation(32.0853, 34.7818);
         User bob = activeUser(bobId, "Bob", Gender.MALE, EnumSet.of(Gender.FEMALE));
         bob.setLocation(32.0870, 34.8877);
@@ -69,7 +79,7 @@ class RestApiReadRoutesTest {
         HttpClient client = HttpClient.newHttpClient();
 
         HttpResponse<String> usersResponse = client.send(
-                HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/users"))
+                HttpRequest.newBuilder(URI.create(BASE_URL + port + "/api/users"))
                         .GET()
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
@@ -77,20 +87,20 @@ class RestApiReadRoutesTest {
         assertEquals(2, MAPPER.readTree(usersResponse.body()).size());
 
         HttpResponse<String> userResponse = client.send(
-                HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/users/" + aliceId))
+                HttpRequest.newBuilder(URI.create(BASE_URL + port + USERS_PATH + aliceId))
                         .GET()
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
         assertEquals(200, userResponse.statusCode());
         JsonNode userJson = MAPPER.readTree(userResponse.body());
-        assertEquals("Alice", userJson.get("name").asText());
+        assertEquals(ALICE_NAME, userJson.get("name").asText());
         assertEquals(
                 "Tel Aviv, Tel Aviv District",
                 userJson.get("approximateLocation").asText());
 
         HttpResponse<String> forbiddenUserResponse = client.send(
-                HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/users/" + aliceId))
-                        .header("X-User-Id", bobId.toString())
+                HttpRequest.newBuilder(URI.create(BASE_URL + port + USERS_PATH + aliceId))
+                        .header(USER_ID_HEADER, bobId.toString())
                         .GET()
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
@@ -99,7 +109,7 @@ class RestApiReadRoutesTest {
         assertEquals("FORBIDDEN", forbiddenUserJson.get("code").asText());
 
         HttpResponse<String> candidatesResponse = client.send(
-                HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/users/" + aliceId + "/candidates"))
+                HttpRequest.newBuilder(URI.create(BASE_URL + port + USERS_PATH + aliceId + CANDIDATES_SEGMENT))
                         .GET()
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
@@ -109,7 +119,7 @@ class RestApiReadRoutesTest {
         assertEquals(bobId.toString(), candidatesJson.get(0).get("id").asText());
 
         HttpResponse<String> matchesResponse = client.send(
-                HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/users/" + aliceId + "/matches"))
+                HttpRequest.newBuilder(URI.create(BASE_URL + port + USERS_PATH + aliceId + "/matches"))
                         .GET()
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
@@ -130,7 +140,7 @@ class RestApiReadRoutesTest {
         UUID candidateId = UUID.randomUUID();
         UUID inactiveId = UUID.randomUUID();
         User active = activeUser(activeId, "Active", Gender.FEMALE, EnumSet.of(Gender.MALE));
-        User candidate = activeUser(candidateId, "Candidate", Gender.MALE, EnumSet.of(Gender.FEMALE));
+        User candidate = activeUser(candidateId, CANDIDATE_NAME, Gender.MALE, EnumSet.of(Gender.FEMALE));
         User inactive = activeUser(inactiveId, "Inactive", Gender.FEMALE, EnumSet.of(Gender.MALE));
         inactive.pause();
         userStorage.save(active);
@@ -143,22 +153,21 @@ class RestApiReadRoutesTest {
         HttpClient client = HttpClient.newHttpClient();
 
         HttpResponse<String> browseResponse = client.send(
-                HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/users/" + activeId + "/browse"))
+                HttpRequest.newBuilder(URI.create(BASE_URL + port + USERS_PATH + activeId + BROWSE_SEGMENT))
                         .GET()
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
         assertEquals(200, browseResponse.statusCode());
         JsonNode browseJson = MAPPER.readTree(browseResponse.body());
-        assertEquals(1, browseJson.get("candidates").size());
+        assertEquals(1, browseJson.get(CANDIDATES_KEY).size());
         assertEquals(
                 candidateId.toString(),
-                browseJson.get("candidates").get(0).get("id").asText());
-        assertTrue(browseJson.get("locationMissing").isBoolean());
-        assertTrue(!browseJson.get("locationMissing").asBoolean());
+                browseJson.get(CANDIDATES_KEY).get(0).get("id").asText());
+        assertTrue(browseJson.get(LOCATION_MISSING_KEY).isBoolean());
+        assertTrue(!browseJson.get(LOCATION_MISSING_KEY).asBoolean());
 
         HttpResponse<String> inactiveCandidatesResponse = client.send(
-                HttpRequest.newBuilder(
-                                URI.create("http://localhost:" + port + "/api/users/" + inactiveId + "/candidates"))
+                HttpRequest.newBuilder(URI.create(BASE_URL + port + USERS_PATH + inactiveId + CANDIDATES_SEGMENT))
                         .GET()
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
@@ -166,7 +175,7 @@ class RestApiReadRoutesTest {
     }
 
     @Test
-    @DisplayName("candidates route remains the deliberate direct-read exception")
+    @DisplayName("candidates route remains the deliberate raw projection exception while browse stays app-layer")
     void candidatesRouteRemainsTheDeliberateDirectReadException() throws Exception {
         TestStorages.Users userStorage = new TestStorages.Users();
         TestStorages.Communications communicationStorage = new TestStorages.Communications();
@@ -176,7 +185,7 @@ class RestApiReadRoutesTest {
         UUID activeId = UUID.randomUUID();
         UUID candidateId = UUID.randomUUID();
         User active = activeUser(activeId, "Active", Gender.FEMALE, EnumSet.of(Gender.MALE));
-        User candidate = activeUser(candidateId, "Candidate", Gender.MALE, EnumSet.of(Gender.FEMALE));
+        User candidate = activeUser(candidateId, CANDIDATE_NAME, Gender.MALE, EnumSet.of(Gender.FEMALE));
         userStorage.save(active);
         userStorage.save(candidate);
 
@@ -186,13 +195,12 @@ class RestApiReadRoutesTest {
         HttpClient client = HttpClient.newHttpClient();
 
         HttpResponse<String> browseResponse = client.send(
-                HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/users/" + activeId + "/browse"))
+                HttpRequest.newBuilder(URI.create(BASE_URL + port + USERS_PATH + activeId + BROWSE_SEGMENT))
                         .GET()
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
         HttpResponse<String> candidatesResponse = client.send(
-                HttpRequest.newBuilder(
-                                URI.create("http://localhost:" + port + "/api/users/" + activeId + "/candidates"))
+                HttpRequest.newBuilder(URI.create(BASE_URL + port + USERS_PATH + activeId + CANDIDATES_SEGMENT))
                         .GET()
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
@@ -203,8 +211,8 @@ class RestApiReadRoutesTest {
         JsonNode browseJson = MAPPER.readTree(browseResponse.body());
         JsonNode candidatesJson = MAPPER.readTree(candidatesResponse.body());
 
-        assertTrue(browseJson.has("candidates"));
-        assertTrue(browseJson.has("locationMissing"));
+        assertTrue(browseJson.has(CANDIDATES_KEY));
+        assertTrue(browseJson.has(LOCATION_MISSING_KEY));
         assertTrue(candidatesJson.isArray());
         assertEquals(candidateId.toString(), candidatesJson.get(0).get("id").asText());
     }
@@ -222,7 +230,7 @@ class RestApiReadRoutesTest {
 
         UUID seekerId = UUID.randomUUID();
         UUID blockedId = UUID.randomUUID();
-        User seeker = activeUser(seekerId, "Seeker", Gender.MALE, EnumSet.of(Gender.FEMALE));
+        User seeker = activeUser(seekerId, SEEKER_NAME, Gender.MALE, EnumSet.of(Gender.FEMALE));
         seeker.setLocation(32.0853, 34.7818);
         User blocked = activeUser(blockedId, "Blocked", Gender.FEMALE, EnumSet.of(Gender.MALE));
         blocked.setLocation(32.0870, 34.8877);
@@ -236,7 +244,7 @@ class RestApiReadRoutesTest {
         HttpClient client = HttpClient.newHttpClient();
 
         HttpResponse<String> browseResponse = client.send(
-                HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/users/" + seekerId + "/browse"))
+                HttpRequest.newBuilder(URI.create(BASE_URL + port + USERS_PATH + seekerId + BROWSE_SEGMENT))
                         .GET()
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
@@ -244,7 +252,7 @@ class RestApiReadRoutesTest {
         JsonNode browseJson = MAPPER.readTree(browseResponse.body());
 
         assertTrue(browseJson.get("candidates").isArray());
-        for (JsonNode candidate : browseJson.get("candidates")) {
+        for (JsonNode candidate : browseJson.get(CANDIDATES_KEY)) {
             assertNotEquals(
                     blockedId.toString(),
                     candidate.get("id").asText(),
@@ -263,7 +271,7 @@ class RestApiReadRoutesTest {
 
         UUID seekerId = UUID.randomUUID();
         UUID unmatchedId = UUID.randomUUID();
-        User seeker = activeUser(seekerId, "Seeker", Gender.FEMALE, EnumSet.of(Gender.MALE));
+        User seeker = activeUser(seekerId, SEEKER_NAME, Gender.FEMALE, EnumSet.of(Gender.MALE));
         seeker.setLocation(32.0853, 34.7818);
         User recentlyUnmatched = activeUser(unmatchedId, "RecentlyUnmatched", Gender.MALE, EnumSet.of(Gender.FEMALE));
         recentlyUnmatched.setLocation(32.0870, 34.8877);
@@ -279,7 +287,7 @@ class RestApiReadRoutesTest {
         HttpClient client = HttpClient.newHttpClient();
 
         HttpResponse<String> browseResponse = client.send(
-                HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/users/" + seekerId + "/browse"))
+                HttpRequest.newBuilder(URI.create(BASE_URL + port + USERS_PATH + seekerId + BROWSE_SEGMENT))
                         .GET()
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
@@ -287,7 +295,7 @@ class RestApiReadRoutesTest {
         JsonNode browseJson = MAPPER.readTree(browseResponse.body());
 
         assertTrue(browseJson.get("candidates").isArray());
-        for (JsonNode candidate : browseJson.get("candidates")) {
+        for (JsonNode candidate : browseJson.get(CANDIDATES_KEY)) {
             assertNotEquals(
                     unmatchedId.toString(),
                     candidate.get("id").asText(),
@@ -323,8 +331,7 @@ class RestApiReadRoutesTest {
         HttpClient client = HttpClient.newHttpClient();
 
         HttpResponse<String> browseResponse = client.send(
-                HttpRequest.newBuilder(
-                                URI.create("http://localhost:" + port + "/api/users/" + noLocationId + "/browse"))
+                HttpRequest.newBuilder(URI.create(BASE_URL + port + USERS_PATH + noLocationId + BROWSE_SEGMENT))
                         .GET()
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
@@ -332,9 +339,10 @@ class RestApiReadRoutesTest {
         JsonNode browseJson = MAPPER.readTree(browseResponse.body());
 
         assertTrue(
-                browseJson.get("locationMissing").asBoolean(),
+                browseJson.get(LOCATION_MISSING_KEY).asBoolean(),
                 "locationMissing must be true when seeker has no location");
-        assertEquals(0, browseJson.get("candidates").size(), "Candidates list must be empty when location is missing");
+        assertEquals(
+                0, browseJson.get(CANDIDATES_KEY).size(), "Candidates list must be empty when location is missing");
     }
 
     @Test
@@ -353,7 +361,7 @@ class RestApiReadRoutesTest {
         UUID blockedId = UUID.randomUUID();
         UUID unmatchedId = UUID.randomUUID();
 
-        User seeker = activeUser(seekerId, "Seeker", Gender.MALE, EnumSet.of(Gender.FEMALE));
+        User seeker = activeUser(seekerId, SEEKER_NAME, Gender.MALE, EnumSet.of(Gender.FEMALE));
         User eligible = activeUser(eligibleId, "Eligible", Gender.FEMALE, EnumSet.of(Gender.MALE));
         User blocked = activeUser(blockedId, "Blocked", Gender.FEMALE, EnumSet.of(Gender.MALE));
         User unmatched = activeUser(unmatchedId, "Unmatched", Gender.FEMALE, EnumSet.of(Gender.MALE));
@@ -374,8 +382,7 @@ class RestApiReadRoutesTest {
         HttpClient client = HttpClient.newHttpClient();
 
         HttpResponse<String> candidatesResponse = client.send(
-                HttpRequest.newBuilder(
-                                URI.create("http://localhost:" + port + "/api/users/" + seekerId + "/candidates"))
+                HttpRequest.newBuilder(URI.create(BASE_URL + port + USERS_PATH + seekerId + CANDIDATES_SEGMENT))
                         .GET()
                         .build(),
                 HttpResponse.BodyHandlers.ofString());

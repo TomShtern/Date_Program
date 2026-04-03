@@ -85,7 +85,11 @@ class StatsHandlerTest {
                 AppConfig.defaults(),
                 new ProfileActivationPolicy(),
                 new InProcessAppEventBus());
-        return new StatsHandler(profileUseCases, session, inputReader);
+        return new StatsHandler(
+                profileUseCases,
+                session,
+                inputReader,
+                AppConfig.defaults().safety().userTimeZone());
     }
 
     @SuppressWarnings("unused")

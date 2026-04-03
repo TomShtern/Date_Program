@@ -37,6 +37,8 @@ import org.junit.jupiter.params.provider.EnumSource;
 class SocialControllerTest {
 
     private static final Instant FIXED_INSTANT = Instant.parse("2026-02-01T12:00:00Z");
+    private static final String SOCIAL_FXML = "/fxml/social.fxml";
+    private static final String NOTIFICATIONS_LIST_SELECTOR = "#notificationsListView";
 
     @BeforeAll
     static void initJfx() throws InterruptedException {
@@ -55,12 +57,15 @@ class SocialControllerTest {
         Fixture fixture = new Fixture();
         fixture.seedData();
 
-        JavaFxTestSupport.LoadedFxml loaded =
-                JavaFxTestSupport.loadFxml("/fxml/social.fxml", () -> new SocialController(fixture.viewModel));
+        JavaFxTestSupport.LoadedFxml loaded = JavaFxTestSupport.loadFxml(
+                SOCIAL_FXML,
+                () -> new SocialController(
+                        fixture.viewModel, fixture.config.safety().userTimeZone()));
         Parent root = loaded.root();
 
         @SuppressWarnings("unchecked")
-        ListView<Notification> notifications = JavaFxTestSupport.lookup(root, "#notificationsListView", ListView.class);
+        ListView<Notification> notifications =
+                JavaFxTestSupport.lookup(root, NOTIFICATIONS_LIST_SELECTOR, ListView.class);
         @SuppressWarnings("unchecked")
         ListView<FriendRequestEntry> requests = JavaFxTestSupport.lookup(root, "#requestsListView", ListView.class);
 
@@ -89,11 +94,13 @@ class SocialControllerTest {
         fixture.users.save(currentUser);
         AppSession.getInstance().setCurrentUser(currentUser);
 
-        JavaFxTestSupport.LoadedFxml loaded =
-                JavaFxTestSupport.loadFxml("/fxml/social.fxml", () -> new SocialController(fixture.viewModel));
+        JavaFxTestSupport.LoadedFxml loaded = JavaFxTestSupport.loadFxml(
+                SOCIAL_FXML,
+                () -> new SocialController(
+                        fixture.viewModel, fixture.config.safety().userTimeZone()));
         Parent root = loaded.root();
 
-        ListView<?> notifications = JavaFxTestSupport.lookup(root, "#notificationsListView", ListView.class);
+        ListView<?> notifications = JavaFxTestSupport.lookup(root, NOTIFICATIONS_LIST_SELECTOR, ListView.class);
         ListView<?> requests = JavaFxTestSupport.lookup(root, "#requestsListView", ListView.class);
 
         JavaFxTestSupport.runOnFxAndWait(fixture.viewModel::refresh);
@@ -105,8 +112,8 @@ class SocialControllerTest {
                                         fixture.viewModel.loadingProperty().get())
                                 && JavaFxTestSupport.callOnFxAndWait(notifications.getItems()::isEmpty)
                                 && JavaFxTestSupport.callOnFxAndWait(requests.getItems()::isEmpty);
-                    } catch (InterruptedException e) {
-                        throw new IllegalStateException(e);
+                    } catch (InterruptedException _) {
+                        throw new IllegalStateException("Interrupted while awaiting empty social state");
                     }
                 },
                 5000));
@@ -123,12 +130,14 @@ class SocialControllerTest {
         Fixture fixture = new Fixture();
         fixture.seedData();
 
-        JavaFxTestSupport.LoadedFxml loaded =
-                JavaFxTestSupport.loadFxml("/fxml/social.fxml", () -> new SocialController(fixture.viewModel));
+        JavaFxTestSupport.LoadedFxml loaded = JavaFxTestSupport.loadFxml(
+                SOCIAL_FXML,
+                () -> new SocialController(
+                        fixture.viewModel, fixture.config.safety().userTimeZone()));
         Parent root = loaded.root();
         @SuppressWarnings("unchecked")
         ListView<Notification> notificationsListView =
-                JavaFxTestSupport.lookup(root, "#notificationsListView", ListView.class);
+                JavaFxTestSupport.lookup(root, NOTIFICATIONS_LIST_SELECTOR, ListView.class);
 
         assertTrue(JavaFxTestSupport.waitUntil(
                 () -> !notificationsListView.getItems().isEmpty(), 5000));
@@ -154,8 +163,8 @@ class SocialControllerTest {
                     try {
                         return JavaFxTestSupport.callOnFxAndWait(
                                 () -> notificationsListView.getItems().get(0).isRead());
-                    } catch (InterruptedException e) {
-                        throw new IllegalStateException(e);
+                    } catch (InterruptedException _) {
+                        throw new IllegalStateException("Interrupted while awaiting read notification state");
                     }
                 },
                 5000));
@@ -167,13 +176,13 @@ class SocialControllerTest {
         private final TestStorages.Users users = new TestStorages.Users();
         private final TestStorages.Interactions interactions = new TestStorages.Interactions();
         private final TestStorages.Communications communications = new TestStorages.Communications();
+        private final AppConfig config = AppConfig.defaults();
         private final SocialViewModel viewModel;
         private final User currentUser = TestUserFactory.createActiveUser("SocialCurrent");
         private final User sender = TestUserFactory.createActiveUser("SocialSender");
 
         private Fixture() {
             TestClock.setFixed(FIXED_INSTANT);
-            AppConfig config = AppConfig.defaults();
             ConnectionService connectionService = new ConnectionService(config, communications, interactions, users);
             var socialUseCases =
                     new datingapp.app.usecase.social.SocialUseCases(connectionService, null, communications);

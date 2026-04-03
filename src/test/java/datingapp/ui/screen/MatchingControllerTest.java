@@ -61,8 +61,9 @@ class MatchingControllerTest {
                 .setNavigationContext(NavigationService.ViewType.MATCHING, fixture.prioritizedCandidate.getId());
 
         MatchingViewModel viewModel = fixture.createViewModel();
-        JavaFxTestSupport.LoadedFxml loaded =
-                JavaFxTestSupport.loadFxml("/fxml/matching.fxml", () -> new MatchingController(viewModel));
+        JavaFxTestSupport.LoadedFxml loaded = JavaFxTestSupport.loadFxml(
+                "/fxml/matching.fxml",
+                () -> new MatchingController(viewModel, fixture.config.safety().userTimeZone()));
         Parent root = loaded.root();
         TextArea noteTextArea = JavaFxTestSupport.lookup(root, "#noteTextArea", TextArea.class);
         Button saveNoteButton = JavaFxTestSupport.lookup(root, "#saveNoteButton", Button.class);
@@ -134,8 +135,9 @@ class MatchingControllerTest {
         fixture.saveUsers();
 
         MatchingViewModel viewModel = fixture.createViewModel();
-        JavaFxTestSupport.LoadedFxml loaded =
-                JavaFxTestSupport.loadFxml("/fxml/matching.fxml", () -> new MatchingController(viewModel));
+        JavaFxTestSupport.LoadedFxml loaded = JavaFxTestSupport.loadFxml(
+                "/fxml/matching.fxml",
+                () -> new MatchingController(viewModel, fixture.config.safety().userTimeZone()));
         Parent root = loaded.root();
         Button likeButton = JavaFxTestSupport.lookup(root, "#likeButton", Button.class);
 
@@ -153,8 +155,9 @@ class MatchingControllerTest {
         fixture.saveUsers();
 
         MatchingViewModel viewModel = fixture.createViewModel();
-        JavaFxTestSupport.LoadedFxml loaded =
-                JavaFxTestSupport.loadFxml("/fxml/matching.fxml", () -> new MatchingController(viewModel));
+        JavaFxTestSupport.LoadedFxml loaded = JavaFxTestSupport.loadFxml(
+                "/fxml/matching.fxml",
+                () -> new MatchingController(viewModel, fixture.config.safety().userTimeZone()));
         Parent root = loaded.root();
         Button superLikeButton = JavaFxTestSupport.lookup(root, "#superLikeButton", Button.class);
 
@@ -172,8 +175,9 @@ class MatchingControllerTest {
         fixture.saveUsers();
 
         MatchingViewModel viewModel = fixture.createViewModel();
-        JavaFxTestSupport.LoadedFxml loaded =
-                JavaFxTestSupport.loadFxml("/fxml/matching.fxml", () -> new MatchingController(viewModel));
+        JavaFxTestSupport.LoadedFxml loaded = JavaFxTestSupport.loadFxml(
+                "/fxml/matching.fxml",
+                () -> new MatchingController(viewModel, fixture.config.safety().userTimeZone()));
         Parent root = loaded.root();
         Button likeButton = JavaFxTestSupport.lookup(root, "#likeButton", Button.class);
         Button undoButton = JavaFxTestSupport.lookup(root, "#undoButton", Button.class);
@@ -208,8 +212,9 @@ class MatchingControllerTest {
         fixture.saveUsers();
 
         MatchingViewModel viewModel = fixture.createViewModel();
-        JavaFxTestSupport.LoadedFxml loaded =
-                JavaFxTestSupport.loadFxml("/fxml/matching.fxml", () -> new MatchingController(viewModel));
+        JavaFxTestSupport.LoadedFxml loaded = JavaFxTestSupport.loadFxml(
+                "/fxml/matching.fxml",
+                () -> new MatchingController(viewModel, fixture.config.safety().userTimeZone()));
         Parent root = loaded.root();
         Label noCandidatesHeading = JavaFxTestSupport.lookup(root, "#noCandidatesHeading", Label.class);
         Label noCandidatesBody = JavaFxTestSupport.lookup(root, "#noCandidatesBody", Label.class);

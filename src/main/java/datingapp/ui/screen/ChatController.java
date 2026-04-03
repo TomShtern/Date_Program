@@ -62,6 +62,7 @@ public class ChatController extends BaseController implements Initializable {
     private static final DateTimeFormatter THREAD_DATE_FORMAT =
             DateTimeFormatter.ofPattern("dd MMM yyyy", Locale.ENGLISH);
     private static final int MESSAGE_WARNING_THRESHOLD = Message.MAX_LENGTH - 100;
+    private static final String USER_TIME_ZONE_NULL = "userTimeZone cannot be null";
     private static final String MESSAGE_LENGTH_STYLE_NORMAL = "-fx-font-size: 11px; -fx-text-fill: -fx-text-secondary;";
     private static final String MESSAGE_LENGTH_STYLE_WARNING = "-fx-font-size: 11px; -fx-text-fill: #f59e0b;";
     private static final String MESSAGE_LENGTH_STYLE_LIMIT = "-fx-font-size: 11px; -fx-text-fill: #ef4444;";
@@ -134,14 +135,16 @@ public class ChatController extends BaseController implements Initializable {
     private ProgressIndicator chatLoadingIndicator;
 
     private final ChatViewModel viewModel;
+    private final ZoneId userTimeZone;
     private final UiComponents.TypingIndicator typingIndicator = new UiComponents.TypingIndicator();
     private final Tooltip presenceTooltip = new Tooltip();
     private final Tooltip sendButtonTooltip = new Tooltip();
     private ListChangeListener<Message> activeMessagesListener;
     private boolean shouldAutoScrollToBottom = true;
 
-    public ChatController(ChatViewModel viewModel) {
+    public ChatController(ChatViewModel viewModel, ZoneId userTimeZone) {
         this.viewModel = viewModel;
+        this.userTimeZone = Objects.requireNonNull(userTimeZone, USER_TIME_ZONE_NULL);
     }
 
     @Override
@@ -465,7 +468,7 @@ public class ChatController extends BaseController implements Initializable {
     }
 
     private ListCell<ConversationPreview> createConversationCell() {
-        return new ConversationListCell(viewModel::getCurrentUserId);
+        return new ConversationListCell(viewModel::getCurrentUserId, userTimeZone);
     }
 
     private void updateAutoScrollState() {
@@ -503,10 +506,12 @@ public class ChatController extends BaseController implements Initializable {
         private final Label timeLabel = new Label();
         private final Label unreadBadge = new Label();
         private final Label snippetLabel = new Label();
+        private final ZoneId userTimeZone;
         private final Supplier<UUID> currentUserIdSupplier;
 
-        public ConversationListCell(Supplier<UUID> currentUserIdSupplier) {
+        public ConversationListCell(Supplier<UUID> currentUserIdSupplier, ZoneId userTimeZone) {
             this.currentUserIdSupplier = currentUserIdSupplier;
+            this.userTimeZone = Objects.requireNonNull(userTimeZone, USER_TIME_ZONE_NULL);
             avatarStack.setPrefSize(40, 40);
             avatarStack.getStyleClass().add("icon-primary");
             avatarStack.setStyle("-fx-background-color: -fx-surface-dark; -fx-background-radius: 20;");
@@ -579,9 +584,9 @@ public class ChatController extends BaseController implements Initializable {
         }
 
         private String formatTimestamp(java.time.Instant createdAt) {
-            var zonedDateTime = createdAt.atZone(ZoneId.systemDefault());
+            var zonedDateTime = createdAt.atZone(userTimeZone);
             LocalDate messageDate = zonedDateTime.toLocalDate();
-            return messageDate.equals(AppClock.today())
+            return messageDate.equals(AppClock.today(userTimeZone))
                     ? zonedDateTime.format(TIME_FORMAT)
                     : zonedDateTime.format(CONVERSATION_DATE_FORMAT);
         }
@@ -636,7 +641,7 @@ public class ChatController extends BaseController implements Initializable {
     }
 
     private ListCell<Message> createMessageCell() {
-        return new MessageListCell(viewModel, messageListView);
+        return new MessageListCell(viewModel, messageListView, userTimeZone);
     }
 
     private static class MessageListCell extends ListCell<Message> {
@@ -649,9 +654,11 @@ public class ChatController extends BaseController implements Initializable {
         private final Region readReceiptIcon = new Region();
         private final HBox metaBox = new HBox(4);
         private final ChatViewModel viewModel;
+        private final ZoneId userTimeZone;
 
-        public MessageListCell(ChatViewModel viewModel, ListView<Message> messageListView) {
+        public MessageListCell(ChatViewModel viewModel, ListView<Message> messageListView, ZoneId userTimeZone) {
             this.viewModel = viewModel;
+            this.userTimeZone = Objects.requireNonNull(userTimeZone, USER_TIME_ZONE_NULL);
             bubble.maxWidthProperty().bind(messageListView.widthProperty().multiply(0.65));
             bubble.setPadding(new Insets(
                     UiConstants.SPACING_STANDARD,
@@ -691,7 +698,7 @@ public class ChatController extends BaseController implements Initializable {
                 updateDateSeparator(msg);
                 contentLabel.setText(msg.content());
 
-                String time = msg.createdAt().atZone(ZoneId.systemDefault()).format(TIME_FORMAT);
+                String time = msg.createdAt().atZone(userTimeZone).format(TIME_FORMAT);
                 timeLabel.setText(time);
 
                 boolean isMine = viewModel.isMessageFromCurrentUser(msg);
@@ -744,11 +751,10 @@ public class ChatController extends BaseController implements Initializable {
                 previousMessage = listView.getItems().get(index - 1);
             }
 
-            LocalDate currentDate =
-                    message.createdAt().atZone(ZoneId.systemDefault()).toLocalDate();
+            LocalDate currentDate = message.createdAt().atZone(userTimeZone).toLocalDate();
             LocalDate previousDate = previousMessage == null
                     ? null
-                    : previousMessage.createdAt().atZone(ZoneId.systemDefault()).toLocalDate();
+                    : previousMessage.createdAt().atZone(userTimeZone).toLocalDate();
 
             boolean showDateSeparator = previousDate == null || !currentDate.equals(previousDate);
             dateSeparatorLabel.setVisible(showDateSeparator);
@@ -757,7 +763,7 @@ public class ChatController extends BaseController implements Initializable {
                 return;
             }
 
-            LocalDate today = AppClock.today();
+            LocalDate today = AppClock.today(userTimeZone);
             LocalDate yesterday = today.minusDays(1);
             if (currentDate.equals(today)) {
                 dateSeparatorLabel.setText("Today");

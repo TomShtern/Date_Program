@@ -11,6 +11,7 @@ import datingapp.ui.UiFeedbackService;
 import datingapp.ui.viewmodel.LoginViewModel;
 import java.net.URL;
 import java.time.Instant;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
@@ -58,7 +59,7 @@ public class LoginController extends BaseController implements Initializable {
     private static final String MSG_NO_PROFILES_TO_SHOW = "No profiles to show.";
 
     // Log Messages
-    private static final String LOG_LOGIN_SUCCESS = "Login successful, navigating to Dashboard";
+    private static final String LOG_LOGIN_SUCCESS = "Login successful, navigating to {}";
     private static final String LOG_OPENING_DIALOG = "Opening account creation dialog";
     private static final String LOG_USER_CREATED = "Created new user: {}";
 
@@ -79,11 +80,13 @@ public class LoginController extends BaseController implements Initializable {
 
     private final LoginViewModel viewModel;
     private final ProfileService profileCompletionService;
+    private final ZoneId userTimeZone;
     private final Label emptyListPlaceholder = new Label();
 
-    public LoginController(LoginViewModel viewModel, ProfileService profileCompletionService) {
+    public LoginController(LoginViewModel viewModel, ProfileService profileCompletionService, ZoneId userTimeZone) {
         this.viewModel = viewModel;
         this.profileCompletionService = profileCompletionService;
+        this.userTimeZone = Objects.requireNonNull(userTimeZone, "userTimeZone cannot be null");
     }
 
     @Override
@@ -104,7 +107,7 @@ public class LoginController extends BaseController implements Initializable {
 
     private void bindUserList() {
         userListView.setItems(viewModel.getFilteredUsers());
-        userListView.setCellFactory(lv -> UserListCellRenderer.create(profileCompletionService));
+        userListView.setCellFactory(lv -> UserListCellRenderer.create(profileCompletionService, userTimeZone));
         addSubscription(userListView.getSelectionModel().selectedItemProperty().subscribe(viewModel::setSelectedUser));
         loginButton.disableProperty().bind(viewModel.loginDisabledProperty());
 
@@ -192,8 +195,9 @@ public class LoginController extends BaseController implements Initializable {
     @FXML
     private void handleLogin() {
         if (viewModel.login()) {
-            logInfo(LOG_LOGIN_SUCCESS);
-            NavigationService.getInstance().navigateTo(NavigationService.ViewType.DASHBOARD);
+            NavigationService.ViewType destination = viewModel.resolvePostLoginDestination();
+            logInfo(LOG_LOGIN_SUCCESS, destination);
+            NavigationService.getInstance().navigateTo(destination);
         }
     }
 
@@ -297,8 +301,8 @@ public class LoginController extends BaseController implements Initializable {
         @SuppressWarnings("PMD.UnnecessaryConstructor")
         private UserListCellRenderer() {}
 
-        static ListCell<User> create(ProfileService profileCompletionService) {
-            return new UserListCell(profileCompletionService);
+        static ListCell<User> create(ProfileService profileCompletionService, ZoneId userTimeZone) {
+            return new UserListCell(profileCompletionService, userTimeZone);
         }
 
         private static final class UserListCell extends ListCell<User> {
@@ -306,6 +310,7 @@ public class LoginController extends BaseController implements Initializable {
             private static final double SELECT_SCALE = 1.03;
 
             private final ProfileService profileCompletionService;
+            private final ZoneId userTimeZone;
             private final HBox container = new HBox(15);
             private final StackPane avatarContainer = new StackPane();
             private final ImageView avatarView = new ImageView();
@@ -317,8 +322,9 @@ public class LoginController extends BaseController implements Initializable {
             private final Label completionBadge = new Label();
             private final Label activityBadge = new Label();
 
-            private UserListCell(ProfileService profileCompletionService) {
+            private UserListCell(ProfileService profileCompletionService, ZoneId userTimeZone) {
                 this.profileCompletionService = profileCompletionService;
+                this.userTimeZone = userTimeZone;
                 avatarView.setFitWidth(AVATAR_SIZE);
                 avatarView.setFitHeight(AVATAR_SIZE);
                 avatarView.setPreserveRatio(true);
@@ -360,7 +366,7 @@ public class LoginController extends BaseController implements Initializable {
                     container.setScaleY(1.0);
                 } else {
                     setText(null);
-                    int age = user.getAge(java.time.ZoneId.systemDefault()).orElse(0);
+                    int age = user.getAge(userTimeZone).orElse(0);
                     nameLabel.setText(user.getName() + ", " + age);
 
                     StringBuilder sb = new StringBuilder(formatState(user.getState()));

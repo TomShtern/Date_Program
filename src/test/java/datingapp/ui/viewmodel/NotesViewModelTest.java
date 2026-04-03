@@ -1,5 +1,7 @@
 package datingapp.ui.viewmodel;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.app.event.InProcessAppEventBus;
@@ -18,7 +20,11 @@ import datingapp.core.workflow.ProfileActivationPolicy;
 import datingapp.ui.JavaFxTestSupport;
 import datingapp.ui.async.UiThreadDispatcher;
 import datingapp.ui.viewmodel.UiDataAdapters.StorageUiUserStore;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.EnumSet;
+import java.util.TimeZone;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterEach;
@@ -32,6 +38,11 @@ import org.junit.jupiter.api.Timeout;
 class NotesViewModelTest {
 
     private static final UiThreadDispatcher TEST_DISPATCHER = JavaFxTestSupport.immediateUiDispatcher();
+    private static final String AUTHOR_NAME = "Morgan";
+    private static final String SUBJECT_ONE_NAME = "Riley";
+    private static final String SUBJECT_TWO_NAME = "Taylor";
+    private static final String UPDATED_RILEY_NOTE = "Updated note content for Riley";
+    private static final Instant UPDATED_NOTE_INSTANT = Instant.parse("2026-02-01T00:30:00Z");
 
     @BeforeAll
     static void initJfx() {
@@ -64,9 +75,9 @@ class NotesViewModelTest {
                 new ProfileActivationPolicy(),
                 new InProcessAppEventBus());
 
-        User author = createUser("Morgan", Gender.FEMALE, EnumSet.of(Gender.MALE));
-        User subjectOne = createUser("Riley", Gender.MALE, EnumSet.of(Gender.FEMALE));
-        User subjectTwo = createUser("Taylor", Gender.MALE, EnumSet.of(Gender.FEMALE));
+        User author = createUser(AUTHOR_NAME, Gender.FEMALE, EnumSet.of(Gender.MALE));
+        User subjectOne = createUser(SUBJECT_ONE_NAME, Gender.MALE, EnumSet.of(Gender.FEMALE));
+        User subjectTwo = createUser(SUBJECT_TWO_NAME, Gender.MALE, EnumSet.of(Gender.FEMALE));
         users.save(author);
         users.save(subjectOne);
         users.save(subjectTwo);
@@ -75,17 +86,77 @@ class NotesViewModelTest {
         AppSession.getInstance().setCurrentUser(author);
 
         NotesViewModel viewModel = new NotesViewModel(
-                profileUseCases, new StorageUiUserStore(users), AppSession.getInstance(), TEST_DISPATCHER);
+                profileUseCases,
+                new StorageUiUserStore(users),
+                AppSession.getInstance(),
+                config.safety().userTimeZone(),
+                TEST_DISPATCHER);
         viewModel.initialize();
 
         assertTrue(JavaFxTestSupport.waitUntil(() -> viewModel.getNotes().size() == 2, 5000));
         assertTrue(
-                viewModel.getNotes().stream().anyMatch(note -> note.userName().equals("Riley")));
+                viewModel.getNotes().stream().anyMatch(note -> note.userName().equals(SUBJECT_ONE_NAME)));
         assertTrue(
-                viewModel.getNotes().stream().anyMatch(note -> note.userName().equals("Taylor")));
+                viewModel.getNotes().stream().anyMatch(note -> note.userName().equals(SUBJECT_TWO_NAME)));
         assertTrue(viewModel.getNotes().stream().anyMatch(note -> note.content().contains("Thoughtful")));
 
         viewModel.dispose();
+    }
+
+    @Test
+    @DisplayName("initialize formats note timestamps using the configured user timezone")
+    void initializeFormatsNoteTimestampsUsingConfiguredUserTimezone() throws InterruptedException {
+        TimeZone originalDefault = TimeZone.getDefault();
+        TimeZone.setDefault(TimeZone.getTimeZone("UTC"));
+        try {
+            TestStorages.Users users = new TestStorages.Users();
+            AppConfig config = AppConfig.defaults();
+            ZoneId configuredZone = ZoneId.of("Pacific/Honolulu");
+            ProfileService profileService = new ProfileService(users);
+            ProfileUseCases profileUseCases = new ProfileUseCases(
+                    users,
+                    profileService,
+                    null,
+                    null,
+                    TestAchievementService.empty(),
+                    config,
+                    new ProfileActivationPolicy(),
+                    new InProcessAppEventBus());
+
+            User author = createUser(AUTHOR_NAME, Gender.FEMALE, EnumSet.of(Gender.MALE));
+            User subject = createUser(SUBJECT_ONE_NAME, Gender.MALE, EnumSet.of(Gender.FEMALE));
+            users.save(author);
+            users.save(subject);
+            users.saveProfileNote(new ProfileNote(
+                    author.getId(),
+                    subject.getId(),
+                    "Timezone-sensitive note",
+                    Instant.parse("2026-01-31T23:30:00Z"),
+                    UPDATED_NOTE_INSTANT));
+            AppSession.getInstance().setCurrentUser(author);
+
+            NotesViewModel viewModel = new NotesViewModel(
+                    profileUseCases,
+                    new StorageUiUserStore(users),
+                    AppSession.getInstance(),
+                    configuredZone,
+                    TEST_DISPATCHER);
+            viewModel.initialize();
+
+            assertTrue(JavaFxTestSupport.waitUntil(() -> viewModel.getNotes().size() == 1, 5000));
+            String expected = DateTimeFormatter.ofPattern("MMM d, yyyy")
+                    .withZone(configuredZone)
+                    .format(UPDATED_NOTE_INSTANT);
+            String utcRendered = DateTimeFormatter.ofPattern("MMM d, yyyy")
+                    .withZone(ZoneId.of("UTC"))
+                    .format(UPDATED_NOTE_INSTANT);
+            assertEquals(expected, viewModel.getNotes().getFirst().lastModified());
+            assertNotEquals(expected, utcRendered);
+
+            viewModel.dispose();
+        } finally {
+            TimeZone.setDefault(originalDefault);
+        }
     }
 
     @Test
@@ -109,7 +180,11 @@ class NotesViewModelTest {
         AppSession.getInstance().setCurrentUser(author);
 
         NotesViewModel viewModel = new NotesViewModel(
-                profileUseCases, new StorageUiUserStore(users), AppSession.getInstance(), TEST_DISPATCHER);
+                profileUseCases,
+                new StorageUiUserStore(users),
+                AppSession.getInstance(),
+                config.safety().userTimeZone(),
+                TEST_DISPATCHER);
         viewModel.initialize();
 
         assertTrue(JavaFxTestSupport.waitUntil(viewModel.getNotes()::isEmpty, 5000));
@@ -132,29 +207,31 @@ class NotesViewModelTest {
                 new ProfileActivationPolicy(),
                 new InProcessAppEventBus());
 
-        User author = createUser("Morgan", Gender.FEMALE, EnumSet.of(Gender.MALE));
-        User subject = createUser("Riley", Gender.MALE, EnumSet.of(Gender.FEMALE));
+        User author = createUser(AUTHOR_NAME, Gender.FEMALE, EnumSet.of(Gender.MALE));
+        User subject = createUser(SUBJECT_ONE_NAME, Gender.MALE, EnumSet.of(Gender.FEMALE));
         users.save(author);
         users.save(subject);
         users.saveProfileNote(ProfileNote.create(author.getId(), subject.getId(), "Thoughtful and funny"));
         AppSession.getInstance().setCurrentUser(author);
 
         NotesViewModel viewModel = new NotesViewModel(
-                profileUseCases, new StorageUiUserStore(users), AppSession.getInstance(), TEST_DISPATCHER);
+                profileUseCases,
+                new StorageUiUserStore(users),
+                AppSession.getInstance(),
+                config.safety().userTimeZone(),
+                TEST_DISPATCHER);
         viewModel.initialize();
 
         assertTrue(JavaFxTestSupport.waitUntil(() -> viewModel.getNotes().size() == 1, 5000));
         viewModel.selectNote(viewModel.getNotes().get(0));
-        viewModel.selectedNoteContentProperty().set("Updated note content for Riley");
+        viewModel.selectedNoteContentProperty().set(UPDATED_RILEY_NOTE);
         viewModel.saveSelectedNote();
 
         assertTrue(JavaFxTestSupport.waitUntil(
-                () -> "Updated note content for Riley"
-                        .equals(viewModel.getNotes().get(0).content()),
-                5000));
+                () -> UPDATED_RILEY_NOTE.equals(viewModel.getNotes().get(0).content()), 5000));
         assertTrue(JavaFxTestSupport.waitUntil(
                 () -> fixtureNoteContent(users, author.getId(), subject.getId())
-                        .filter("Updated note content for Riley"::equals)
+                        .filter(UPDATED_RILEY_NOTE::equals)
                         .isPresent(),
                 5000));
 
@@ -178,14 +255,18 @@ class NotesViewModelTest {
                 new InProcessAppEventBus());
 
         User author = createUser("Jordan", Gender.FEMALE, EnumSet.of(Gender.MALE));
-        User subject = createUser("Taylor", Gender.MALE, EnumSet.of(Gender.FEMALE));
+        User subject = createUser(SUBJECT_TWO_NAME, Gender.MALE, EnumSet.of(Gender.FEMALE));
         users.save(author);
         users.save(subject);
         users.saveProfileNote(ProfileNote.create(author.getId(), subject.getId(), "Great travel stories"));
         AppSession.getInstance().setCurrentUser(author);
 
         NotesViewModel viewModel = new NotesViewModel(
-                profileUseCases, new StorageUiUserStore(users), AppSession.getInstance(), TEST_DISPATCHER);
+                profileUseCases,
+                new StorageUiUserStore(users),
+                AppSession.getInstance(),
+                config.safety().userTimeZone(),
+                TEST_DISPATCHER);
         viewModel.initialize();
 
         assertTrue(JavaFxTestSupport.waitUntil(() -> viewModel.getNotes().size() == 1, 5000));

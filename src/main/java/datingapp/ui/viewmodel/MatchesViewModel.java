@@ -5,7 +5,10 @@ import datingapp.app.usecase.matching.MatchingUseCases;
 import datingapp.app.usecase.matching.MatchingUseCases.PendingLikersQuery;
 import datingapp.app.usecase.matching.MatchingUseCases.RecordLikeCommand;
 import datingapp.app.usecase.matching.MatchingUseCases.RemoveLikeCommand;
+import datingapp.app.usecase.matching.MatchingUseCases.SentLikesQuery;
+import datingapp.app.usecase.profile.ProfileUseCases;
 import datingapp.app.usecase.social.SocialUseCases;
+import datingapp.app.usecase.social.SocialUseCases.ListBlockedUsersQuery;
 import datingapp.app.usecase.social.SocialUseCases.RelationshipCommand;
 import datingapp.app.usecase.social.SocialUseCases.ReportCommand;
 import datingapp.core.AppConfig;
@@ -72,6 +75,7 @@ public class MatchesViewModel extends BaseViewModel {
     private final MatchingService matchingService;
     private final RecommendationService dailyService;
     private final MatchingUseCases matchingUseCases;
+    private final ProfileUseCases profileUseCases;
     private final SocialUseCases socialUseCases;
     private final AppConfig config;
     private final AppSession session;
@@ -113,14 +117,18 @@ public class MatchesViewModel extends BaseViewModel {
             MatchingService matchingService,
             RecommendationService dailyService,
             MatchingUseCases matchingUseCases,
+            ProfileUseCases profileUseCases,
             SocialUseCases socialUseCases,
             AppConfig config) {
 
         public Dependencies {
-            Objects.requireNonNull(matchData, "matchData cannot be null");
-            Objects.requireNonNull(userStore, "userStore cannot be null");
-            Objects.requireNonNull(matchingService, "matchingService cannot be null");
             Objects.requireNonNull(dailyService, "dailyService cannot be null");
+            if (matchingUseCases == null || profileUseCases == null || socialUseCases == null) {
+                Objects.requireNonNull(matchData, "matchData cannot be null when use-case slices are absent");
+                Objects.requireNonNull(userStore, "userStore cannot be null when use-case slices are absent");
+                Objects.requireNonNull(
+                        matchingService, "matchingService cannot be null when use-case slices are absent");
+            }
             Objects.requireNonNull(config, "config cannot be null");
         }
     }
@@ -133,7 +141,7 @@ public class MatchesViewModel extends BaseViewModel {
             AppConfig config,
             AppSession session) {
         this(
-                new Dependencies(matchData, userStore, matchingService, dailyService, null, null, config),
+                new Dependencies(matchData, userStore, matchingService, dailyService, null, null, null, config),
                 session,
                 new JavaFxUiThreadDispatcher());
     }
@@ -147,7 +155,8 @@ public class MatchesViewModel extends BaseViewModel {
             AppConfig config,
             AppSession session) {
         this(
-                new Dependencies(matchData, userStore, matchingService, dailyService, matchingUseCases, null, config),
+                new Dependencies(
+                        matchData, userStore, matchingService, dailyService, matchingUseCases, null, null, config),
                 session,
                 new JavaFxUiThreadDispatcher());
     }
@@ -160,6 +169,7 @@ public class MatchesViewModel extends BaseViewModel {
         this.matchingService = resolvedDependencies.matchingService();
         this.dailyService = resolvedDependencies.dailyService();
         this.matchingUseCases = resolvedDependencies.matchingUseCases();
+        this.profileUseCases = resolvedDependencies.profileUseCases();
         this.socialUseCases = resolvedDependencies.socialUseCases();
         this.config = resolvedDependencies.config();
         this.session = Objects.requireNonNull(session, "session cannot be null");
@@ -269,6 +279,10 @@ public class MatchesViewModel extends BaseViewModel {
     private record MatchFetchResult(List<MatchCardData> cards, int totalCount, boolean hasMore) {}
 
     private MatchFetchResult fetchMatchesFromStorage(UUID userId, long expectedEpoch) {
+        if (matchingUseCases != null && profileUseCases != null) {
+            return fetchMatchesFromUseCases(userId, expectedEpoch);
+        }
+
         // Reservce PAGE_SIZE items atomically to prevent concurrent callers of
         // fetchMatchesFromStorage from fetching the same page (TOCTOU race).
         // currentMatchOffset is advanced immediately; we adjust it downward below
@@ -293,6 +307,45 @@ public class MatchesViewModel extends BaseViewModel {
         List<UUID> otherUserIds =
                 page.items().stream().map(m -> m.getOtherUser(userId)).toList();
         Map<UUID, User> otherUsers = userStore.findByIds(new HashSet<>(otherUserIds));
+
+        List<MatchCardData> cardData = new ArrayList<>();
+        for (Match match : page.items()) {
+            UUID otherUserId = match.getOtherUser(userId);
+            User otherUser = otherUsers.get(otherUserId);
+            if (otherUser != null) {
+                MatchQualitySummary qualitySummary = resolveMatchQualitySummary(userId, match);
+                cardData.add(new MatchCardData(
+                        match.getId(),
+                        otherUser.getId(),
+                        otherUser.getName(),
+                        TextUtil.formatTimeAgo(match.getCreatedAt()),
+                        match.getCreatedAt(),
+                        qualitySummary.score(),
+                        qualitySummary.label()));
+            }
+        }
+        return new MatchFetchResult(List.copyOf(cardData), page.totalCount(), page.hasMore());
+    }
+
+    private MatchFetchResult fetchMatchesFromUseCases(UUID userId, long expectedEpoch) {
+        int offset = currentMatchOffset.getAndAdd(PAGE_SIZE);
+        var matchesResult = matchingUseCases.listPagedMatches(
+                new MatchingUseCases.ListPagedMatchesQuery(UserContext.ui(userId), PAGE_SIZE, offset));
+        if (!matchesResult.success()) {
+            throw new IllegalStateException(
+                    matchesResult.error() != null ? matchesResult.error().message() : "Failed to load matches");
+        }
+
+        UiDataAdapters.UiPage<Match> page =
+                UiDataAdapters.UiPage.from(matchesResult.data().page());
+        int actualCount = page.items().size();
+        if (actualCount < PAGE_SIZE && refreshEpoch.get() == expectedEpoch) {
+            currentMatchOffset.addAndGet(actualCount - PAGE_SIZE);
+        }
+
+        List<UUID> otherUserIds =
+                page.items().stream().map(match -> match.getOtherUser(userId)).toList();
+        Map<UUID, User> otherUsers = loadUsersByIds(otherUserIds);
 
         List<MatchCardData> cardData = new ArrayList<>();
         for (Match match : page.items()) {
@@ -343,18 +396,15 @@ public class MatchesViewModel extends BaseViewModel {
         for (PendingLiker pending : pendingLikers) {
             User liker = pending.user();
             if (liker != null && liker.getState() == UserState.ACTIVE) {
-                Like like = matchData.getLike(liker.getId(), userId).orElse(null);
-                if (like != null) {
-                    int age = liker.getAge(config.safety().userTimeZone()).orElse(0);
-                    received.add(new LikeCardData(
-                            liker.getId(),
-                            like.id(),
-                            liker.getName(),
-                            age,
-                            summarizeBio(liker),
-                            TextUtil.formatTimeAgo(pending.likedAt()),
-                            pending.likedAt()));
-                }
+                int age = liker.getAge(config.safety().userTimeZone()).orElse(0);
+                received.add(new LikeCardData(
+                        liker.getId(),
+                        null,
+                        liker.getName(),
+                        age,
+                        summarizeBio(liker),
+                        TextUtil.formatTimeAgo(pending.likedAt()),
+                        pending.likedAt()));
             }
         }
         received.sort(likeTimeComparator());
@@ -362,6 +412,10 @@ public class MatchesViewModel extends BaseViewModel {
     }
 
     private List<LikeCardData> fetchSentLikesFromStorage(UUID userId) {
+        if (matchingUseCases != null && profileUseCases != null && socialUseCases != null) {
+            return fetchSentLikesFromUseCases(userId);
+        }
+
         Set<UUID> blocked = matchData.getBlockedUserIds(userId);
         Set<UUID> matched = getMatchedUserIds(userId);
         Set<UUID> allLikedOrPassedIds = matchData.getLikedOrPassedUserIds(userId);
@@ -388,6 +442,50 @@ public class MatchesViewModel extends BaseViewModel {
                             TextUtil.formatTimeAgo(like.createdAt()),
                             like.createdAt()));
                 }
+            }
+        }
+        sent.sort(likeTimeComparator());
+        return sent;
+    }
+
+    private List<LikeCardData> fetchSentLikesFromUseCases(UUID userId) {
+        var blockedUsersResult = socialUseCases.listBlockedUsers(new ListBlockedUsersQuery(UserContext.ui(userId)));
+        if (!blockedUsersResult.success()) {
+            throw new IllegalStateException(
+                    blockedUsersResult.error() != null
+                            ? blockedUsersResult.error().message()
+                            : "Failed to load blocked users");
+        }
+
+        Set<UUID> blockedUserIds = blockedUsersResult.data().stream()
+                .map(SocialUseCases.BlockedUserSummary::userId)
+                .collect(java.util.stream.Collectors.toSet());
+        var sentLikesResult = matchingUseCases.sentLikes(new SentLikesQuery(UserContext.ui(userId)));
+        if (!sentLikesResult.success()) {
+            throw new IllegalStateException(
+                    sentLikesResult.error() != null ? sentLikesResult.error().message() : "Failed to load sent likes");
+        }
+
+        List<MatchingUseCases.SentLikeSnapshot> sentLikeSnapshots = sentLikesResult.data().stream()
+                .filter(sentLike -> !blockedUserIds.contains(sentLike.userId()))
+                .toList();
+        Map<UUID, User> potentialUsers = loadUsersByIds(sentLikeSnapshots.stream()
+                .map(MatchingUseCases.SentLikeSnapshot::userId)
+                .toList());
+        List<LikeCardData> sent = new ArrayList<>();
+
+        for (MatchingUseCases.SentLikeSnapshot sentLike : sentLikeSnapshots) {
+            User otherUser = potentialUsers.get(sentLike.userId());
+            if (otherUser != null && otherUser.getState() == UserState.ACTIVE) {
+                int age = otherUser.getAge(config.safety().userTimeZone()).orElse(0);
+                sent.add(new LikeCardData(
+                        otherUser.getId(),
+                        sentLike.likeId(),
+                        otherUser.getName(),
+                        age,
+                        summarizeBio(otherUser),
+                        TextUtil.formatTimeAgo(sentLike.likedAt()),
+                        sentLike.likedAt()));
             }
         }
         sent.sort(likeTimeComparator());
@@ -821,6 +919,15 @@ public class MatchesViewModel extends BaseViewModel {
             matched.add(match.getOtherUser(userId));
         }
         return matched;
+    }
+
+    private Map<UUID, User> loadUsersByIds(List<UUID> userIds) {
+        var usersResult = profileUseCases.getUsersByIds(new ProfileUseCases.GetUsersByIdsQuery(userIds));
+        if (!usersResult.success()) {
+            throw new IllegalStateException(
+                    usersResult.error() != null ? usersResult.error().message() : "Failed to load users");
+        }
+        return usersResult.data();
     }
 
     private Comparator<LikeCardData> likeTimeComparator() {

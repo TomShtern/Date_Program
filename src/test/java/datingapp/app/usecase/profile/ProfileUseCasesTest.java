@@ -3,6 +3,7 @@ package datingapp.app.usecase.profile;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -162,6 +163,34 @@ class ProfileUseCasesTest {
         AppEvent.ProfileCompleted event = (AppEvent.ProfileCompleted) publishedEvents.get(1);
         assertEquals(user.getId(), event.userId());
         assertNotNull(event.occurredAt());
+    }
+
+    @Test
+    @DisplayName("saveProfile should not publish ProfileCompleted when the profile remains incomplete")
+    void saveProfileDoesNotPublishProfileCompletedWhenProfileRemainsIncomplete() {
+        User user = User.StorageBuilder.create(UUID.randomUUID(), "Draft User", AppClock.now())
+                .state(User.UserState.INCOMPLETE)
+                .bio("Draft bio only")
+                .build();
+
+        List<AppEvent> publishedEvents = new ArrayList<>();
+        ProfileUseCases eventUseCases = new ProfileUseCases(
+                userStorage,
+                profileService,
+                validationService,
+                metricsService,
+                achievementService,
+                config,
+                new ProfileActivationPolicy(),
+                capturingEventBus(publishedEvents));
+
+        var result = eventUseCases.saveProfile(new SaveProfileCommand(UserContext.cli(user.getId()), user));
+
+        assertTrue(result.success());
+        assertFalse(result.data().activated());
+        assertEquals(1, publishedEvents.size());
+        assertTrue(publishedEvents.getFirst() instanceof AppEvent.ProfileSaved);
+        assertFalse(publishedEvents.stream().anyMatch(event -> event instanceof AppEvent.ProfileCompleted));
     }
 
     @Test
@@ -337,6 +366,27 @@ class ProfileUseCasesTest {
         assertTrue(getResult.success());
         assertEquals(2, listResult.data().size());
         assertEquals(first.getId(), getResult.data().getId());
+    }
+
+    @Test
+    @DisplayName("getUsersByIds returns a stable map and ignores unknown IDs")
+    void getUsersByIdsReturnsStableMapAndIgnoresUnknownIds() {
+        User first = TestUserFactory.createActiveUser(UUID.randomUUID(), "First User");
+        User second = TestUserFactory.createActiveUser(UUID.randomUUID(), "Second User");
+        UUID unknownId = UUID.randomUUID();
+        userStorage.save(first);
+        userStorage.save(second);
+
+        var result = useCases.getUsersByIds(
+                new ProfileUseCases.GetUsersByIdsQuery(List.of(second.getId(), unknownId, first.getId())));
+
+        assertTrue(result.success());
+        assertEquals(
+                List.of(second.getId(), first.getId()),
+                List.copyOf(result.data().keySet()));
+        assertSame(second, result.data().get(second.getId()));
+        assertSame(first, result.data().get(first.getId()));
+        assertFalse(result.data().containsKey(unknownId));
     }
 
     @Test

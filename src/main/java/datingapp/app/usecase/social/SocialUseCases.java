@@ -27,6 +27,7 @@ public class SocialUseCases {
     private static final String CONTEXT_REQUIRED = "Context is required";
     private static final String CONTEXT_AND_TARGET_REQUIRED = "Context and target user are required";
     private static final String CONNECTION_SERVICE_NOT_CONFIGURED = "ConnectionService is not configured";
+    private static final String TRUST_SAFETY_SERVICE_NOT_CONFIGURED = "TrustSafetyService is not configured";
 
     private enum CompatibilityMode {
         COMPATIBILITY
@@ -109,7 +110,7 @@ public class SocialUseCases {
             return UseCaseResult.failure(UseCaseError.validation(CONTEXT_AND_TARGET_REQUIRED));
         }
         if (trustSafetyService == null) {
-            return UseCaseResult.failure(UseCaseError.dependency("TrustSafetyService is not configured"));
+            return UseCaseResult.failure(UseCaseError.dependency(TRUST_SAFETY_SERVICE_NOT_CONFIGURED));
         }
         try {
             TrustSafetyService.BlockResult result =
@@ -127,6 +128,42 @@ public class SocialUseCases {
         }
     }
 
+    public UseCaseResult<List<BlockedUserSummary>> listBlockedUsers(ListBlockedUsersQuery query) {
+        if (query == null || query.context() == null) {
+            return UseCaseResult.failure(UseCaseError.validation(CONTEXT_REQUIRED));
+        }
+        if (trustSafetyService == null) {
+            return UseCaseResult.failure(UseCaseError.dependency(TRUST_SAFETY_SERVICE_NOT_CONFIGURED));
+        }
+        try {
+            List<BlockedUserSummary> blockedUsers =
+                    trustSafetyService.getBlockedUsers(query.context().userId()).stream()
+                            .map(user -> new BlockedUserSummary(user.getId(), user.getName()))
+                            .toList();
+            return UseCaseResult.success(blockedUsers);
+        } catch (Exception e) {
+            return UseCaseResult.failure(UseCaseError.internal("Failed to load blocked users: " + e.getMessage()));
+        }
+    }
+
+    public UseCaseResult<Void> unblockUser(RelationshipCommand command) {
+        if (command == null || command.context() == null || command.targetUserId() == null) {
+            return UseCaseResult.failure(UseCaseError.validation(CONTEXT_AND_TARGET_REQUIRED));
+        }
+        if (trustSafetyService == null) {
+            return UseCaseResult.failure(UseCaseError.dependency(TRUST_SAFETY_SERVICE_NOT_CONFIGURED));
+        }
+        try {
+            boolean success = trustSafetyService.unblock(command.context().userId(), command.targetUserId());
+            if (!success) {
+                return UseCaseResult.failure(UseCaseError.conflict("Failed to unblock user"));
+            }
+            return UseCaseResult.success(null);
+        } catch (Exception e) {
+            return UseCaseResult.failure(UseCaseError.internal("Failed to unblock user: " + e.getMessage()));
+        }
+    }
+
     public UseCaseResult<ReportOutcome> reportUser(ReportCommand command) {
         if (command == null
                 || command.context() == null
@@ -135,7 +172,7 @@ public class SocialUseCases {
             return UseCaseResult.failure(UseCaseError.validation("Context, target user and reason are required"));
         }
         if (trustSafetyService == null) {
-            return UseCaseResult.failure(UseCaseError.dependency("TrustSafetyService is not configured"));
+            return UseCaseResult.failure(UseCaseError.dependency(TRUST_SAFETY_SERVICE_NOT_CONFIGURED));
         }
         try {
             TrustSafetyService.ReportResult result = trustSafetyService.report(
@@ -382,6 +419,10 @@ public class SocialUseCases {
     }
 
     public static record RelationshipCommand(UserContext context, UUID targetUserId) {}
+
+    public static record ListBlockedUsersQuery(UserContext context) {}
+
+    public static record BlockedUserSummary(UUID userId, String name) {}
 
     public static record ReportCommand(
             UserContext context, UUID targetUserId, Report.Reason reason, String description, boolean blockUser) {}

@@ -1,24 +1,16 @@
 package datingapp.ui.viewmodel;
 
-import datingapp.core.AppConfig;
+import datingapp.app.usecase.common.UserContext;
+import datingapp.app.usecase.dashboard.DashboardUseCases;
 import datingapp.core.AppSession;
-import datingapp.core.connection.ConnectionService;
-import datingapp.core.matching.RecommendationService;
-import datingapp.core.matching.RecommendationService.DailyPick;
-import datingapp.core.matching.RecommendationService.DailyStatus;
-import datingapp.core.metrics.AchievementService;
 import datingapp.core.metrics.EngagementDomain.Achievement;
-import datingapp.core.metrics.EngagementDomain.Achievement.UserAchievement;
 import datingapp.core.model.User;
-import datingapp.core.profile.ProfileService;
 import datingapp.ui.UiPreferencesStore;
 import datingapp.ui.async.JavaFxUiThreadDispatcher;
 import datingapp.ui.async.UiThreadDispatcher;
-import datingapp.ui.viewmodel.UiDataAdapters.UiMatchDataAccess;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import javafx.beans.property.BooleanProperty;
@@ -44,12 +36,7 @@ public class DashboardViewModel extends BaseViewModel {
     private static final String DEFAULT_PICK_EMPTY_MESSAGE =
             "No daily pick is available right now. Check back tomorrow.";
 
-    private final RecommendationService dailyService;
-    private final UiMatchDataAccess matchData;
-    private final AchievementService achievementService;
-    private final ConnectionService messagingService;
-    private final ProfileService profileCompletionService;
-    private final AppConfig config;
+    private final DashboardUseCases dashboardUseCases;
     private final AppSession session;
     private final UiPreferencesStore uiPreferencesStore;
 
@@ -72,13 +59,7 @@ public class DashboardViewModel extends BaseViewModel {
     private Set<String> latestAchievementIds = Set.of();
     private List<Achievement> newlyUnlockedAchievements = List.of();
 
-    public record Dependencies(
-            RecommendationService dailyService,
-            UiMatchDataAccess matchData,
-            AchievementService achievementService,
-            ConnectionService messagingService,
-            ProfileService profileCompletionService,
-            AppConfig config) {}
+    public record Dependencies(DashboardUseCases dashboardUseCases) {}
 
     public DashboardViewModel(Dependencies dependencies, AppSession session) {
         this(dependencies, session, new JavaFxUiThreadDispatcher(), new UiPreferencesStore());
@@ -95,15 +76,8 @@ public class DashboardViewModel extends BaseViewModel {
             UiPreferencesStore uiPreferencesStore) {
         super("dashboard", uiDispatcher);
         Dependencies resolvedDependencies = Objects.requireNonNull(dependencies, "dependencies cannot be null");
-        this.dailyService = Objects.requireNonNull(resolvedDependencies.dailyService(), "dailyService cannot be null");
-        this.matchData = Objects.requireNonNull(resolvedDependencies.matchData(), "matchData cannot be null");
-        this.achievementService =
-                Objects.requireNonNull(resolvedDependencies.achievementService(), "achievementService cannot be null");
-        this.messagingService =
-                Objects.requireNonNull(resolvedDependencies.messagingService(), "messagingService cannot be null");
-        this.profileCompletionService = Objects.requireNonNull(
-                resolvedDependencies.profileCompletionService(), "profileCompletionService cannot be null");
-        this.config = Objects.requireNonNull(resolvedDependencies.config(), "config cannot be null");
+        this.dashboardUseCases =
+                Objects.requireNonNull(resolvedDependencies.dashboardUseCases(), "dashboardUseCases cannot be null");
         this.session = Objects.requireNonNull(session, "session cannot be null");
         this.uiPreferencesStore = Objects.requireNonNull(uiPreferencesStore, "uiPreferencesStore cannot be null");
     }
@@ -146,12 +120,14 @@ public class DashboardViewModel extends BaseViewModel {
         }
 
         asyncScope.runFireAndForget("mark daily pick viewed", () -> {
-            try {
-                dailyService.markDailyPickViewed(user.getId());
+            var result = dashboardUseCases.markDailyPickViewed(
+                    new DashboardUseCases.MarkDailyPickViewedCommand(UserContext.ui(user.getId())));
+            if (result.success()) {
                 asyncScope.dispatchToUi(() -> dailyPickSeen.set(true));
-            } catch (Exception e) {
-                logError("Failed to mark daily pick viewed", e);
-                notifyError("Failed to update daily pick status", e);
+            } else {
+                Exception failure = new IllegalStateException(result.error().message());
+                logError("Failed to mark daily pick viewed", failure);
+                notifyError("Failed to update daily pick status", failure);
             }
         });
     }
@@ -227,54 +203,31 @@ public class DashboardViewModel extends BaseViewModel {
 
     private DashboardData loadDashboardData(User user) {
         try {
-            String completionText = profileCompletionService.calculate(user).getDisplayString();
-            DailyStatus status = dailyService.getStatus(user.getId());
-            String likesText = status.hasUnlimitedLikes()
-                    ? "Likes: ∞"
-                    : "Likes: " + status.likesUsed() + "/" + (status.likesUsed() + status.likesRemaining());
-
-            int activeMatchCount = matchData.countActiveMatchesFor(user.getId());
-            Optional<DailyPick> dailyPick = dailyService.getDailyPick(user);
-            String pickName = DEFAULT_PICK_TEXT;
-            String pickReason = "";
-            UUID pickUserId = null;
-            boolean pickSeen = false;
-            boolean pickAvailable = false;
-            String pickEmptyMessage = DEFAULT_PICK_EMPTY_MESSAGE;
-            if (dailyPick.isPresent()) {
-                DailyPick pick = dailyPick.get();
-                User pickUser = pick.user();
-                int age = pickUser.getAge(config.safety().userTimeZone()).orElse(0);
-                pickName = pickUser.getName() + ", " + age;
-                pickUserId = pickUser.getId();
-                pickReason = pick.reason();
-                pickSeen = pick.alreadySeen();
-                pickAvailable = true;
-                pickEmptyMessage = "";
+            var summaryResult = dashboardUseCases.getDashboardSummary(
+                    new DashboardUseCases.DashboardSummaryQuery(UserContext.ui(user.getId())));
+            if (!summaryResult.success()) {
+                return DashboardData.empty(
+                        user.getName(),
+                        new IllegalStateException(summaryResult.error().message()));
             }
 
-            List<UserAchievement> achievements = achievementService.getUnlocked(user.getId());
-            int unreadCount = messagingService.getTotalUnreadCount(user.getId());
-            int pendingRequests = messagingService.countPendingRequestsFor(user.getId());
-            int unreadNotifications = messagingService.getUnreadNotificationCount(user.getId());
-            String nudgeMessage = computeProfileNudge(user);
-
+            DashboardUseCases.DashboardSummaryResult summary = summaryResult.data();
             return new DashboardData(
-                    user.getName(),
-                    completionText,
-                    likesText,
-                    String.valueOf(activeMatchCount),
-                    pickName,
-                    pickReason,
-                    pickUserId,
-                    pickSeen,
-                    pickAvailable,
-                    pickEmptyMessage,
-                    achievements,
-                    unreadCount,
-                    pendingRequests,
-                    unreadNotifications,
-                    nudgeMessage,
+                    summary.userName(),
+                    summary.completionText(),
+                    summary.dailyStatus().displayText(),
+                    String.valueOf(summary.totalMatches()),
+                    summary.dailyPick().displayName(),
+                    summary.dailyPick().reason(),
+                    summary.dailyPick().userId(),
+                    summary.dailyPick().alreadySeen(),
+                    summary.dailyPick().available(),
+                    summary.dailyPick().emptyMessage(),
+                    summary.achievementSummary().unlockedAchievements(),
+                    summary.unreadSummary().unreadMessages(),
+                    summary.unreadSummary().pendingRequests(),
+                    summary.unreadSummary().unreadNotifications(),
+                    summary.profileNudgeMessage(),
                     null);
         } catch (Exception e) {
             return DashboardData.empty(user.getName(), e);
@@ -312,7 +265,7 @@ public class DashboardViewModel extends BaseViewModel {
         Set<String> seenAchievementIds = uiPreferencesStore.loadSeenAchievementIds();
         newlyUnlockedAchievements = data.achievements().stream()
                 .filter(ua -> !seenAchievementIds.contains(ua.id().toString()))
-                .map(UserAchievement::achievement)
+                .map(DashboardUseCases.UnlockedAchievement::achievement)
                 .toList();
         newAchievementsAvailable.set(!newlyUnlockedAchievements.isEmpty());
 
@@ -321,29 +274,6 @@ public class DashboardViewModel extends BaseViewModel {
             notifyError(
                     detail == null || detail.isBlank() ? "Some dashboard data failed to load" : detail, data.error());
         }
-    }
-
-    private String computeProfileNudge(User user) {
-        if (user == null) {
-            return "";
-        }
-        String bioText = user.getBio();
-        if (bioText == null || bioText.isBlank()) {
-            return "Add a bio to boost your profile!";
-        }
-        if (user.getPhotoUrls() == null || user.getPhotoUrls().isEmpty()) {
-            return "Upload a photo to get more matches!";
-        }
-        if (!user.hasLocation()) {
-            return "Set your location to discover people nearby.";
-        }
-        if (user.getInterests() == null || user.getInterests().size() < 3) {
-            return "Pick at least 3 interests so your personality shines.";
-        }
-        if (profileCompletionService.countLifestyleFields(user) < 3) {
-            return "Add a few lifestyle details to improve match quality.";
-        }
-        return "";
     }
 
     private record DashboardData(
@@ -357,7 +287,7 @@ public class DashboardViewModel extends BaseViewModel {
             boolean pickSeen,
             boolean pickAvailable,
             String pickEmptyMessage,
-            List<UserAchievement> achievements,
+            List<DashboardUseCases.UnlockedAchievement> achievements,
             int unreadCount,
             int pendingRequests,
             int unreadNotifications,

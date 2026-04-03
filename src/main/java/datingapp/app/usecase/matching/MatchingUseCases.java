@@ -377,7 +377,7 @@ public class MatchingUseCases {
         }
         try {
             UUID userId = query.context().userId();
-            PageData<Match> page = matchingService.getPageOfMatchesForUser(userId, query.offset(), query.limit());
+            PageData<Match> page = interactionStorage.getPageOfActiveMatchesFor(userId, query.offset(), query.limit());
             Set<UUID> otherIds = new HashSet<>();
             for (Match match : page.items()) {
                 otherIds.add(match.getOtherUser(userId));
@@ -398,6 +398,28 @@ public class MatchingUseCases {
                     matchingService.findPendingLikersWithTimes(query.context().userId()));
         } catch (Exception e) {
             return UseCaseResult.failure(UseCaseError.internal("Failed to load pending likers: " + e.getMessage()));
+        }
+    }
+
+    public UseCaseResult<List<SentLikeSnapshot>> sentLikes(SentLikesQuery query) {
+        if (query == null || query.context() == null) {
+            return UseCaseResult.failure(UseCaseError.validation(CONTEXT_REQUIRED));
+        }
+        try {
+            UUID userId = query.context().userId();
+            Set<UUID> matchedUserIds = interactionStorage.getMatchedCounterpartIds(userId);
+            List<SentLikeSnapshot> sentLikes = interactionStorage.getLikedOrPassedUserIds(userId).stream()
+                    .filter(otherUserId -> !matchedUserIds.contains(otherUserId))
+                    .map(otherUserId -> interactionStorage
+                            .getLike(userId, otherUserId)
+                            .filter(like -> like.direction() == Like.Direction.LIKE)
+                            .map(like -> new SentLikeSnapshot(otherUserId, like.id(), like.createdAt())))
+                    .flatMap(Optional::stream)
+                    .sorted((left, right) -> right.likedAt().compareTo(left.likedAt()))
+                    .toList();
+            return UseCaseResult.success(sentLikes);
+        } catch (Exception e) {
+            return UseCaseResult.failure(UseCaseError.internal("Failed to load sent likes: " + e.getMessage()));
         }
     }
 
@@ -599,6 +621,10 @@ public class MatchingUseCases {
     public static record PagedMatchesResult(PageData<Match> page, Map<UUID, User> usersById) {}
 
     public static record PendingLikersQuery(UserContext context) {}
+
+    public static record SentLikesQuery(UserContext context) {}
+
+    public static record SentLikeSnapshot(UUID userId, UUID likeId, Instant likedAt) {}
 
     public static record StandoutsQuery(UserContext context, User currentUser) {}
 

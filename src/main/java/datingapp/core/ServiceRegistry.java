@@ -1,6 +1,7 @@
 package datingapp.core;
 
 import datingapp.app.event.AppEventBus;
+import datingapp.app.usecase.dashboard.DashboardUseCases;
 import datingapp.app.usecase.matching.MatchingUseCases;
 import datingapp.app.usecase.messaging.MessagingUseCases;
 import datingapp.app.usecase.profile.ProfileInsightsUseCases;
@@ -74,6 +75,7 @@ public final class ServiceRegistry {
 
     private final MessagingUseCases messagingUseCases;
     private final MatchingUseCases matchingUseCases;
+    private final DashboardUseCases dashboardUseCases;
     private final ProfileUseCases profileUseCases;
     private final VerificationUseCases verificationUseCases;
     private final SocialUseCases socialUseCases;
@@ -148,6 +150,16 @@ public final class ServiceRegistry {
                 .matchQualityService(this.matchQualityService)
                 .eventBus(this.eventBus)
                 .build();
+        this.dashboardUseCases = builder.dashboardUseCases != null
+                ? Objects.requireNonNull(builder.dashboardUseCases, "dashboardUseCases cannot be null")
+                : new DashboardUseCases(
+                        this.userStorage,
+                        this.recommendationService,
+                        this.interactionStorage,
+                        this.achievementService,
+                        this.connectionService,
+                        this.profileService,
+                        this.config);
         this.profileUseCases = ProfileUseCases.builder()
                 .userStorage(this.userStorage)
                 .profileService(this.profileService)
@@ -193,6 +205,7 @@ public final class ServiceRegistry {
         private ProfileMutationUseCases profileMutationUseCases;
         private ProfileInsightsUseCases profileInsightsUseCases;
         private ProfileNotesUseCases profileNotesUseCases;
+        private DashboardUseCases dashboardUseCases;
         private ConnectionService connectionService;
         private AppEventBus eventBus;
         private ProfileActivationPolicy activationPolicy = new ProfileActivationPolicy();
@@ -322,6 +335,11 @@ public final class ServiceRegistry {
 
         public Builder profileNotesUseCases(ProfileNotesUseCases profileNotesUseCases) {
             this.profileNotesUseCases = profileNotesUseCases;
+            return this;
+        }
+
+        public Builder dashboardUseCases(DashboardUseCases dashboardUseCases) {
+            this.dashboardUseCases = dashboardUseCases;
             return this;
         }
 
@@ -456,6 +474,10 @@ public final class ServiceRegistry {
 
     public MatchingUseCases getMatchingUseCases() {
         return matchingUseCases;
+    }
+
+    public DashboardUseCases getDashboardUseCases() {
+        return dashboardUseCases;
     }
 
     public ProfileUseCases getProfileUseCases() {

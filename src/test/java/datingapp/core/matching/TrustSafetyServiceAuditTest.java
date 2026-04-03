@@ -255,6 +255,34 @@ class TrustSafetyServiceAuditTest {
         }
     }
 
+    @Test
+    @DisplayName("report succeeds even when follow-up block persistence fails")
+    void reportSucceedsEvenWhenFollowUpBlockPersistenceFails() {
+        FailingBlockTrustSafetyStorage trustSafetyStorage = new FailingBlockTrustSafetyStorage();
+        TestStorages.Interactions interactionStorage = new TestStorages.Interactions();
+        TestStorages.Users userStorage = new TestStorages.Users();
+
+        TrustSafetyService service = TrustSafetyService.builder(
+                        trustSafetyStorage,
+                        interactionStorage,
+                        userStorage,
+                        AppConfig.builder().autoBanThreshold(3).build())
+                .build();
+
+        User reporter = createActiveUser("Reporter");
+        User reported = createActiveUser("Reported");
+        userStorage.save(reporter);
+        userStorage.save(reported);
+
+        TrustSafetyService.ReportResult result = service.report(
+                reporter.getId(), reported.getId(), Report.Reason.SPAM, "follow-up block should fail", true);
+
+        assertTrue(result.success());
+        assertFalse(result.userWasBanned());
+        assertTrue(trustSafetyStorage.hasReported(reporter.getId(), reported.getId()));
+        assertFalse(trustSafetyStorage.isBlocked(reporter.getId(), reported.getId()));
+    }
+
     private static User createActiveUser(String name) {
         User user = new User(UUID.randomUUID(), name);
         user.setBio("Test user");
@@ -276,5 +304,12 @@ class TrustSafetyServiceAuditTest {
                 DepthPreference.DEEP_CHAT));
         user.activate();
         return user;
+    }
+
+    private static final class FailingBlockTrustSafetyStorage extends TestStorages.TrustSafety {
+        @Override
+        public void save(Block block) {
+            throw new RuntimeException("block persistence failed");
+        }
     }
 }

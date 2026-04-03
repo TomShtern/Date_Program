@@ -32,7 +32,6 @@ import datingapp.core.profile.MatchPreferences.PacePreferences.MessagingFrequenc
 import datingapp.core.profile.MatchPreferences.PacePreferences.TimeToFirstDate;
 import datingapp.core.profile.ProfileService;
 import datingapp.core.profile.ValidationService;
-import datingapp.core.storage.UserStorage;
 import java.text.Normalizer;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -40,6 +39,7 @@ import java.time.format.DateTimeParseException;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -63,7 +63,6 @@ public class ProfileHandler implements LoggingSupport {
     private static final String PRESS_ENTER_MENU_KEY = "cli.common.press_enter_menu";
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
-    private final UserStorage userStorage;
     private final ValidationService validationService;
     private final LocationService locationService;
     private final AppConfig config;
@@ -76,14 +75,14 @@ public class ProfileHandler implements LoggingSupport {
     private static final String PROMPT_CHOICE = "Your choice: ";
 
     public ProfileHandler(
-            UserStorage userStorage,
+            datingapp.core.storage.UserStorage userStorage,
             ValidationService validationService,
             LocationService locationService,
             ProfileUseCases profileUseCases,
             AppConfig config,
             AppSession session,
             InputReader inputReader) {
-        this.userStorage = Objects.requireNonNull(userStorage);
+        Objects.requireNonNull(userStorage, "userStorage cannot be null");
         this.validationService = Objects.requireNonNull(validationService, "validationService cannot be null");
         this.locationService = Objects.requireNonNull(locationService, "locationService cannot be null");
         this.profileUseCases = Objects.requireNonNull(profileUseCases, "profileUseCases cannot be null");
@@ -95,7 +94,7 @@ public class ProfileHandler implements LoggingSupport {
     }
 
     public ProfileHandler(
-            UserStorage userStorage,
+            datingapp.core.storage.UserStorage userStorage,
             ValidationService validationService,
             ProfileUseCases profileUseCases,
             AppConfig config,
@@ -265,7 +264,7 @@ public class ProfileHandler implements LoggingSupport {
                     editing = false;
                 } else {
                     if (handleDealbreakerChoice(choice, currentUser)) {
-                        userStorage.save(currentUser);
+                        persistProfileChanges(currentUser);
                     }
                 }
             }
@@ -1039,9 +1038,10 @@ public class ProfileHandler implements LoggingSupport {
     }
 
     private void renderNotes(List<ProfileNote> notes) {
+        Map<UUID, User> subjectsById = loadNoteSubjects(notes);
         for (int i = 0; i < notes.size(); i++) {
             ProfileNote note = notes.get(i);
-            User subject = userStorage.get(note.subjectId()).orElse(null);
+            User subject = subjectsById.get(note.subjectId());
             String subjectName = subject != null ? subject.getName() : "(deleted user)";
 
             logInfo("  {}. {} - \"{}\"", i + 1, subjectName, note.getPreview());
@@ -1055,8 +1055,9 @@ public class ProfileHandler implements LoggingSupport {
             int idx = Integer.parseInt(input) - 1;
             if (idx >= 0 && idx < notes.size()) {
                 ProfileNote note = notes.get(idx);
-                User subject = userStorage.get(note.subjectId()).orElse(null);
-                String subjectName = subject != null ? subject.getName() : "this user";
+                var subjectResult = profileUseCases.getUserById(note.subjectId());
+                String subjectName =
+                        subjectResult.success() ? subjectResult.data().getName() : "this user";
                 manageNoteFor(note.subjectId(), subjectName);
             }
         } catch (NumberFormatException e) {
@@ -1148,8 +1149,13 @@ public class ProfileHandler implements LoggingSupport {
             return;
         }
 
-        User user = new User(UUID.randomUUID(), normalizedName);
-        userStorage.save(user);
+        var createResult = profileMutationUseCases.createUser(
+                new ProfileMutationUseCases.CreateUserCommand(normalizedName, null, null, null));
+        if (!createResult.success()) {
+            logInfo(ERROR_WITH_GAP_FORMAT, createResult.error().message());
+            return;
+        }
+        User user = createResult.data().user();
         session.setCurrentUser(user);
 
         logInfo("\n✅ User created! ID: {}", user.getId());
@@ -1160,7 +1166,13 @@ public class ProfileHandler implements LoggingSupport {
     public void selectUser() {
         logInfo("\n--- Select User ---\n");
 
-        List<User> users = userStorage.findAll();
+        var listUsersResult = profileUseCases.listUsers();
+        if (!listUsersResult.success()) {
+            logInfo(ERROR_WITH_GAP_FORMAT, listUsersResult.error().message());
+            return;
+        }
+
+        List<User> users = listUsersResult.data();
         if (users.isEmpty()) {
             logInfo("No users found. Create one first!\n");
             return;
@@ -1180,7 +1192,14 @@ public class ProfileHandler implements LoggingSupport {
                 }
                 return;
             }
-            session.setCurrentUser(users.get(idx));
+
+            User selected = users.get(idx);
+            var selectedUserResult = profileUseCases.getUserById(selected.getId());
+            if (!selectedUserResult.success()) {
+                logInfo(ERROR_WITH_GAP_FORMAT, selectedUserResult.error().message());
+                return;
+            }
+            session.setCurrentUser(selectedUserResult.data());
             logInfo("\n✅ Selected: {}\n", session.getCurrentUser().getName());
         } catch (NumberFormatException _) {
             logInfo("❌ Invalid input.\n");
@@ -1192,6 +1211,28 @@ public class ProfileHandler implements LoggingSupport {
             return null;
         }
         return Normalizer.normalize(name.trim(), Normalizer.Form.NFKC);
+    }
+
+    private boolean persistProfileChanges(User currentUser) {
+        var saveResult = profileMutationUseCases.saveProfile(
+                new SaveProfileCommand(UserContext.cli(currentUser.getId()), currentUser));
+        if (!saveResult.success()) {
+            logInfo(ERROR_WITH_GAP_FORMAT, saveResult.error().message());
+            return false;
+        }
+        session.setCurrentUser(saveResult.data().user());
+        return true;
+    }
+
+    private Map<UUID, User> loadNoteSubjects(List<ProfileNote> notes) {
+        List<UUID> subjectIds =
+                notes.stream().map(ProfileNote::subjectId).distinct().toList();
+        var usersResult = profileUseCases.getUsersByIds(new ProfileUseCases.GetUsersByIdsQuery(subjectIds));
+        if (!usersResult.success()) {
+            logInfo(ERROR_MESSAGE_FORMAT, usersResult.error().message());
+            return Map.of();
+        }
+        return usersResult.data();
     }
 
     /**

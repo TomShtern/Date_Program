@@ -2,6 +2,7 @@ package datingapp.app.api;
 
 import datingapp.app.usecase.matching.MatchingUseCases.MatchQualitySnapshot;
 import datingapp.app.usecase.matching.MatchingUseCases.UndoOutcome;
+import datingapp.app.usecase.profile.VerificationUseCases;
 import datingapp.app.usecase.social.SocialUseCases.RelationshipTransitionOutcome;
 import datingapp.core.connection.ConnectionModels.FriendRequest;
 import datingapp.core.connection.ConnectionModels.Message;
@@ -401,8 +402,49 @@ final class RestApiDtos {
     /** Response for moderation operations. */
     static record ModerationResponse(boolean success, boolean alreadyHandled, String errorMessage) {}
 
+    /** Blocked user DTO for safety-related responses. */
+    static record BlockedUserDto(UUID userId, String name, String statusLabel) {
+        static BlockedUserDto from(datingapp.app.usecase.social.SocialUseCases.BlockedUserSummary blockedUser) {
+            return new BlockedUserDto(blockedUser.userId(), blockedUser.name(), "Blocked profile");
+        }
+    }
+
+    /** Blocked users response. */
+    static record BlockedUsersResponse(List<BlockedUserDto> blockedUsers) {
+        static BlockedUsersResponse from(
+                List<datingapp.app.usecase.social.SocialUseCases.BlockedUserSummary> blockedUsers) {
+            return new BlockedUsersResponse(
+                    blockedUsers.stream().map(BlockedUserDto::from).toList());
+        }
+    }
+
     /** Response for reporting a user. */
     static record ReportResponse(boolean success, boolean autoBanned, String errorMessage, boolean blockedByReporter) {}
+
+    /** Request body for starting verification. */
+    static record StartVerificationRequest(User.VerificationMethod method, String contact) {}
+
+    /** Response body for starting verification. */
+    static record StartVerificationResponse(UUID userId, String method, String contact, String devVerificationCode) {
+        static StartVerificationResponse from(VerificationUseCases.StartVerificationResult result) {
+            User user = result.user();
+            User.VerificationMethod method = user.getVerificationMethod();
+            String contact = method == User.VerificationMethod.PHONE ? user.getPhone() : user.getEmail();
+            return new StartVerificationResponse(
+                    user.getId(), method != null ? method.name() : null, contact, result.generatedCode());
+        }
+    }
+
+    /** Request body for confirming verification. */
+    static record ConfirmVerificationRequest(String verificationCode) {}
+
+    /** Response body for confirming verification. */
+    static record ConfirmVerificationResponse(boolean verified, Instant verifiedAt) {
+        static ConfirmVerificationResponse from(VerificationUseCases.ConfirmVerificationResult result) {
+            return new ConfirmVerificationResponse(
+                    result.user().isVerified(), result.user().getVerifiedAt());
+        }
+    }
 
     /** User stats DTO. */
     static record UserStatsDto(

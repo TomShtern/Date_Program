@@ -251,6 +251,30 @@ class JdbiMatchmakingStorageTransitionAtomicityTest {
         assertEquals(1, interactionStorage.countByDirection(userB, Like.Direction.LIKE));
     }
 
+    @Test
+    @DisplayName("blockTransition rolls back match update when conversation archive fails")
+    void blockTransitionRollsBackMatchUpdateWhenConversationArchiveFails() {
+        Match match = Match.create(userA, userB);
+        interactionStorage.save(match);
+
+        match.block(userA);
+
+        Conversation missingConversation = Conversation.create(userA, userB);
+        missingConversation.archive(missingConversation.getUserA(), MatchArchiveReason.BLOCK);
+        missingConversation.setVisibility(missingConversation.getUserA(), false);
+
+        assertThrows(
+                DatabaseManager.StorageException.class,
+                () -> interactionStorage.blockTransition(
+                        userA, userB, Optional.of(match), Optional.of(missingConversation)));
+
+        Match persisted = interactionStorage.get(match.getId()).orElseThrow();
+        assertEquals(MatchState.ACTIVE, persisted.getState());
+        assertTrue(persisted.getEndedAt() == null
+                || persisted.getEndedBy() == null
+                || !persisted.getEndedBy().equals(userA));
+    }
+
     private Match createPersistedActiveMatchWithOldTimestamp() {
         Instant baseline = Instant.now().minusSeconds(120);
         UUID firstUser = userA.toString().compareTo(userB.toString()) <= 0 ? userA : userB;

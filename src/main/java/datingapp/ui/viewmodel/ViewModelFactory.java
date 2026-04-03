@@ -22,10 +22,8 @@ import datingapp.ui.screen.SocialController;
 import datingapp.ui.screen.StandoutsController;
 import datingapp.ui.screen.StatsController;
 import datingapp.ui.viewmodel.UiDataAdapters.MetricsUiPresenceDataAccess;
-import datingapp.ui.viewmodel.UiDataAdapters.StorageUiMatchDataAccess;
 import datingapp.ui.viewmodel.UiDataAdapters.StorageUiSocialDataAccess;
 import datingapp.ui.viewmodel.UiDataAdapters.StorageUiUserStore;
-import datingapp.ui.viewmodel.UiDataAdapters.UiMatchDataAccess;
 import datingapp.ui.viewmodel.UiDataAdapters.UiProfileNoteDataAccess;
 import datingapp.ui.viewmodel.UiDataAdapters.UiUserStore;
 import datingapp.ui.viewmodel.UiDataAdapters.UseCaseUiProfileNoteDataAccess;
@@ -69,7 +67,6 @@ public class ViewModelFactory {
 
     // Cached UI adapter singletons — created once per factory lifecycle
     private UiUserStore cachedUiUserStore;
-    private UiMatchDataAccess cachedUiMatchDataAccess;
     private UiProfileNoteDataAccess cachedUiProfileNoteDataAccess;
     private UiDataAdapters.UiPresenceDataAccess cachedUiPresenceDataAccess;
 
@@ -114,17 +111,31 @@ public class ViewModelFactory {
      */
     private Map<Class<?>, Supplier<Object>> buildControllerFactories() {
         Map<Class<?>, Supplier<Object>> map = new HashMap<>();
-        map.put(LoginController.class, () -> new LoginController(getLoginViewModel(), services.getProfileService()));
+        map.put(
+                LoginController.class,
+                () -> new LoginController(
+                        getLoginViewModel(),
+                        services.getProfileService(),
+                        services.getConfig().safety().userTimeZone()));
         map.put(DashboardController.class, () -> new DashboardController(getDashboardViewModel()));
         map.put(ProfileController.class, () -> new ProfileController(getProfileViewModel()));
         map.put(ProfileViewController.class, () -> new ProfileViewController(getProfileReadOnlyViewModel()));
-        map.put(MatchingController.class, () -> new MatchingController(getMatchingViewModel()));
+        map.put(
+                MatchingController.class,
+                () -> new MatchingController(
+                        getMatchingViewModel(), services.getConfig().safety().userTimeZone()));
         map.put(MatchesController.class, () -> new MatchesController(getMatchesViewModel()));
-        map.put(ChatController.class, () -> new ChatController(getChatViewModel()));
+        map.put(
+                ChatController.class,
+                () -> new ChatController(
+                        getChatViewModel(), services.getConfig().safety().userTimeZone()));
         map.put(StatsController.class, () -> new StatsController(getStatsViewModel()));
         map.put(PreferencesController.class, () -> new PreferencesController(getPreferencesViewModel()));
         map.put(StandoutsController.class, () -> new StandoutsController(getStandoutsViewModel()));
-        map.put(SocialController.class, () -> new SocialController(getSocialViewModel()));
+        map.put(
+                SocialController.class,
+                () -> new SocialController(
+                        getSocialViewModel(), services.getConfig().safety().userTimeZone()));
         map.put(SafetyController.class, () -> new SafetyController(getSafetyViewModel()));
         map.put(NotesController.class, () -> new NotesController(getNotesViewModel()));
         return Collections.unmodifiableMap(map);
@@ -175,13 +186,7 @@ public class ViewModelFactory {
         return getViewModel(
                 DashboardViewModel.class,
                 () -> new DashboardViewModel(
-                        new DashboardViewModel.Dependencies(
-                                services.getRecommendationService(),
-                                createUiMatchDataAccess(),
-                                services.getAchievementService(),
-                                services.getConnectionService(),
-                                services.getProfileService(),
-                                services.getConfig()),
+                        new DashboardViewModel.Dependencies(services.getDashboardUseCases()),
                         session,
                         uiDispatcher,
                         uiPreferencesStore));
@@ -229,11 +234,12 @@ public class ViewModelFactory {
                 MatchesViewModel.class,
                 () -> new MatchesViewModel(
                         new MatchesViewModel.Dependencies(
-                                createUiMatchDataAccess(),
-                                createUiUserStore(),
-                                services.getMatchingService(),
+                                null,
+                                null,
+                                null,
                                 services.getRecommendationService(),
                                 services.getMatchingUseCases(),
+                                services.getProfileUseCases(),
                                 services.getSocialUseCases(),
                                 services.getConfig()),
                         session,
@@ -305,9 +311,9 @@ public class ViewModelFactory {
         return getViewModel(
                 SafetyViewModel.class,
                 () -> new SafetyViewModel(
-                        services.getTrustSafetyService(),
+                        services.getSocialUseCases(),
+                        services.getVerificationUseCases(),
                         services.getProfileMutationUseCases(),
-                        services.getProfileUseCases(),
                         session,
                         uiDispatcher));
     }
@@ -316,7 +322,11 @@ public class ViewModelFactory {
         return getViewModel(
                 NotesViewModel.class,
                 () -> new NotesViewModel(
-                        services.getProfileNotesUseCases(), createUiUserStore(), session, uiDispatcher));
+                        services.getProfileNotesUseCases(),
+                        createUiUserStore(),
+                        session,
+                        services.getConfig().safety().userTimeZone(),
+                        uiDispatcher));
     }
 
     /**
@@ -363,7 +373,6 @@ public class ViewModelFactory {
 
         viewModelCache.clear();
         cachedUiUserStore = null;
-        cachedUiMatchDataAccess = null;
         cachedUiProfileNoteDataAccess = null;
         cachedUiPresenceDataAccess = null;
     }
@@ -373,14 +382,6 @@ public class ViewModelFactory {
             cachedUiUserStore = new StorageUiUserStore(services.getUserStorage());
         }
         return cachedUiUserStore;
-    }
-
-    private UiMatchDataAccess createUiMatchDataAccess() {
-        if (cachedUiMatchDataAccess == null) {
-            cachedUiMatchDataAccess =
-                    new StorageUiMatchDataAccess(services.getInteractionStorage(), services.getTrustSafetyStorage());
-        }
-        return cachedUiMatchDataAccess;
     }
 
     private UiProfileNoteDataAccess createUiProfileNoteDataAccess() {

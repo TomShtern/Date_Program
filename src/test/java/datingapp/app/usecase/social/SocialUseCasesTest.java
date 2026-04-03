@@ -312,6 +312,37 @@ class SocialUseCasesTest {
     }
 
     @Test
+    @DisplayName("listBlockedUsers returns app-layer blocked user summaries")
+    void listBlockedUsersReturnsAppLayerBlockedUserSummaries() {
+        var blockResult = useCases.blockUser(new RelationshipCommand(UserContext.cli(userA.getId()), userB.getId()));
+
+        assertTrue(blockResult.success());
+
+        var listResult =
+                useCases.listBlockedUsers(new SocialUseCases.ListBlockedUsersQuery(UserContext.cli(userA.getId())));
+
+        assertTrue(listResult.success());
+        assertEquals(1, listResult.data().size());
+        assertEquals(userB.getId(), listResult.data().getFirst().userId());
+        assertEquals(userB.getName(), listResult.data().getFirst().name());
+    }
+
+    @Test
+    @DisplayName("unblockUser removes the block through the app-layer seam")
+    void unblockUserRemovesTheBlockThroughTheAppLayerSeam() {
+        var blockResult = useCases.blockUser(new RelationshipCommand(UserContext.cli(userA.getId()), userB.getId()));
+        assertTrue(blockResult.success());
+
+        var unblockResult =
+                useCases.unblockUser(new RelationshipCommand(UserContext.cli(userA.getId()), userB.getId()));
+
+        assertTrue(unblockResult.success());
+        assertTrue(useCases.listBlockedUsers(new SocialUseCases.ListBlockedUsersQuery(UserContext.cli(userA.getId())))
+                .data()
+                .isEmpty());
+    }
+
+    @Test
     @DisplayName("report user publishes moderation event")
     void reportUserPublishesModerationEvent() {
         AtomicReference<AppEvent.UserReported> published = new AtomicReference<>();

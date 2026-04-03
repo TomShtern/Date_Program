@@ -10,9 +10,9 @@ import java.util.function.Function;
 /**
  * Centralized immutable registry of CLI main-menu options and dispatch metadata.
  *
- * <p><b>Simulation Mode:</b> Menu options in this registry include simulated operations such as
- * blocking, reporting, and profile verification. These operations do not persist beyond the current
- * session. See individual handlers for [SIMULATED] markers in user-facing messages.
+ * <p>Menu options in this registry dispatch to the current CLI handlers and use-case flows.
+ * Safety, reporting, and verification actions follow the real runtime persistence rules of the
+ * configured storage layer rather than a session-only simulation mode.
  */
 public final class MainMenuRegistry {
 

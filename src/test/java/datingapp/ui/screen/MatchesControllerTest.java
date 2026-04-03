@@ -18,6 +18,8 @@ import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
 import datingapp.core.profile.MatchPreferences.PacePreferences;
 import datingapp.core.profile.ProfileService;
+import datingapp.core.profile.ValidationService;
+import datingapp.core.testutil.TestAchievementService;
 import datingapp.core.testutil.TestStorages;
 import datingapp.ui.JavaFxTestSupport;
 import datingapp.ui.NavigationService;
@@ -54,8 +56,9 @@ class MatchesControllerTest {
         Fixture fixture = new Fixture();
         fixture.seedSingleMatch();
 
-        JavaFxTestSupport.LoadedFxml loaded =
-                JavaFxTestSupport.loadFxml("/fxml/matches.fxml", () -> new MatchesController(fixture.viewModel));
+        TrackingMatchesController controller = new TrackingMatchesController(fixture.viewModel);
+
+        JavaFxTestSupport.LoadedFxml loaded = JavaFxTestSupport.loadFxml("/fxml/matches.fxml", () -> controller);
         Parent root = loaded.root();
 
         assertTrue(JavaFxTestSupport.waitUntil(
@@ -70,9 +73,8 @@ class MatchesControllerTest {
 
         JavaFxTestSupport.runOnFxAndWait(messageButton::fire);
 
-        UUID targetUserId = NavigationService.getInstance()
-                .consumeNavigationContext(NavigationService.ViewType.CHAT, UUID.class)
-                .orElseThrow();
+        UUID targetUserId = JavaFxTestSupport.callOnFxAndWait(controller::chatTargetUserId);
+        assertNotNull(targetUserId);
         assertEquals(fixture.otherUser.getId(), targetUserId);
 
         fixture.dispose();
@@ -190,6 +192,15 @@ class MatchesControllerTest {
                     new ConnectionService(config, communications, interactions, users),
                     trustSafetyService,
                     communications);
+            var profileUseCases = new datingapp.app.usecase.profile.ProfileUseCases(
+                    users,
+                    profileService,
+                    new ValidationService(config),
+                    null,
+                    TestAchievementService.empty(),
+                    config,
+                    new datingapp.core.workflow.ProfileActivationPolicy(),
+                    new datingapp.app.event.InProcessAppEventBus());
 
             this.viewModel = new MatchesViewModel(
                     new MatchesViewModel.Dependencies(
@@ -198,6 +209,7 @@ class MatchesControllerTest {
                             matchingService,
                             dailyService,
                             matchingUseCases,
+                            profileUseCases,
                             socialUseCases,
                             config),
                     AppSession.getInstance(),
@@ -237,6 +249,23 @@ class MatchesControllerTest {
                     PacePreferences.DepthPreference.DEEP_CHAT));
             user.activate();
             return user;
+        }
+    }
+
+    private static final class TrackingMatchesController extends MatchesController {
+        private UUID chatTargetUserId;
+
+        private TrackingMatchesController(MatchesViewModel viewModel) {
+            super(viewModel);
+        }
+
+        @Override
+        protected void navigateToChat(UUID userId) {
+            chatTargetUserId = userId;
+        }
+
+        private UUID chatTargetUserId() {
+            return chatTargetUserId;
         }
     }
 

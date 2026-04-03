@@ -1,5 +1,6 @@
 package datingapp.app.cli;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -10,7 +11,9 @@ import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import datingapp.app.cli.CliTextAndInput.InputReader;
 import datingapp.app.testutil.TestEventBus;
+import datingapp.app.usecase.common.UseCaseResult;
 import datingapp.app.usecase.profile.ProfileMutationUseCases;
+import datingapp.app.usecase.profile.ProfileNotesUseCases;
 import datingapp.app.usecase.profile.ProfileUseCases;
 import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
@@ -29,6 +32,8 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Scanner;
 import java.util.TimeZone;
@@ -278,10 +283,163 @@ class ProfileHandlerTest {
         assertTrue(resolvedLocation.orElseThrow().label().contains("Approximate"));
     }
 
+    @Test
+    @DisplayName("createUser routes account creation through ProfileMutationUseCases")
+    void createUserRoutesAccountCreationThroughProfileMutationUseCases() {
+        TestStorages.Users routedStorage = new TestStorages.Users();
+        ProfileMutationUseCases mutationUseCases = new ProfileMutationUseCases(
+                routedStorage,
+                validationService,
+                TestAchievementService.empty(),
+                AppConfig.defaults(),
+                new datingapp.core.workflow.ProfileActivationPolicy(),
+                new TestEventBus());
+        ProfileUseCases routedUseCases = ProfileUseCases.builder()
+                .userStorage(routedStorage)
+                .validationService(validationService)
+                .achievementService(TestAchievementService.empty())
+                .config(AppConfig.defaults())
+                .activationPolicy(new datingapp.core.workflow.ProfileActivationPolicy())
+                .eventBus(new TestEventBus())
+                .profileMutationUseCases(mutationUseCases)
+                .build();
+        TestStorages.Users rawStorage = new TestStorages.Users() {
+            @Override
+            public void save(User user) {
+                throw new AssertionError("raw userStorage.save should not be used by createUser");
+            }
+        };
+        ProfileHandler handler = createHandler("New User\n", rawStorage, routedUseCases);
+
+        assertDoesNotThrow(handler::createUser);
+        assertEquals(1, routedStorage.findAll().size());
+        assertEquals("New User", session.getCurrentUser().getName());
+    }
+
+    @Test
+    @DisplayName("selectUser loads candidates through ProfileUseCases")
+    void selectUserLoadsCandidatesThroughProfileUseCases() {
+        User storedUser = TestUserFactory.createActiveUser("Selected User");
+        ProfileUseCases routedUseCases =
+                new ProfileUseCases(
+                        userStorage,
+                        null,
+                        validationService,
+                        null,
+                        TestAchievementService.empty(),
+                        AppConfig.defaults(),
+                        new datingapp.core.workflow.ProfileActivationPolicy(),
+                        new TestEventBus()) {
+                    @Override
+                    public UseCaseResult<List<User>> listUsers() {
+                        return UseCaseResult.success(List.of(storedUser));
+                    }
+
+                    @Override
+                    public UseCaseResult<User> getUserById(UUID userId) {
+                        return UseCaseResult.success(storedUser);
+                    }
+                };
+        TestStorages.Users rawStorage = new TestStorages.Users() {
+            @Override
+            public List<User> findAll() {
+                throw new AssertionError("raw userStorage.findAll should not be used by selectUser");
+            }
+        };
+        ProfileHandler handler = createHandler("1\n", rawStorage, routedUseCases);
+
+        assertDoesNotThrow(handler::selectUser);
+        assertEquals(storedUser.getId(), session.getCurrentUser().getId());
+    }
+
+    @Test
+    @DisplayName("viewAllNotes resolves note subjects through batched ProfileUseCases lookup")
+    void viewAllNotesResolvesNoteSubjectsThroughBatchedProfileUseCasesLookup() {
+        User author = TestUserFactory.createActiveUser(UUID.randomUUID(), "Author");
+        User subject = TestUserFactory.createActiveUser(UUID.randomUUID(), "Subject");
+        TestStorages.Users notesStorage = new TestStorages.Users();
+        notesStorage.save(author);
+        notesStorage.save(subject);
+        notesStorage.saveProfileNote(
+                datingapp.core.model.ProfileNote.create(author.getId(), subject.getId(), "Test note"));
+        ProfileNotesUseCases notesUseCases =
+                new ProfileNotesUseCases(notesStorage, validationService, AppConfig.defaults(), new TestEventBus());
+        ProfileUseCases routedUseCases =
+                new ProfileUseCases(
+                        notesStorage,
+                        null,
+                        validationService,
+                        null,
+                        TestAchievementService.empty(),
+                        AppConfig.defaults(),
+                        new datingapp.core.workflow.ProfileActivationPolicy(),
+                        new TestEventBus(),
+                        null,
+                        null,
+                        notesUseCases,
+                        null) {
+                    @Override
+                    public UseCaseResult<Map<UUID, User>> getUsersByIds(GetUsersByIdsQuery query) {
+                        return UseCaseResult.success(Map.of(subject.getId(), subject));
+                    }
+                };
+        TestStorages.Users rawStorage = new TestStorages.Users() {
+            @Override
+            public Optional<User> get(UUID id) {
+                throw new AssertionError("raw userStorage.get should not be used for note subject lookup");
+            }
+        };
+        session.setCurrentUser(author);
+        ProfileHandler handler = createHandler("0\n", rawStorage, routedUseCases);
+
+        assertDoesNotThrow(handler::viewAllNotes);
+    }
+
+    @Test
+    @DisplayName("setDealbreakers persists through app-layer mutation instead of raw storage")
+    void setDealbreakersPersistsThroughAppLayerMutationInsteadOfRawStorage() {
+        User currentUser = TestUserFactory.createActiveUser(UUID.randomUUID(), "Dealbreaker User");
+        TestStorages.Users routedStorage = new TestStorages.Users();
+        routedStorage.save(currentUser);
+        ProfileMutationUseCases mutationUseCases = new ProfileMutationUseCases(
+                routedStorage,
+                validationService,
+                TestAchievementService.empty(),
+                AppConfig.defaults(),
+                new datingapp.core.workflow.ProfileActivationPolicy(),
+                new TestEventBus());
+        ProfileUseCases routedUseCases = ProfileUseCases.builder()
+                .userStorage(routedStorage)
+                .validationService(validationService)
+                .achievementService(TestAchievementService.empty())
+                .config(AppConfig.defaults())
+                .activationPolicy(new datingapp.core.workflow.ProfileActivationPolicy())
+                .eventBus(new TestEventBus())
+                .profileMutationUseCases(mutationUseCases)
+                .build();
+        TestStorages.Users rawStorage = new TestStorages.Users() {
+            @Override
+            public void save(User user) {
+                throw new AssertionError("raw userStorage.save should not be used when persisting dealbreakers");
+            }
+        };
+        session.setCurrentUser(currentUser);
+        ProfileHandler handler = createHandler("7\n0\n", rawStorage, routedUseCases);
+
+        assertDoesNotThrow(handler::setDealbreakers);
+        assertTrue(routedStorage.get(currentUser.getId()).isPresent());
+    }
+
     private ProfileHandler createHandler(String input) {
         InputReader inputReader = new InputReader(new Scanner(new StringReader(input)));
         return new ProfileHandler(
                 userStorage, validationService, profileUseCases, AppConfig.defaults(), session, inputReader);
+    }
+
+    private ProfileHandler createHandler(String input, TestStorages.Users handlerStorage, ProfileUseCases useCases) {
+        InputReader inputReader = new InputReader(new Scanner(new StringReader(input)));
+        return new ProfileHandler(
+                handlerStorage, validationService, useCases, AppConfig.defaults(), session, inputReader);
     }
 
     private static void invokePrompt(ProfileHandler handler, String methodName, User user) throws Exception {

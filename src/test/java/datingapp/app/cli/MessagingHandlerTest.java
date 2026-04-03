@@ -54,6 +54,9 @@ import org.junit.jupiter.api.Timeout;
 @Timeout(value = 10, unit = TimeUnit.SECONDS)
 class MessagingHandlerTest {
 
+    private static final String DB_PASSWORD_PROPERTY = "datingapp.db.password";
+    private static final String DB_PROFILE_PROPERTY = "datingapp.db.profile";
+
     private AppSession session;
     private DatabaseManager dbManager;
     private ServiceRegistry registry;
@@ -64,8 +67,8 @@ class MessagingHandlerTest {
 
     @BeforeAll
     static void setUpDatabase() {
-        System.setProperty("datingapp.db.password", "test");
-        System.setProperty("datingapp.db.profile", "test");
+        System.setProperty(DB_PASSWORD_PROPERTY, "test");
+        System.setProperty(DB_PROFILE_PROPERTY, "test");
     }
 
     @AfterAll
@@ -78,8 +81,8 @@ class MessagingHandlerTest {
         session = AppSession.getInstance();
         session.reset();
 
-        System.setProperty("datingapp.db.password", "test");
-        System.setProperty("datingapp.db.profile", "test");
+        System.setProperty(DB_PASSWORD_PROPERTY, "test");
+        System.setProperty(DB_PROFILE_PROPERTY, "test");
         DatabaseManager.resetInstance();
         DatabaseManager.setJdbcUrl("jdbc:h2:mem:messagingtest_" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1");
         dbManager = DatabaseManager.getInstance();
@@ -98,19 +101,28 @@ class MessagingHandlerTest {
     void tearDownEach() {
         session.reset();
         DatabaseManager.resetInstance();
-        System.clearProperty("datingapp.db.password");
-        System.clearProperty("datingapp.db.profile");
+        System.clearProperty(DB_PASSWORD_PROPERTY);
+        System.clearProperty(DB_PROFILE_PROPERTY);
     }
 
     private MessagingHandler createHandler(String input) {
         InputReader inputReader = new InputReader(new Scanner(new StringReader(input)));
         return new MessagingHandler(
-                registry.getMessagingUseCases(), registry.getSocialUseCases(), inputReader, session);
+                registry.getMessagingUseCases(),
+                registry.getSocialUseCases(),
+                inputReader,
+                session,
+                AppConfig.defaults().safety().userTimeZone());
     }
 
     private MessagingHandler createHandler(String input, MessagingUseCases messagingUseCases) {
         InputReader inputReader = new InputReader(new Scanner(new StringReader(input)));
-        return new MessagingHandler(messagingUseCases, registry.getSocialUseCases(), inputReader, session);
+        return new MessagingHandler(
+                messagingUseCases,
+                registry.getSocialUseCases(),
+                inputReader,
+                session,
+                AppConfig.defaults().safety().userTimeZone());
     }
 
     private MessagingUseCases createMessagingUseCases(
