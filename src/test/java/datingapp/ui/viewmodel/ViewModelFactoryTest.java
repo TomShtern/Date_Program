@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.app.event.InProcessAppEventBus;
@@ -187,6 +188,15 @@ class ViewModelFactoryTest {
     }
 
     @Test
+    @DisplayName("createController fails fast for unregistered controller types")
+    void createControllerFailsFastForUnregisteredControllerTypes() {
+        IllegalStateException error =
+                assertThrows(IllegalStateException.class, () -> factory.createController(UnregisteredController.class));
+
+        assertTrue(error.getMessage().contains(UnregisteredController.class.getName()));
+    }
+
+    @Test
     @DisplayName("getPreferencesStore returns a non-null store")
     void getPreferencesStoreReturnsNonNull() {
         assertNotNull(factory.getPreferencesStore());
@@ -274,4 +284,6 @@ class ViewModelFactoryTest {
     private static User createMinimalActiveUser(String name) {
         return TestUserFactory.createActiveUser(name);
     }
+
+    private static final class UnregisteredController {}
 }

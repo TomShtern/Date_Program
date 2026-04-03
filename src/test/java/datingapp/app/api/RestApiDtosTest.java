@@ -11,13 +11,15 @@ import datingapp.app.api.RestApiDtos.ErrorResponse;
 import datingapp.app.api.RestApiDtos.HealthResponse;
 import datingapp.app.api.RestApiDtos.MessageDto;
 import datingapp.app.api.RestApiDtos.StartVerificationResponse;
-import datingapp.app.api.RestApiDtos.UserDetail;
-import datingapp.app.api.RestApiDtos.UserSummary;
+import datingapp.app.api.RestApiUserDtos.ProfileUpdateResponse;
+import datingapp.app.api.RestApiUserDtos.UserDetail;
+import datingapp.app.api.RestApiUserDtos.UserSummary;
 import datingapp.app.usecase.profile.ProfileInsightsUseCases;
 import datingapp.app.usecase.profile.VerificationUseCases;
 import datingapp.core.metrics.EngagementDomain.Achievement;
 import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
+import datingapp.core.model.User.UserState;
 import datingapp.core.model.User.VerificationMethod;
 import datingapp.core.testutil.TestClock;
 import java.time.Instant;
@@ -137,6 +139,31 @@ class RestApiDtosTest {
             assertEquals(25, laDetail.age());
         }
 
+        @Test
+        @DisplayName("UserDetail and ProfileUpdateResponse share the same user-field shaping")
+        void userDetailAndProfileUpdateResponseShareTheSameUserFieldShaping() {
+            User user = testUser();
+            user.setMaxDistanceKm(275, 500);
+            ZoneId utc = ZoneId.of("UTC");
+            String approximateLocation = "Tel Aviv, IL";
+
+            UserDetail detail = UserDetail.from(user, utc, approximateLocation);
+            ProfileUpdateResponse response = ProfileUpdateResponse.from(user, true, utc, approximateLocation);
+
+            assertEquals(detail.age(), response.age());
+            assertEquals(detail.gender(), response.gender());
+            assertEquals(detail.interestedIn(), response.interestedIn());
+            assertEquals(detail.approximateLocation(), response.approximateLocation());
+            assertEquals(detail.maxDistanceKm(), response.maxDistanceKm());
+            assertEquals(detail.state(), response.state());
+            assertEquals(26, detail.age());
+            assertEquals("FEMALE", detail.gender());
+            assertEquals(List.of("MALE"), detail.interestedIn());
+            assertEquals("Tel Aviv, IL", detail.approximateLocation());
+            assertEquals(275, detail.maxDistanceKm());
+            assertEquals("ACTIVE", detail.state());
+        }
+
         private User testUser() {
             return buildTestUser();
         }
@@ -204,10 +231,11 @@ class RestApiDtosTest {
     }
 
     private static User buildTestUser() {
-        User user = new User(UUID.randomUUID(), "User");
-        user.setBirthDate(LocalDate.of(2000, 1, 1));
-        user.setGender(Gender.FEMALE);
-        user.setInterestedIn(EnumSet.of(Gender.MALE));
-        return user;
+        return User.StorageBuilder.create(UUID.randomUUID(), "User", Instant.parse("2026-01-01T00:00:00Z"))
+                .state(UserState.ACTIVE)
+                .birthDate(LocalDate.of(2000, 1, 1))
+                .gender(Gender.FEMALE)
+                .interestedIn(EnumSet.of(Gender.MALE))
+                .build();
     }
 }

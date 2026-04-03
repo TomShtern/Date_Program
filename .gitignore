@@ -142,3 +142,4 @@ telemetry-id
 .kilocode/
 .kilocodemodes
 .github/agents/Delta-Ops-Agent.agent.md
+.qwen/settings.json

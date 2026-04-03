@@ -109,6 +109,39 @@ class SocialUseCasesTest {
     }
 
     @Test
+    @DisplayName("responding to a friend request publishes the accepted event")
+    void respondingToFriendRequestPublishesTheAcceptedEvent() {
+        var requestTransition =
+                useCases.requestFriendZone(new RelationshipCommand(UserContext.cli(userA.getId()), userB.getId()));
+        assertTrue(requestTransition.success());
+
+        var pending = useCases.pendingFriendRequests(new FriendRequestsQuery(UserContext.cli(userB.getId())));
+        assertTrue(pending.success());
+        UUID requestId = pending.data().getFirst().id();
+
+        AtomicReference<AppEvent.FriendRequestAccepted> published = new AtomicReference<>();
+        eventBus.subscribe(AppEvent.FriendRequestAccepted.class, published::set);
+
+        var accepted = useCases.respondToFriendRequest(
+                new RespondFriendRequestCommand(UserContext.cli(userB.getId()), requestId, FriendRequestAction.ACCEPT));
+
+        assertTrue(accepted.success());
+        assertEquals(
+                Match.MatchState.FRIENDS,
+                interactionStorage
+                        .get(Match.generateId(userA.getId(), userB.getId()))
+                        .orElseThrow()
+                        .getState());
+        assertNotNull(published.get());
+        assertEquals(requestId, published.get().requestId());
+        assertEquals(userA.getId(), published.get().fromUserId());
+        assertEquals(userB.getId(), published.get().toUserId());
+        assertEquals(
+                Match.generateId(userA.getId(), userB.getId()), published.get().matchId());
+        assertNotNull(published.get().occurredAt());
+    }
+
+    @Test
     @DisplayName("request friend zone publishes the expected relationship transition event")
     void requestFriendZonePublishesExpectedRelationshipTransitionEvent() {
         AtomicReference<AppEvent.RelationshipTransitioned> published = new AtomicReference<>();

@@ -37,6 +37,7 @@ import datingapp.ui.NavigationService;
 import datingapp.ui.viewmodel.LoginViewModel;
 import datingapp.ui.viewmodel.ViewModelFactory;
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.util.Deque;
 import java.util.EnumSet;
 import java.util.UUID;
@@ -45,10 +46,14 @@ import javafx.event.ActionEvent;
 import javafx.scene.Parent;
 import javafx.scene.control.Button;
 import javafx.scene.control.Dialog;
+import javafx.scene.control.Label;
+import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
 import javafx.scene.control.Spinner;
 import javafx.scene.control.TextField;
+import javafx.scene.layout.HBox;
 import javafx.scene.layout.StackPane;
+import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -209,6 +214,78 @@ class LoginControllerTest {
                 5000));
 
         assertFalse(JavaFxTestSupport.callOnFxAndWait(loginButton::isDisabled));
+
+        viewModel.dispose();
+    }
+
+    @Test
+    @DisplayName("user list cell renders verification and activity metadata")
+    void userListCellRendersVerificationAndActivityMetadata() throws Exception {
+        TestStorages.Users users = new TestStorages.Users();
+        AppConfig config = AppConfig.defaults();
+        ProfileService profileService = new ProfileService(users);
+
+        User verifiedUser = createActiveUser("Morgan", Gender.FEMALE, EnumSet.of(Gender.MALE));
+        verifiedUser.markVerified();
+        users.save(verifiedUser);
+
+        LoginViewModel viewModel = new LoginViewModel(
+                new datingapp.ui.viewmodel.UiDataAdapters.StorageUiUserStore(users),
+                config,
+                AppSession.getInstance(),
+                JavaFxTestSupport.blockingUiDispatcher());
+
+        JavaFxTestSupport.LoadedFxml loaded = JavaFxTestSupport.loadFxml(
+                LOGIN_FXML,
+                () -> new LoginController(
+                        viewModel, profileService, config.safety().userTimeZone()));
+        Parent root = loaded.root();
+        @SuppressWarnings("unchecked")
+        ListView<User> userListView = JavaFxTestSupport.lookup(root, "#userListView", ListView.class);
+
+        assertTrue(JavaFxTestSupport.waitUntil(
+                () -> {
+                    try {
+                        return JavaFxTestSupport.callOnFxAndWait(
+                                        () -> userListView.getItems().size())
+                                == 1;
+                    } catch (InterruptedException _) {
+                        throw new IllegalStateException("Interrupted while awaiting login list");
+                    }
+                },
+                5000));
+
+        ListCell<User> cell = JavaFxTestSupport.callOnFxAndWait(
+                () -> userListView.getCellFactory().call(userListView));
+        Method updateItem =
+                javafx.scene.control.Cell.class.getDeclaredMethod("updateItem", Object.class, boolean.class);
+        updateItem.setAccessible(true);
+        JavaFxTestSupport.runOnFxAndWait(() -> {
+            try {
+                updateItem.invoke(cell, verifiedUser, false);
+            } catch (ReflectiveOperationException e) {
+                throw new IllegalStateException(e);
+            }
+        });
+
+        HBox container = JavaFxTestSupport.callOnFxAndWait(() -> (HBox) cell.getGraphic());
+        VBox textBox = JavaFxTestSupport.callOnFxAndWait(
+                () -> (VBox) container.getChildren().get(1));
+        Label nameLabel = JavaFxTestSupport.callOnFxAndWait(
+                () -> (Label) textBox.getChildren().get(0));
+        Label detailsLabel = JavaFxTestSupport.callOnFxAndWait(
+                () -> (Label) textBox.getChildren().get(1));
+        HBox badgeRow = JavaFxTestSupport.callOnFxAndWait(
+                () -> (HBox) textBox.getChildren().get(2));
+        Label completionBadge = JavaFxTestSupport.callOnFxAndWait(
+                () -> (Label) badgeRow.getChildren().get(0));
+        Label activityBadge = JavaFxTestSupport.callOnFxAndWait(
+                () -> (Label) badgeRow.getChildren().get(1));
+
+        assertEquals("Morgan, 25", JavaFxTestSupport.callOnFxAndWait(nameLabel::getText));
+        assertTrue(JavaFxTestSupport.callOnFxAndWait(detailsLabel::getText).contains("Verified"));
+        assertTrue(JavaFxTestSupport.callOnFxAndWait(completionBadge::getText).startsWith("Profile "));
+        assertTrue(JavaFxTestSupport.callOnFxAndWait(activityBadge::getText).startsWith("Active "));
 
         viewModel.dispose();
     }

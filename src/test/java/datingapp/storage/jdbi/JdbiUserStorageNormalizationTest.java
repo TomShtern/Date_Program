@@ -673,6 +673,38 @@ class JdbiUserStorageNormalizationTest {
         assertThrows(IllegalArgumentException.class, () -> JdbiUserStorage.normalizedGroupFromStorage("mystery_group"));
     }
 
+    @Test
+    @DisplayName("invalid normalized enum values are ignored during hydration")
+    void invalidNormalizedEnumValuesAreIgnoredDuringHydration() {
+        jdbi.useHandle(handle -> {
+            handle.createUpdate("INSERT INTO user_interested_in (user_id, gender) VALUES (:userId, :gender)")
+                    .bind("userId", userId)
+                    .bind("gender", "MALE")
+                    .execute();
+            handle.createUpdate("INSERT INTO user_interested_in (user_id, gender) VALUES (:userId, :gender)")
+                    .bind("userId", userId)
+                    .bind("gender", "ALIEN")
+                    .execute();
+            handle.createUpdate("INSERT INTO user_db_smoking (user_id, \"value\") VALUES (:userId, :value)")
+                    .bind("userId", userId)
+                    .bind("value", "NEVER")
+                    .execute();
+            handle.createUpdate("INSERT INTO user_db_smoking (user_id, \"value\") VALUES (:userId, :value)")
+                    .bind("userId", userId)
+                    .bind("value", "SPACE_SMOKE")
+                    .execute();
+        });
+
+        storage.clearCache();
+
+        User hydrated = storage.findByIds(Set.of(userId)).get(userId);
+
+        assertNotNull(hydrated);
+        assertEquals(Set.of(Gender.MALE), hydrated.getInterestedIn());
+        assertTrue(hydrated.getDealbreakers().acceptableSmoking().contains(Lifestyle.Smoking.NEVER));
+        assertEquals(1, hydrated.getDealbreakers().acceptableSmoking().size());
+    }
+
     private static User createActiveUser(
             UUID id, String name, Gender gender, Set<Gender> interestedIn, boolean withLocation) {
         return createActiveUser(id, name, gender, interestedIn, withLocation, Instant.now());

@@ -177,6 +177,21 @@ class MessagingUseCasesTest {
     }
 
     @Test
+    @DisplayName("loadConversation normalizes negative offsets to zero")
+    void loadConversationNormalizesNegativeOffsetsToZero() {
+        var sendResult = useCases.sendMessage(
+                new SendMessageCommand(UserContext.cli(sender.getId()), recipient.getId(), "Offset test"));
+        assertTrue(sendResult.success());
+
+        var result = useCases.loadConversation(
+                new LoadConversationQuery(UserContext.cli(sender.getId()), recipient.getId(), 50, -25, false));
+
+        assertTrue(result.success());
+        assertEquals(1, result.data().messages().size());
+        assertEquals("Offset test", result.data().messages().getFirst().content());
+    }
+
+    @Test
     @DisplayName("countMessagesByConversationIds returns batch message counts")
     void countMessagesByConversationIdsReturnsBatchCounts() {
         var sendResult = useCases.sendMessage(

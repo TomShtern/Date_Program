@@ -27,11 +27,10 @@ public class SocialUseCases {
     private static final String CONTEXT_REQUIRED = "Context is required";
     private static final String CONTEXT_AND_TARGET_REQUIRED = "Context and target user are required";
     private static final String CONNECTION_SERVICE_NOT_CONFIGURED = "ConnectionService is not configured";
+    private static final String CONNECTION_SERVICE_REQUIRED = "connectionService cannot be null";
+    private static final String TRUST_SAFETY_SERVICE_REQUIRED = "trustSafetyService cannot be null";
+    private static final String COMMUNICATION_STORAGE_REQUIRED = "communicationStorage cannot be null";
     private static final String TRUST_SAFETY_SERVICE_NOT_CONFIGURED = "TrustSafetyService is not configured";
-
-    private enum CompatibilityMode {
-        COMPATIBILITY
-    }
 
     private static final AppEventBus COMPATIBILITY_NO_OP_EVENT_BUS = new AppEventBus() {
         @Override
@@ -57,28 +56,27 @@ public class SocialUseCases {
     private final AppEventBus eventBus;
 
     public SocialUseCases(ConnectionService connectionService, TrustSafetyService trustSafetyService) {
-        this(
-                connectionService,
-                trustSafetyService,
-                null,
-                COMPATIBILITY_NO_OP_EVENT_BUS,
-                CompatibilityMode.COMPATIBILITY);
+        this.connectionService = connectionService;
+        this.trustSafetyService = Objects.requireNonNull(trustSafetyService, TRUST_SAFETY_SERVICE_REQUIRED);
+        this.communicationStorage = null;
+        this.eventBus = COMPATIBILITY_NO_OP_EVENT_BUS;
     }
 
     public SocialUseCases(TrustSafetyService trustSafetyService) {
-        this(null, trustSafetyService, null, COMPATIBILITY_NO_OP_EVENT_BUS, CompatibilityMode.COMPATIBILITY);
+        this.connectionService = null;
+        this.trustSafetyService = Objects.requireNonNull(trustSafetyService, TRUST_SAFETY_SERVICE_REQUIRED);
+        this.communicationStorage = null;
+        this.eventBus = COMPATIBILITY_NO_OP_EVENT_BUS;
     }
 
     public SocialUseCases(
             ConnectionService connectionService,
             TrustSafetyService trustSafetyService,
             CommunicationStorage communicationStorage) {
-        this(
-                connectionService,
-                trustSafetyService,
-                communicationStorage,
-                COMPATIBILITY_NO_OP_EVENT_BUS,
-                CompatibilityMode.COMPATIBILITY);
+        this.connectionService = Objects.requireNonNull(connectionService, CONNECTION_SERVICE_REQUIRED);
+        this.trustSafetyService = Objects.requireNonNull(trustSafetyService, TRUST_SAFETY_SERVICE_REQUIRED);
+        this.communicationStorage = Objects.requireNonNull(communicationStorage, COMMUNICATION_STORAGE_REQUIRED);
+        this.eventBus = COMPATIBILITY_NO_OP_EVENT_BUS;
     }
 
     public SocialUseCases(
@@ -86,31 +84,18 @@ public class SocialUseCases {
             TrustSafetyService trustSafetyService,
             CommunicationStorage communicationStorage,
             AppEventBus eventBus) {
-        this.connectionService = Objects.requireNonNull(connectionService, "connectionService cannot be null");
-        this.trustSafetyService = Objects.requireNonNull(trustSafetyService, "trustSafetyService cannot be null");
-        this.communicationStorage = Objects.requireNonNull(communicationStorage, "communicationStorage cannot be null");
+        this.connectionService = Objects.requireNonNull(connectionService, CONNECTION_SERVICE_REQUIRED);
+        this.trustSafetyService = Objects.requireNonNull(trustSafetyService, TRUST_SAFETY_SERVICE_REQUIRED);
+        this.communicationStorage = Objects.requireNonNull(communicationStorage, COMMUNICATION_STORAGE_REQUIRED);
         this.eventBus = Objects.requireNonNull(eventBus, "eventBus cannot be null");
-    }
-
-    private SocialUseCases(
-            ConnectionService connectionService,
-            TrustSafetyService trustSafetyService,
-            CommunicationStorage communicationStorage,
-            AppEventBus eventBus,
-            CompatibilityMode compatibilityMode) {
-        Objects.requireNonNull(compatibilityMode, "compatibilityMode cannot be null");
-        this.connectionService = connectionService;
-        this.trustSafetyService = trustSafetyService;
-        this.communicationStorage = communicationStorage;
-        this.eventBus = eventBus;
     }
 
     public UseCaseResult<TrustSafetyService.BlockResult> blockUser(RelationshipCommand command) {
         if (command == null || command.context() == null || command.targetUserId() == null) {
-            return UseCaseResult.failure(UseCaseError.validation(CONTEXT_AND_TARGET_REQUIRED));
+            return validationFailure(CONTEXT_AND_TARGET_REQUIRED);
         }
         if (trustSafetyService == null) {
-            return UseCaseResult.failure(UseCaseError.dependency(TRUST_SAFETY_SERVICE_NOT_CONFIGURED));
+            return dependencyFailure(TRUST_SAFETY_SERVICE_NOT_CONFIGURED);
         }
         try {
             TrustSafetyService.BlockResult result =
@@ -124,16 +109,16 @@ public class SocialUseCases {
                     new AppEvent.UserBlocked(command.context().userId(), command.targetUserId(), AppClock.now()));
             return UseCaseResult.success(result);
         } catch (Exception e) {
-            return UseCaseResult.failure(UseCaseError.internal("Failed to block user: " + e.getMessage()));
+            return internalFailure("block user", e);
         }
     }
 
     public UseCaseResult<List<BlockedUserSummary>> listBlockedUsers(ListBlockedUsersQuery query) {
         if (query == null || query.context() == null) {
-            return UseCaseResult.failure(UseCaseError.validation(CONTEXT_REQUIRED));
+            return validationFailure(CONTEXT_REQUIRED);
         }
         if (trustSafetyService == null) {
-            return UseCaseResult.failure(UseCaseError.dependency(TRUST_SAFETY_SERVICE_NOT_CONFIGURED));
+            return dependencyFailure(TRUST_SAFETY_SERVICE_NOT_CONFIGURED);
         }
         try {
             List<BlockedUserSummary> blockedUsers =
@@ -142,16 +127,16 @@ public class SocialUseCases {
                             .toList();
             return UseCaseResult.success(blockedUsers);
         } catch (Exception e) {
-            return UseCaseResult.failure(UseCaseError.internal("Failed to load blocked users: " + e.getMessage()));
+            return internalFailure("load blocked users", e);
         }
     }
 
     public UseCaseResult<Void> unblockUser(RelationshipCommand command) {
         if (command == null || command.context() == null || command.targetUserId() == null) {
-            return UseCaseResult.failure(UseCaseError.validation(CONTEXT_AND_TARGET_REQUIRED));
+            return validationFailure(CONTEXT_AND_TARGET_REQUIRED);
         }
         if (trustSafetyService == null) {
-            return UseCaseResult.failure(UseCaseError.dependency(TRUST_SAFETY_SERVICE_NOT_CONFIGURED));
+            return dependencyFailure(TRUST_SAFETY_SERVICE_NOT_CONFIGURED);
         }
         try {
             boolean success = trustSafetyService.unblock(command.context().userId(), command.targetUserId());
@@ -160,7 +145,7 @@ public class SocialUseCases {
             }
             return UseCaseResult.success(null);
         } catch (Exception e) {
-            return UseCaseResult.failure(UseCaseError.internal("Failed to unblock user: " + e.getMessage()));
+            return internalFailure("unblock user", e);
         }
     }
 
@@ -169,10 +154,10 @@ public class SocialUseCases {
                 || command.context() == null
                 || command.targetUserId() == null
                 || command.reason() == null) {
-            return UseCaseResult.failure(UseCaseError.validation("Context, target user and reason are required"));
+            return validationFailure("Context, target user and reason are required");
         }
         if (trustSafetyService == null) {
-            return UseCaseResult.failure(UseCaseError.dependency(TRUST_SAFETY_SERVICE_NOT_CONFIGURED));
+            return dependencyFailure(TRUST_SAFETY_SERVICE_NOT_CONFIGURED);
         }
         try {
             TrustSafetyService.ReportResult result = trustSafetyService.report(
@@ -200,16 +185,16 @@ public class SocialUseCases {
                             AppClock.now()));
             return UseCaseResult.success(ReportOutcome.from(result, command.blockUser()));
         } catch (Exception e) {
-            return UseCaseResult.failure(UseCaseError.internal("Failed to report user: " + e.getMessage()));
+            return internalFailure("report user", e);
         }
     }
 
     public UseCaseResult<RelationshipTransitionOutcome> unmatch(RelationshipCommand command) {
         if (command == null || command.context() == null || command.targetUserId() == null) {
-            return UseCaseResult.failure(UseCaseError.validation(CONTEXT_AND_TARGET_REQUIRED));
+            return validationFailure(CONTEXT_AND_TARGET_REQUIRED);
         }
         if (connectionService == null) {
-            return UseCaseResult.failure(UseCaseError.dependency(CONNECTION_SERVICE_NOT_CONFIGURED));
+            return dependencyFailure(CONNECTION_SERVICE_NOT_CONFIGURED);
         }
         try {
             ConnectionService.TransitionResult result =
@@ -224,16 +209,16 @@ public class SocialUseCases {
                     AppEvent.RelationshipTransitionState.UNMATCHED);
             return UseCaseResult.success(RelationshipTransitionOutcome.from(result));
         } catch (Exception e) {
-            return UseCaseResult.failure(UseCaseError.internal("Failed to unmatch users: " + e.getMessage()));
+            return internalFailure("unmatch users", e);
         }
     }
 
     public UseCaseResult<RelationshipTransitionOutcome> requestFriendZone(RelationshipCommand command) {
         if (command == null || command.context() == null || command.targetUserId() == null) {
-            return UseCaseResult.failure(UseCaseError.validation(CONTEXT_AND_TARGET_REQUIRED));
+            return validationFailure(CONTEXT_AND_TARGET_REQUIRED);
         }
         if (connectionService == null) {
-            return UseCaseResult.failure(UseCaseError.dependency(CONNECTION_SERVICE_NOT_CONFIGURED));
+            return dependencyFailure(CONNECTION_SERVICE_NOT_CONFIGURED);
         }
         try {
             ConnectionService.TransitionResult result =
@@ -248,17 +233,16 @@ public class SocialUseCases {
                     AppEvent.RelationshipTransitionState.FRIEND_ZONE_REQUESTED);
             return UseCaseResult.success(RelationshipTransitionOutcome.from(result));
         } catch (Exception e) {
-            return UseCaseResult.failure(
-                    UseCaseError.internal("Failed to request friend-zone transition: " + e.getMessage()));
+            return internalFailure("request friend-zone transition", e);
         }
     }
 
     public UseCaseResult<RelationshipTransitionOutcome> gracefulExit(RelationshipCommand command) {
         if (command == null || command.context() == null || command.targetUserId() == null) {
-            return UseCaseResult.failure(UseCaseError.validation(CONTEXT_AND_TARGET_REQUIRED));
+            return validationFailure(CONTEXT_AND_TARGET_REQUIRED);
         }
         if (connectionService == null) {
-            return UseCaseResult.failure(UseCaseError.dependency(CONNECTION_SERVICE_NOT_CONFIGURED));
+            return dependencyFailure(CONNECTION_SERVICE_NOT_CONFIGURED);
         }
         try {
             ConnectionService.TransitionResult result =
@@ -273,33 +257,31 @@ public class SocialUseCases {
                     AppEvent.RelationshipTransitionState.GRACEFUL_EXIT);
             return UseCaseResult.success(RelationshipTransitionOutcome.from(result));
         } catch (Exception e) {
-            return UseCaseResult.failure(
-                    UseCaseError.internal("Failed to gracefully exit relationship: " + e.getMessage()));
+            return internalFailure("gracefully exit relationship", e);
         }
     }
 
     public UseCaseResult<List<FriendRequest>> pendingFriendRequests(FriendRequestsQuery query) {
         if (query == null || query.context() == null) {
-            return UseCaseResult.failure(UseCaseError.validation(CONTEXT_REQUIRED));
+            return validationFailure(CONTEXT_REQUIRED);
         }
         if (connectionService == null) {
-            return UseCaseResult.failure(UseCaseError.dependency(CONNECTION_SERVICE_NOT_CONFIGURED));
+            return dependencyFailure(CONNECTION_SERVICE_NOT_CONFIGURED);
         }
         try {
             return UseCaseResult.success(
                     connectionService.getPendingRequestsFor(query.context().userId()));
         } catch (Exception e) {
-            return UseCaseResult.failure(
-                    UseCaseError.internal("Failed to load pending friend requests: " + e.getMessage()));
+            return internalFailure("load pending friend requests", e);
         }
     }
 
     public UseCaseResult<RelationshipTransitionOutcome> respondToFriendRequest(RespondFriendRequestCommand command) {
         if (command == null || command.context() == null || command.requestId() == null || command.action() == null) {
-            return UseCaseResult.failure(UseCaseError.validation("Context, requestId and action are required"));
+            return validationFailure("Context, requestId and action are required");
         }
         if (connectionService == null) {
-            return UseCaseResult.failure(UseCaseError.dependency(CONNECTION_SERVICE_NOT_CONFIGURED));
+            return dependencyFailure(CONNECTION_SERVICE_NOT_CONFIGURED);
         }
         try {
             ConnectionService.TransitionResult result =
@@ -324,32 +306,31 @@ public class SocialUseCases {
             }
             return UseCaseResult.success(RelationshipTransitionOutcome.from(result));
         } catch (Exception e) {
-            return UseCaseResult.failure(
-                    UseCaseError.internal("Failed to respond to friend request: " + e.getMessage()));
+            return internalFailure("respond to friend request", e);
         }
     }
 
     public UseCaseResult<List<Notification>> notifications(NotificationsQuery query) {
         if (query == null || query.context() == null) {
-            return UseCaseResult.failure(UseCaseError.validation(CONTEXT_REQUIRED));
+            return validationFailure(CONTEXT_REQUIRED);
         }
         if (communicationStorage == null) {
-            return UseCaseResult.failure(UseCaseError.dependency(COMMUNICATION_STORAGE_NOT_CONFIGURED));
+            return dependencyFailure(COMMUNICATION_STORAGE_NOT_CONFIGURED);
         }
         try {
             return UseCaseResult.success(
                     communicationStorage.getNotificationsForUser(query.context().userId(), query.unreadOnly()));
         } catch (Exception e) {
-            return UseCaseResult.failure(UseCaseError.internal("Failed to load notifications: " + e.getMessage()));
+            return internalFailure("load notifications", e);
         }
     }
 
     public UseCaseResult<Void> markNotificationRead(MarkNotificationReadCommand command) {
         if (command == null || command.context() == null || command.notificationId() == null) {
-            return UseCaseResult.failure(UseCaseError.validation("Context and notificationId are required"));
+            return validationFailure("Context and notificationId are required");
         }
         if (communicationStorage == null) {
-            return UseCaseResult.failure(UseCaseError.dependency(COMMUNICATION_STORAGE_NOT_CONFIGURED));
+            return dependencyFailure(COMMUNICATION_STORAGE_NOT_CONFIGURED);
         }
         try {
             Notification notification = communicationStorage
@@ -364,25 +345,35 @@ public class SocialUseCases {
             communicationStorage.markNotificationAsRead(command.context().userId(), command.notificationId());
             return UseCaseResult.success(null);
         } catch (Exception e) {
-            return UseCaseResult.failure(
-                    UseCaseError.internal("Failed to mark notification as read: " + e.getMessage()));
+            return internalFailure("mark notification as read", e);
         }
     }
 
     public UseCaseResult<Integer> markAllNotificationsRead(MarkAllNotificationsReadCommand command) {
         if (command == null || command.context() == null) {
-            return UseCaseResult.failure(UseCaseError.validation(CONTEXT_REQUIRED));
+            return validationFailure(CONTEXT_REQUIRED);
         }
         if (communicationStorage == null) {
-            return UseCaseResult.failure(UseCaseError.dependency(COMMUNICATION_STORAGE_NOT_CONFIGURED));
+            return dependencyFailure(COMMUNICATION_STORAGE_NOT_CONFIGURED);
         }
         try {
             return UseCaseResult.success(communicationStorage.markAllNotificationsAsRead(
                     command.context().userId()));
         } catch (Exception e) {
-            return UseCaseResult.failure(
-                    UseCaseError.internal("Failed to mark notifications as read: " + e.getMessage()));
+            return internalFailure("mark notifications as read", e);
         }
+    }
+
+    private static <T> UseCaseResult<T> validationFailure(String message) {
+        return UseCaseResult.failure(UseCaseError.validation(message));
+    }
+
+    private static <T> UseCaseResult<T> dependencyFailure(String message) {
+        return UseCaseResult.failure(UseCaseError.dependency(message));
+    }
+
+    private static <T> UseCaseResult<T> internalFailure(String action, Exception error) {
+        return UseCaseResult.failure(UseCaseError.internal("Failed to " + action + ": " + error.getMessage()));
     }
 
     private void logModerationAction(String action, UUID actorId, UUID targetUserId, String reason) {

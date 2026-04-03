@@ -104,30 +104,15 @@ public class ValidationService {
     }
 
     public ValidationResult validateEmail(String email) {
-        try {
-            normalizeEmail(email);
-            return ValidationResult.success();
-        } catch (IllegalArgumentException e) {
-            return ValidationResult.failure(e.getMessage());
-        }
+        return validateNormalized(() -> normalizeEmail(email));
     }
 
     public ValidationResult validatePhone(String phone) {
-        try {
-            normalizePhone(phone);
-            return ValidationResult.success();
-        } catch (IllegalArgumentException e) {
-            return ValidationResult.failure(e.getMessage());
-        }
+        return validateNormalized(() -> normalizePhone(phone));
     }
 
     public ValidationResult validatePhotoUrl(String photoUrl) {
-        try {
-            normalizePhotoUrl(photoUrl);
-            return ValidationResult.success();
-        } catch (IllegalArgumentException e) {
-            return ValidationResult.failure(e.getMessage());
-        }
+        return validateNormalized(() -> normalizePhotoUrl(photoUrl));
     }
 
     /**
@@ -137,14 +122,7 @@ public class ValidationService {
      * @return validation result
      */
     public ValidationResult validateAge(int age) {
-        if (age < config.validation().minAge()) {
-            return ValidationResult.failure(
-                    AGE_TOO_YOUNG.formatted(config.validation().minAge()));
-        }
-        if (age > config.validation().maxAge()) {
-            return ValidationResult.failure(AGE_INVALID);
-        }
-        return ValidationResult.success();
+        return validateAgeBounds(age);
     }
 
     /**
@@ -164,14 +142,7 @@ public class ValidationService {
         }
 
         int age = Period.between(birthDate, today).getYears();
-        if (age < config.validation().minAge()) {
-            return ValidationResult.failure(
-                    AGE_TOO_YOUNG.formatted(config.validation().minAge()));
-        }
-        if (age > config.validation().maxAge()) {
-            return ValidationResult.failure(AGE_INVALID);
-        }
-        return ValidationResult.success();
+        return validateAgeBounds(age);
     }
 
     /**
@@ -479,6 +450,26 @@ public class ValidationService {
 
     private static boolean containsControlCharacters(String value) {
         return value.chars().anyMatch(ch -> Character.isISOControl(ch) || Character.isWhitespace(ch));
+    }
+
+    private ValidationResult validateAgeBounds(int age) {
+        if (age < config.validation().minAge()) {
+            return ValidationResult.failure(
+                    AGE_TOO_YOUNG.formatted(config.validation().minAge()));
+        }
+        if (age > config.validation().maxAge()) {
+            return ValidationResult.failure(AGE_INVALID);
+        }
+        return ValidationResult.success();
+    }
+
+    private static ValidationResult validateNormalized(Runnable normalization) {
+        try {
+            normalization.run();
+            return ValidationResult.success();
+        } catch (IllegalArgumentException e) {
+            return ValidationResult.failure(e.getMessage());
+        }
     }
 
     private static boolean isValidAsciiDomain(String domain) {

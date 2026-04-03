@@ -120,16 +120,14 @@ public class ConnectionService {
     }
 
     public MessageLoadResult getMessages(UUID userId, UUID otherUserId, int limit, int offset) {
-        if (limit < 1 || limit > config.validation().messageMaxPageSize()) {
-            return MessageLoadResult.failure("Invalid limit");
-        }
-        if (offset < 0) {
-            return MessageLoadResult.failure("Invalid offset");
+        MessageLoadResult invalidPageRequest = validateMessagePageRequest(limit, offset);
+        if (invalidPageRequest != null) {
+            return invalidPageRequest;
         }
 
         String conversationId = Conversation.generateId(userId, otherUserId);
-        Optional<Conversation> convoOpt = communicationStorage.getConversation(conversationId);
-        if (convoOpt.isEmpty() || !convoOpt.get().involves(userId)) {
+        Optional<Conversation> convoOpt = findAuthorizedConversation(userId, conversationId);
+        if (convoOpt.isEmpty()) {
             return MessageLoadResult.failure("Conversation not found or unauthorized");
         }
 
@@ -140,11 +138,9 @@ public class ConnectionService {
         if (conversationId == null || conversationId.isBlank()) {
             return MessageLoadResult.failure("Conversation ID cannot be empty");
         }
-        if (limit < 1 || limit > config.validation().messageMaxPageSize()) {
-            return MessageLoadResult.failure("Invalid limit");
-        }
-        if (offset < 0) {
-            return MessageLoadResult.failure("Invalid offset");
+        MessageLoadResult invalidPageRequest = validateMessagePageRequest(limit, offset);
+        if (invalidPageRequest != null) {
+            return invalidPageRequest;
         }
         if (communicationStorage.getConversation(conversationId).isEmpty()) {
             return MessageLoadResult.failure(CONVERSATION_NOT_FOUND);
@@ -168,14 +164,9 @@ public class ConnectionService {
     }
 
     public int getTotalMessagesExchanged(UUID userId) {
-        List<Conversation> conversations = communicationStorage.getAllConversationsFor(userId);
-        if (conversations.isEmpty()) {
+        Set<String> conversationIds = conversationIdsFor(userId);
+        if (conversationIds.isEmpty()) {
             return 0;
-        }
-
-        Set<String> conversationIds = new HashSet<>();
-        for (Conversation conversation : conversations) {
-            conversationIds.add(conversation.getId());
         }
 
         return countMessagesByConversationIds(conversationIds).values().stream()
@@ -226,16 +217,12 @@ public class ConnectionService {
         Objects.requireNonNull(userId, USER_ID_REQUIRED);
         Objects.requireNonNull(conversationId, CONVERSATION_ID_REQUIRED);
 
-        Optional<Conversation> conversationOpt = communicationStorage.getConversation(conversationId);
+        Optional<Conversation> conversationOpt = findAuthorizedConversation(userId, conversationId);
         if (conversationOpt.isEmpty()) {
             return null;
         }
 
         Conversation conversation = conversationOpt.get();
-        if (!conversation.involves(userId)) {
-            return null;
-        }
-
         User otherUser = userStorage.get(conversation.getOtherUser(userId)).orElse(null);
         if (otherUser == null) {
             return null;
@@ -247,8 +234,8 @@ public class ConnectionService {
     }
 
     public void markAsRead(UUID userId, String conversationId) {
-        Optional<Conversation> convoOpt = communicationStorage.getConversation(conversationId);
-        if (convoOpt.isEmpty() || !convoOpt.get().involves(userId)) {
+        Optional<Conversation> convoOpt = findAuthorizedConversation(userId, conversationId);
+        if (convoOpt.isEmpty()) {
             return;
         }
 
@@ -260,7 +247,7 @@ public class ConnectionService {
     }
 
     public int getUnreadCount(UUID userId, String conversationId) {
-        Optional<Conversation> convoOpt = communicationStorage.getConversation(conversationId);
+        Optional<Conversation> convoOpt = findAuthorizedConversation(userId, conversationId);
         if (convoOpt.isEmpty()) {
             return 0;
         }
@@ -280,14 +267,50 @@ public class ConnectionService {
         return communicationStorage.countMessagesAfterNotFrom(convo.getId(), lastReadAt, userId);
     }
 
-    public int getTotalUnreadCount(UUID userId) {
+    private MessageLoadResult validateMessagePageRequest(int limit, int offset) {
+        if (limit < 1 || limit > config.validation().messageMaxPageSize()) {
+            return MessageLoadResult.failure("Invalid limit");
+        }
+        if (offset < 0) {
+            return MessageLoadResult.failure("Invalid offset");
+        }
+        return null;
+    }
+
+    private Optional<Conversation> findAuthorizedConversation(UUID userId, String conversationId) {
+        return communicationStorage
+                .getConversation(conversationId)
+                .filter(conversation -> conversation.involves(userId));
+    }
+
+    private Conversation requireAuthorizedConversation(UUID userId, String conversationId) {
+        Optional<Conversation> conversation = communicationStorage.getConversation(conversationId);
+        if (conversation.isEmpty()) {
+            throw new IllegalArgumentException(CONVERSATION_NOT_FOUND);
+        }
+        if (!conversation.get().involves(userId)) {
+            throw new IllegalArgumentException("Conversation not found or unauthorized");
+        }
+        return conversation.get();
+    }
+
+    private Set<String> conversationIdsFor(UUID userId) {
         List<Conversation> conversations = communicationStorage.getAllConversationsFor(userId);
         if (conversations.isEmpty()) {
+            return Set.of();
+        }
+        Set<String> conversationIds = new HashSet<>();
+        for (Conversation conversation : conversations) {
+            conversationIds.add(conversation.getId());
+        }
+        return conversationIds;
+    }
+
+    public int getTotalUnreadCount(UUID userId) {
+        Set<String> conversationIds = conversationIdsFor(userId);
+        if (conversationIds.isEmpty()) {
             return 0;
         }
-
-        Set<String> conversationIds =
-                conversations.stream().map(Conversation::getId).collect(java.util.stream.Collectors.toSet());
         return communicationStorage.countUnreadMessagesByConversationIds(userId, conversationIds).values().stream()
                 .mapToInt(Integer::intValue)
                 .sum();
@@ -326,12 +349,7 @@ public class ConnectionService {
         Objects.requireNonNull(userId, USER_ID_REQUIRED);
         Objects.requireNonNull(reason, "reason cannot be null");
 
-        Conversation conversation = communicationStorage
-                .getConversation(conversationId)
-                .orElseThrow(() -> new IllegalArgumentException(CONVERSATION_NOT_FOUND));
-        if (!conversation.involves(userId)) {
-            throw new IllegalArgumentException("Conversation not found or unauthorized");
-        }
+        requireAuthorizedConversation(userId, conversationId);
         communicationStorage.archiveConversation(conversationId, userId, reason);
     }
 
@@ -339,12 +357,7 @@ public class ConnectionService {
         Objects.requireNonNull(userId, USER_ID_REQUIRED);
         Objects.requireNonNull(conversationId, CONVERSATION_ID_REQUIRED);
 
-        Conversation conversation = communicationStorage
-                .getConversation(conversationId)
-                .orElseThrow(() -> new IllegalArgumentException(CONVERSATION_NOT_FOUND));
-        if (!conversation.involves(userId)) {
-            throw new IllegalArgumentException("Conversation not found or unauthorized");
-        }
+        requireAuthorizedConversation(userId, conversationId);
         communicationStorage.deleteConversationWithMessages(conversationId);
     }
 
@@ -353,12 +366,7 @@ public class ConnectionService {
         Objects.requireNonNull(conversationId, CONVERSATION_ID_REQUIRED);
         Objects.requireNonNull(messageId, "messageId cannot be null");
 
-        Conversation conversation = communicationStorage
-                .getConversation(conversationId)
-                .orElseThrow(() -> new IllegalArgumentException(CONVERSATION_NOT_FOUND));
-        if (!conversation.involves(userId)) {
-            throw new IllegalArgumentException("Conversation not found or unauthorized");
-        }
+        requireAuthorizedConversation(userId, conversationId);
 
         Message message = communicationStorage
                 .getMessage(messageId)

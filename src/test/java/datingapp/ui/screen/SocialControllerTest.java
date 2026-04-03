@@ -9,6 +9,7 @@ import datingapp.core.AppSession;
 import datingapp.core.connection.ConnectionModels.FriendRequest;
 import datingapp.core.connection.ConnectionModels.Notification;
 import datingapp.core.connection.ConnectionService;
+import datingapp.core.matching.TrustSafetyService;
 import datingapp.core.model.User;
 import datingapp.core.testutil.TestClock;
 import datingapp.core.testutil.TestStorages;
@@ -174,6 +175,7 @@ class SocialControllerTest {
         private final TestStorages.Users users = new TestStorages.Users();
         private final TestStorages.Interactions interactions = new TestStorages.Interactions();
         private final TestStorages.Communications communications = new TestStorages.Communications();
+        private final TestStorages.TrustSafety trustSafety = new TestStorages.TrustSafety();
         private final AppConfig config = AppConfig.defaults();
         private final SocialViewModel viewModel;
         private final User currentUser = TestUserFactory.createActiveUser("SocialCurrent");
@@ -182,8 +184,11 @@ class SocialControllerTest {
         private Fixture() {
             TestClock.setFixed(FIXED_INSTANT);
             ConnectionService connectionService = new ConnectionService(config, communications, interactions, users);
-            var socialUseCases =
-                    new datingapp.app.usecase.social.SocialUseCases(connectionService, null, communications);
+            TrustSafetyService trustSafetyService = TrustSafetyService.builder(
+                            trustSafety, interactions, users, config, communications)
+                    .build();
+            var socialUseCases = new datingapp.app.usecase.social.SocialUseCases(
+                    connectionService, trustSafetyService, communications);
             this.viewModel = new SocialViewModel(
                     connectionService,
                     new datingapp.ui.viewmodel.UiDataAdapters.StorageUiSocialDataAccess(communications),

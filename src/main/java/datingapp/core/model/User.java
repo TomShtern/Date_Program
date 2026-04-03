@@ -645,18 +645,6 @@ public class User {
         touch();
     }
 
-    /**
-     * Sets max distance with a default system limit of 500km.
-     * For production use, prefer {@link #setMaxDistanceKm(int, int)} with explicit system limit.
-     *
-     * @deprecated Use {@link #setMaxDistanceKm(int, int)} with explicit system limit
-     */
-    @Deprecated(since = "2026-03", forRemoval = false)
-    @SuppressWarnings("java:S1133")
-    public void setMaxDistanceKm(int maxDistanceKm) {
-        setMaxDistanceKm(maxDistanceKm, 500);
-    }
-
     public void setAgeRange(int minAge, int maxAge, int systemMinAge, int systemMaxAge) {
         if (minAge < systemMinAge) {
             throw new IllegalArgumentException("minAge must be at least " + systemMinAge);
@@ -670,18 +658,6 @@ public class User {
         this.minAge = minAge;
         this.maxAge = maxAge;
         touch();
-    }
-
-    /**
-     * Sets age range with default system limits (18-120).
-     * For production use, prefer {@link #setAgeRange(int, int, int, int)} with explicit system limits.
-     *
-     * @deprecated Use {@link #setAgeRange(int, int, int, int)} with explicit system limits
-     */
-    @Deprecated(since = "2026-03", forRemoval = false)
-    @SuppressWarnings("java:S1133")
-    public void setAgeRange(int minAge, int maxAge) {
-        setAgeRange(minAge, maxAge, 18, 120);
     }
 
     /** Sets photo URLs with null-safe copy. */

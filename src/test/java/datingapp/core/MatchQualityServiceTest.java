@@ -546,6 +546,23 @@ class MatchQualityServiceTest {
         }
     }
 
+    @Nested
+    @DisplayName("Pace Compatibility")
+    class PaceCompatibilityTests {
+
+        @Test
+        @DisplayName("incomplete pace preferences return a neutral sentinel score")
+        void incompletePacePreferencesReturnNeutralSentinelScore() {
+            PacePreferences complete = new PacePreferences(
+                    MessagingFrequency.OFTEN,
+                    TimeToFirstDate.FEW_DAYS,
+                    CommunicationStyle.MIX_OF_EVERYTHING,
+                    DepthPreference.DEEP_CHAT);
+
+            assertEquals(-1, service.calculatePaceCompatibility(complete, null));
+        }
+    }
+
     // ==================== INTEREST MATCHER TESTS ====================
 
     @Nested

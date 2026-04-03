@@ -8,7 +8,6 @@ import datingapp.app.usecase.social.SocialUseCases;
 import datingapp.app.usecase.social.SocialUseCases.RelationshipCommand;
 import datingapp.app.usecase.social.SocialUseCases.RelationshipTransitionOutcome;
 import datingapp.app.usecase.social.SocialUseCases.ReportCommand;
-import datingapp.core.AppConfig;
 import datingapp.core.AppSession;
 import datingapp.core.connection.ConnectionModels.Message;
 import datingapp.core.connection.ConnectionModels.Report;
@@ -16,14 +15,11 @@ import datingapp.core.connection.ConnectionService.ConversationPreview;
 import datingapp.core.connection.ConnectionService.SendResult;
 import datingapp.core.model.ProfileNote;
 import datingapp.core.model.User;
-import datingapp.ui.async.JavaFxUiThreadDispatcher;
 import datingapp.ui.async.TaskHandle;
 import datingapp.ui.async.UiThreadDispatcher;
 import datingapp.ui.viewmodel.ConversationLoader.ConversationRefreshData;
 import datingapp.ui.viewmodel.ConversationLoader.MessageLoadData;
 import datingapp.ui.viewmodel.ConversationLoader.OpenConversationData;
-import datingapp.ui.viewmodel.UiDataAdapters.NoOpUiPresenceDataAccess;
-import datingapp.ui.viewmodel.UiDataAdapters.NoOpUiProfileNoteDataAccess;
 import datingapp.ui.viewmodel.UiDataAdapters.PresenceStatus;
 import datingapp.ui.viewmodel.UiDataAdapters.UiPresenceDataAccess;
 import datingapp.ui.viewmodel.UiDataAdapters.UiProfileNoteDataAccess;
@@ -53,8 +49,6 @@ import org.jetbrains.annotations.Nullable;
  * Handles the conversation list and the active message thread.
  */
 public class ChatViewModel extends BaseViewModel {
-    private static final Duration DEFAULT_CONVERSATION_POLL_INTERVAL = Duration.ofSeconds(15);
-    private static final Duration DEFAULT_ACTIVE_CONVERSATION_POLL_INTERVAL = Duration.ofSeconds(5);
     private static final String TASK_LOAD_MESSAGES = "load messages";
     private static final String TASK_REFRESH_CONVERSATIONS = "refresh conversations";
 
@@ -62,10 +56,6 @@ public class ChatViewModel extends BaseViewModel {
         public ChatUiDependencies {
             Objects.requireNonNull(noteDataAccess, "noteDataAccess cannot be null");
             Objects.requireNonNull(presenceDataAccess, "presenceDataAccess cannot be null");
-        }
-
-        public static ChatUiDependencies noOp() {
-            return new ChatUiDependencies(new NoOpUiProfileNoteDataAccess(), new NoOpUiPresenceDataAccess());
         }
     }
 
@@ -104,42 +94,6 @@ public class ChatViewModel extends BaseViewModel {
 
     /** Keep reference to listener for cleanup. */
     private final javafx.beans.value.ChangeListener<ConversationPreview> selectionListener;
-
-    public ChatViewModel(MessagingUseCases messagingUseCases, SocialUseCases socialUseCases, AppSession session) {
-        this(messagingUseCases, socialUseCases, session, new JavaFxUiThreadDispatcher());
-    }
-
-    public ChatViewModel(
-            MessagingUseCases messagingUseCases,
-            SocialUseCases socialUseCases,
-            AppSession session,
-            UiThreadDispatcher uiDispatcher) {
-        this(
-                messagingUseCases,
-                socialUseCases,
-                session,
-                uiDispatcher,
-                DEFAULT_CONVERSATION_POLL_INTERVAL,
-                DEFAULT_ACTIVE_CONVERSATION_POLL_INTERVAL,
-                ChatUiDependencies.noOp());
-    }
-
-    public ChatViewModel(
-            MessagingUseCases messagingUseCases,
-            SocialUseCases socialUseCases,
-            AppSession session,
-            UiThreadDispatcher uiDispatcher,
-            Duration conversationPollInterval,
-            Duration activeConversationPollInterval) {
-        this(
-                messagingUseCases,
-                socialUseCases,
-                session,
-                uiDispatcher,
-                conversationPollInterval,
-                activeConversationPollInterval,
-                ChatUiDependencies.noOp());
-    }
 
     public ChatViewModel(
             MessagingUseCases messagingUseCases,
@@ -188,18 +142,6 @@ public class ChatViewModel extends BaseViewModel {
             }
         };
         selectedConversation.addListener(selectionListener);
-    }
-
-    public ChatViewModel(
-            MessagingUseCases messagingUseCases, SocialUseCases socialUseCases, AppSession session, AppConfig config) {
-        this(
-                messagingUseCases,
-                socialUseCases,
-                session,
-                new JavaFxUiThreadDispatcher(),
-                Duration.ofSeconds(config.validation().chatBackgroundPollSeconds()),
-                Duration.ofSeconds(config.validation().chatActivePollSeconds()),
-                ChatUiDependencies.noOp());
     }
 
     /**

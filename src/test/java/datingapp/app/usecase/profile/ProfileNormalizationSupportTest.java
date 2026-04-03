@@ -30,6 +30,19 @@ class ProfileNormalizationSupportTest {
     }
 
     @Test
+    @DisplayName("normalize discovery preferences floors distance to one kilometer")
+    void normalizeDiscoveryPreferencesFloorsDistanceToOneKilometer() {
+        AppConfig config =
+                AppConfig.builder().minAge(18).maxAge(60).maxDistanceKm(120).build();
+
+        var normalized = ProfileNormalizationSupport.normalizeDiscoveryPreferences(config, 30, 35, 0);
+
+        assertEquals(30, normalized.minAge());
+        assertEquals(35, normalized.maxAge());
+        assertEquals(1, normalized.maxDistanceKm());
+    }
+
+    @Test
     @DisplayName("apply minimal bootstrap sets the same honest incomplete defaults")
     void applyMinimalBootstrapSetsTheSameHonestIncompleteDefaults() {
         AppConfig config = AppConfig.defaults();

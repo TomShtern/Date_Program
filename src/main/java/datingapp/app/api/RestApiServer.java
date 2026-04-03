@@ -25,23 +25,24 @@ import datingapp.app.api.RestApiDtos.ModerationResponse;
 import datingapp.app.api.RestApiDtos.NotificationDto;
 import datingapp.app.api.RestApiDtos.PagedMatchResponse;
 import datingapp.app.api.RestApiDtos.PassResponse;
-import datingapp.app.api.RestApiDtos.PendingLikerDto;
 import datingapp.app.api.RestApiDtos.PendingLikersResponse;
 import datingapp.app.api.RestApiDtos.ProfileUpdateRequest;
-import datingapp.app.api.RestApiDtos.ProfileUpdateResponse;
 import datingapp.app.api.RestApiDtos.ReportResponse;
 import datingapp.app.api.RestApiDtos.SendMessageRequest;
-import datingapp.app.api.RestApiDtos.StandoutDto;
 import datingapp.app.api.RestApiDtos.StandoutsResponse;
 import datingapp.app.api.RestApiDtos.StartVerificationRequest;
 import datingapp.app.api.RestApiDtos.StartVerificationResponse;
 import datingapp.app.api.RestApiDtos.TransitionResponse;
 import datingapp.app.api.RestApiDtos.UndoResponse;
-import datingapp.app.api.RestApiDtos.UserDetail;
 import datingapp.app.api.RestApiDtos.UserStatsDto;
-import datingapp.app.api.RestApiDtos.UserSummary;
+import datingapp.app.api.RestApiUserDtos.PendingLikerDto;
+import datingapp.app.api.RestApiUserDtos.ProfileUpdateResponse;
+import datingapp.app.api.RestApiUserDtos.StandoutDto;
+import datingapp.app.api.RestApiUserDtos.UserDetail;
+import datingapp.app.api.RestApiUserDtos.UserSummary;
 import datingapp.app.bootstrap.ApplicationStartup;
 import datingapp.app.event.AppEvent;
+import datingapp.app.usecase.common.UseCaseResult;
 import datingapp.app.usecase.common.UserContext;
 import datingapp.app.usecase.matching.MatchingUseCases;
 import datingapp.app.usecase.matching.MatchingUseCases.ArchiveMatchCommand;
@@ -246,12 +247,11 @@ public class RestApiServer {
     // ── User Handlers ───────────────────────────────────────────────────
 
     void listUsers(Context ctx) {
-        var result = profileUseCases.listUsers();
-        if (!result.success()) {
-            handleUseCaseFailure(ctx, result.error());
+        Optional<List<User>> usersResult = dataOrHandleFailure(ctx, profileUseCases.listUsers());
+        if (usersResult.isEmpty()) {
             return;
         }
-        List<UserSummary> users = result.data().stream()
+        List<UserSummary> users = usersResult.get().stream()
                 .map(user -> UserSummary.from(user, userTimeZone))
                 .toList();
         ctx.json(users);
@@ -309,12 +309,12 @@ public class RestApiServer {
         }
         ensureActiveCandidateBrowser(user);
 
-        var result = matchingUseCases.browseCandidates(new BrowseCandidatesCommand(UserContext.api(id), user));
-        if (!result.success()) {
-            handleUseCaseFailure(ctx, result.error());
+        Optional<MatchingUseCases.BrowseCandidatesResult> result = dataOrHandleFailure(
+                ctx, matchingUseCases.browseCandidates(new BrowseCandidatesCommand(UserContext.api(id), user)));
+        if (result.isEmpty()) {
             return;
         }
-        ctx.json(BrowseCandidatesResponse.from(result.data(), userTimeZone));
+        ctx.json(BrowseCandidatesResponse.from(result.get(), userTimeZone));
     }
 
     void updateProfile(Context ctx) {
@@ -337,34 +337,35 @@ public class RestApiServer {
         Double longitude =
                 resolvedLocation.map(ResolvedProfileLocation::longitude).orElse(request.longitude());
 
-        var result = profileMutationUseCases.updateProfile(new UpdateProfileCommand(
-                UserContext.api(userId),
-                request.bio(),
-                request.birthDate(),
-                request.gender(),
-                request.interestedIn(),
-                latitude,
-                longitude,
-                request.maxDistanceKm(),
-                request.minAge(),
-                request.maxAge(),
-                request.heightCm(),
-                request.smoking(),
-                request.drinking(),
-                request.wantsKids(),
-                request.lookingFor(),
-                request.education(),
-                request.interests(),
-                request.dealbreakers()));
-        if (!result.success()) {
-            handleUseCaseFailure(ctx, result.error());
+        Optional<ProfileMutationUseCases.ProfileSaveResult> result = dataOrHandleFailure(
+                ctx,
+                profileMutationUseCases.updateProfile(new UpdateProfileCommand(
+                        UserContext.api(userId),
+                        request.bio(),
+                        request.birthDate(),
+                        request.gender(),
+                        request.interestedIn(),
+                        latitude,
+                        longitude,
+                        request.maxDistanceKm(),
+                        request.minAge(),
+                        request.maxAge(),
+                        request.heightCm(),
+                        request.smoking(),
+                        request.drinking(),
+                        request.wantsKids(),
+                        request.lookingFor(),
+                        request.education(),
+                        request.interests(),
+                        request.dealbreakers())));
+        if (result.isEmpty()) {
             return;
         }
         ctx.json(ProfileUpdateResponse.from(
-                result.data().user(),
-                result.data().activated(),
+                result.get().user(),
+                result.get().activated(),
                 userTimeZone,
-                locationLabel(result.data().user())));
+                locationLabel(result.get().user())));
     }
 
     void deleteUser(Context ctx) {
@@ -373,10 +374,10 @@ public class RestApiServer {
             return;
         }
 
-        var result = profileMutationUseCases.deleteAccount(
-                new DeleteAccountCommand(UserContext.api(userId), AppEvent.DeletionReason.USER_REQUEST));
-        if (!result.success()) {
-            handleUseCaseFailure(ctx, result.error());
+        if (handleFailureIfNeeded(
+                ctx,
+                profileMutationUseCases.deleteAccount(
+                        new DeleteAccountCommand(UserContext.api(userId), AppEvent.DeletionReason.USER_REQUEST)))) {
             return;
         }
         ctx.status(204);
@@ -454,45 +455,47 @@ public class RestApiServer {
 
     void getFriendRequests(Context ctx) {
         UUID userId = parseUuid(ctx.pathParam("id"));
-        if (loadUser(ctx, userId) == null) {
+        if (!ensureUsersExist(ctx, userId)) {
             return;
         }
 
-        var result = socialUseCases.pendingFriendRequests(new FriendRequestsQuery(UserContext.api(userId)));
-        if (!result.success()) {
-            handleUseCaseFailure(ctx, result.error());
+        Optional<List<datingapp.core.connection.ConnectionModels.FriendRequest>> result = dataOrHandleFailure(
+                ctx, socialUseCases.pendingFriendRequests(new FriendRequestsQuery(UserContext.api(userId))));
+        if (result.isEmpty()) {
             return;
         }
-        ctx.json(FriendRequestsResponse.from(result.data()));
+        ctx.json(FriendRequestsResponse.from(result.get()));
     }
 
     void likeUser(Context ctx) {
         UUID userId = parseUuid(ctx.pathParam("id"));
         UUID targetId = parseUuid(ctx.pathParam(PATH_TARGET_ID));
-        User currentUser = loadUser(ctx, userId);
-        User targetUser = loadUser(ctx, targetId);
-        if (currentUser == null || targetUser == null) {
+        Optional<User> currentUser = loadExistingUser(ctx, userId);
+        Optional<User> targetUser = loadExistingUser(ctx, targetId);
+        if (currentUser.isEmpty() || targetUser.isEmpty()) {
             return;
         }
 
-        var result = matchingUseCases.recordLike(new RecordLikeCommand(
-                UserContext.api(userId),
-                targetId,
-                datingapp.core.connection.ConnectionModels.Like.Direction.LIKE,
-                true));
-        if (!result.success()) {
-            handleUseCaseFailure(ctx, result.error());
+        Optional<MatchingUseCases.RecordLikeResult> result = dataOrHandleFailure(
+                ctx,
+                matchingUseCases.recordLike(new RecordLikeCommand(
+                        UserContext.api(userId),
+                        targetId,
+                        datingapp.core.connection.ConnectionModels.Like.Direction.LIKE,
+                        true)));
+        if (result.isEmpty()) {
             return;
         }
 
-        Optional<Match> match = result.data().match();
+        Optional<Match> match = result.get().match();
 
         if (match.isPresent()) {
             ctx.status(201);
             ctx.json(new LikeResponse(
                     true,
                     "It's a match!",
-                    MatchSummary.from(match.get(), userId, Map.of(targetUser.getId(), targetUser))));
+                    MatchSummary.from(
+                            match.get(), userId, Map.of(targetUser.get().getId(), targetUser.get()))));
         } else {
             ctx.status(200);
             ctx.json(new LikeResponse(false, "Like recorded", null));
@@ -502,17 +505,17 @@ public class RestApiServer {
     void passUser(Context ctx) {
         UUID userId = parseUuid(ctx.pathParam("id"));
         UUID targetId = parseUuid(ctx.pathParam(PATH_TARGET_ID));
-        if (loadUser(ctx, userId) == null || loadUser(ctx, targetId) == null) {
+        if (!ensureUsersExist(ctx, userId, targetId)) {
             return;
         }
 
-        var result = matchingUseCases.recordLike(new RecordLikeCommand(
-                UserContext.api(userId),
-                targetId,
-                datingapp.core.connection.ConnectionModels.Like.Direction.PASS,
-                true));
-        if (!result.success()) {
-            handleUseCaseFailure(ctx, result.error());
+        if (handleFailureIfNeeded(
+                ctx,
+                matchingUseCases.recordLike(new RecordLikeCommand(
+                        UserContext.api(userId),
+                        targetId,
+                        datingapp.core.connection.ConnectionModels.Like.Direction.PASS,
+                        true)))) {
             return;
         }
         ctx.status(200);
@@ -521,30 +524,30 @@ public class RestApiServer {
 
     void undoSwipe(Context ctx) {
         UUID userId = parseUuid(ctx.pathParam("id"));
-        if (loadUser(ctx, userId) == null) {
+        if (!ensureUsersExist(ctx, userId)) {
             return;
         }
 
-        var result = matchingUseCases.undoSwipe(new UndoSwipeCommand(UserContext.api(userId)));
-        if (!result.success()) {
-            handleUseCaseFailure(ctx, result.error());
+        Optional<MatchingUseCases.UndoOutcome> result =
+                dataOrHandleFailure(ctx, matchingUseCases.undoSwipe(new UndoSwipeCommand(UserContext.api(userId))));
+        if (result.isEmpty()) {
             return;
         }
-        ctx.json(UndoResponse.from(result.data()));
+        ctx.json(UndoResponse.from(result.get()));
     }
 
     void getPendingLikers(Context ctx) {
         UUID userId = parseUuid(ctx.pathParam("id"));
-        if (loadUser(ctx, userId) == null) {
+        if (!ensureUsersExist(ctx, userId)) {
             return;
         }
 
-        var result = matchingUseCases.pendingLikers(new PendingLikersQuery(UserContext.api(userId)));
-        if (!result.success()) {
-            handleUseCaseFailure(ctx, result.error());
+        Optional<List<datingapp.core.matching.MatchingService.PendingLiker>> result = dataOrHandleFailure(
+                ctx, matchingUseCases.pendingLikers(new PendingLikersQuery(UserContext.api(userId))));
+        if (result.isEmpty()) {
             return;
         }
-        ctx.json(new PendingLikersResponse(result.data().stream()
+        ctx.json(new PendingLikersResponse(result.get().stream()
                 .map(pendingLiker -> PendingLikerDto.from(pendingLiker, userTimeZone))
                 .toList()));
     }
@@ -1073,6 +1076,34 @@ public class RestApiServer {
         }
         handleUseCaseFailure(ctx, result.error());
         return null;
+    }
+
+    private Optional<User> loadExistingUser(Context ctx, UUID userId) {
+        return Optional.ofNullable(loadUser(ctx, userId));
+    }
+
+    private boolean ensureUsersExist(Context ctx, UUID... userIds) {
+        for (UUID userId : userIds) {
+            if (loadUser(ctx, userId) == null) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private boolean handleFailureIfNeeded(Context ctx, UseCaseResult<?> result) {
+        if (result.success()) {
+            return false;
+        }
+        handleUseCaseFailure(ctx, result.error());
+        return true;
+    }
+
+    private <T> Optional<T> dataOrHandleFailure(Context ctx, UseCaseResult<T> result) {
+        if (handleFailureIfNeeded(ctx, result)) {
+            return Optional.empty();
+        }
+        return Optional.ofNullable(result.data());
     }
 
     private List<User> readCandidateSummaries(User user) {

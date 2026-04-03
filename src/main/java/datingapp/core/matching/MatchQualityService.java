@@ -212,8 +212,38 @@ public class MatchQualityService {
      * @return Computed match quality
      */
     public Optional<MatchQuality> computeQuality(Match match, UUID perspectiveUserId) {
-        UUID otherUserId = match.getOtherUser(perspectiveUserId);
+        Optional<Participants> participants = loadParticipants(match, perspectiveUserId);
+        if (participants.isEmpty()) {
+            return Optional.empty();
+        }
+        MatchComputation computation = computeMatchComputation(participants.get());
+        int compatibilityScore = calculateCompatibilityScore(computation);
+        List<String> highlights = generateHighlights(computation);
 
+        return Optional.of(new MatchQuality(
+                match.getId(),
+                perspectiveUserId,
+                participants.get().otherUserId(),
+                AppClock.now(),
+                computation.distanceScore(),
+                computation.ageScore(),
+                computation.interestScore(),
+                computation.lifestyleScore(),
+                computation.paceScore(),
+                computation.responseScore(),
+                computation.distanceKm(),
+                computation.ageDifference(),
+                computation.sharedInterests(),
+                computation.lifestyleMatches(),
+                computation.timeBetweenLikes(),
+                computation.paceSyncLevel(),
+                compatibilityScore,
+                highlights,
+                starThresholdPolicy));
+    }
+
+    private Optional<Participants> loadParticipants(Match match, UUID perspectiveUserId) {
+        UUID otherUserId = match.getOtherUser(perspectiveUserId);
         User me = userStorage.get(perspectiveUserId).orElse(null);
         User them = userStorage.get(otherUserId).orElse(null);
 
@@ -222,26 +252,23 @@ public class MatchQualityService {
             return Optional.empty();
         }
 
-        // === Calculate Individual Scores ===
+        return Optional.of(new Participants(me, them, otherUserId));
+    }
 
-        // Distance Score
-        double distanceKm;
-        if (me.hasLocationSet() && them.hasLocationSet()) {
-            distanceKm = GeoUtils.distanceKm(me.getLat(), me.getLon(), them.getLat(), them.getLon());
-        } else {
-            distanceKm = -1;
-        }
+    private MatchComputation computeMatchComputation(Participants participants) {
+        User me = participants.me();
+        User them = participants.them();
+
+        double distanceKm = calculateDistanceKm(me, them);
         double distanceScore =
-                distanceKm >= 0 ? calculator.calculateDistanceScore(distanceKm, me.getMaxDistanceKm()) : 0.5; // Neutral
+                distanceKm >= 0 ? calculator.calculateDistanceScore(distanceKm, me.getMaxDistanceKm()) : 0.5;
 
-        // Age Score
         Optional<Integer> meAge = me.getAge(config.safety().userTimeZone());
         Optional<Integer> themAge = them.getAge(config.safety().userTimeZone());
         boolean comparableAge = meAge.isPresent() && themAge.isPresent();
         int ageDiff = comparableAge ? Math.abs(meAge.get() - themAge.get()) : 0;
         double ageScore = comparableAge ? calculator.calculateAgeScore(me, them) : 0.5;
 
-        // Interest Score
         InterestMatcher.MatchResult interestMatch = InterestMatcher.compare(me.getInterests(), them.getInterests());
         double interestScore = calculator.calculateInterestScore(me, them);
         List<String> sharedInterests = InterestMatcher.formatAsList(interestMatch.shared());
@@ -250,19 +277,39 @@ public class MatchQualityService {
                         interestMatch.shared(), config.matching().sharedInterestsPreviewCount())
                 : null;
 
-        // Lifestyle Score
         List<String> lifestyleMatches = findLifestyleMatches(me, them);
         double lifestyleScore = calculator.calculateLifestyleScore(me, them);
 
-        // Response Score
-        Duration timeBetweenLikes = calculateTimeBetweenLikes(perspectiveUserId, otherUserId);
+        Duration timeBetweenLikes = calculateTimeBetweenLikes(me.getId(), them.getId());
         double responseScore = calculator.calculateResponseScore(timeBetweenLikes);
 
-        // Pace Score (Phase 2)
         double paceScore = calculator.calculatePaceScore(me.getPacePreferences(), them.getPacePreferences());
-        String paceSyncLevel = getPaceSyncLevel(paceScore);
 
-        // === Calculate Overall Score ===
+        return new MatchComputation(
+                distanceKm,
+                distanceScore,
+                ageDiff,
+                comparableAge,
+                ageScore,
+                sharedInterests,
+                sharedInterestSummary,
+                interestScore,
+                lifestyleMatches,
+                lifestyleScore,
+                timeBetweenLikes,
+                responseScore,
+                paceScore,
+                getPaceSyncLevel(paceScore));
+    }
+
+    private double calculateDistanceKm(User me, User them) {
+        if (!me.hasLocationSet() || !them.hasLocationSet()) {
+            return -1;
+        }
+        return GeoUtils.distanceKm(me.getLat(), me.getLon(), them.getLat(), them.getLon());
+    }
+
+    private int calculateCompatibilityScore(MatchComputation computation) {
         double totalWeight = config.matching().distanceWeight()
                 + config.matching().ageWeight()
                 + config.matching().interestWeight()
@@ -270,47 +317,15 @@ public class MatchQualityService {
                 + config.matching().paceWeight()
                 + config.matching().responseWeight();
 
-        double weightedScore = distanceScore * config.matching().distanceWeight()
-                + ageScore * config.matching().ageWeight()
-                + interestScore * config.matching().interestWeight()
-                + lifestyleScore * config.matching().lifestyleWeight()
-                + paceScore * config.matching().paceWeight()
-                + responseScore * config.matching().responseWeight();
+        double weightedScore = computation.distanceScore() * config.matching().distanceWeight()
+                + computation.ageScore() * config.matching().ageWeight()
+                + computation.interestScore() * config.matching().interestWeight()
+                + computation.lifestyleScore() * config.matching().lifestyleWeight()
+                + computation.paceScore() * config.matching().paceWeight()
+                + computation.responseScore() * config.matching().responseWeight();
 
         double normalizedScore = totalWeight > 0 ? (weightedScore / totalWeight) : 0.0;
-        int compatibilityScore = (int) Math.round(normalizedScore * 100);
-
-        // === Generate Highlights ===
-        List<String> highlights = generateHighlights(
-                distanceKm,
-                sharedInterests,
-                sharedInterestSummary,
-                lifestyleMatches,
-                paceScore,
-                timeBetweenLikes,
-                comparableAge,
-                ageDiff);
-
-        return Optional.of(new MatchQuality(
-                match.getId(),
-                perspectiveUserId,
-                otherUserId,
-                AppClock.now(),
-                distanceScore,
-                ageScore,
-                interestScore,
-                lifestyleScore,
-                paceScore,
-                responseScore,
-                distanceKm,
-                ageDiff,
-                sharedInterests,
-                lifestyleMatches,
-                timeBetweenLikes,
-                paceSyncLevel,
-                compatibilityScore,
-                highlights,
-                starThresholdPolicy));
+        return (int) Math.round(normalizedScore * 100);
     }
 
     // === Score Calculation Methods ===
@@ -408,23 +423,15 @@ public class MatchQualityService {
 
     // === Highlight Generation ===
 
-    private List<String> generateHighlights(
-            double distanceKm,
-            List<String> sharedInterests,
-            String sharedInterestSummary,
-            List<String> lifestyleMatches,
-            double paceScore,
-            Duration timeBetween,
-            boolean comparableAge,
-            int ageDiff) {
+    private List<String> generateHighlights(MatchComputation computation) {
         List<String> highlights = new ArrayList<>();
-        addDistanceHighlight(highlights, distanceKm);
-        addInterestHighlight(highlights, sharedInterests, sharedInterestSummary);
-        highlights.addAll(lifestyleMatches);
-        addPaceHighlight(highlights, paceScore);
-        addResponseHighlight(highlights, timeBetween);
-        if (comparableAge) {
-            addAgeHighlight(highlights, ageDiff);
+        addDistanceHighlight(highlights, computation.distanceKm());
+        addInterestHighlight(highlights, computation.sharedInterests(), computation.sharedInterestSummary());
+        highlights.addAll(computation.lifestyleMatches());
+        addPaceHighlight(highlights, computation.paceScore());
+        addResponseHighlight(highlights, computation.timeBetweenLikes());
+        if (computation.comparableAge()) {
+            addAgeHighlight(highlights, computation.ageDifference());
         }
         if (highlights.size() > HIGHLIGHT_MAX_COUNT) {
             highlights = new ArrayList<>(highlights.subList(0, HIGHLIGHT_MAX_COUNT));
@@ -479,4 +486,22 @@ public class MatchQualityService {
     public boolean isLowPaceCompatibility(int score) {
         return score >= 0 && score < config.algorithm().paceCompatibilityThreshold();
     }
+
+    private record Participants(User me, User them, UUID otherUserId) {}
+
+    private record MatchComputation(
+            double distanceKm,
+            double distanceScore,
+            int ageDifference,
+            boolean comparableAge,
+            double ageScore,
+            List<String> sharedInterests,
+            String sharedInterestSummary,
+            double interestScore,
+            List<String> lifestyleMatches,
+            double lifestyleScore,
+            Duration timeBetweenLikes,
+            double responseScore,
+            double paceScore,
+            String paceSyncLevel) {}
 }

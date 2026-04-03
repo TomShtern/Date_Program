@@ -136,16 +136,18 @@ public final class ServiceRegistry {
                 : new ProfileNotesUseCases(this.userStorage, this.validationService, this.config, this.eventBus);
 
         this.messagingUseCases = new MessagingUseCases(this.connectionService, this.validationService, this.eventBus);
-        this.matchingUseCases = MatchingUseCases.builder()
-                .candidateFinder(this.candidateFinder)
-                .matchingService(this.matchingService)
-                .recommendationService(this.recommendationService)
-                .undoService(this.undoService)
-                .interactionStorage(this.interactionStorage)
-                .userStorage(this.userStorage)
-                .matchQualityService(this.matchQualityService)
-                .eventBus(this.eventBus)
-                .build();
+        this.matchingUseCases = new MatchingUseCases(
+                this.candidateFinder,
+                this.matchingService,
+                MatchingUseCases.wrapDailyLimitService(this.recommendationService),
+                MatchingUseCases.wrapDailyPickService(this.recommendationService),
+                MatchingUseCases.wrapStandoutService(this.recommendationService),
+                this.undoService,
+                this.interactionStorage,
+                this.userStorage,
+                this.matchQualityService,
+                this.eventBus,
+                this.recommendationService);
         this.dashboardUseCases = builder.dashboardUseCases != null
                 ? Objects.requireNonNull(builder.dashboardUseCases, "dashboardUseCases cannot be null")
                 : new DashboardUseCases(
@@ -156,20 +158,19 @@ public final class ServiceRegistry {
                         this.connectionService,
                         this.profileService,
                         this.config);
-        this.profileUseCases = ProfileUseCases.builder()
-                .userStorage(this.userStorage)
-                .profileService(this.profileService)
-                .validationService(this.validationService)
-                .activityMetricsService(this.activityMetricsService)
-                .achievementService(this.achievementService)
-                .profileMutationUseCases(this.profileMutationUseCases)
-                .profileInsightsUseCases(this.profileInsightsUseCases)
-                .accountCleanupStorage(this.accountCleanupStorage)
-                .profileNotesUseCases(this.profileNotesUseCases)
-                .config(this.config)
-                .activationPolicy(this.activationPolicy)
-                .eventBus(this.eventBus)
-                .build();
+        this.profileUseCases = new ProfileUseCases(
+                this.userStorage,
+                this.profileService,
+                this.validationService,
+                this.activityMetricsService,
+                this.achievementService,
+                this.config,
+                this.activationPolicy,
+                this.eventBus,
+                this.profileMutationUseCases,
+                this.accountCleanupStorage,
+                this.profileNotesUseCases,
+                this.profileInsightsUseCases);
         this.verificationUseCases = new VerificationUseCases(this.userStorage, this.trustSafetyService);
         this.socialUseCases = new SocialUseCases(
                 this.connectionService, this.trustSafetyService, this.communicationStorage, this.eventBus);

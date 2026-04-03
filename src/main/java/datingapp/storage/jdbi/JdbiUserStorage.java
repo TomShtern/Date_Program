@@ -253,11 +253,7 @@ public final class JdbiUserStorage implements UserStorage {
     }
 
     public void saveUserPhotos(UUID userId, List<String> urls) {
-        try {
-            normalizedProfileRepository.saveUserPhotos(userId, urls);
-        } finally {
-            invalidateCachedUser(userId);
-        }
+        saveNormalizedProfileFragment(userId, () -> normalizedProfileRepository.saveUserPhotos(userId, urls));
     }
 
     public List<String> loadUserPhotos(UUID userId) {
@@ -265,11 +261,7 @@ public final class JdbiUserStorage implements UserStorage {
     }
 
     public void saveUserInterests(UUID userId, Set<String> interests) {
-        try {
-            normalizedProfileRepository.saveUserInterests(userId, interests);
-        } finally {
-            invalidateCachedUser(userId);
-        }
+        saveNormalizedProfileFragment(userId, () -> normalizedProfileRepository.saveUserInterests(userId, interests));
     }
 
     public Set<String> loadUserInterests(UUID userId) {
@@ -277,11 +269,7 @@ public final class JdbiUserStorage implements UserStorage {
     }
 
     public void saveUserInterestedIn(UUID userId, Set<String> genders) {
-        try {
-            normalizedProfileRepository.saveUserInterestedIn(userId, genders);
-        } finally {
-            invalidateCachedUser(userId);
-        }
+        saveNormalizedProfileFragment(userId, () -> normalizedProfileRepository.saveUserInterestedIn(userId, genders));
     }
 
     public Set<String> loadUserInterestedIn(UUID userId) {
@@ -289,11 +277,8 @@ public final class JdbiUserStorage implements UserStorage {
     }
 
     public void saveDealbreaker(UUID userId, String tableName, Set<String> values) {
-        try {
-            normalizedProfileRepository.saveDealbreaker(userId, tableName, values);
-        } finally {
-            invalidateCachedUser(userId);
-        }
+        saveNormalizedProfileFragment(
+                userId, () -> normalizedProfileRepository.saveDealbreaker(userId, tableName, values));
     }
 
     public Set<String> loadDealbreaker(UUID userId, String tableName) {
@@ -374,6 +359,14 @@ public final class JdbiUserStorage implements UserStorage {
     private void saveWithHandle(Handle handle, User user) {
         handle.attach(Dao.class).save(new UserSqlBindings(user));
         normalizedProfileRepository.saveNormalizedProfileData(handle, user);
+    }
+
+    private void saveNormalizedProfileFragment(UUID userId, Runnable saveOperation) {
+        try {
+            saveOperation.run();
+        } finally {
+            invalidateCachedUser(userId);
+        }
     }
 
     private <T> T withLockedHandle(UUID userId, Function<Handle, T> operation) {

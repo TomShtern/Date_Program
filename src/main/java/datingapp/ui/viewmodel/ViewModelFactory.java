@@ -27,7 +27,6 @@ import datingapp.ui.viewmodel.UiDataAdapters.StorageUiUserStore;
 import datingapp.ui.viewmodel.UiDataAdapters.UiProfileNoteDataAccess;
 import datingapp.ui.viewmodel.UiDataAdapters.UiUserStore;
 import datingapp.ui.viewmodel.UiDataAdapters.UseCaseUiProfileNoteDataAccess;
-import java.lang.reflect.InvocationTargetException;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -148,20 +147,11 @@ public class ViewModelFactory {
     public Object createController(Class<?> controllerClass) {
         logDebug("Creating controller: {}", controllerClass.getSimpleName());
         Supplier<Object> factory = controllerFactories.get(controllerClass);
-        return factory != null ? factory.get() : createFallbackController(controllerClass);
-    }
-
-    private Object createFallbackController(Class<?> controllerClass) {
-        try {
-            return controllerClass.getDeclaredConstructor().newInstance();
-        } catch (InstantiationException
-                | IllegalAccessException
-                | InvocationTargetException
-                | NoSuchMethodException e) {
+        if (factory == null) {
             String controllerName = controllerClass.getName();
-            logError("Failed to create fallback controller: {}", controllerName, e);
-            throw new IllegalStateException("Failed to create fallback controller: " + controllerName, e);
+            throw new IllegalStateException("No controller factory registered for: " + controllerName);
         }
+        return factory.get();
     }
 
     // --- ViewModel Accessors (lazy initialization) ---
@@ -398,12 +388,6 @@ public class ViewModelFactory {
     private void logDebug(String message, Object... args) {
         if (logger.isDebugEnabled()) {
             logger.debug(message, args);
-        }
-    }
-
-    private void logError(String message, Object... args) {
-        if (logger.isErrorEnabled()) {
-            logger.error(message, args);
         }
     }
 }

@@ -1,10 +1,6 @@
 package datingapp.ui.screen;
 
-import datingapp.core.model.LocationModels.City;
-import datingapp.core.model.LocationModels.Country;
-import datingapp.core.model.LocationModels.ResolvedLocation;
 import datingapp.core.model.User.Gender;
-import datingapp.core.profile.LocationService;
 import datingapp.core.profile.MatchPreferences.Dealbreakers;
 import datingapp.core.profile.MatchPreferences.Interest;
 import datingapp.core.profile.MatchPreferences.Lifestyle;
@@ -21,7 +17,6 @@ import datingapp.ui.viewmodel.ProfileViewModel;
 import java.io.File;
 import java.net.URL;
 import java.util.List;
-import java.util.Optional;
 import java.util.ResourceBundle;
 import javafx.beans.property.ObjectProperty;
 import javafx.collections.FXCollections;
@@ -35,7 +30,6 @@ import javafx.scene.control.DatePicker;
 import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
-import javafx.scene.control.ListView;
 import javafx.scene.control.ProgressBar;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextArea;
@@ -1018,189 +1012,6 @@ public class ProfileController extends BaseController implements Initializable {
         }
         return "Current location: " + viewModel.locationDisplayProperty().get();
     }
-
-    private ComboBox<Country> createCountryCombo(LocationService locationService, Country defaultCountry) {
-        ComboBox<Country> countryCombo =
-                new ComboBox<>(FXCollections.observableArrayList(locationService.getAvailableCountries()));
-        countryCombo.setMaxWidth(Double.MAX_VALUE);
-        countryCombo.setConverter(new StringConverter<>() {
-            @Override
-            public String toString(Country country) {
-                return country == null ? "" : country.displayName();
-            }
-
-            @Override
-            public Country fromString(String string) {
-                return null;
-            }
-        });
-        countryCombo.setCellFactory(list -> new ListCell<>() {
-            @Override
-            protected void updateItem(Country item, boolean empty) {
-                super.updateItem(item, empty);
-                if (empty || item == null) {
-                    setText(null);
-                    setDisable(false);
-                    return;
-                }
-                setText(item.displayName());
-                setDisable(!item.available());
-            }
-        });
-        countryCombo.getSelectionModel().select(defaultCountry);
-        return countryCombo;
-    }
-
-    private ListView<City> createCityListView() {
-        ListView<City> cityListView = new ListView<>();
-        cityListView.setPrefHeight(180);
-        cityListView.setCellFactory(list -> new ListCell<>() {
-            @Override
-            protected void updateItem(City item, boolean empty) {
-                super.updateItem(item, empty);
-                setText(empty || item == null ? null : item.displayName());
-            }
-        });
-        return cityListView;
-    }
-
-    private void refreshCitySuggestions(LocationService locationService, LocationDialogRefs dialogRefs) {
-        Country selectedCountry = dialogRefs.countryCombo().getValue();
-        if (selectedCountry == null) {
-            dialogRefs.cityListView().getItems().clear();
-            return;
-        }
-        dialogRefs
-                .cityListView()
-                .getItems()
-                .setAll(locationService.searchCities(
-                        selectedCountry.code(), dialogRefs.citySearchField().getText(), 10));
-    }
-
-    private void wireLocationDialogInteractions(
-            Country defaultCountry,
-            LocationDialogRefs dialogRefs,
-            Runnable refreshCitySuggestions,
-            Runnable refreshValidationState) {
-        dialogRefs.countryCombo().valueProperty().addListener((obs, oldVal, newVal) -> {
-            if (newVal != null && !newVal.available()) {
-                dialogRefs.countryCombo().getSelectionModel().select(oldVal != null ? oldVal : defaultCountry);
-                UiUtils.setLabelMessage(
-                        dialogRefs.errorLabel(), newVal.name() + " is coming soon. Please choose Israel for now.");
-                return;
-            }
-            dialogRefs.citySearchField().clear();
-            dialogRefs.zipField().clear();
-            dialogRefs.cityListView().getSelectionModel().clearSelection();
-            refreshCitySuggestions.run();
-            refreshValidationState.run();
-        });
-        dialogRefs.citySearchField().textProperty().addListener((obs, oldVal, newVal) -> {
-            dialogRefs.cityListView().getSelectionModel().clearSelection();
-            refreshCitySuggestions.run();
-            refreshValidationState.run();
-        });
-        dialogRefs.cityListView().getSelectionModel().selectedItemProperty().addListener((obs, oldVal, newVal) -> {
-            if (newVal != null) {
-                dialogRefs.zipField().clear();
-            }
-            refreshValidationState.run();
-        });
-        dialogRefs.zipField().textProperty().addListener((obs, oldVal, newVal) -> {
-            if (newVal != null && !newVal.isBlank()) {
-                dialogRefs.cityListView().getSelectionModel().clearSelection();
-            }
-            refreshValidationState.run();
-        });
-    }
-
-    private void refreshLocationValidation(
-            LocationService locationService, LocationDialogRefs dialogRefs, ResolvedLocation[] pendingLocation) {
-        pendingLocation[0] = null;
-        UiUtils.setLabelMessage(dialogRefs.errorLabel(), null);
-
-        Country selectedCountry = dialogRefs.countryCombo().getValue();
-        if (selectedCountry == null) {
-            setLocationDialogState(
-                    dialogRefs.confirmButton(), dialogRefs.previewLabel(), true, "Choose a supported country first.");
-            return;
-        }
-        if (!selectedCountry.available()) {
-            setLocationDialogState(
-                    dialogRefs.confirmButton(),
-                    dialogRefs.previewLabel(),
-                    true,
-                    "This country will be available in a future update.");
-            UiUtils.setLabelMessage(
-                    dialogRefs.errorLabel(), "This country is coming soon. Please choose Israel for now.");
-            return;
-        }
-
-        City selectedCity = dialogRefs.cityListView().getSelectionModel().getSelectedItem();
-        if (selectedCity != null) {
-            pendingLocation[0] = locationService.resolveCity(selectedCity);
-            setLocationDialogState(
-                    dialogRefs.confirmButton(),
-                    dialogRefs.previewLabel(),
-                    false,
-                    "Selected city: " + pendingLocation[0].label());
-            return;
-        }
-
-        String zipText = dialogRefs.zipField().getText() == null
-                ? ""
-                : dialogRefs.zipField().getText().trim();
-        if (zipText.isBlank()) {
-            setLocationDialogState(
-                    dialogRefs.confirmButton(),
-                    dialogRefs.previewLabel(),
-                    true,
-                    "Search for a city or enter a supported ZIP code.");
-            return;
-        }
-
-        LocationService.ZipLookupResult lookupResult = locationService.lookupZip(selectedCountry.code(), zipText);
-        if (!lookupResult.valid()) {
-            setLocationDialogState(
-                    dialogRefs.confirmButton(),
-                    dialogRefs.previewLabel(),
-                    true,
-                    "Enter a valid supported ZIP code to continue.");
-            UiUtils.setLabelMessage(dialogRefs.errorLabel(), lookupResult.message());
-            return;
-        }
-        Optional<ResolvedLocation> resolvedLocation = lookupResult.resolvedLocation();
-        if (resolvedLocation.isPresent()) {
-            pendingLocation[0] = resolvedLocation.orElseThrow();
-            setLocationDialogState(
-                    dialogRefs.confirmButton(),
-                    dialogRefs.previewLabel(),
-                    false,
-                    "ZIP preview: " + pendingLocation[0].label());
-            return;
-        }
-        setLocationDialogState(
-                dialogRefs.confirmButton(),
-                dialogRefs.previewLabel(),
-                true,
-                "ZIP format is valid, but we do not support that area yet.");
-        UiUtils.setLabelMessage(dialogRefs.errorLabel(), lookupResult.message());
-    }
-
-    private void setLocationDialogState(
-            Button confirmButton, Label previewLabel, boolean disabled, String previewText) {
-        confirmButton.setDisable(disabled);
-        previewLabel.setText(previewText);
-    }
-
-    private record LocationDialogRefs(
-            ComboBox<Country> countryCombo,
-            TextField citySearchField,
-            ListView<City> cityListView,
-            TextField zipField,
-            Button confirmButton,
-            Label previewLabel,
-            Label errorLabel) {}
 
     /**
      * Opens a dialog to configure dealbreakers.

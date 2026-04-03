@@ -115,6 +115,59 @@ class ChatControllerTest {
     }
 
     @Test
+    @DisplayName("relationship buttons remain disabled until a conversation is selected")
+    void relationshipButtonsRemainDisabledUntilAConversationIsSelected() throws Exception {
+        Fixture fixture = new Fixture();
+        fixture.seedConversationWithNote(KNOWN_CHAT_NOTE);
+
+        JavaFxTestSupport.LoadedFxml loaded = JavaFxTestSupport.loadFxml(
+                CHAT_FXML,
+                () -> new ChatController(
+                        fixture.viewModel, fixture.config.safety().userTimeZone()));
+        Parent root = loaded.root();
+        @SuppressWarnings("unchecked")
+        ListView<ConnectionService.ConversationPreview> conversationListView =
+                JavaFxTestSupport.lookup(root, CONVERSATION_LIST_SELECTOR, ListView.class);
+        Button friendZoneButton = JavaFxTestSupport.lookup(root, "#friendZoneButton", Button.class);
+        Button gracefulExitButton = JavaFxTestSupport.lookup(root, "#gracefulExitButton", Button.class);
+        Button unmatchButton = JavaFxTestSupport.lookup(root, "#unmatchButton", Button.class);
+
+        assertTrue(JavaFxTestSupport.waitUntil(
+                () -> {
+                    try {
+                        return !JavaFxTestSupport.callOnFxAndWait(
+                                () -> conversationListView.getItems().isEmpty());
+                    } catch (InterruptedException _) {
+                        throw new IllegalStateException("Interrupted while awaiting conversations");
+                    }
+                },
+                8000));
+
+        assertTrue(JavaFxTestSupport.callOnFxAndWait(friendZoneButton::isDisabled));
+        assertTrue(JavaFxTestSupport.callOnFxAndWait(gracefulExitButton::isDisabled));
+        assertTrue(JavaFxTestSupport.callOnFxAndWait(unmatchButton::isDisabled));
+
+        JavaFxTestSupport.runOnFxAndWait(
+                () -> conversationListView.getSelectionModel().selectFirst());
+
+        assertTrue(JavaFxTestSupport.waitUntil(
+                () -> {
+                    try {
+                        return !JavaFxTestSupport.callOnFxAndWait(friendZoneButton::isDisabled)
+                                && !JavaFxTestSupport.callOnFxAndWait(gracefulExitButton::isDisabled)
+                                && !JavaFxTestSupport.callOnFxAndWait(unmatchButton::isDisabled);
+                    } catch (InterruptedException _) {
+                        throw new IllegalStateException("Interrupted while awaiting relationship button enablement");
+                    }
+                },
+                8000));
+
+        fixture.dispose();
+        NavigationService.getInstance().clearHistory();
+        AppSession.getInstance().reset();
+    }
+
+    @Test
     @DisplayName("FXML selection toggles chat state and note buttons remain wired")
     void selectionTogglesChatStateAndNoteButtonsRemainWired() throws Exception {
         Fixture fixture = new Fixture();

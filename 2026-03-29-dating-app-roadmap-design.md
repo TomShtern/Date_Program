@@ -33,24 +33,24 @@ A working dating app on the user's Android phone, backed by a Kotlin server depl
 
 ## Code Reality Snapshot (2026-04-03) 🧪
 
-> **Status markers below are based on the current code** in `src/main/java`, `src/test/java`, and `pom.xml` — not on older docs.
+> **Status markers below are based on the current code** in `src/main/java`, `src/test/java`, and `pom.xml`, plus a fresh `mvn spotless:apply verify` run on 2026-04-03 — not on older docs.
 
 ### Legend
 
-- ✅ **Implemented in code**
+- ✅ **Completed / implemented in actual code**
 - 🟡 **Partially implemented / inconsistent / needs hardening**
 - 🔴 **Not implemented / not started**
 - ⚪ **Later phase / intentionally deferred**
 
 ### High-level phase status
 
-| Phase                         | Status | Current code reality                                                                                                                               |
-|-------------------------------|--------|----------------------------------------------------------------------------------------------------------------------------------------------------|
-| Phase 1: Stabilize Core       | 🟡     | Core matching / profile / messaging / stats / safety logic is mostly real; remaining work is consolidation, parity, onboarding, and seam hardening |
-| Phase 2: PostgreSQL Migration | 🔴     | Runtime still uses H2; `pom.xml` has no PostgreSQL dependency or runtime migration path yet                                                        |
-| Phase 3: Kotlin Migration     | 🔴     | No Kotlin plugin, no mixed Java/Kotlin build, no Kotlin sources                                                                                    |
-| Phase 4: Android App          | 🔴     | No Android project yet; REST server is still localhost-only                                                                                        |
-| Phase 5: Cloud & Services     | ⚪      | Still a future phase; cloud/auth/photo/push infrastructure is not started in code                                                                  |
+| Phase                         | Status | Current code reality                                                                                                                                                                    |
+|-------------------------------|--------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Phase 1: Stabilize Core       | 🟡     | Core matching / profile / messaging / stats / safety logic is largely real; remaining work is onboarding, recommendation-ranked browse, REST parity cleanup, and quality-gate hardening |
+| Phase 2: PostgreSQL Migration | 🔴     | Runtime still uses H2; `pom.xml` has no PostgreSQL dependency or runtime migration path yet                                                                                             |
+| Phase 3: Kotlin Migration     | 🔴     | No Kotlin plugin, no mixed Java/Kotlin build, no Kotlin sources                                                                                                                         |
+| Phase 4: Android App          | 🔴     | No Android project yet; REST server is still localhost-only                                                                                                                             |
+| Phase 5: Cloud & Services     | ⚪      | Still a future phase; cloud/auth/photo/push infrastructure is not started in code                                                                                                       |
 
 ### Phase 1 reality check
 
@@ -62,8 +62,8 @@ A working dating app on the user's Android phone, backed by a Kotlin server depl
 | One-way blocking                   | ✅      | Candidate filtering checks blocks in either direction                                                               |
 | No re-match cooldown               | ✅      | Recently unmatched pairs are excluded until cooldown expires                                                        |
 | Friend-zone doesn't clean up       | 🟡     | Relationship transition APIs and tests exist, but storage-backed cleanup/failure semantics should still be hardened |
-| Undo silently expires              | 🟡     | Undo availability and messaging exist in CLI/JavaFX, but parity/polish across all surfaces is still incomplete      |
-| Location silently kills experience | 🟡     | CLI explains missing location before browsing, but location UX/parity is still not fully polished                   |
+| Undo silently expires              | ✅      | Undo availability, countdown, and expired-window messaging are surfaced through `MatchingUseCases`, CLI, and JavaFX |
+| Location silently kills experience | ✅      | Missing-location state is surfaced in CLI, JavaFX, and REST via browse-result empty-state messaging                 |
 
 #### 1b. Hollow features → real features
 
@@ -72,7 +72,7 @@ A working dating app on the user's Android phone, backed by a Kotlin server depl
 | MatchQuality scores           | ✅      | Surfaced in CLI, JavaFX, and REST                                                                                                                                      |
 | RecommendationService ranking | 🟡     | Daily picks / standouts are real, but normal browse flow still returns `CandidateFinder.findCandidatesForUser(...)` results rather than recommendation-ranked browsing |
 | ActivityMetrics               | ✅      | Exposed through stats/achievements flows in CLI, JavaFX, and REST                                                                                                      |
-| ProfileCompletion score       | 🟡     | Surfaced in JavaFX and CLI, but not yet turned into a strong guided onboarding / first-run experience                                                                  |
+| ProfileCompletion score       | ✅      | Surfaced as dashboard/profile-completion nudges and guidance in JavaFX and app-layer dashboard flows                                                                   |
 | Event handlers                | ✅      | Achievements and notifications have visible surfaced outputs                                                                                                           |
 
 #### 1c. User journey gaps
@@ -86,17 +86,17 @@ A working dating app on the user's Android phone, backed by a Kotlin server depl
 
 #### 1d. Testing & validation
 
-| Goal                                                      | Status | Code reality                                                                                                                     |
-|-----------------------------------------------------------|--------|----------------------------------------------------------------------------------------------------------------------------------|
-| CLI exercises every feature                               | 🟡     | CLI is broad and useful, but safety flows still carry simulated wording and some polish gaps                                     |
-| REST API exposes every feature through the use-case layer | 🟡     | REST is broad, but safety parity is incomplete and one deliberate direct-read exception remains                                  |
-| All semantic fixes get regression tests                   | 🟡     | Strong regression coverage exists for many matching/relationship/storage cases, but policy/guard seams still need targeted tests |
-| Quality gate passes                                       | 🟡     | The full Maven quality gate is defined in `pom.xml`, but this snapshot is read-only and did not re-run it                        |
+| Goal                                                      | Status | Code reality                                                                                                                                                                                                                                                                   |
+|-----------------------------------------------------------|--------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| CLI exercises every feature                               | 🟡     | CLI coverage is broad across profile, matching, messaging, safety, stats, and relationship flows, but a final explicit end-to-end pass is still worth doing                                                                                                                    |
+| REST API exposes every feature through the use-case layer | 🟡     | REST is broad, but safety parity is incomplete and one deliberate direct-read exception remains                                                                                                                                                                                |
+| All semantic fixes get regression tests                   | 🟡     | Strong regression coverage exists for many matching/relationship/storage cases, but policy/guard seams still need targeted tests                                                                                                                                               |
+| Quality gate passes                                       | 🟡     | A fresh `mvn spotless:apply verify` run on 2026-04-03 currently fails on `ChatViewModelTest.shouldSkipStaleBackgroundLoads()[8]` timing out; an isolated rerun of that test passed, so the current blocker looks like suite stability rather than a broad compile/lint failure |
 
 ### Bottom line right now
 
 - ✅ **Core engine work is much further along than the roadmap implies**
-- 🟡 **The main remaining Phase 1 work is consolidation, parity, onboarding, and hardening**
+- 🟡 **The main remaining Phase 1 work is onboarding, recommendation-ranked browse, REST parity cleanup, and quality-gate hardening**
 - 🔴 **Phases 2-4 are still largely ahead of the current codebase**
 
 ## Phase 1: Stabilize Core (Java, H2, CLI) 🟡

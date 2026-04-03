@@ -1,6 +1,7 @@
 package datingapp.app.api;
 
-import datingapp.app.support.UserPresentationSupport;
+import datingapp.app.api.RestApiUserDtos.DailyPickDto;
+import datingapp.app.api.RestApiUserDtos.UserSummary;
 import datingapp.app.usecase.matching.MatchingUseCases.MatchQualitySnapshot;
 import datingapp.app.usecase.matching.MatchingUseCases.UndoOutcome;
 import datingapp.app.usecase.profile.VerificationUseCases;
@@ -9,9 +10,6 @@ import datingapp.core.connection.ConnectionModels.FriendRequest;
 import datingapp.core.connection.ConnectionModels.Message;
 import datingapp.core.connection.ConnectionModels.Notification;
 import datingapp.core.connection.ConnectionModels.Report;
-import datingapp.core.matching.DailyPickService.DailyPick;
-import datingapp.core.matching.MatchingService;
-import datingapp.core.matching.Standout;
 import datingapp.core.metrics.EngagementDomain.Achievement.UserAchievement;
 import datingapp.core.metrics.EngagementDomain.UserStats;
 import datingapp.core.model.LocationModels.City;
@@ -50,52 +48,6 @@ final class RestApiDtos {
 
     /** Error response. */
     static record ErrorResponse(String code, String message) {}
-
-    /** Minimal user info for lists. */
-    static record UserSummary(UUID id, String name, int age, String state) {
-        /**
-         * Creates a UserSummary from a User entity.
-         * Uses the provided timezone for age calculation.
-         */
-        static UserSummary from(User user, ZoneId userTimeZone) {
-            return new UserSummary(
-                    user.getId(),
-                    user.getName(),
-                    UserPresentationSupport.safeAge(user, userTimeZone),
-                    user.getState().name());
-        }
-    }
-
-    /** Full user detail for single-user queries. */
-    static record UserDetail(
-            UUID id,
-            String name,
-            int age,
-            String bio,
-            String gender,
-            List<String> interestedIn,
-            String approximateLocation,
-            int maxDistanceKm,
-            List<String> photoUrls,
-            String state) {
-        /**
-         * Creates a UserDetail from a User entity.
-         * Uses the provided timezone for age calculation.
-         */
-        static UserDetail from(User user, ZoneId userTimeZone, String approximateLocation) {
-            return new UserDetail(
-                    user.getId(),
-                    user.getName(),
-                    UserPresentationSupport.safeAge(user, userTimeZone),
-                    user.getBio(),
-                    user.getGender() != null ? user.getGender().name() : null,
-                    user.getInterestedIn().stream().map(Enum::name).toList(),
-                    approximateLocation,
-                    user.getMaxDistanceKm(),
-                    user.getPhotoUrls(),
-                    user.getState().name());
-        }
-    }
 
     /** Country DTO for location metadata responses. */
     static record LocationCountryDto(
@@ -156,20 +108,6 @@ final class RestApiDtos {
         }
     }
 
-    /** Daily pick DTO. */
-    static record DailyPickDto(
-            UUID userId, String userName, int userAge, LocalDate date, String reason, boolean alreadySeen) {
-        static DailyPickDto from(DailyPick dailyPick, ZoneId userTimeZone) {
-            return new DailyPickDto(
-                    dailyPick.user().getId(),
-                    dailyPick.user().getName(),
-                    UserPresentationSupport.safeAge(dailyPick.user(), userTimeZone),
-                    dailyPick.date(),
-                    dailyPick.reason(),
-                    dailyPick.alreadySeen());
-        }
-    }
-
     /** Match summary for API responses. */
     static record MatchSummary(
             String matchId, UUID otherUserId, String otherUserName, String state, Instant createdAt) {
@@ -214,19 +152,8 @@ final class RestApiDtos {
     static record ConversationSummary(
             String id, UUID otherUserId, String otherUserName, int messageCount, Instant lastMessageAt) {}
 
-    /** Pending liker DTO for API responses. */
-    static record PendingLikerDto(UUID userId, String name, int age, Instant likedAt) {
-        static PendingLikerDto from(MatchingService.PendingLiker pendingLiker, ZoneId userTimeZone) {
-            return new PendingLikerDto(
-                    pendingLiker.user().getId(),
-                    pendingLiker.user().getName(),
-                    UserPresentationSupport.safeAge(pendingLiker.user(), userTimeZone),
-                    pendingLiker.likedAt());
-        }
-    }
-
     /** Pending likers response. */
-    static record PendingLikersResponse(List<PendingLikerDto> pendingLikers) {}
+    static record PendingLikersResponse(List<RestApiUserDtos.PendingLikerDto> pendingLikers) {}
 
     /** Friend request DTO for API responses. */
     static record FriendRequestDto(
@@ -250,35 +177,9 @@ final class RestApiDtos {
         }
     }
 
-    /** Standout DTO for API responses. */
-    static record StandoutDto(
-            UUID id,
-            UUID standoutUserId,
-            String standoutUserName,
-            int standoutUserAge,
-            int rank,
-            int score,
-            String reason,
-            Instant createdAt,
-            Instant interactedAt) {
-        static StandoutDto from(Standout standout, Map<UUID, User> usersById, ZoneId userTimeZone) {
-            User user = usersById.get(standout.standoutUserId());
-            return new StandoutDto(
-                    standout.id(),
-                    standout.standoutUserId(),
-                    user != null ? user.getName() : UNKNOWN_USER,
-                    UserPresentationSupport.safeAge(user, userTimeZone),
-                    standout.rank(),
-                    standout.score(),
-                    standout.reason(),
-                    standout.createdAt(),
-                    standout.interactedAt());
-        }
-    }
-
     /** Standouts response. */
     static record StandoutsResponse(
-            List<StandoutDto> standouts, int totalCandidates, boolean fromCache, String message) {}
+            List<RestApiUserDtos.StandoutDto> standouts, int totalCandidates, boolean fromCache, String message) {}
 
     /** Notification DTO. */
     static record NotificationDto(
@@ -338,34 +239,6 @@ final class RestApiDtos {
             Set<Interest> interests,
             Dealbreakers dealbreakers,
             ProfileLocationRequest location) {}
-
-    /** Response body for profile updates. */
-    static record ProfileUpdateResponse(
-            UUID id,
-            String name,
-            int age,
-            String bio,
-            String gender,
-            List<String> interestedIn,
-            String approximateLocation,
-            int maxDistanceKm,
-            String state,
-            boolean activated) {
-        static ProfileUpdateResponse from(
-                User user, boolean activated, ZoneId userTimeZone, String approximateLocation) {
-            return new ProfileUpdateResponse(
-                    user.getId(),
-                    user.getName(),
-                    UserPresentationSupport.safeAge(user, userTimeZone),
-                    user.getBio(),
-                    user.getGender() != null ? user.getGender().name() : null,
-                    user.getInterestedIn().stream().map(Enum::name).toList(),
-                    approximateLocation,
-                    user.getMaxDistanceKm(),
-                    user.getState().name(),
-                    activated);
-        }
-    }
 
     /** Match quality response. */
     static record MatchQualityDto(

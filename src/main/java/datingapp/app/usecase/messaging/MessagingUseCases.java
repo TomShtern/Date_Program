@@ -44,10 +44,10 @@ public class MessagingUseCases {
 
     public UseCaseResult<ConversationListResult> listConversations(ListConversationsQuery query) {
         if (query == null || query.context() == null) {
-            return UseCaseResult.failure(UseCaseError.validation(CONTEXT_REQUIRED));
+            return validationFailure(CONTEXT_REQUIRED);
         }
-        int limit = query.limit() > 0 ? query.limit() : DEFAULT_LIMIT;
-        int offset = Math.max(0, query.offset());
+        int limit = normalizeLimit(query.limit());
+        int offset = normalizeOffset(query.offset());
         try {
             List<ConversationPreview> previews =
                     connectionService.getConversations(query.context().userId(), limit, offset);
@@ -55,13 +55,13 @@ public class MessagingUseCases {
                     previews.stream().mapToInt(ConversationPreview::unreadCount).sum();
             return UseCaseResult.success(new ConversationListResult(previews, totalUnread));
         } catch (Exception e) {
-            return UseCaseResult.failure(UseCaseError.internal("Failed to list conversations: " + e.getMessage()));
+            return internalFailure("list conversations", e);
         }
     }
 
     public UseCaseResult<OpenConversationResult> openConversation(OpenConversationCommand command) {
         if (command == null || command.context() == null || command.otherUserId() == null) {
-            return UseCaseResult.failure(UseCaseError.validation("Context and target user are required"));
+            return validationFailure("Context and target user are required");
         }
         try {
             Conversation conversation =
@@ -73,16 +73,16 @@ public class MessagingUseCases {
             }
             return UseCaseResult.success(new OpenConversationResult(conversation, preview));
         } catch (Exception e) {
-            return UseCaseResult.failure(UseCaseError.internal("Failed to open conversation: " + e.getMessage()));
+            return internalFailure("open conversation", e);
         }
     }
 
     public UseCaseResult<ConversationThread> loadConversation(LoadConversationQuery query) {
         if (query == null || query.context() == null || query.otherUserId() == null) {
-            return UseCaseResult.failure(UseCaseError.validation("Context and target user are required"));
+            return validationFailure("Context and target user are required");
         }
-        int limit = query.limit() > 0 ? query.limit() : DEFAULT_LIMIT;
-        int offset = Math.max(0, query.offset());
+        int limit = normalizeLimit(query.limit());
+        int offset = normalizeOffset(query.offset());
         try {
             var result = connectionService.getMessages(query.context().userId(), query.otherUserId(), limit, offset);
             if (!result.success()) {
@@ -97,7 +97,7 @@ public class MessagingUseCases {
 
             return UseCaseResult.success(new ConversationThread(result.messages(), canMessage, conversationId));
         } catch (Exception e) {
-            return UseCaseResult.failure(UseCaseError.internal("Failed to load conversation: " + e.getMessage()));
+            return internalFailure("load conversation", e);
         }
     }
 
@@ -129,16 +129,15 @@ public class MessagingUseCases {
 
     public UseCaseResult<ConnectionService.SendResult> sendMessage(SendMessageCommand command) {
         if (command == null || command.context() == null || command.recipientId() == null) {
-            return UseCaseResult.failure(UseCaseError.validation("Context and recipient are required"));
+            return validationFailure("Context and recipient are required");
         }
         if (validationService != null) {
             var validationResult = validationService.validateMessageContent(command.content());
             if (!validationResult.valid()) {
-                return UseCaseResult.failure(
-                        UseCaseError.validation(validationResult.errors().getFirst()));
+                return validationFailure(validationResult.errors().getFirst());
             }
         } else if (command.content() == null || command.content().isBlank()) {
-            return UseCaseResult.failure(UseCaseError.validation("Message content cannot be empty"));
+            return validationFailure("Message content cannot be empty");
         }
         ConnectionService.SendResult result;
         try {
@@ -148,7 +147,7 @@ public class MessagingUseCases {
                 return UseCaseResult.failure(UseCaseError.conflict(result.errorMessage()));
             }
         } catch (Exception e) {
-            return UseCaseResult.failure(UseCaseError.internal("Failed to send message: " + e.getMessage()));
+            return internalFailure("send message", e);
         }
 
         publishMessageSentEvent(command, result);
@@ -167,55 +166,53 @@ public class MessagingUseCases {
 
     public UseCaseResult<Void> markConversationRead(MarkConversationReadCommand command) {
         if (command == null || command.context() == null || command.conversationId() == null) {
-            return UseCaseResult.failure(UseCaseError.validation("Context and conversationId are required"));
+            return validationFailure("Context and conversationId are required");
         }
         try {
             connectionService.markAsRead(command.context().userId(), command.conversationId());
             return UseCaseResult.success(null);
         } catch (Exception e) {
-            return UseCaseResult.failure(
-                    UseCaseError.internal("Failed to mark conversation as read: " + e.getMessage()));
+            return internalFailure("mark conversation as read", e);
         }
     }
 
     public UseCaseResult<Integer> totalUnreadCount(UserContext context) {
         if (context == null) {
-            return UseCaseResult.failure(UseCaseError.validation(CONTEXT_REQUIRED));
+            return validationFailure(CONTEXT_REQUIRED);
         }
         try {
             return UseCaseResult.success(connectionService.getTotalUnreadCount(context.userId()));
         } catch (Exception e) {
-            return UseCaseResult.failure(UseCaseError.internal("Failed to compute unread count: " + e.getMessage()));
+            return internalFailure("compute unread count", e);
         }
     }
 
     public UseCaseResult<Map<String, Integer>> countMessagesByConversationIds(
             CountMessagesByConversationIdsQuery query) {
         if (query == null || query.context() == null) {
-            return UseCaseResult.failure(UseCaseError.validation(CONTEXT_REQUIRED));
+            return validationFailure(CONTEXT_REQUIRED);
         }
         if (query.conversationIds() == null) {
-            return UseCaseResult.failure(UseCaseError.validation("conversationIds are required"));
+            return validationFailure("conversationIds are required");
         }
         try {
             return UseCaseResult.success(connectionService.countMessagesByConversationIds(query.conversationIds()));
         } catch (Exception e) {
-            return UseCaseResult.failure(
-                    UseCaseError.internal("Failed to count messages by conversation IDs: " + e.getMessage()));
+            return internalFailure("count messages by conversation IDs", e);
         }
     }
 
     public UseCaseResult<Void> deleteConversation(DeleteConversationCommand command) {
         if (command == null || command.context() == null || command.conversationId() == null) {
-            return UseCaseResult.failure(UseCaseError.validation("Context and conversationId are required"));
+            return validationFailure("Context and conversationId are required");
         }
         try {
             connectionService.deleteConversation(command.context().userId(), command.conversationId());
             return UseCaseResult.success(null);
         } catch (IllegalArgumentException e) {
-            return UseCaseResult.failure(UseCaseError.validation(e.getMessage()));
+            return validationFailure(e.getMessage());
         } catch (Exception e) {
-            return UseCaseResult.failure(UseCaseError.internal("Failed to delete conversation: " + e.getMessage()));
+            return internalFailure("delete conversation", e);
         }
     }
 
@@ -224,7 +221,7 @@ public class MessagingUseCases {
                 || command.context() == null
                 || command.conversationId() == null
                 || command.reason() == null) {
-            return UseCaseResult.failure(UseCaseError.validation("Context, conversationId and reason are required"));
+            return validationFailure("Context, conversationId and reason are required");
         }
         try {
             connectionService.archiveConversation(
@@ -235,9 +232,9 @@ public class MessagingUseCases {
                     "Event publish failed for archived conversation " + command.conversationId());
             return UseCaseResult.success(null);
         } catch (IllegalArgumentException e) {
-            return UseCaseResult.failure(UseCaseError.validation(e.getMessage()));
+            return validationFailure(e.getMessage());
         } catch (Exception e) {
-            return UseCaseResult.failure(UseCaseError.internal("Failed to archive conversation: " + e.getMessage()));
+            return internalFailure("archive conversation", e);
         }
     }
 
@@ -246,16 +243,32 @@ public class MessagingUseCases {
                 || command.context() == null
                 || command.conversationId() == null
                 || command.messageId() == null) {
-            return UseCaseResult.failure(UseCaseError.validation("Context, conversationId and messageId are required"));
+            return validationFailure("Context, conversationId and messageId are required");
         }
         try {
             connectionService.deleteMessage(command.context().userId(), command.conversationId(), command.messageId());
             return UseCaseResult.success(null);
         } catch (IllegalArgumentException e) {
-            return UseCaseResult.failure(UseCaseError.validation(e.getMessage()));
+            return validationFailure(e.getMessage());
         } catch (Exception e) {
-            return UseCaseResult.failure(UseCaseError.internal("Failed to delete message: " + e.getMessage()));
+            return internalFailure("delete message", e);
         }
+    }
+
+    private static int normalizeLimit(int limit) {
+        return limit > 0 ? limit : DEFAULT_LIMIT;
+    }
+
+    private static int normalizeOffset(int offset) {
+        return Math.max(0, offset);
+    }
+
+    private static <T> UseCaseResult<T> validationFailure(String message) {
+        return UseCaseResult.failure(UseCaseError.validation(message));
+    }
+
+    private static <T> UseCaseResult<T> internalFailure(String action, Exception error) {
+        return UseCaseResult.failure(UseCaseError.internal("Failed to " + action + ": " + error.getMessage()));
     }
 
     public static record ListConversationsQuery(UserContext context, int limit, int offset) {}

@@ -1131,7 +1131,7 @@ public final class DevDataSeeder {
 
     /**
      * Constructs a fully-formed, ACTIVE seed user from a definition record.
-     * Uses two-arg setters where the system limit is required.
+     * Uses explicit-limit setters for discovery preferences.
      * Throws if the profile is still incomplete when {@code activate()} is called.
      */
     @SuppressWarnings("PMD.UnusedPrivateMethod") // Public API for future callers, tests, and migration
@@ -1180,7 +1180,7 @@ public final class DevDataSeeder {
     }
 
     /**
-     * Constructs a fully-formed, ACTIVE seed user. Uses two-arg setters where the
+     * Constructs a fully-formed, ACTIVE seed user. Uses explicit-limit setters where the
      * system limit is required. Throws if the profile is still incomplete when
      * {@code activate()} is called — surfaces misconfigured seed entries early.
      *

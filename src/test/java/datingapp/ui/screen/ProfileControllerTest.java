@@ -164,6 +164,50 @@ class ProfileControllerTest {
     }
 
     @Test
+    @DisplayName("auxiliary profile action buttons stay wired to handlers")
+    void auxiliaryProfileActionButtonsStayWiredToHandlers() throws Exception {
+        String originalUserHome = System.getProperty("user.home");
+        Path tempHome = Files.createTempDirectory("datingapp-profile-actions-home");
+        try {
+            System.setProperty("user.home", tempHome.toString());
+            System.setProperty(FILE_URLS_ENABLED_PROPERTY, "true");
+            System.setProperty(FILE_URL_ROOT_PROPERTY, tempHome.toString());
+
+            TestStorages.Users users = new TestStorages.Users();
+            AppConfig config = AppConfig.defaults();
+            ProfileService profileService = new ProfileService(users);
+
+            User currentUser = createActiveUser("Action Test User");
+            users.save(currentUser);
+            AppSession.getInstance().setCurrentUser(currentUser);
+
+            ProfileViewModel viewModel = createViewModel(users, config, profileService);
+
+            JavaFxTestSupport.LoadedFxml loaded =
+                    JavaFxTestSupport.loadFxml("/fxml/profile.fxml", () -> new ProfileController(viewModel));
+            Parent root = loaded.root();
+
+            Button setLocationButton = JavaFxTestSupport.lookup(root, "#setLocationButton", Button.class);
+            Button editDealbreakersButton = JavaFxTestSupport.lookup(root, "#editDealbreakersBtn", Button.class);
+            Button previewButton = JavaFxTestSupport.lookup(root, "#previewButton", Button.class);
+            Button profileScoreButton = JavaFxTestSupport.lookup(root, "#profileScoreButton", Button.class);
+
+            assertNotNull(JavaFxTestSupport.callOnFxAndWait(setLocationButton::getOnAction));
+            assertNotNull(JavaFxTestSupport.callOnFxAndWait(editDealbreakersButton::getOnAction));
+            assertNotNull(JavaFxTestSupport.callOnFxAndWait(previewButton::getOnAction));
+            assertNotNull(JavaFxTestSupport.callOnFxAndWait(profileScoreButton::getOnAction));
+
+            viewModel.dispose();
+            NavigationService.getInstance().clearHistory();
+            AppSession.getInstance().reset();
+        } finally {
+            System.clearProperty(FILE_URLS_ENABLED_PROPERTY);
+            System.clearProperty(FILE_URL_ROOT_PROPERTY);
+            System.setProperty("user.home", originalUserHome);
+        }
+    }
+
+    @Test
     @DisplayName("successful incomplete save keeps user on profile and shows completion guidance")
     void successfulIncompleteSaveKeepsUserOnProfileAndShowsCompletionGuidance() throws Exception {
         TestStorages.Users users = new TestStorages.Users();

@@ -293,6 +293,13 @@ class UserTest {
     }
 
     @Test
+    @DisplayName("deprecated discovery preference setter overloads are removed")
+    void deprecatedDiscoveryPreferenceSetterOverloadsAreRemoved() {
+        assertThrows(NoSuchMethodException.class, () -> User.class.getMethod("setAgeRange", int.class, int.class));
+        assertThrows(NoSuchMethodException.class, () -> User.class.getMethod("setMaxDistanceKm", int.class));
+    }
+
+    @Test
     @DisplayName("addInterest is idempotent for duplicates")
     void addInterest_isIdempotent() {
         User user = new User(UUID.randomUUID(), "Eve");

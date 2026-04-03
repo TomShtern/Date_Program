@@ -386,6 +386,25 @@ class ValidationServiceTest {
     }
 
     @Nested
+    @DisplayName("Profile Note Validation")
+    class ProfileNoteValidation {
+
+        @Test
+        @DisplayName("Profile note content respects the configured maximum length")
+        void profileNoteContentRespectsConfiguredMaximumLength() {
+            ValidationService noteValidator = new ValidationService(
+                    AppConfig.builder().maxProfileNoteLength(12).build());
+
+            assertTrue(noteValidator.validateProfileNoteContent("x".repeat(12)).valid());
+
+            ValidationResult result = noteValidator.validateProfileNoteContent("x".repeat(13));
+
+            assertFalse(result.valid());
+            assertEquals("Note too long (max 12 characters)", result.errors().getFirst());
+        }
+    }
+
+    @Nested
     @DisplayName("Interest Validation")
     class InterestValidation {
 

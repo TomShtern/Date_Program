@@ -33,6 +33,8 @@ import java.util.concurrent.TimeUnit;
 import javafx.animation.Animation;
 import javafx.scene.Parent;
 import javafx.scene.control.Button;
+import javafx.scene.control.Label;
+import javafx.scene.control.ToggleButton;
 import javafx.scene.layout.Pane;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
@@ -74,6 +76,30 @@ class MatchesControllerTest {
         UUID targetUserId = JavaFxTestSupport.callOnFxAndWait(controller::chatTargetUserId);
         assertNotNull(targetUserId);
         assertEquals(fixture.otherUser.getId(), targetUserId);
+
+        fixture.dispose();
+        NavigationService.getInstance().clearHistory();
+        AppSession.getInstance().reset();
+    }
+
+    @Test
+    @DisplayName("matches becomes the default section when a match exists")
+    void matchesBecomesTheDefaultSectionWhenAMatchExists() throws Exception {
+        Fixture fixture = new Fixture();
+        fixture.seedSingleMatch();
+
+        JavaFxTestSupport.LoadedFxml loaded =
+                JavaFxTestSupport.loadFxml("/fxml/matches.fxml", () -> new MatchesController(fixture.viewModel));
+        Parent root = loaded.root();
+
+        assertTrue(JavaFxTestSupport.waitUntil(
+                () -> !fixture.viewModel.getMatches().isEmpty(), 5000));
+
+        ToggleButton matchesTabButton = JavaFxTestSupport.lookup(root, "#matchesTabButton", ToggleButton.class);
+        Label headerTitleLabel = JavaFxTestSupport.lookup(root, "#headerTitleLabel", Label.class);
+
+        assertTrue(JavaFxTestSupport.callOnFxAndWait(matchesTabButton::isSelected));
+        assertEquals("Your Matches", JavaFxTestSupport.callOnFxAndWait(headerTitleLabel::getText));
 
         fixture.dispose();
         NavigationService.getInstance().clearHistory();

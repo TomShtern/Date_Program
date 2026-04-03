@@ -25,6 +25,8 @@ import datingapp.core.testutil.TestAchievementService;
 import datingapp.core.testutil.TestClock;
 import datingapp.core.testutil.TestStorages;
 import datingapp.ui.async.UiAsyncTestSupport;
+import datingapp.ui.viewmodel.UiDataAdapters.NoOpUiPresenceDataAccess;
+import datingapp.ui.viewmodel.UiDataAdapters.NoOpUiProfileNoteDataAccess;
 import datingapp.ui.viewmodel.UiDataAdapters.PresenceStatus;
 import datingapp.ui.viewmodel.UiDataAdapters.UiPresenceDataAccess;
 import datingapp.ui.viewmodel.UiDataAdapters.UseCaseUiProfileNoteDataAccess;
@@ -715,7 +717,8 @@ class ChatViewModelTest {
     @Test
     @DisplayName("explicit no-op presence dependencies report unsupported state")
     void noOpPresenceDependenciesReportUnsupportedState() {
-        ChatViewModel.ChatUiDependencies dependencies = ChatViewModel.ChatUiDependencies.noOp();
+        ChatViewModel.ChatUiDependencies dependencies =
+                new ChatViewModel.ChatUiDependencies(new NoOpUiProfileNoteDataAccess(), new NoOpUiPresenceDataAccess());
 
         assertFalse(dependencies.presenceDataAccess().isSupported());
         assertFalse(dependencies.presenceDataAccess().unsupportedReason().isBlank());
