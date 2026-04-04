@@ -111,8 +111,8 @@ class OnboardingFlowTest {
             profileViewModel.timeToFirstDateProperty().set(PacePreferences.TimeToFirstDate.FEW_DAYS);
             profileViewModel.communicationStyleProperty().set(PacePreferences.CommunicationStyle.MIX_OF_EVERYTHING);
             profileViewModel.depthPreferenceProperty().set(PacePreferences.DepthPreference.DEEP_CHAT);
+            AppSession.getInstance().getCurrentUser().setPhotoUrls(List.of("https://example.com/taylor.jpg"));
         });
-        AppSession.getInstance().getCurrentUser().setPhotoUrls(List.of("https://example.com/taylor.jpg"));
         JavaFxTestSupport.runOnFxAndWait(saveButton::fire);
 
         assertTrue(JavaFxTestSupport.waitUntil(profileController::navigatedToDashboard, 5000));
@@ -147,7 +147,7 @@ class OnboardingFlowTest {
     }
 
     private static final class TrackingProfileController extends ProfileController {
-        private boolean navigatedToDashboard;
+        private volatile boolean navigatedToDashboard;
 
         TrackingProfileController(ProfileViewModel viewModel) {
             super(viewModel);

@@ -20,6 +20,7 @@
 ### Modify
 - `src/main/java/datingapp/ui/screen/LoginController.java` — continue directly into onboarding after account creation and carry onboarding context for incomplete logins.
 - `src/main/java/datingapp/ui/viewmodel/LoginViewModel.java` — expose a typed post-login decision instead of leaving onboarding intent implicit.
+- `src/main/java/datingapp/core/workflow/ProfileActivationPolicy.java` — expose the authoritative `ALREADY_ACTIVE` reason-code constant used by onboarding/login activation checks.
 - `src/main/java/datingapp/ui/viewmodel/ProfileViewModel.java` — surface onboarding properties/checklist text, refresh them after load/save, and distinguish draft-save vs activation-ready states.
 - `src/main/java/datingapp/ui/screen/ProfileController.java` — render onboarding banner/checklist, update CTA text, and route cancel/back safely for incomplete first-run sessions.
 - `src/main/resources/fxml/profile.fxml` — add the onboarding banner/checklist container without replacing the existing editor.
@@ -96,7 +97,7 @@ void incompleteLoginResolvesToProfileOnboardingInsteadOfPlainProfileHop() {
 
 - [ ] **Step 2: Run the focused login tests to confirm the red state**
 
-Run: `mvn --% -Dcheckstyle.skip=true -Dtest=LoginViewModelTest,LoginControllerTest test`
+Run: `mvn -Dcheckstyle.skip=true -Dtest=LoginViewModelTest,LoginControllerTest test`
 Expected: FAIL because `PostLoginDecision`, `OnboardingContext`, and `continueIntoOnboarding(...)` do not exist yet.
 
 - [ ] **Step 3: Implement the typed onboarding contract and controller handoff**
@@ -123,6 +124,20 @@ public record OnboardingContext(UUID userId, EntryReason entryReason, boolean fi
 ```
 
 ```java
+public final class ProfileActivationPolicy {
+    public static final String REASON_ALREADY_ACTIVE = "ALREADY_ACTIVE";
+
+    public WorkflowDecision canActivate(User user) {
+        // ...
+        if (state == UserState.ACTIVE) {
+            return WorkflowDecision.deny(REASON_ALREADY_ACTIVE, "User is already active");
+        }
+        // ...
+    }
+}
+```
+
+```java
 public enum PostLoginDecision {
     GO_TO_DASHBOARD,
     START_ONBOARDING
@@ -135,7 +150,7 @@ public PostLoginDecision resolvePostLoginDecision() {
     var activationDecision = activationPolicy.canActivate(selectedUser);
     if (selectedUser.getState() == UserState.ACTIVE
             || (activationDecision instanceof datingapp.core.workflow.WorkflowDecision.Denied denied
-                    && "ALREADY_ACTIVE".equals(denied.reasonCode()))) {
+                    && ProfileActivationPolicy.REASON_ALREADY_ACTIVE.equals(denied.reasonCode()))) {
         return PostLoginDecision.GO_TO_DASHBOARD;
     }
     return PostLoginDecision.START_ONBOARDING;
@@ -175,7 +190,7 @@ private void handleLoginSuccess() {
 
 - [ ] **Step 4: Re-run the focused login tests until they pass**
 
-Run: `mvn --% -Dcheckstyle.skip=true -Dtest=LoginViewModelTest,LoginControllerTest test`
+Run: `mvn -Dcheckstyle.skip=true -Dtest=LoginViewModelTest,LoginControllerTest test`
 Expected: PASS with the new typed onboarding decision and navigation context path.
 
 - [ ] **Step 5: Commit the login/onboarding handoff slice**
@@ -240,7 +255,7 @@ void activeUsersDoNotStayInOnboardingMode() {
 
 - [ ] **Step 2: Run the focused profile ViewModel tests to verify they fail first**
 
-Run: `mvn --% -Dcheckstyle.skip=true -Dtest=ProfileViewModelTest,ProfileActivationPolicyTest test`
+Run: `mvn -Dcheckstyle.skip=true -Dtest=ProfileViewModelTest,ProfileActivationPolicyTest test`
 Expected: FAIL because the onboarding properties and setter do not exist yet.
 
 - [ ] **Step 3: Add a dedicated onboarding snapshot and bind it in the ViewModel**
@@ -285,6 +300,11 @@ public void setOnboardingContext(datingapp.ui.OnboardingContext onboardingContex
     this.onboardingContext = onboardingContext;
 }
 
+public boolean isIncompleteLoginOnboarding() {
+    return onboardingContext != null
+            && onboardingContext.entryReason() == datingapp.ui.OnboardingContext.EntryReason.INCOMPLETE_LOGIN;
+}
+
 private void updateOnboardingState(User user, CompletionResult completion) {
     var activationDecision = new ProfileActivationPolicy().canActivate(user);
     ProfileOnboardingState state = ProfileOnboardingState.from(user, activationDecision, completion.nextSteps());
@@ -310,7 +330,7 @@ Call `updateOnboardingState(user, result)` from both `loadCurrentUser()` and `up
 
 - [ ] **Step 4: Re-run the focused ViewModel tests until they pass**
 
-Run: `mvn --% -Dcheckstyle.skip=true -Dtest=ProfileViewModelTest,ProfileActivationPolicyTest test`
+Run: `mvn -Dcheckstyle.skip=true -Dtest=ProfileViewModelTest,ProfileActivationPolicyTest test`
 Expected: PASS with incomplete users showing onboarding guidance and active users dropping back to normal save mode.
 
 - [ ] **Step 5: Commit the ViewModel onboarding state slice**
@@ -383,7 +403,7 @@ void cancelDuringFirstRunOnboardingReturnsToLoginInsteadOfDashboard() throws Exc
 
 - [ ] **Step 2: Run the focused profile controller tests and confirm the missing UI red state**
 
-Run: `mvn --% -Dcheckstyle.skip=true -Dtest=ProfileControllerTest,ProfileFormValidatorTest test`
+Run: `mvn -Dcheckstyle.skip=true -Dtest=ProfileControllerTest,ProfileFormValidatorTest test`
 Expected: FAIL because the onboarding banner nodes and onboarding-specific cancel/save behavior do not exist.
 
 - [ ] **Step 3: Add onboarding UI nodes and bind them in the controller**
@@ -433,6 +453,9 @@ private void rebuildOnboardingChecklist() {
 ```java
 private void navigateAfterCancel() {
     if (viewModel.onboardingActiveProperty().get()) {
+        if (viewModel.isIncompleteLoginOnboarding()) {
+            AppSession.getInstance().logout();
+        }
         NavigationService.getInstance().navigateTo(NavigationService.ViewType.LOGIN);
         return;
     }
@@ -444,7 +467,7 @@ Call `bindOnboardingBanner()` from `initialize(...)`, and replace the current ha
 
 - [ ] **Step 4: Re-run the focused controller tests until they pass**
 
-Run: `mvn --% -Dcheckstyle.skip=true -Dtest=ProfileControllerTest,ProfileFormValidatorTest test`
+Run: `mvn -Dcheckstyle.skip=true -Dtest=ProfileControllerTest,ProfileFormValidatorTest test`
 Expected: PASS with the onboarding banner rendered, save button text updated, and cancel/back respecting first-run onboarding.
 
 - [ ] **Step 5: Commit the profile-screen onboarding slice**
@@ -511,7 +534,7 @@ void newAccountEntersOnboardingAndReachesDashboardOnceActivated() throws Excepti
 
 - [ ] **Step 2: Run the onboarding-only regression test in isolation**
 
-Run: `mvn --% -Dcheckstyle.skip=true -Dtest=OnboardingFlowTest test`
+Run: `mvn -Dcheckstyle.skip=true -Dtest=OnboardingFlowTest test`
 Expected: FAIL until the login handoff, onboarding banner state, and activation path all work together.
 
 - [ ] **Step 3: Implement the minimum glue needed for the flow test to pass**
@@ -545,7 +568,7 @@ if (savedUser != null && savedUser.getState() == User.UserState.ACTIVE) {
 
 - [ ] **Step 4: Re-run the onboarding-only regression, then the whole onboarding-focused test pack**
 
-Run: `mvn --% -Dcheckstyle.skip=true -Dtest=OnboardingFlowTest,LoginControllerTest,LoginViewModelTest,ProfileControllerTest,ProfileViewModelTest test`
+Run: `mvn -Dcheckstyle.skip=true -Dtest=OnboardingFlowTest,LoginControllerTest,LoginViewModelTest,ProfileControllerTest,ProfileViewModelTest test`
 Expected: PASS with a dedicated flow regression covering the missing first-run journey.
 
 - [ ] **Step 5: Commit the onboarding regression slice**
@@ -574,12 +597,12 @@ Expected: no new Java or FXML errors in the onboarding change set.
 
 - [ ] **Step 2: Run the focused onboarding regression pack**
 
-Run: `mvn --% -Dcheckstyle.skip=true -Dtest=OnboardingFlowTest,LoginControllerTest,LoginViewModelTest,ProfileControllerTest,ProfileViewModelTest test`
+Run: `mvn -Dcheckstyle.skip=true -Dtest=OnboardingFlowTest,LoginControllerTest,LoginViewModelTest,ProfileControllerTest,ProfileViewModelTest test`
 Expected: PASS.
 
 - [ ] **Step 3: Run a broader profile/use-case smoke pack**
 
-Run: `mvn --% -Dcheckstyle.skip=true -Dtest=ProfileMutationUseCasesTest,ProfileUseCasesTest,ProfileActivationPolicyTest test`
+Run: `mvn -Dcheckstyle.skip=true -Dtest=ProfileMutationUseCasesTest,ProfileUseCasesTest,ProfileActivationPolicyTest test`
 Expected: PASS, proving the onboarding changes did not break the activation/completion seam.
 
 - [ ] **Step 4: Run the repo quality gate before concluding**

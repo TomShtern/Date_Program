@@ -197,7 +197,8 @@ public class LoginController extends BaseController implements Initializable {
     @FXML
     private void handleLogin() {
         if (viewModel.login()) {
-            switch (viewModel.resolvePostLoginDecision()) {
+            LoginViewModel.PostLoginDecision decision = viewModel.resolvePostLoginDecision();
+            switch (decision) {
                 case GO_TO_DASHBOARD -> {
                     NavigationService.ViewType destination = NavigationService.ViewType.DASHBOARD;
                     logInfo(LOG_LOGIN_SUCCESS, destination);
@@ -213,9 +214,7 @@ public class LoginController extends BaseController implements Initializable {
                         NavigationService.getInstance().navigateTo(destination);
                     }
                 }
-                default ->
-                    throw new IllegalStateException(
-                            "Unsupported post-login decision: " + viewModel.resolvePostLoginDecision());
+                default -> throw new IllegalStateException("Unsupported post-login decision: " + decision);
             }
         }
     }

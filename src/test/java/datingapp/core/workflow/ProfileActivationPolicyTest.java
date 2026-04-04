@@ -94,7 +94,7 @@ class ProfileActivationPolicyTest {
             User u = TestUserFactory.createActiveUser("Active");
             WorkflowDecision d = policy.canActivate(u);
             assertTrue(d.isDenied());
-            assertEquals("ALREADY_ACTIVE", ((WorkflowDecision.Denied) d).reasonCode());
+            assertEquals(ProfileActivationPolicy.REASON_ALREADY_ACTIVE, ((WorkflowDecision.Denied) d).reasonCode());
         }
 
         @Test

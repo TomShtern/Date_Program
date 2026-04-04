@@ -49,6 +49,6 @@
 
 ## Self-review
 
-- Spec coverage: this plan covers the remaining Phase 1 browse-ranking seam end to end.
+- Spec coverage: this plan covers the browse-ranking seam end to end.
 - Placeholder scan: removed vague “improve ranking” language in favor of exact files and responsibilities.
 - Consistency check: `CandidateFinder` remains the filter and `RecommendationService` becomes the ranking seam for normal browse.

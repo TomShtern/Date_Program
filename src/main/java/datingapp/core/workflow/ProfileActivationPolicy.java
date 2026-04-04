@@ -11,6 +11,7 @@ import java.util.List;
  * duplicated across ProfileUseCases, LoginViewModel, and ProfileViewModel.
  */
 public final class ProfileActivationPolicy {
+    public static final String REASON_ALREADY_ACTIVE = "ALREADY_ACTIVE";
 
     public WorkflowDecision canActivate(User user) {
         if (user == null) {
@@ -21,7 +22,7 @@ public final class ProfileActivationPolicy {
             return WorkflowDecision.deny("BANNED", "Banned users cannot activate");
         }
         if (state == UserState.ACTIVE) {
-            return WorkflowDecision.deny("ALREADY_ACTIVE", "User is already active");
+            return WorkflowDecision.deny(REASON_ALREADY_ACTIVE, "User is already active");
         }
         if (state != UserState.INCOMPLETE && state != UserState.PAUSED) {
             return WorkflowDecision.deny("WRONG_STATE", "Unexpected state: " + state);

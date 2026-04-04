@@ -1,5 +1,6 @@
 package datingapp.ui.screen;
 
+import datingapp.core.AppSession;
 import datingapp.core.model.User.Gender;
 import datingapp.core.profile.MatchPreferences.Dealbreakers;
 import datingapp.core.profile.MatchPreferences.Interest;
@@ -765,8 +766,10 @@ public class ProfileController extends BaseController implements Initializable {
         }
         if (onboardingChecklistBox != null) {
             rebuildOnboardingChecklist();
-            viewModel.onboardingChecklistProperty().addListener((javafx.collections.ListChangeListener<String>)
-                    change -> rebuildOnboardingChecklist());
+            javafx.collections.ListChangeListener<String> onboardingChecklistListener =
+                    change -> rebuildOnboardingChecklist();
+            viewModel.onboardingChecklistProperty().addListener(onboardingChecklistListener);
+            addSubscription(() -> viewModel.onboardingChecklistProperty().removeListener(onboardingChecklistListener));
         }
     }
 
@@ -940,8 +943,7 @@ public class ProfileController extends BaseController implements Initializable {
             return;
         }
         cleanup(); // Clean up subscriptions before navigating away
-        if (isOnboardingActive()) {
-            navigateToLogin();
+        if (navigateAfterOnboardingExit()) {
             return;
         }
         navigateToDashboard();
@@ -955,7 +957,7 @@ public class ProfileController extends BaseController implements Initializable {
         }
         if (isOnboardingActive()) {
             cleanup();
-            navigateToLogin();
+            navigateAfterOnboardingExit();
             return;
         }
         super.handleBack();
@@ -967,6 +969,17 @@ public class ProfileController extends BaseController implements Initializable {
 
     private boolean isOnboardingActive() {
         return Boolean.TRUE.equals(viewModel.onboardingActiveProperty().get());
+    }
+
+    private boolean navigateAfterOnboardingExit() {
+        if (!isOnboardingActive()) {
+            return false;
+        }
+        if (viewModel.isIncompleteLoginOnboarding()) {
+            AppSession.getInstance().logout();
+        }
+        navigateToLogin();
+        return true;
     }
 
     /**

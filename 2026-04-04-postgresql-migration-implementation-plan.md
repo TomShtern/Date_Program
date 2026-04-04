@@ -74,7 +74,7 @@
 - [ ] **Step 2: Run the focused config/bootstrap pack and confirm the red state**
 
 Run:
-`mvn --% -Dtest=DatabaseManagerConfigurationTest,ApplicationStartupBootstrapTest test`
+`mvn -Dtest=DatabaseManagerConfigurationTest,ApplicationStartupBootstrapTest test`
 
 Expected:
 - FAIL because there is no PostgreSQL JDBC dependency and no runtime DB config surface in `AppConfig` / `ApplicationStartup`.
@@ -89,7 +89,7 @@ Expected:
 - [ ] **Step 4: Re-run the focused config/bootstrap pack until it passes**
 
 Run:
-`mvn --% -Dtest=DatabaseManagerConfigurationTest,ApplicationStartupBootstrapTest test`
+`mvn -Dtest=DatabaseManagerConfigurationTest,ApplicationStartupBootstrapTest test`
 
 Expected:
 - PASS with PostgreSQL runtime config loading supported and H2 test profile behavior preserved.
@@ -112,7 +112,7 @@ Expected:
 - [ ] **Step 2: Run the focused runtime/bootstrap pack and confirm the red state**
 
 Run:
-`mvn --% -Dtest=DatabaseDialectTest,StorageFactoryInMemoryTest,ServiceRegistryTest test`
+`mvn -Dtest=DatabaseDialectTest,StorageFactoryInMemoryTest,ServiceRegistryTest test`
 
 Expected:
 - FAIL because runtime bootstrap is still exposed only as `StorageFactory.buildH2(...)` and `DatabaseManager` still assumes H2 URL semantics.
@@ -126,7 +126,7 @@ Expected:
 - [ ] **Step 4: Re-run the focused runtime/bootstrap pack until it passes**
 
 Run:
-`mvn --% -Dtest=DatabaseDialectTest,StorageFactoryInMemoryTest,ServiceRegistryTest test`
+`mvn -Dtest=DatabaseDialectTest,StorageFactoryInMemoryTest,ServiceRegistryTest test`
 
 Expected:
 - PASS with generic runtime bootstrap in place and H2 in-memory tests unchanged.
@@ -148,7 +148,7 @@ Expected:
 - [ ] **Step 2: Run the focused schema pack and confirm the red state**
 
 Run:
-`mvn --% -Dtest=SchemaInitializerTest,DatabaseManagerConfigurationTest,DatabaseDialectTest test`
+`mvn -Dtest=SchemaInitializerTest,DatabaseManagerConfigurationTest,DatabaseDialectTest test`
 
 Expected:
 - FAIL because `MigrationRunner.recordSchemaVersion(...)` still uses H2 `MERGE ... KEY (...)`, and `addForeignKeyIfMissing(...)` still uses `ADD CONSTRAINT IF NOT EXISTS`.
@@ -162,7 +162,7 @@ Expected:
 - [ ] **Step 4: Re-run the focused schema pack until it passes**
 
 Run:
-`mvn --% -Dtest=SchemaInitializerTest,DatabaseDialectTest test`
+`mvn -Dtest=SchemaInitializerTest,DatabaseDialectTest test`
 
 Expected:
 - PASS with H2 migration tests preserved and PostgreSQL-safe migration SQL generation covered.
@@ -188,7 +188,7 @@ Expected:
 - [ ] **Step 2: Run the focused storage pack and confirm the red state**
 
 Run:
-`mvn --% -Dtest=JdbiUserStorageMigrationTest,JdbiUserStorageNormalizationTest,JdbiConnectionStorageAtomicityTest,SqlRowReadersTest,DatabaseDialectTest test`
+`mvn -Dtest=JdbiUserStorageMigrationTest,JdbiUserStorageNormalizationTest,JdbiConnectionStorageAtomicityTest,SqlRowReadersTest,DatabaseDialectTest test`
 
 Expected:
 - FAIL because `JdbiUserStorage`, `JdbiMetricsStorage`, and `JdbiMatchmakingStorage` still embed H2-specific `MERGE ... KEY (...)` and `DATEDIFF('SECOND', ...)` SQL.
@@ -202,7 +202,7 @@ Expected:
 - [ ] **Step 4: Re-run the focused storage pack until it passes**
 
 Run:
-`mvn --% -Dtest=JdbiUserStorageMigrationTest,JdbiUserStorageNormalizationTest,JdbiConnectionStorageAtomicityTest,SqlRowReadersTest test`
+`mvn -Dtest=JdbiUserStorageMigrationTest,JdbiUserStorageNormalizationTest,JdbiConnectionStorageAtomicityTest,SqlRowReadersTest test`
 
 Expected:
 - PASS with H2-backed storage semantics preserved under the new dialect-aware SQL path.
@@ -217,7 +217,7 @@ Expected:
 - [ ] **Step 1: Run the H2-preservation smoke packs**
 
 Run:
-`mvn --% -Dtest=DatabaseManagerConfigurationTest,StorageFactoryInMemoryTest,SchemaInitializerTest,JdbiUserStorageMigrationTest,JdbiUserStorageNormalizationTest,JdbiConnectionStorageAtomicityTest,ServiceRegistryTest,ApplicationStartupBootstrapTest test`
+`mvn -Dtest=DatabaseManagerConfigurationTest,StorageFactoryInMemoryTest,SchemaInitializerTest,JdbiUserStorageMigrationTest,JdbiUserStorageNormalizationTest,JdbiConnectionStorageAtomicityTest,ServiceRegistryTest,ApplicationStartupBootstrapTest test`
 
 Expected:
 - PASS, proving H2 tests remain intact after PostgreSQL runtime support work.

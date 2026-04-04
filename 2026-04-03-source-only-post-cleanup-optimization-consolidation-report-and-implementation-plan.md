@@ -1,7 +1,7 @@
 # Source-Only Post-Cleanup Optimization, Consolidation, and Simplification Report + Implementation Plan
 
 **Date:** 2026-04-03
-**Status:** Proposed
+**Status:** Completed
 **Source of truth used for this document:** `src/main/java`, `src/test/java`, `pom.xml`
 **Explicitly not used as truth:** repository docs, roadmap docs, reports, plans, audits, and other markdown files
 
@@ -603,7 +603,7 @@ The companion cleanup plan was compared against the current source after this so
 - ✅ Verified the Task 1 characterization slice passes.
 
 **Run:**
-`mvn --% -Dcheckstyle.skip=true -Dtest=ProfileControllerTest,MatchesControllerTest,ChatControllerTest,LoginControllerTest,RestApiDtosTest,MessagingUseCasesTest,SocialUseCasesTest,MatchQualityServiceTest,ValidationServiceTest,ServiceRegistryTest,JdbiUserStorageNormalizationTest,JdbiUserStorageMigrationTest,ConnectionServiceTest test`
+`mvn -Dcheckstyle.skip=true -Dtest=ProfileControllerTest,MatchesControllerTest,ChatControllerTest,LoginControllerTest,RestApiDtosTest,MessagingUseCasesTest,SocialUseCasesTest,MatchQualityServiceTest,ValidationServiceTest,ServiceRegistryTest,JdbiUserStorageNormalizationTest,JdbiUserStorageMigrationTest,ConnectionServiceTest test`
 
 **Expected:**
 - current behavior is pinned before refactors begin
@@ -637,7 +637,7 @@ The companion cleanup plan was compared against the current source after this so
 - ✅ Verified the Task 2 normalization/profile slice passes.
 
 **Run:**
-`mvn --% -Dcheckstyle.skip=true -Dtest=ProfileNormalizationSupportTest,ProfileMutationUseCasesTest,LoginViewModelTest,PreferencesViewModelTest,ProfileViewModelTest test`
+`mvn -Dcheckstyle.skip=true -Dtest=ProfileNormalizationSupportTest,ProfileMutationUseCasesTest,LoginViewModelTest,PreferencesViewModelTest,ProfileViewModelTest test`
 
 **Expected:**
 - one authoritative normalization path
@@ -671,7 +671,7 @@ The companion cleanup plan was compared against the current source after this so
 - ✅ Verified the Task 3 storage slice passes.
 
 **Run:**
-`mvn --% -Dcheckstyle.skip=true -Dtest=JdbiUserStorageNormalizationTest,JdbiUserStorageMigrationTest,ServiceRegistryTest test`
+`mvn -Dcheckstyle.skip=true -Dtest=JdbiUserStorageNormalizationTest,JdbiUserStorageMigrationTest,ServiceRegistryTest test`
 
 **Expected:**
 - no duplicated enum-compatibility parsing
@@ -704,7 +704,7 @@ The companion cleanup plan was compared against the current source after this so
 **Note:** Compatibility-only `SocialUseCases` constructors were intentionally retained in this task because real production/test callers still require them; the cleanup here reduced wrapper repetition without forcing premature constructor-surface changes.
 
 **Run:**
-`mvn --% -Dcheckstyle.skip=true -Dtest=ValidationServiceTest,MessagingUseCasesTest,SocialUseCasesTest test`
+`mvn -Dcheckstyle.skip=true -Dtest=ValidationServiceTest,MessagingUseCasesTest,SocialUseCasesTest test`
 
 **Expected:**
 - fewer duplicated wrappers
@@ -735,7 +735,7 @@ The companion cleanup plan was compared against the current source after this so
 - ✅ Verified the Task 5 connection-service slice passes.
 
 **Run:**
-`mvn --% -Dcheckstyle.skip=true -Dtest=ConnectionServiceTest,MessagingUseCasesTest,SocialUseCasesTest test`
+`mvn -Dcheckstyle.skip=true -Dtest=ConnectionServiceTest,MessagingUseCasesTest,SocialUseCasesTest test`
 
 **Expected:**
 - shorter methods in `ConnectionService`
@@ -765,7 +765,7 @@ The companion cleanup plan was compared against the current source after this so
 - ✅ Verified the Task 6 match-quality slice passes.
 
 **Run:**
-`mvn --% -Dcheckstyle.skip=true -Dtest=MatchQualityServiceTest test`
+`mvn -Dcheckstyle.skip=true -Dtest=MatchQualityServiceTest test`
 
 **Expected:**
 - materially smaller orchestration path
@@ -798,7 +798,7 @@ The companion cleanup plan was compared against the current source after this so
 - ✅ Verified the Task 7 profile/social/registry slice passes.
 
 **Run:**
-`mvn --% -Dcheckstyle.skip=true -Dtest=ProfileUseCasesTest,ProfileUseCasesNotesTest,ProfileMutationUseCasesTest,SocialUseCasesTest,ServiceRegistryTest test`
+`mvn -Dcheckstyle.skip=true -Dtest=ProfileUseCasesTest,ProfileUseCasesNotesTest,ProfileMutationUseCasesTest,SocialUseCasesTest,ServiceRegistryTest test`
 
 **Expected:**
 - smaller compatibility surface
@@ -830,7 +830,7 @@ The companion cleanup plan was compared against the current source after this so
 - ✅ Verified the Task 8 REST DTO slice passes.
 
 **Run:**
-`mvn --% -Dcheckstyle.skip=true -Dtest=RestApiDtosTest,RestApiReadRoutesTest,RestApiPhaseTwoRoutesTest test`
+`mvn -Dcheckstyle.skip=true -Dtest=RestApiDtosTest,RestApiReadRoutesTest,RestApiPhaseTwoRoutesTest test`
 
 **Expected:**
 - smaller DTO files
@@ -861,7 +861,7 @@ The companion cleanup plan was compared against the current source after this so
 - ✅ Verified the Task 9 REST route slice passes.
 
 **Run:**
-`mvn --% -Dcheckstyle.skip=true -Dtest=RestApiRoutesTest,RestApiReadRoutesTest,RestApiRelationshipRoutesTest,RestApiVerificationRoutesTest,RestApiNotesRoutesTest,RestApiRequestGuardsTest,RestApiIdentityPolicyTest test`
+`mvn -Dcheckstyle.skip=true -Dtest=RestApiRoutesTest,RestApiReadRoutesTest,RestApiRelationshipRoutesTest,RestApiVerificationRoutesTest,RestApiNotesRoutesTest,RestApiRequestGuardsTest,RestApiIdentityPolicyTest test`
 
 **Expected:**
 - shorter handler methods
@@ -903,7 +903,7 @@ The companion cleanup plan was compared against the current source after this so
 **Note:** `CreateAccountDialogFactory` was already small enough that no further extraction was justified in this pass, and the controller slimming focused on the highest-payoff safe seams rather than broad rewrites.
 
 **Run:**
-`mvn --% -Dcheckstyle.skip=true -Dtest=ProfileControllerTest,MatchesControllerTest,ChatControllerTest,LoginControllerTest,ViewModelFactoryTest,ChatViewModelTest,ProfileViewModelTest,MatchesViewModelTest test`
+`mvn -Dcheckstyle.skip=true -Dtest=ProfileControllerTest,MatchesControllerTest,ChatControllerTest,LoginControllerTest,ViewModelFactoryTest,ChatViewModelTest,ProfileViewModelTest,MatchesViewModelTest test`
 
 **Expected:**
 - materially smaller UI hotspot classes
@@ -923,19 +923,19 @@ After all tasks above are complete:
 ### Recommended focused verification commands
 
 Normalization + profile:
-`mvn --% -Dcheckstyle.skip=true -Dtest=ProfileNormalizationSupportTest,ProfileMutationUseCasesTest,ProfileUseCasesTest,ProfileUseCasesNotesTest,LoginViewModelTest,PreferencesViewModelTest,ProfileViewModelTest test`
+`mvn -Dcheckstyle.skip=true -Dtest=ProfileNormalizationSupportTest,ProfileMutationUseCasesTest,ProfileUseCasesTest,ProfileUseCasesNotesTest,LoginViewModelTest,PreferencesViewModelTest,ProfileViewModelTest test`
 
 Messaging/social/domain:
-`mvn --% -Dcheckstyle.skip=true -Dtest=ValidationServiceTest,MessagingUseCasesTest,SocialUseCasesTest,ConnectionServiceTest,MatchQualityServiceTest test`
+`mvn -Dcheckstyle.skip=true -Dtest=ValidationServiceTest,MessagingUseCasesTest,SocialUseCasesTest,ConnectionServiceTest,MatchQualityServiceTest test`
 
 REST:
-`mvn --% -Dcheckstyle.skip=true -Dtest=RestApiDtosTest,RestApiRoutesTest,RestApiReadRoutesTest,RestApiRelationshipRoutesTest,RestApiVerificationRoutesTest,RestApiNotesRoutesTest,RestApiRequestGuardsTest,RestApiIdentityPolicyTest test`
+`mvn -Dcheckstyle.skip=true -Dtest=RestApiDtosTest,RestApiRoutesTest,RestApiReadRoutesTest,RestApiRelationshipRoutesTest,RestApiVerificationRoutesTest,RestApiNotesRoutesTest,RestApiRequestGuardsTest,RestApiIdentityPolicyTest test`
 
 UI:
-`mvn --% -Dcheckstyle.skip=true -Dtest=ProfileControllerTest,MatchesControllerTest,ChatControllerTest,LoginControllerTest,ViewModelFactoryTest,ChatViewModelTest test`
+`mvn -Dcheckstyle.skip=true -Dtest=ProfileControllerTest,MatchesControllerTest,ChatControllerTest,LoginControllerTest,ViewModelFactoryTest,ChatViewModelTest test`
 
 Storage:
-`mvn --% -Dcheckstyle.skip=true -Dtest=JdbiUserStorageNormalizationTest,JdbiUserStorageMigrationTest,ServiceRegistryTest test`
+`mvn -Dcheckstyle.skip=true -Dtest=JdbiUserStorageNormalizationTest,JdbiUserStorageMigrationTest,ServiceRegistryTest test`
 
 Full gate:
 `mvn spotless:apply verify`

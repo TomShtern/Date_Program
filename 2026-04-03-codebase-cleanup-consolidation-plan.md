@@ -587,20 +587,21 @@ if (limit < 1 || limit > 100) throw new IllegalArgumentException("limit must be 
 **Estimated Effort:** 2-3 hours plus full-suite verification after each batch
 **Estimated Savings:** ~270 LOC in targeted use-case files (the cleanup ledger counts only the main-source helper/addition/removal rows below; rollout safeguards such as the feature flag and semantic regression tests are tracked separately because they add safety rather than remove duplication)
 
-| Step | Action                                                                                                  | File(s)                                                               | LOC Change                                 |
-|------|---------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------|--------------------------------------------|
-| 4.1  | Add `UseCaseResult.wrap(Callable<T>)` helper                                                            | `app/usecase/common/UseCaseResult.java`                               | +10 LOC                                    |
-| 4.2  | Add a feature flag for staged rollout; default it off until semantic parity is verified                 | `AppConfig.java`, `AppConfigValidator.java`, `config/app-config.json` | Safety work (excluded from cleanup ledger) |
-| 4.3  | Convert one pilot module (`ProfileNotesUseCases`, 5 methods) to `UseCaseResult.wrap()`                  | `ProfileNotesUseCases.java`                                           | -25 LOC                                    |
-| 4.4  | Add integration/semantic regression tests for representative use-cases before broader rollout           | matching/messaging/profile/social use-case tests                      | Test-only safety work                      |
-| 4.5  | Run the full test suite and verify exact error messages / exception types before the next batch         | Whole repo                                                            | 0                                          |
-| 4.6  | Convert `ProfileUseCases` + `ProfileMutationUseCases` in controlled 5-10 method batches                 | `ProfileUseCases.java`, `ProfileMutationUseCases.java`                | -55 LOC                                    |
-| 4.7  | Convert `MessagingUseCases` + `MatchingUseCases` in controlled 5-10 method batches                      | `MessagingUseCases.java`, `MatchingUseCases.java`                     | -135 LOC                                   |
-| 4.8  | Convert `SocialUseCases` in controlled 5-10 method batches; keep UI/framework catch blocks out of scope | `SocialUseCases.java`                                                 | -65 LOC                                    |
+| Step | Action                                                                                                                                                                                                                                                                                                                                      | File(s)                                                                  | LOC Change                                 |
+|------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------|--------------------------------------------|
+| 4.1  | Add `UseCaseResult.wrap(Callable<T>)` helper                                                                                                                                                                                                                                                                                                | `app/usecase/common/UseCaseResult.java`                                  | +10 LOC                                    |
+| 4.2  | Add a feature flag for staged rollout; default it off until semantic parity is verified                                                                                                                                                                                                                                                     | `AppConfig.java`, `AppConfigValidator.java`, `config/app-config.json`    | Safety work (excluded from cleanup ledger) |
+| 4.3  | Run an automated pre-migration verifier over `ProfileNotesUseCases`, `ProfileUseCases`, `ProfileMutationUseCases`, `MessagingUseCases`, `MatchingUseCases`, and `SocialUseCases`; only catches that exactly match `return UseCaseResult.failure(UseCaseError.unexpected(e.getMessage()))` are eligible for `UseCaseResult.wrap()` migration | targeted use-case modules + verifier harness                             | Safety work                                |
+| 4.4  | Add integration/semantic regression tests that assert migrated callers depend on `UseCaseResult` / `UseCaseError` semantics rather than raw exception types                                                                                                                                                                                 | matching/messaging/profile/social use-case tests                         | Test-only safety work                      |
+| 4.5  | Convert one pilot module (`ProfileNotesUseCases`, 5 methods) to `UseCaseResult.wrap()`                                                                                                                                                                                                                                                      | `ProfileNotesUseCases.java`                                              | -25 LOC                                    |
+| 4.6  | Run the full test suite and explicitly verify exact error messages, `UseCaseError.Code` values, and caller-visible exception-type expectations before the next batch                                                                                                                                                                        | Whole repo                                                               | 0                                          |
+| 4.7  | Convert `ProfileUseCases` + `ProfileMutationUseCases` in controlled 5-10 method batches                                                                                                                                                                                                                                                     | `ProfileUseCases.java`, `ProfileMutationUseCases.java`                   | -55 LOC                                    |
+| 4.8  | Convert `MessagingUseCases`, `MatchingUseCases`, and `SocialUseCases` in controlled 5-10 method batches; keep UI/framework catch blocks out of scope and exclude verifier deviations pending manual review                                                                                                                                  | `MessagingUseCases.java`, `MatchingUseCases.java`, `SocialUseCases.java` | -200 LOC                                   |
+| 4.9  | Remove the staged rollout flag from `AppConfig`, `AppConfigValidator`, and runtime config once the default-on path has passed repeated full-suite verification                                                                                                                                                                              | `AppConfig.java`, `AppConfigValidator.java`, `config/app-config.json`    | Safety cleanup                             |
 
-**Rollout rule:** This phase only targets use-case `execute()` / `handle()` style methods. Do **not** blanket-convert ViewModel, UI, storage, or framework-level catch blocks. The feature flag must remain available as a rollback lever until the semantic-regression tests and full-suite runs prove parity across the migrated use-case modules.
+**Rollout rule:** This phase only targets use-case `execute()` / `handle()` style methods. Do **not** blanket-convert ViewModel, UI, storage, or framework-level catch blocks. Only modules whose candidate catches pass the pre-migration verifier should enter `UseCaseResult.wrap()` batches; deviations stay out of scope until manually reviewed. The feature flag must remain available as a rollback lever until the semantic-regression tests and full-suite runs prove parity across the migrated use-case modules.
 
-**Verification:** After 4.3 and after every later batch, run the full suite and explicitly verify exact error messages, `UseCaseError.Code` values, and constructor exception messages before enabling the flag by default.
+**Verification:** After 4.5 and after every later batch, run the full suite and explicitly verify exact error messages, `UseCaseError.Code` values, constructor exception messages, and the migrated callers' reliance on `UseCaseError` rather than raw exception types before enabling the flag by default or removing it in 4.9.
 
 ---
 
@@ -702,15 +703,15 @@ That is the corrected basis for the top-line savings claims. Category **D-F** it
 
 ### After All Phases Complete
 
-| Metric                                  | Before                            | After                          | Change                                                                                    |
-|-----------------------------------------|-----------------------------------|--------------------------------|-------------------------------------------------------------------------------------------|
-| Total Java Files                        | 166                               | ~161                           | -5 files                                                                                  |
-| Total Java LOC                          | ~82,468                           | ~81,350                        | -~1,100 LOC                                                                               |
-| Dead Code Methods                       | ~15                               | 0                              | Eliminated                                                                                |
-| Duplicated Patterns                     | ~20 instances                     | Single source                  | Consolidated                                                                              |
-| ViewModel Constructors                  | 6-8 each                          | 1 each                         | Simplified                                                                                |
-| Catch Block Boilerplate (Phase 4 scope) | 56 targeted use-case catch blocks | 0 in migrated use-case modules | Eliminated via `UseCaseResult.wrap()` batches (UI/framework handlers remain out of scope) |
-| PMD Suppressed Violations               | 37                                | ~30                            | Reduced                                                                                   |
+| Metric                                  | Before                                                                                                              | After                          | Change                                        |
+|-----------------------------------------|---------------------------------------------------------------------------------------------------------------------|--------------------------------|-----------------------------------------------|
+| Total Java Files                        | 166                                                                                                                 | ~161                           | -5 files                                      |
+| Total Java LOC                          | ~82,468                                                                                                             | ~81,350                        | -~1,100 LOC                                   |
+| Dead Code Methods                       | ~15                                                                                                                 | 0                              | Eliminated                                    |
+| Duplicated Patterns                     | ~20 instances                                                                                                       | Single source                  | Consolidated                                  |
+| ViewModel Constructors                  | 6-8 each                                                                                                            | 1 each                         | Simplified                                    |
+| Catch Block Boilerplate (Phase 4 scope) | 56 targeted use-case catch blocks (subset of the 103 total catch blocks; UI/framework handlers remain out of scope) | 0 in migrated use-case modules | Eliminated via `UseCaseResult.wrap()` batches |
+| PMD Suppressed Violations               | 37                                                                                                                  | ~30                            | Reduced                                       |
 
 **Accounting note:** The `-~1,100 LOC` figure comes from the itemized phase ledger above, including positive additions such as `BaseViewModel.ensureCurrentUser()`, logger helpers in `BaseController`, `TextUtil.truncateWithEllipsis(...)`, and `UseCaseResult.wrap(...)`. The original `-1,700+ LOC` / `~2,000+ LOC` claims were not supported by the current phase-by-phase deltas and effectively over-counted planned removals.
 
@@ -737,16 +738,30 @@ That is the corrected basis for the top-line savings claims. Category **D-F** it
 ### Execution Guidelines
 
 - Execute phases **in order** — earlier phases may affect later ones
-- After each phase: `mvn compile` → run affected tests → commit if green
+- After each phase: `mvn compile` → run the phase-specific verification pack below → perform the listed smoke checks when required → commit if green
 - If a phase introduces test failures, **fix before proceeding** to next phase
+- Phase 1: `mvn -Dtest=ProfileControllerTest,LoginControllerTest,DashboardControllerTest test`
+- Phase 2: `mvn -Dtest=ProfileViewModelTest,MatchingViewModelTest,StatsViewModelTest,ProfileControllerTest,MatchingControllerTest,MatchesControllerTest,ChatControllerTest,DashboardControllerTest test`
+- Phase 3: `mvn -Dtest=ProfileViewModelTest,MatchingViewModelTest,MatchesViewModelTest,ChatViewModelTest,StatsViewModelTest,ViewModelFactoryTest test`
+- Phase 4: `mvn test` after **every** migration batch, plus an explicit review of exact error messages, `UseCaseError.Code` values, and caller-visible exception-type expectations before changing the feature-flag default or proceeding to the next batch
+- Phase 5: `mvn -Dtest=MatchQualityServiceTest,RecommendationServiceTest,StorageContractTest,JdbiUserStorageNormalizationTest test`
+- Phase 6: `mvn -Dtest=ProfileControllerTest,MatchingControllerTest,MatchesControllerTest,ChatControllerTest,DashboardControllerTest test`
+- Phase 7: `mvn -Dtest=ProfileViewModelTest,MatchesViewModelTest,ChatViewModelTest,ViewModelFactoryTest test`
+- Phase 8: `mvn -Dtest=ProfileMutationUseCasesTest,ProfileUseCasesTest test`
+- Manual smoke plan for Phase 3: launch the app and exercise `Profile`, `Matching`, and `Stats`; verify load, navigation, save/update flows, and that no duplicate listeners or background-task errors appear
+- Manual smoke plan for Phase 6: launch the app and step through `Dashboard` → `Profile` / `Matching` / `Matches` / `Chat`; verify button wiring, empty-state visibility, card rendering, and back-navigation flows
+- Manual smoke plan for Phase 7: exercise profile photo add/set-primary/delete, match actions, chat selection/send/refresh, and the main ViewModel-driven refresh flows after the inlining work
 - Use `git diff --stat` after each phase to track LOC changes
 
 ### Post-Execution Verification
 
 1. `mvn spotless:apply verify` — full quality gate must pass
 2. `mvn test` — all tests must pass
-3. Manual smoke test: launch app, navigate through all screens
-4. `mvn jacoco:report` — verify coverage hasn't dropped below 0.60 threshold
+3. Re-run the stricter Phase 4 exact-message / `UseCaseError.Code` / exception-type verification whenever the completed work touched the catch-block migration seam
+4. Manual smoke test: launch the app and execute the Phase 3 / 6 / 7 screen-and-workflow checks that match the phases you changed
+5. `mvn jacoco:report` — verify coverage hasn't dropped below 0.60 threshold
+6. Count `@SuppressWarnings(...PMD...)` occurrences with `rg -n '@SuppressWarnings\(.*PMD' src/main/java src/test/java` and confirm the total is `<= 30`
+7. If any verification step fails, stop, capture the failing command/output, reset to the baseline snapshot commit from the pre-execution checklist (`git reset --hard <baseline-commit>` or equivalent restore point), and investigate before retrying
 
 ---
 

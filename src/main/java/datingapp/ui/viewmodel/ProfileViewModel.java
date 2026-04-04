@@ -202,6 +202,11 @@ public class ProfileViewModel extends BaseViewModel {
         refreshOnboardingState();
     }
 
+    public boolean isIncompleteLoginOnboarding() {
+        return onboardingContext != null
+                && onboardingContext.entryReason() == OnboardingContext.EntryReason.INCOMPLETE_LOGIN;
+    }
+
     /**
      * Loads the current user's data into the form properties.
      */

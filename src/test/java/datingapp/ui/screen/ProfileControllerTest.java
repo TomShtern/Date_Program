@@ -104,6 +104,37 @@ class ProfileControllerTest {
 
         assertTrue(controller.navigatedToLogin());
         assertFalse(controller.navigatedToDashboard());
+        assertEquals(currentUser, AppSession.getInstance().getCurrentUser());
+
+        viewModel.dispose();
+        NavigationService.getInstance().clearHistory();
+        AppSession.getInstance().reset();
+    }
+
+    @Test
+    @DisplayName("cancel during incomplete-login onboarding logs out before returning to login")
+    void cancelDuringIncompleteLoginOnboardingLogsOutBeforeReturningToLogin() throws Exception {
+        TestStorages.Users users = new TestStorages.Users();
+        AppConfig config = AppConfig.defaults();
+        ProfileService profileService = new ProfileService(users);
+
+        User currentUser = createActivatableIncompleteUser("Cancel Incomplete Login User");
+        users.save(currentUser);
+        AppSession.getInstance().setCurrentUser(currentUser);
+
+        ProfileViewModel viewModel = createViewModel(users, config, profileService);
+        viewModel.setOnboardingContext(datingapp.ui.OnboardingContext.incompleteLogin(currentUser.getId()));
+        TrackingProfileController controller = new TrackingProfileController(viewModel);
+
+        JavaFxTestSupport.LoadedFxml loaded = JavaFxTestSupport.loadFxml("/fxml/profile.fxml", () -> controller);
+        Parent root = loaded.root();
+        Button cancelButton = JavaFxTestSupport.lookup(root, "#cancelButton", Button.class);
+
+        JavaFxTestSupport.runOnFxAndWait(cancelButton::fire);
+
+        assertTrue(controller.navigatedToLogin());
+        assertFalse(controller.navigatedToDashboard());
+        assertEquals(null, AppSession.getInstance().getCurrentUser());
 
         viewModel.dispose();
         NavigationService.getInstance().clearHistory();
@@ -131,6 +162,35 @@ class ProfileControllerTest {
 
         assertTrue(controller.navigatedToLogin());
         assertFalse(controller.navigatedToDashboard());
+        assertEquals(currentUser, AppSession.getInstance().getCurrentUser());
+
+        viewModel.dispose();
+        NavigationService.getInstance().clearHistory();
+        AppSession.getInstance().reset();
+    }
+
+    @Test
+    @DisplayName("back during incomplete-login onboarding logs out before returning to login")
+    void backDuringIncompleteLoginOnboardingLogsOutBeforeReturningToLogin() throws Exception {
+        TestStorages.Users users = new TestStorages.Users();
+        AppConfig config = AppConfig.defaults();
+        ProfileService profileService = new ProfileService(users);
+
+        User currentUser = createActivatableIncompleteUser("Back Incomplete Login User");
+        users.save(currentUser);
+        AppSession.getInstance().setCurrentUser(currentUser);
+
+        ProfileViewModel viewModel = createViewModel(users, config, profileService);
+        viewModel.setOnboardingContext(datingapp.ui.OnboardingContext.incompleteLogin(currentUser.getId()));
+        TrackingProfileController controller = new TrackingProfileController(viewModel);
+
+        JavaFxTestSupport.loadFxml("/fxml/profile.fxml", () -> controller);
+
+        JavaFxTestSupport.runOnFxAndWait(controller::handleBack);
+
+        assertTrue(controller.navigatedToLogin());
+        assertFalse(controller.navigatedToDashboard());
+        assertEquals(null, AppSession.getInstance().getCurrentUser());
 
         viewModel.dispose();
         NavigationService.getInstance().clearHistory();
@@ -465,6 +525,7 @@ class ProfileControllerTest {
             navigatedToDashboard = true;
         }
 
+        @Override
         protected void navigateToLogin() {
             navigatedToLogin = true;
         }

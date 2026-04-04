@@ -175,7 +175,7 @@ public class LoginViewModel extends BaseViewModel {
         var activationDecision = activationPolicy.canActivate(selectedUser);
         if (selectedUser.getState() == UserState.ACTIVE
                 || (activationDecision instanceof WorkflowDecision.Denied denied
-                        && "ALREADY_ACTIVE".equals(denied.reasonCode()))) {
+                        && ProfileActivationPolicy.REASON_ALREADY_ACTIVE.equals(denied.reasonCode()))) {
             return PostLoginDecision.GO_TO_DASHBOARD;
         }
 
