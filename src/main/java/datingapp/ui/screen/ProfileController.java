@@ -8,6 +8,7 @@ import datingapp.core.profile.MatchPreferences.PacePreferences;
 import datingapp.core.profile.ProfileService;
 import datingapp.ui.ImageCache;
 import datingapp.ui.NavigationService;
+import datingapp.ui.OnboardingContext;
 import datingapp.ui.UiAnimations;
 import datingapp.ui.UiConstants;
 import datingapp.ui.UiDialogs;
@@ -146,6 +147,18 @@ public class ProfileController extends BaseController implements Initializable {
 
     @FXML
     private Label completionDetailsLabel;
+
+    @FXML
+    private VBox onboardingBanner;
+
+    @FXML
+    private Label onboardingHeadlineLabel;
+
+    @FXML
+    private Label onboardingSummaryLabel;
+
+    @FXML
+    private VBox onboardingChecklistBox;
 
     @FXML
     private TextArea bioArea;
@@ -298,6 +311,9 @@ public class ProfileController extends BaseController implements Initializable {
     @Override
     public void initialize(URL location, ResourceBundle resources) {
         viewModel.setErrorHandler(UiFeedbackService::showError);
+        NavigationService.getInstance()
+                .consumeNavigationContext(NavigationService.ViewType.PROFILE, OnboardingContext.class)
+                .ifPresent(viewModel::setOnboardingContext);
 
         // Bind basic form fields to ViewModel properties
         if (nameLabel != null) {
@@ -323,6 +339,8 @@ public class ProfileController extends BaseController implements Initializable {
         if (birthDatePicker != null) {
             birthDatePicker.valueProperty().bindBidirectional(viewModel.birthDateProperty());
         }
+
+        bindOnboardingBanner();
 
         // Setup lifestyle and pace-preference combo boxes
         setupLifestyleComboBoxes();
@@ -731,6 +749,40 @@ public class ProfileController extends BaseController implements Initializable {
         }
     }
 
+    private void bindOnboardingBanner() {
+        if (onboardingBanner != null) {
+            onboardingBanner.visibleProperty().bind(viewModel.onboardingActiveProperty());
+            onboardingBanner.managedProperty().bind(viewModel.onboardingActiveProperty());
+        }
+        if (onboardingHeadlineLabel != null) {
+            onboardingHeadlineLabel.textProperty().bind(viewModel.onboardingHeadlineProperty());
+        }
+        if (onboardingSummaryLabel != null) {
+            onboardingSummaryLabel.textProperty().bind(viewModel.onboardingSummaryProperty());
+        }
+        if (saveButton != null) {
+            saveButton.textProperty().bind(viewModel.primaryActionLabelProperty());
+        }
+        if (onboardingChecklistBox != null) {
+            rebuildOnboardingChecklist();
+            viewModel.onboardingChecklistProperty().addListener((javafx.collections.ListChangeListener<String>)
+                    change -> rebuildOnboardingChecklist());
+        }
+    }
+
+    private void rebuildOnboardingChecklist() {
+        if (onboardingChecklistBox == null) {
+            return;
+        }
+        onboardingChecklistBox.getChildren().clear();
+        for (String step : viewModel.onboardingChecklistProperty()) {
+            Label checklistItem = new Label("• " + step);
+            checklistItem.getStyleClass().add(STYLE_CLASS_TEXT_SECONDARY);
+            checklistItem.setWrapText(true);
+            onboardingChecklistBox.getChildren().add(checklistItem);
+        }
+    }
+
     private void showSaveFailureStatus() {
         if (saveStatusLabel == null) {
             return;
@@ -888,7 +940,11 @@ public class ProfileController extends BaseController implements Initializable {
             return;
         }
         cleanup(); // Clean up subscriptions before navigating away
-        NavigationService.getInstance().navigateTo(NavigationService.ViewType.DASHBOARD);
+        if (isOnboardingActive()) {
+            navigateToLogin();
+            return;
+        }
+        navigateToDashboard();
     }
 
     @Override
@@ -897,7 +953,20 @@ public class ProfileController extends BaseController implements Initializable {
         if (!confirmDiscardUnsavedChanges()) {
             return;
         }
+        if (isOnboardingActive()) {
+            cleanup();
+            navigateToLogin();
+            return;
+        }
         super.handleBack();
+    }
+
+    protected void navigateToLogin() {
+        NavigationService.getInstance().navigateTo(NavigationService.ViewType.LOGIN);
+    }
+
+    private boolean isOnboardingActive() {
+        return Boolean.TRUE.equals(viewModel.onboardingActiveProperty().get());
     }
 
     /**

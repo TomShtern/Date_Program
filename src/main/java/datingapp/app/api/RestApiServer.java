@@ -85,7 +85,6 @@ import datingapp.app.usecase.social.SocialUseCases.RespondFriendRequestCommand;
 import datingapp.core.ServiceRegistry;
 import datingapp.core.connection.ConnectionModels.Conversation;
 import datingapp.core.connection.ConnectionService;
-import datingapp.core.matching.CandidateFinder;
 import datingapp.core.model.Match;
 import datingapp.core.model.User;
 import datingapp.core.model.User.UserState;
@@ -159,7 +158,6 @@ public class RestApiServer {
 
     private static final String PARAM_OFFSET = "offset";
 
-    private final CandidateFinder candidateFinder;
     private final MatchingUseCases matchingUseCases;
     private final MessagingUseCases messagingUseCases;
     private final ProfileUseCases profileUseCases;
@@ -182,7 +180,6 @@ public class RestApiServer {
 
     /** Creates a server with the given services and port. */
     public RestApiServer(ServiceRegistry services, int port) {
-        this.candidateFinder = services.getCandidateFinder();
         this.matchingUseCases = services.getMatchingUseCases();
         this.messagingUseCases = services.getMessagingUseCases();
         this.profileUseCases = services.getProfileUseCases();
@@ -309,8 +306,7 @@ public class RestApiServer {
         }
         ensureActiveCandidateBrowser(user);
 
-        Optional<MatchingUseCases.BrowseCandidatesResult> result = dataOrHandleFailure(
-                ctx, matchingUseCases.browseCandidates(new BrowseCandidatesCommand(UserContext.api(id), user)));
+        Optional<MatchingUseCases.BrowseCandidatesResult> result = loadBrowseCandidates(ctx, id, user);
         if (result.isEmpty()) {
             return;
         }
@@ -390,9 +386,12 @@ public class RestApiServer {
             return;
         }
         ensureActiveCandidateBrowser(user);
-        // Deliberate sprint exception: /browse remains the app-layer browse/daily-pick flow,
-        // while /candidates continues to expose the raw candidate projection directly.
-        List<UserSummary> candidates = readCandidateSummaries(user).stream()
+        Optional<MatchingUseCases.BrowseCandidatesResult> result = loadBrowseCandidates(ctx, id, user);
+        if (result.isEmpty()) {
+            return;
+        }
+
+        List<UserSummary> candidates = result.get().candidates().stream()
                 .map(candidate -> UserSummary.from(candidate, userTimeZone))
                 .toList();
         ctx.json(candidates);
@@ -1106,13 +1105,10 @@ public class RestApiServer {
         return Optional.ofNullable(result.data());
     }
 
-    private List<User> readCandidateSummaries(User user) {
-        // Deliberate direct-read exception for this sprint only.
-        // /api/users/{id}/browse stays on MatchingUseCases.browseCandidates(...)
-        // so it can carry browse-only state like daily-pick metadata.
-        // /api/users/{id}/candidates stays on CandidateFinder directly because it
-        // intentionally returns the raw candidate projection without that browse flow.
-        return candidateFinder.findCandidatesForUser(user);
+    private Optional<MatchingUseCases.BrowseCandidatesResult> loadBrowseCandidates(
+            Context ctx, UUID userId, User user) {
+        return dataOrHandleFailure(
+                ctx, matchingUseCases.browseCandidates(new BrowseCandidatesCommand(UserContext.api(userId), user)));
     }
 
     private MatchSummary toMatchSummary(Match match, UUID currentUserId, Map<UUID, User> usersById) {

@@ -9,6 +9,7 @@ import datingapp.ui.UiConstants;
 import datingapp.ui.UiUtils;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
 import javafx.collections.FXCollections;
 import javafx.geometry.Insets;
 import javafx.scene.Node;
@@ -27,6 +28,9 @@ import javafx.util.StringConverter;
 /** Shared JavaFX dialog for human-friendly location selection. */
 public final class LocationSelectionDialog {
 
+    private static final String LOCATION_SERVICE_REQUIRED = "locationService cannot be null";
+    private static final String PENDING_LOCATION_REQUIRED = "pendingLocation cannot be null";
+
     private LocationSelectionDialog() {}
 
     public static Optional<ResolvedLocation> show(
@@ -35,7 +39,7 @@ public final class LocationSelectionDialog {
             boolean hasCurrentLocation,
             double latitude,
             double longitude) {
-        Objects.requireNonNull(locationService, "locationService cannot be null");
+        Objects.requireNonNull(locationService, LOCATION_SERVICE_REQUIRED);
 
         Optional<SeededSelection> seed =
                 hasCurrentLocation ? initialSelection(locationService, latitude, longitude) : Optional.empty();
@@ -48,7 +52,7 @@ public final class LocationSelectionDialog {
             currentLocation = Optional.of(new ResolvedLocation(
                     latitude, longitude, locationService.formatForDisplay(latitude, longitude), precision));
         }
-        ResolvedLocation[] seededLocation = new ResolvedLocation[] {currentLocation.orElse(null)};
+        AtomicReference<ResolvedLocation> seededLocation = new AtomicReference<>(currentLocation.orElse(null));
 
         Dialog<ButtonType> dialog =
                 UiUtils.createThemedDialog(ownerNode, "Set Location", "Choose where you want to discover people");
@@ -104,102 +108,176 @@ public final class LocationSelectionDialog {
 
         Button confirmButton = (Button) dialog.getDialogPane().lookupButton(ButtonType.OK);
         confirmButton.setText("Save Location");
+        DialogControls controls = new DialogControls(
+                countryCombo,
+                citySearchField,
+                cityListView,
+                zipField,
+                approximateFallbackCheck,
+                previewLabel,
+                errorLabel,
+                confirmButton);
 
         if (seed.isPresent() && seed.orElseThrow().selectedCity().isPresent()) {
             City selectedCity = seed.orElseThrow().selectedCity().orElseThrow();
-            citySearchField.setText(selectedCity.name());
-            cityListView
+            controls.citySearchField().setText(selectedCity.name());
+            controls.cityListView()
                     .getItems()
                     .setAll(locationService.searchCities(countryCombo.getValue().code(), selectedCity.name(), 10));
-            cityListView.getSelectionModel().select(selectedCity);
+            controls.cityListView().getSelectionModel().select(selectedCity);
         } else {
-            cityListView
+            controls.cityListView()
                     .getItems()
                     .setAll(locationService.getPopularCities(
                             countryCombo.getValue().code(), 10));
         }
 
-        ResolvedLocation[] pendingLocation = new ResolvedLocation[] {seededLocation[0]};
-
-        Runnable refreshCitySuggestions = () -> {
-            Country selectedCountry = countryCombo.getValue();
-            if (selectedCountry == null) {
-                cityListView.getItems().clear();
-                return;
-            }
-            cityListView
-                    .getItems()
-                    .setAll(locationService.searchCities(selectedCountry.code(), citySearchField.getText(), 10));
-        };
-        Runnable refreshEvaluation = () -> {
-            SelectionEvaluation evaluation = evaluateSelection(
-                    locationService,
-                    countryCombo.getValue(),
-                    Optional.ofNullable(cityListView.getSelectionModel().getSelectedItem()),
-                    zipField.getText(),
-                    approximateFallbackCheck.isSelected(),
-                    Optional.ofNullable(seededLocation[0]));
-            pendingLocation[0] = evaluation.pendingLocation().orElse(null);
-            previewLabel.setText(evaluation.previewText());
-            UiUtils.setLabelMessage(errorLabel, evaluation.errorText());
-            confirmButton.setDisable(!evaluation.saveEnabled());
-        };
-
-        countryCombo.valueProperty().addListener((obs, oldVal, newVal) -> {
-            if (newVal != null && !newVal.available()) {
-                countryCombo.getSelectionModel().select(oldVal != null ? oldVal : locationService.getDefaultCountry());
-                UiUtils.setLabelMessage(errorLabel, newVal.name() + " is coming soon. Please choose Israel for now.");
-                return;
-            }
-            seededLocation[0] = null;
-            citySearchField.clear();
-            zipField.clear();
-            cityListView.getSelectionModel().clearSelection();
-            refreshCitySuggestions.run();
-            refreshEvaluation.run();
-        });
-        citySearchField.textProperty().addListener((obs, oldVal, newVal) -> {
-            seededLocation[0] = null;
-            cityListView.getSelectionModel().clearSelection();
-            refreshCitySuggestions.run();
-            refreshEvaluation.run();
-        });
-        cityListView.getSelectionModel().selectedItemProperty().addListener((obs, oldVal, newVal) -> {
-            seededLocation[0] = null;
-            if (newVal != null) {
-                citySearchField.setText(newVal.name());
-                zipField.clear();
-            }
-            refreshEvaluation.run();
-        });
-        zipField.textProperty().addListener((obs, oldVal, newVal) -> {
-            seededLocation[0] = null;
-            if (newVal != null && !newVal.isBlank()) {
-                cityListView.getSelectionModel().clearSelection();
-            }
-            refreshEvaluation.run();
-        });
-        approximateFallbackCheck.selectedProperty().addListener((obs, oldVal, newVal) -> refreshEvaluation.run());
-
-        refreshEvaluation.run();
+        AtomicReference<ResolvedLocation> pendingLocation = new AtomicReference<>(seededLocation.get());
+        bindDialogInteractions(locationService, controls, seededLocation, pendingLocation);
 
         confirmButton.addEventFilter(javafx.event.ActionEvent.ACTION, event -> {
-            if (pendingLocation[0] == null) {
-                UiUtils.setLabelMessage(errorLabel, "Please choose a supported city or ZIP option before saving.");
+            if (pendingLocation.get() == null) {
+                UiUtils.setLabelMessage(
+                        controls.errorLabel(), "Please choose a supported city or ZIP option before saving.");
                 event.consume();
             }
         });
 
         Optional<ButtonType> result = dialog.showAndWait();
-        if (result.isPresent() && result.orElseThrow() == ButtonType.OK && pendingLocation[0] != null) {
-            return Optional.of(pendingLocation[0]);
+        if (result.isPresent() && result.orElseThrow() == ButtonType.OK && pendingLocation.get() != null) {
+            return Optional.of(pendingLocation.get());
         }
         return Optional.empty();
     }
 
+    static void bindDialogInteractions(
+            LocationService locationService,
+            DialogControls controls,
+            AtomicReference<ResolvedLocation> seededLocation,
+            AtomicReference<ResolvedLocation> pendingLocation) {
+        Objects.requireNonNull(locationService, LOCATION_SERVICE_REQUIRED);
+        Objects.requireNonNull(controls, "controls cannot be null");
+        Objects.requireNonNull(seededLocation, "seededLocation cannot be null");
+        Objects.requireNonNull(pendingLocation, PENDING_LOCATION_REQUIRED);
+
+        Runnable refreshCitySuggestions = () -> refreshCitySuggestions(locationService, controls);
+        Runnable refreshEvaluation =
+                () -> refreshEvaluation(locationService, controls, seededLocation, pendingLocation);
+
+        bindCountrySelection(locationService, controls, seededLocation, refreshCitySuggestions, refreshEvaluation);
+        bindCitySearch(controls, seededLocation, refreshCitySuggestions, refreshEvaluation);
+        bindCitySelection(controls, seededLocation, refreshEvaluation);
+        bindZipChanges(controls, seededLocation, refreshEvaluation);
+        controls.approximateFallbackCheck()
+                .selectedProperty()
+                .addListener((obs, oldVal, newVal) -> refreshEvaluation.run());
+
+        refreshEvaluation.run();
+    }
+
+    private static void refreshCitySuggestions(LocationService locationService, DialogControls controls) {
+        Country selectedCountry = controls.countryCombo().getValue();
+        if (selectedCountry == null) {
+            controls.cityListView().getItems().clear();
+            return;
+        }
+        controls.cityListView()
+                .getItems()
+                .setAll(locationService.searchCities(
+                        selectedCountry.code(), controls.citySearchField().getText(), 10));
+    }
+
+    private static void refreshEvaluation(
+            LocationService locationService,
+            DialogControls controls,
+            AtomicReference<ResolvedLocation> seededLocation,
+            AtomicReference<ResolvedLocation> pendingLocation) {
+        SelectionEvaluation evaluation = evaluateSelection(
+                locationService,
+                controls.countryCombo().getValue(),
+                Optional.ofNullable(controls.cityListView().getSelectionModel().getSelectedItem()),
+                controls.zipField().getText(),
+                controls.approximateFallbackCheck().isSelected(),
+                Optional.ofNullable(seededLocation.get()));
+        pendingLocation.set(evaluation.pendingLocation().orElse(null));
+        controls.previewLabel().setText(evaluation.previewText());
+        UiUtils.setLabelMessage(controls.errorLabel(), evaluation.errorText());
+        controls.confirmButton().setDisable(!evaluation.saveEnabled());
+    }
+
+    private static void bindCountrySelection(
+            LocationService locationService,
+            DialogControls controls,
+            AtomicReference<ResolvedLocation> seededLocation,
+            Runnable refreshCitySuggestions,
+            Runnable refreshEvaluation) {
+        controls.countryCombo().valueProperty().addListener((obs, oldVal, newVal) -> {
+            if (newVal != null && !newVal.available()) {
+                controls.countryCombo()
+                        .getSelectionModel()
+                        .select(oldVal != null ? oldVal : locationService.getDefaultCountry());
+                UiUtils.setLabelMessage(
+                        controls.errorLabel(), newVal.name() + " is coming soon. Please choose Israel for now.");
+                return;
+            }
+            seededLocation.set(null);
+            controls.citySearchField().clear();
+            controls.zipField().clear();
+            controls.cityListView().getSelectionModel().clearSelection();
+            refreshCitySuggestions.run();
+            refreshEvaluation.run();
+        });
+    }
+
+    private static void bindCitySearch(
+            DialogControls controls,
+            AtomicReference<ResolvedLocation> seededLocation,
+            Runnable refreshCitySuggestions,
+            Runnable refreshEvaluation) {
+        controls.citySearchField().textProperty().addListener((obs, oldVal, newVal) -> {
+            seededLocation.set(null);
+            if (!matchesSelectedCitySearch(controls.cityListView(), newVal)) {
+                controls.cityListView().getSelectionModel().clearSelection();
+                refreshCitySuggestions.run();
+            }
+            refreshEvaluation.run();
+        });
+    }
+
+    private static void bindCitySelection(
+            DialogControls controls, AtomicReference<ResolvedLocation> seededLocation, Runnable refreshEvaluation) {
+        controls.cityListView().getSelectionModel().selectedItemProperty().addListener((obs, oldVal, newVal) -> {
+            seededLocation.set(null);
+            if (newVal != null) {
+                if (!Objects.equals(controls.citySearchField().getText(), newVal.name())) {
+                    controls.citySearchField().setText(newVal.name());
+                }
+                controls.zipField().clear();
+            }
+            refreshEvaluation.run();
+        });
+    }
+
+    private static void bindZipChanges(
+            DialogControls controls, AtomicReference<ResolvedLocation> seededLocation, Runnable refreshEvaluation) {
+        controls.zipField().textProperty().addListener((obs, oldVal, newVal) -> {
+            seededLocation.set(null);
+            if (newVal != null && !newVal.isBlank()) {
+                controls.cityListView().getSelectionModel().clearSelection();
+            }
+            refreshEvaluation.run();
+        });
+    }
+
+    private static boolean matchesSelectedCitySearch(ListView<City> cityListView, String citySearchText) {
+        City selectedCity = cityListView.getSelectionModel().getSelectedItem();
+        return selectedCity != null
+                && Objects.equals(selectedCity.name(), citySearchText == null ? "" : citySearchText.trim());
+    }
+
     static Optional<SeededSelection> initialSelection(
             LocationService locationService, double latitude, double longitude) {
-        Objects.requireNonNull(locationService, "locationService cannot be null");
+        Objects.requireNonNull(locationService, LOCATION_SERVICE_REQUIRED);
         return locationService
                 .seedSelection(latitude, longitude)
                 .map(seed -> new SeededSelection(
@@ -213,7 +291,7 @@ public final class LocationSelectionDialog {
             String zipText,
             boolean useApproximateFallback,
             Optional<ResolvedLocation> existingLocation) {
-        Objects.requireNonNull(locationService, "locationService cannot be null");
+        Objects.requireNonNull(locationService, LOCATION_SERVICE_REQUIRED);
         Objects.requireNonNull(selectedCity, "selectedCity cannot be null");
         Objects.requireNonNull(existingLocation, "existingLocation cannot be null");
 
@@ -317,7 +395,28 @@ public final class LocationSelectionDialog {
             Objects.requireNonNull(country, "country cannot be null");
             Objects.requireNonNull(selectedCity, "selectedCity cannot be null");
             zipText = zipText == null ? "" : zipText;
-            Objects.requireNonNull(pendingLocation, "pendingLocation cannot be null");
+            Objects.requireNonNull(pendingLocation, PENDING_LOCATION_REQUIRED);
+        }
+    }
+
+    record DialogControls(
+            ComboBox<Country> countryCombo,
+            TextField citySearchField,
+            ListView<City> cityListView,
+            TextField zipField,
+            CheckBox approximateFallbackCheck,
+            Label previewLabel,
+            Label errorLabel,
+            Button confirmButton) {
+        DialogControls {
+            Objects.requireNonNull(countryCombo, "countryCombo cannot be null");
+            Objects.requireNonNull(citySearchField, "citySearchField cannot be null");
+            Objects.requireNonNull(cityListView, "cityListView cannot be null");
+            Objects.requireNonNull(zipField, "zipField cannot be null");
+            Objects.requireNonNull(approximateFallbackCheck, "approximateFallbackCheck cannot be null");
+            Objects.requireNonNull(previewLabel, "previewLabel cannot be null");
+            Objects.requireNonNull(errorLabel, "errorLabel cannot be null");
+            Objects.requireNonNull(confirmButton, "confirmButton cannot be null");
         }
     }
 
@@ -328,7 +427,7 @@ public final class LocationSelectionDialog {
             boolean saveEnabled,
             boolean usingApproximateFallback) {
         SelectionEvaluation {
-            Objects.requireNonNull(pendingLocation, "pendingLocation cannot be null");
+            Objects.requireNonNull(pendingLocation, PENDING_LOCATION_REQUIRED);
             previewText = previewText == null ? "" : previewText;
             errorText = errorText == null ? "" : errorText;
         }

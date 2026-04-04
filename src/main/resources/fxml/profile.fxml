@@ -50,7 +50,7 @@
         <Label fx:id="completionLabel" styleClass="notification-badge profile-completion-percent" text="20%"/>
         <Label styleClass="profile-completion-text" text="complete"/>
         <Label fx:id="completionDetailsLabel" maxWidth="180" styleClass="text-secondary" text="Missing: --"
-                                                                               wrapText="true"/>
+                                                                                       wrapText="true"/>
       </VBox>
     </HBox>
   </top>
@@ -62,6 +62,12 @@
         <padding>
           <Insets bottom="40" left="50" right="50" top="20"/>
         </padding>
+        <!-- First-run onboarding banner -->
+        <VBox fx:id="onboardingBanner" spacing="8.0" styleClass="section-glass-card" visible="false" managed="false">
+          <Label fx:id="onboardingHeadlineLabel" styleClass="section-title" text="Finish your profile to start matching"/>
+          <Label fx:id="onboardingSummaryLabel" styleClass="text-secondary" wrapText="true"/>
+          <VBox fx:id="onboardingChecklistBox" spacing="6.0"/>
+        </VBox>
         <!-- Avatar Section - Enhanced with glow ring -->
         <VBox alignment="CENTER" spacing="16">
           <StackPane styleClass="profile-avatar-container">
@@ -131,7 +137,7 @@
             <Label fx:id="charCountLabel" styleClass="char-counter" text="0/500"/>
           </HBox>
           <TextArea fx:id="bioArea" prefHeight="100" promptText="Tell others about yourself..."
-                                                                                                                                      wrapText="true" styleClass="bio-textarea" accessibleText="Profile biography editor"/>
+                                                                                                                                                wrapText="true" styleClass="bio-textarea" accessibleText="Profile biography editor"/>
           <HBox spacing="12" alignment="CENTER_LEFT">
             <Label styleClass="field-label" text="Birth date:" prefWidth="120"/>
             <DatePicker fx:id="birthDatePicker" promptText="YYYY-MM-DD" prefWidth="180"/>
@@ -149,7 +155,7 @@
           <HBox spacing="12" alignment="CENTER_LEFT">
             <FontIcon iconLiteral="mdi2m-map-marker-outline" iconSize="20" iconColor="#64748b"/>
             <TextField fx:id="locationField" editable="false" focusTraversable="false" promptText="Choose your location" styleClass="profile-location-field"
-                                                                                                                                                                HBox.hgrow="ALWAYS"/>
+                                                                                                                                                                            HBox.hgrow="ALWAYS"/>
             <Button fx:id="setLocationButton" onAction="#handleSetLocation" styleClass="button-secondary-small" text="Set Location"/>
           </HBox>
           <Label styleClass="text-secondary" text="Pick a city or ZIP-based area to improve distance matching." wrapText="true"/>

@@ -11,6 +11,7 @@ import datingapp.core.matching.CandidateFinder;
 import datingapp.core.matching.CompatibilityCalculator;
 import datingapp.core.matching.DailyLimitService;
 import datingapp.core.matching.DailyPickService;
+import datingapp.core.matching.DefaultBrowseRankingService;
 import datingapp.core.matching.DefaultCompatibilityCalculator;
 import datingapp.core.matching.DefaultDailyLimitService;
 import datingapp.core.matching.DefaultDailyPickService;
@@ -113,8 +114,11 @@ final class RestApiTestFixture {
             DailyPickService dailyPickService = new DefaultDailyPickService(analyticsStorage, candidateFinder, config);
             StandoutService standoutService = new DefaultStandoutService(
                     compatibilityCalculator, userStorage, candidateFinder, standoutStorage, profileService, config);
-            RecommendationService recommendationService =
-                    new RecommendationService(dailyLimitService, dailyPickService, standoutService);
+            RecommendationService recommendationService = new RecommendationService(
+                    dailyLimitService,
+                    dailyPickService,
+                    standoutService,
+                    new DefaultBrowseRankingService(compatibilityCalculator, profileService, config));
             UndoService undoService = new UndoService(interactionStorage, undoStorage, config);
             MatchingService matchingService = MatchingService.builder()
                     .interactionStorage(interactionStorage)

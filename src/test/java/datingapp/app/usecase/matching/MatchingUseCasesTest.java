@@ -33,6 +33,7 @@ import datingapp.core.storage.InteractionStorage;
 import datingapp.core.testutil.TestStorages;
 import datingapp.core.testutil.TestUserFactory;
 import java.time.Duration;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -116,6 +117,73 @@ class MatchingUseCasesTest {
 
         assertTrue(result.success());
         assertFalse(result.data().candidates().isEmpty());
+    }
+
+    @Test
+    @DisplayName("browseCandidates applies recommendation ranking before returning candidates")
+    void browseCandidatesAppliesRecommendationRankingBeforeReturningCandidates() {
+        AppConfig config = AppConfig.defaults();
+        TestStorages.Users rankedUsers = new TestStorages.Users();
+        TestStorages.Interactions rankedInteractions = new TestStorages.Interactions();
+        TestStorages.TrustSafety rankedTrustSafety = new TestStorages.TrustSafety();
+        TestStorages.Undos rankedUndos = new TestStorages.Undos();
+
+        User seeker = TestUserFactory.createActiveUser(UUID.randomUUID(), "Seeker");
+        rankedUsers.save(seeker);
+
+        User alpha = TestUserFactory.createActiveUser(UUID.randomUUID(), "Alpha");
+        alpha.setGender(User.Gender.FEMALE);
+        alpha.setInterestedIn(Set.of(User.Gender.MALE));
+        alpha.setLocation(32.0854, 34.7817);
+        rankedUsers.save(alpha);
+
+        User zulu = TestUserFactory.createActiveUser(UUID.randomUUID(), "Zulu");
+        zulu.setGender(User.Gender.FEMALE);
+        zulu.setInterestedIn(Set.of(User.Gender.MALE));
+        zulu.setLocation(32.2100, 34.8400);
+        rankedUsers.save(zulu);
+
+        CandidateFinder rankedCandidateFinder = new CandidateFinder(
+                rankedUsers,
+                rankedInteractions,
+                rankedTrustSafety,
+                config.safety().userTimeZone());
+        RecommendationService rankedRecommendationService = new RecommendationService(
+                dailyLimitService,
+                dailyPickService,
+                standoutService,
+                (browseSeeker, browseCandidates) -> browseCandidates.stream()
+                        .sorted(Comparator.comparing(User::getName).reversed())
+                        .toList());
+        UndoService rankedUndoService = new UndoService(rankedInteractions, rankedUndos, config);
+        MatchingService rankedMatchingService = MatchingService.builder()
+                .interactionStorage(rankedInteractions)
+                .trustSafetyStorage(rankedTrustSafety)
+                .userStorage(rankedUsers)
+                .undoService(rankedUndoService)
+                .dailyService(rankedRecommendationService)
+                .candidateFinder(rankedCandidateFinder)
+                .build();
+        MatchingUseCases rankedUseCases = new MatchingUseCases(
+                rankedCandidateFinder,
+                rankedMatchingService,
+                MatchingUseCases.wrapDailyLimitService(rankedRecommendationService),
+                MatchingUseCases.wrapDailyPickService(rankedRecommendationService),
+                MatchingUseCases.wrapStandoutService(rankedRecommendationService),
+                rankedUndoService,
+                rankedInteractions,
+                rankedUsers,
+                new MatchQualityService(rankedUsers, rankedInteractions, config),
+                new TestEventBus(),
+                rankedRecommendationService);
+
+        var result =
+                rankedUseCases.browseCandidates(new BrowseCandidatesCommand(UserContext.cli(seeker.getId()), seeker));
+
+        assertTrue(result.success());
+        assertEquals(
+                List.of("Zulu", "Alpha"),
+                result.data().candidates().stream().map(User::getName).limit(2).toList());
     }
 
     @Test

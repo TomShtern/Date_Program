@@ -270,7 +270,9 @@ public class MatchingUseCases {
             }
 
             List<User> candidates = candidateFinder.findCandidatesForUser(currentUser);
-            return UseCaseResult.success(new BrowseCandidatesResult(candidates, dailyPick, dailyPickViewed, false));
+            List<User> rankedCandidates = recommendationService.rankBrowseCandidates(currentUser, candidates);
+            return UseCaseResult.success(
+                    new BrowseCandidatesResult(rankedCandidates, dailyPick, dailyPickViewed, false));
         } catch (Exception e) {
             return UseCaseResult.failure(UseCaseError.internal("Failed to browse candidates: " + e.getMessage()));
         }

@@ -88,6 +88,7 @@ class LoginViewModelTest {
 
         assertTrue(viewModel.login());
         assertEquals(incomplete, AppSession.getInstance().getCurrentUser());
+        assertEquals(LoginViewModel.PostLoginDecision.START_ONBOARDING, viewModel.resolvePostLoginDecision());
         assertEquals(NavigationService.ViewType.PROFILE, viewModel.resolvePostLoginDestination());
         assertEquals(User.UserState.INCOMPLETE, incomplete.getState());
         assertTrue(incomplete.getBio() == null || incomplete.getBio().isBlank());
@@ -115,6 +116,7 @@ class LoginViewModelTest {
 
         assertTrue(viewModel.login());
         assertEquals(complete, AppSession.getInstance().getCurrentUser());
+        assertEquals(LoginViewModel.PostLoginDecision.GO_TO_DASHBOARD, viewModel.resolvePostLoginDecision());
         assertEquals(NavigationService.ViewType.DASHBOARD, viewModel.resolvePostLoginDestination());
 
         viewModel.dispose();

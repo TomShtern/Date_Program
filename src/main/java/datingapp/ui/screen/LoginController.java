@@ -6,6 +6,7 @@ import datingapp.core.model.User;
 import datingapp.core.model.User.UserState;
 import datingapp.core.profile.ProfileService;
 import datingapp.ui.NavigationService;
+import datingapp.ui.OnboardingContext;
 import datingapp.ui.UiAnimations;
 import datingapp.ui.UiConstants;
 import datingapp.ui.UiFeedbackService;
@@ -196,9 +197,26 @@ public class LoginController extends BaseController implements Initializable {
     @FXML
     private void handleLogin() {
         if (viewModel.login()) {
-            NavigationService.ViewType destination = viewModel.resolvePostLoginDestination();
-            logInfo(LOG_LOGIN_SUCCESS, destination);
-            NavigationService.getInstance().navigateTo(destination);
+            switch (viewModel.resolvePostLoginDecision()) {
+                case GO_TO_DASHBOARD -> {
+                    NavigationService.ViewType destination = NavigationService.ViewType.DASHBOARD;
+                    logInfo(LOG_LOGIN_SUCCESS, destination);
+                    NavigationService.getInstance().navigateTo(destination);
+                }
+                case START_ONBOARDING -> {
+                    User selected = viewModel.getSelectedUser();
+                    if (selected != null) {
+                        navigateToOnboarding(OnboardingContext.incompleteLogin(selected.getId()));
+                    } else {
+                        NavigationService.ViewType destination = NavigationService.ViewType.PROFILE;
+                        logInfo(LOG_LOGIN_SUCCESS, destination);
+                        NavigationService.getInstance().navigateTo(destination);
+                    }
+                }
+                default ->
+                    throw new IllegalStateException(
+                            "Unsupported post-login decision: " + viewModel.resolvePostLoginDecision());
+            }
         }
     }
 
@@ -257,12 +275,31 @@ public class LoginController extends BaseController implements Initializable {
         Optional<User> result = dialog.showAndWait();
         result.ifPresent(user -> {
             logInfo(LOG_USER_CREATED, user.getName());
-            // Select the newly created user
-            userListView.getSelectionModel().select(user);
+            continueIntoOnboarding(user);
         });
 
         // Clear form on close
         viewModel.clearCreateForm();
+    }
+
+    void continueIntoOnboarding(User user) {
+        if (user == null) {
+            return;
+        }
+
+        viewModel.setSelectedUser(user);
+        if (!viewModel.login()) {
+            return;
+        }
+
+        navigateToOnboarding(OnboardingContext.newAccount(user.getId()));
+    }
+
+    private void navigateToOnboarding(OnboardingContext context) {
+        NavigationService navigationService = NavigationService.getInstance();
+        navigationService.setNavigationContext(NavigationService.ViewType.PROFILE, context);
+        logInfo(LOG_LOGIN_SUCCESS, NavigationService.ViewType.PROFILE);
+        navigationService.navigateTo(NavigationService.ViewType.PROFILE);
     }
 
     private void logInfo(String message, Object... args) {

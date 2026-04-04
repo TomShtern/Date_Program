@@ -14,6 +14,7 @@ import datingapp.core.profile.ProfileService;
 import datingapp.core.profile.ValidationService;
 import datingapp.core.testutil.TestStorages;
 import datingapp.core.testutil.TestUserFactory;
+import datingapp.ui.OnboardingContext;
 import datingapp.ui.async.UiThreadDispatcher;
 import datingapp.ui.viewmodel.ProfileViewModel.SaveOutcome;
 import java.lang.reflect.Modifier;
@@ -239,6 +240,8 @@ class ProfileViewModelTest {
         assertTrue(latch.await(5, TimeUnit.SECONDS));
         assertEquals(SaveOutcome.ACTIVATED, saveResult.get());
         assertEquals(User.UserState.ACTIVE, session.getCurrentUser().getState());
+        assertFalse(viewModel.onboardingActiveProperty().get());
+        assertEquals("Save changes", viewModel.primaryActionLabelProperty().get());
 
         viewModel.dispose();
     }
@@ -269,6 +272,53 @@ class ProfileViewModelTest {
         assertEquals(SaveOutcome.ACTIVATED, saveResult.get());
         assertEquals(User.UserState.ACTIVE, session.getCurrentUser().getState());
         assertEquals("Updated active bio", session.getCurrentUser().getBio());
+        assertFalse(viewModel.onboardingActiveProperty().get());
+        assertEquals("Save changes", viewModel.primaryActionLabelProperty().get());
+
+        viewModel.dispose();
+    }
+
+    @Test
+    @DisplayName("loadCurrentUser exposes onboarding guidance for incomplete first-run users")
+    void loadCurrentUserExposesOnboardingGuidanceForIncompleteFirstRunUsers() {
+        TestStorages.Users users = new TestStorages.Users();
+        AppConfig config = AppConfig.defaults();
+        ProfileService profileService = new ProfileService(users);
+
+        User currentUser = createActivatableIncompleteUser("GuideUser");
+        currentUser.setPhotoUrls(List.of());
+        users.save(currentUser);
+        session.setCurrentUser(currentUser);
+
+        ProfileViewModel viewModel = newMutationBackedProfileViewModel(users, config, profileService);
+        viewModel.setOnboardingContext(OnboardingContext.newAccount(currentUser.getId()));
+
+        viewModel.loadCurrentUser();
+
+        assertTrue(viewModel.onboardingActiveProperty().get());
+        assertTrue(viewModel.onboardingHeadlineProperty().get().contains("Finish your profile"));
+        assertFalse(viewModel.onboardingChecklistProperty().isEmpty());
+        assertEquals("Finish onboarding", viewModel.primaryActionLabelProperty().get());
+
+        viewModel.dispose();
+    }
+
+    @Test
+    @DisplayName("active users do not stay in onboarding mode")
+    void activeUsersDoNotStayInOnboardingMode() {
+        TestStorages.Users users = new TestStorages.Users();
+        AppConfig config = AppConfig.defaults();
+        ProfileService profileService = new ProfileService(users);
+
+        User currentUser = createActiveUser("DoneUser");
+        users.save(currentUser);
+        session.setCurrentUser(currentUser);
+
+        ProfileViewModel viewModel = newMutationBackedProfileViewModel(users, config, profileService);
+        viewModel.loadCurrentUser();
+
+        assertFalse(viewModel.onboardingActiveProperty().get());
+        assertEquals("Save changes", viewModel.primaryActionLabelProperty().get());
 
         viewModel.dispose();
     }

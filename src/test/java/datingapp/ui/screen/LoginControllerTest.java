@@ -153,6 +153,31 @@ class LoginControllerTest {
 
         assertEquals(incompleteUser, AppSession.getInstance().getCurrentUser());
         assertEquals(NavigationService.ViewType.PROFILE, peekNavigationHistory());
+        assertEquals(LoginViewModel.PostLoginDecision.START_ONBOARDING, viewModel.resolvePostLoginDecision());
+
+        viewModel.dispose();
+    }
+
+    @Test
+    @DisplayName("create account continues directly into onboarding on profile")
+    void createAccountContinuesDirectlyIntoOnboardingOnProfile() throws Exception {
+        TestStorages.Users users = new TestStorages.Users();
+        AppConfig config = AppConfig.defaults();
+        ProfileService profileService = new ProfileService(users);
+        LoginViewModel viewModel = new LoginViewModel(
+                new datingapp.ui.viewmodel.UiDataAdapters.StorageUiUserStore(users),
+                config,
+                AppSession.getInstance(),
+                JavaFxTestSupport.blockingUiDispatcher());
+
+        LoginController controller =
+                new LoginController(viewModel, profileService, config.safety().userTimeZone());
+        User createdUser = viewModel.createUser("Taylor", 29, Gender.OTHER, Gender.FEMALE);
+
+        JavaFxTestSupport.runOnFxAndWait(() -> controller.continueIntoOnboarding(createdUser));
+
+        assertEquals(createdUser, AppSession.getInstance().getCurrentUser());
+        assertEquals(NavigationService.ViewType.PROFILE, peekNavigationHistory());
 
         viewModel.dispose();
     }

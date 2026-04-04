@@ -27,6 +27,7 @@ import java.util.concurrent.TimeUnit;
 import javafx.scene.Parent;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
+import javafx.scene.layout.VBox;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -45,6 +46,95 @@ class ProfileControllerTest {
     @BeforeAll
     static void initJfx() throws InterruptedException {
         JavaFxTestSupport.initJfx();
+    }
+
+    @Test
+    @DisplayName("onboarding users see the checklist banner and a finish-onboarding CTA")
+    void onboardingUsersSeeChecklistBannerAndFinishOnboardingCta() throws Exception {
+        TestStorages.Users users = new TestStorages.Users();
+        AppConfig config = AppConfig.defaults();
+        ProfileService profileService = new ProfileService(users);
+
+        User currentUser = createActivatableIncompleteUser("Banner User");
+        users.save(currentUser);
+        AppSession.getInstance().setCurrentUser(currentUser);
+
+        ProfileViewModel viewModel = createViewModel(users, config, profileService);
+        viewModel.setOnboardingContext(datingapp.ui.OnboardingContext.newAccount(currentUser.getId()));
+        TrackingProfileController controller = new TrackingProfileController(viewModel);
+
+        JavaFxTestSupport.LoadedFxml loaded = JavaFxTestSupport.loadFxml("/fxml/profile.fxml", () -> controller);
+        Parent root = loaded.root();
+
+        Label onboardingHeadlineLabel = JavaFxTestSupport.lookup(root, "#onboardingHeadlineLabel", Label.class);
+        Label onboardingSummaryLabel = JavaFxTestSupport.lookup(root, "#onboardingSummaryLabel", Label.class);
+        VBox onboardingChecklistBox = JavaFxTestSupport.lookup(root, "#onboardingChecklistBox", VBox.class);
+        Button saveButton = JavaFxTestSupport.lookup(root, "#saveButton", Button.class);
+
+        assertTrue(JavaFxTestSupport.callOnFxAndWait(onboardingHeadlineLabel::isVisible));
+        assertTrue(JavaFxTestSupport.callOnFxAndWait(onboardingSummaryLabel::isVisible));
+        assertFalse(JavaFxTestSupport.callOnFxAndWait(onboardingChecklistBox.getChildren()::isEmpty));
+        assertEquals("Finish onboarding", JavaFxTestSupport.callOnFxAndWait(saveButton::getText));
+
+        viewModel.dispose();
+        NavigationService.getInstance().clearHistory();
+        AppSession.getInstance().reset();
+    }
+
+    @Test
+    @DisplayName("cancel during first-run onboarding returns to login instead of dashboard")
+    void cancelDuringFirstRunOnboardingReturnsToLoginInsteadOfDashboard() throws Exception {
+        TestStorages.Users users = new TestStorages.Users();
+        AppConfig config = AppConfig.defaults();
+        ProfileService profileService = new ProfileService(users);
+
+        User currentUser = createActivatableIncompleteUser("Cancel User");
+        users.save(currentUser);
+        AppSession.getInstance().setCurrentUser(currentUser);
+
+        ProfileViewModel viewModel = createViewModel(users, config, profileService);
+        viewModel.setOnboardingContext(datingapp.ui.OnboardingContext.newAccount(currentUser.getId()));
+        TrackingProfileController controller = new TrackingProfileController(viewModel);
+
+        JavaFxTestSupport.LoadedFxml loaded = JavaFxTestSupport.loadFxml("/fxml/profile.fxml", () -> controller);
+        Parent root = loaded.root();
+        Button cancelButton = JavaFxTestSupport.lookup(root, "#cancelButton", Button.class);
+
+        JavaFxTestSupport.runOnFxAndWait(cancelButton::fire);
+
+        assertTrue(controller.navigatedToLogin());
+        assertFalse(controller.navigatedToDashboard());
+
+        viewModel.dispose();
+        NavigationService.getInstance().clearHistory();
+        AppSession.getInstance().reset();
+    }
+
+    @Test
+    @DisplayName("back during first-run onboarding returns to login instead of dashboard")
+    void backDuringFirstRunOnboardingReturnsToLoginInsteadOfDashboard() throws Exception {
+        TestStorages.Users users = new TestStorages.Users();
+        AppConfig config = AppConfig.defaults();
+        ProfileService profileService = new ProfileService(users);
+
+        User currentUser = createActivatableIncompleteUser("Back User");
+        users.save(currentUser);
+        AppSession.getInstance().setCurrentUser(currentUser);
+
+        ProfileViewModel viewModel = createViewModel(users, config, profileService);
+        viewModel.setOnboardingContext(datingapp.ui.OnboardingContext.newAccount(currentUser.getId()));
+        TrackingProfileController controller = new TrackingProfileController(viewModel);
+
+        JavaFxTestSupport.loadFxml("/fxml/profile.fxml", () -> controller);
+
+        JavaFxTestSupport.runOnFxAndWait(controller::handleBack);
+
+        assertTrue(controller.navigatedToLogin());
+        assertFalse(controller.navigatedToDashboard());
+
+        viewModel.dispose();
+        NavigationService.getInstance().clearHistory();
+        AppSession.getInstance().reset();
     }
 
     @Test
@@ -364,6 +454,7 @@ class ProfileControllerTest {
 
     private static final class TrackingProfileController extends ProfileController {
         private boolean navigatedToDashboard;
+        private boolean navigatedToLogin;
 
         TrackingProfileController(ProfileViewModel viewModel) {
             super(viewModel);
@@ -374,8 +465,16 @@ class ProfileControllerTest {
             navigatedToDashboard = true;
         }
 
+        protected void navigateToLogin() {
+            navigatedToLogin = true;
+        }
+
         boolean navigatedToDashboard() {
             return navigatedToDashboard;
+        }
+
+        boolean navigatedToLogin() {
+            return navigatedToLogin;
         }
     }
 }

@@ -18,7 +18,9 @@ import datingapp.core.profile.ProfileService;
 import datingapp.core.profile.ProfileService.CompletionResult;
 import datingapp.core.profile.ValidationService;
 import datingapp.core.workflow.ProfileActivationPolicy;
+import datingapp.core.workflow.WorkflowDecision;
 import datingapp.ui.LocalPhotoStore;
+import datingapp.ui.OnboardingContext;
 import datingapp.ui.UiFeedbackService;
 import datingapp.ui.async.UiThreadDispatcher;
 import datingapp.ui.viewmodel.UiDataAdapters.UiUserStore;
@@ -63,6 +65,7 @@ public class ProfileViewModel extends BaseViewModel {
     private final ProfileService profileCompletionService;
     private final ProfileMutationUseCases profileMutationUseCases;
     private final ProfileUseCases profileUseCases;
+    private final ProfileActivationPolicy activationPolicy;
     private final AppSession session;
     private final LocationService locationService;
     private final ValidationService validationService;
@@ -82,6 +85,13 @@ public class ProfileViewModel extends BaseViewModel {
     private final javafx.beans.property.BooleanProperty hasLocation = new SimpleBooleanProperty(false);
     private final IntegerProperty photoCount = new SimpleIntegerProperty(0);
     private final javafx.beans.property.BooleanProperty saving = new SimpleBooleanProperty(false);
+    private final javafx.beans.property.BooleanProperty onboardingActive = new SimpleBooleanProperty(false);
+    private final StringProperty onboardingHeadline = new SimpleStringProperty("");
+    private final StringProperty onboardingSummary = new SimpleStringProperty("");
+    private final StringProperty primaryActionLabel = new SimpleStringProperty("Save changes");
+    private final javafx.collections.ObservableList<String> onboardingChecklist = FXCollections.observableArrayList();
+    private final javafx.collections.ObservableList<String> readOnlyOnboardingChecklist =
+            FXCollections.unmodifiableObservableList(onboardingChecklist);
 
     // Multiple photos
     private final javafx.collections.ObservableList<String> photoUrls = FXCollections.observableArrayList();
@@ -118,6 +128,7 @@ public class ProfileViewModel extends BaseViewModel {
     private final ObservableSet<Interest> selectedInterests =
             FXCollections.observableSet(EnumSet.noneOf(Interest.class));
 
+    private OnboardingContext onboardingContext;
     private String lastSavedSnapshot = "";
 
     ProfileViewModel(
@@ -161,6 +172,8 @@ public class ProfileViewModel extends BaseViewModel {
         this.profileMutationUseCases = dependencies.profileMutationUseCases();
         this.profileUseCases = dependencies.profileUseCases();
         this.config = Objects.requireNonNull(dependencies.config(), "config cannot be null");
+        this.activationPolicy =
+                Objects.requireNonNull(dependencies.activationPolicy(), "activationPolicy cannot be null");
         this.session = Objects.requireNonNull(dependencies.session(), "session cannot be null");
         this.validationService =
                 Objects.requireNonNull(dependencies.validationService(), "validationService cannot be null");
@@ -182,6 +195,11 @@ public class ProfileViewModel extends BaseViewModel {
 
     public void setErrorHandler(ViewModelErrorSink handler) {
         setErrorSink(handler);
+    }
+
+    public void setOnboardingContext(OnboardingContext onboardingContext) {
+        this.onboardingContext = onboardingContext;
+        refreshOnboardingState();
     }
 
     /**
@@ -252,7 +270,8 @@ public class ProfileViewModel extends BaseViewModel {
         updatePrimaryPhoto(user);
 
         // Calculate completion using static method
-        updateCompletion(user);
+        CompletionResult completion = updateCompletion(user);
+        updateOnboardingState(user, completion);
         markCurrentStateSaved();
     }
 
@@ -310,7 +329,7 @@ public class ProfileViewModel extends BaseViewModel {
         return count + " filter" + (count != 1 ? "s" : "") + " set";
     }
 
-    private void updateCompletion(User user) {
+    private CompletionResult updateCompletion(User user) {
         try {
             CompletionResult result;
             if (profileUseCases != null) {
@@ -324,12 +343,53 @@ public class ProfileViewModel extends BaseViewModel {
             }
             completionStatus.set(result.getDisplayString());
             completionDetails.set(buildCompletionDetails(result));
+            return result;
         } catch (Exception e) {
             logError("Failed to calculate profile completion", e);
             notifyError("Failed to calculate profile completion", e);
             completionStatus.set("--");
             completionDetails.set("Unable to calculate completion");
+            return null;
         }
+    }
+
+    private void refreshOnboardingState() {
+        refreshOnboardingState(session.getCurrentUser());
+    }
+
+    private void refreshOnboardingState(User user) {
+        if (user == null) {
+            clearOnboardingState();
+            return;
+        }
+        CompletionResult completion = updateCompletion(user);
+        updateOnboardingState(user, completion);
+    }
+
+    private void updateOnboardingState(User user, CompletionResult completion) {
+        if (onboardingContext == null
+                || user == null
+                || user.getState() == User.UserState.ACTIVE
+                || completion == null) {
+            clearOnboardingState();
+            return;
+        }
+
+        WorkflowDecision activationDecision = activationPolicy.canActivate(user);
+        ProfileOnboardingState state = ProfileOnboardingState.from(true, activationDecision, completion.nextSteps());
+        onboardingActive.set(state.active());
+        onboardingHeadline.set(state.headline());
+        onboardingSummary.set(state.summary());
+        primaryActionLabel.set(state.primaryActionLabel());
+        onboardingChecklist.setAll(state.checklist());
+    }
+
+    private void clearOnboardingState() {
+        onboardingActive.set(false);
+        onboardingHeadline.set("");
+        onboardingSummary.set("");
+        primaryActionLabel.set("Save changes");
+        onboardingChecklist.clear();
     }
 
     private void updatePrimaryPhoto(User user) {
@@ -469,7 +529,8 @@ public class ProfileViewModel extends BaseViewModel {
 
     private void updateSessionAndCompletion(User user) {
         session.setCurrentUser(user);
-        updateCompletion(user);
+        CompletionResult completion = updateCompletion(user);
+        updateOnboardingState(user, completion);
         markCurrentStateSaved();
     }
 
@@ -562,6 +623,26 @@ public class ProfileViewModel extends BaseViewModel {
 
     public IntegerProperty photoCountProperty() {
         return photoCount;
+    }
+
+    public javafx.beans.property.BooleanProperty onboardingActiveProperty() {
+        return onboardingActive;
+    }
+
+    public StringProperty onboardingHeadlineProperty() {
+        return onboardingHeadline;
+    }
+
+    public StringProperty onboardingSummaryProperty() {
+        return onboardingSummary;
+    }
+
+    public StringProperty primaryActionLabelProperty() {
+        return primaryActionLabel;
+    }
+
+    public javafx.collections.ObservableList<String> onboardingChecklistProperty() {
+        return readOnlyOnboardingChecklist;
     }
 
     public int getMaxPhotos() {
@@ -947,7 +1028,8 @@ public class ProfileViewModel extends BaseViewModel {
         }
         syncPhotoCarousel();
         session.setCurrentUser(user);
-        updateCompletion(user);
+        CompletionResult completion = updateCompletion(user);
+        updateOnboardingState(user, completion);
         markCurrentStateSaved();
         UiFeedbackService.showSuccess(result.successMessage());
     }

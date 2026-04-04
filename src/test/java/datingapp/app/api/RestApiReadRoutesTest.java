@@ -175,19 +175,29 @@ class RestApiReadRoutesTest {
     }
 
     @Test
-    @DisplayName("candidates route remains the deliberate raw projection exception while browse stays app-layer")
-    void candidatesRouteRemainsTheDeliberateDirectReadException() throws Exception {
+    @DisplayName("candidates route preserves array shape while matching browse ordering")
+    void candidatesRoutePreservesArrayShapeWhileMatchingBrowseOrdering() throws Exception {
         TestStorages.Users userStorage = new TestStorages.Users();
         TestStorages.Communications communicationStorage = new TestStorages.Communications();
         TestStorages.Interactions interactionStorage = new TestStorages.Interactions(communicationStorage);
         ServiceRegistry services = createServices(userStorage, interactionStorage, communicationStorage);
 
-        UUID activeId = UUID.randomUUID();
-        UUID candidateId = UUID.randomUUID();
-        User active = activeUser(activeId, "Active", Gender.FEMALE, EnumSet.of(Gender.MALE));
-        User candidate = activeUser(candidateId, CANDIDATE_NAME, Gender.MALE, EnumSet.of(Gender.FEMALE));
-        userStorage.save(active);
-        userStorage.save(candidate);
+        UUID seekerId = UUID.randomUUID();
+        User seeker = rankedBrowseUser(seekerId, "Seeker", Gender.MALE, EnumSet.of(Gender.FEMALE), 40.7128, -74.0060);
+        User nearWeak = sparseBrowseCandidate(
+                UUID.randomUUID(),
+                "NearWeak",
+                40.7130,
+                -74.0062,
+                Gender.FEMALE,
+                EnumSet.of(Gender.MALE),
+                AppClock.now().minus(java.time.Duration.ofDays(60)));
+        User farStrong = rankedBrowseUser(
+                UUID.randomUUID(), "FarStrong", Gender.FEMALE, EnumSet.of(Gender.MALE), 40.7700, -74.0500);
+
+        userStorage.save(seeker);
+        userStorage.save(nearWeak);
+        userStorage.save(farStrong);
 
         server = new RestApiServer(services, 0);
         server.start();
@@ -195,12 +205,12 @@ class RestApiReadRoutesTest {
         HttpClient client = HttpClient.newHttpClient();
 
         HttpResponse<String> browseResponse = client.send(
-                HttpRequest.newBuilder(URI.create(BASE_URL + port + USERS_PATH + activeId + BROWSE_SEGMENT))
+                HttpRequest.newBuilder(URI.create(BASE_URL + port + USERS_PATH + seekerId + BROWSE_SEGMENT))
                         .GET()
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
         HttpResponse<String> candidatesResponse = client.send(
-                HttpRequest.newBuilder(URI.create(BASE_URL + port + USERS_PATH + activeId + CANDIDATES_SEGMENT))
+                HttpRequest.newBuilder(URI.create(BASE_URL + port + USERS_PATH + seekerId + CANDIDATES_SEGMENT))
                         .GET()
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
@@ -214,7 +224,17 @@ class RestApiReadRoutesTest {
         assertTrue(browseJson.has(CANDIDATES_KEY));
         assertTrue(browseJson.has(LOCATION_MISSING_KEY));
         assertTrue(candidatesJson.isArray());
-        assertEquals(candidateId.toString(), candidatesJson.get(0).get("id").asText());
+        List<String> browseCandidateIds = new ArrayList<>();
+        for (JsonNode candidate : browseJson.get(CANDIDATES_KEY)) {
+            browseCandidateIds.add(candidate.get("id").asText());
+        }
+        List<String> candidatesIds = new ArrayList<>();
+        for (JsonNode candidate : candidatesJson) {
+            candidatesIds.add(candidate.get("id").asText());
+        }
+
+        assertEquals(browseCandidateIds, candidatesIds);
+        assertEquals(farStrong.getId().toString(), candidatesIds.getFirst());
     }
 
     @Test
@@ -343,6 +363,45 @@ class RestApiReadRoutesTest {
                 "locationMissing must be true when seeker has no location");
         assertEquals(
                 0, browseJson.get(CANDIDATES_KEY).size(), "Candidates list must be empty when location is missing");
+    }
+
+    @Test
+    @DisplayName("/candidates endpoint returns an empty array when seeker has no location")
+    void candidatesReturnsEmptyArrayWhenSeekerHasNoLocation() throws Exception {
+        TestStorages.Users userStorage = new TestStorages.Users();
+        TestStorages.Communications communicationStorage = new TestStorages.Communications();
+        TestStorages.Interactions interactionStorage = new TestStorages.Interactions(communicationStorage);
+        ServiceRegistry services = RestApiTestFixture.builder(userStorage, interactionStorage, communicationStorage)
+                .build();
+
+        UUID noLocationId = UUID.randomUUID();
+        UUID candidateId = UUID.randomUUID();
+        User noLocation = User.StorageBuilder.create(noLocationId, "NoLocation", AppClock.now())
+                .state(UserState.ACTIVE)
+                .birthDate(LocalDate.of(1998, 1, 1))
+                .gender(Gender.FEMALE)
+                .interestedIn(EnumSet.of(Gender.MALE))
+                .build();
+        User candidate = activeUser(candidateId, "Candidate", Gender.MALE, EnumSet.of(Gender.FEMALE));
+        candidate.setLocation(32.0870, 34.8877);
+        userStorage.save(noLocation);
+        userStorage.save(candidate);
+
+        server = new RestApiServer(services, 0);
+        server.start();
+        int port = server.getApp().port();
+        HttpClient client = HttpClient.newHttpClient();
+
+        HttpResponse<String> candidatesResponse = client.send(
+                HttpRequest.newBuilder(URI.create(BASE_URL + port + USERS_PATH + noLocationId + CANDIDATES_SEGMENT))
+                        .GET()
+                        .build(),
+                HttpResponse.BodyHandlers.ofString());
+        assertEquals(200, candidatesResponse.statusCode());
+        JsonNode candidatesJson = MAPPER.readTree(candidatesResponse.body());
+
+        assertTrue(candidatesJson.isArray());
+        assertEquals(0, candidatesJson.size(), "Candidates list must be empty when location is missing");
     }
 
     @Test
@@ -509,6 +568,56 @@ class RestApiReadRoutesTest {
                 .hasLocationSet(true)
                 .maxDistanceKm(100)
                 .photoUrls(List.of("https://example.com/" + name.toLowerCase() + ".jpg"))
+                .build();
+    }
+
+    private static User rankedBrowseUser(
+            UUID id, String name, Gender gender, EnumSet<Gender> interestedIn, double lat, double lon) {
+        return User.StorageBuilder.create(id, name, AppClock.now())
+                .state(UserState.ACTIVE)
+                .bio("Shared interests and complete profile")
+                .birthDate(LocalDate.of(1998, 1, 1))
+                .gender(gender)
+                .interestedIn(interestedIn)
+                .location(lat, lon)
+                .hasLocationSet(true)
+                .maxDistanceKm(100)
+                .photoUrls(List.of("https://example.com/" + name.toLowerCase() + ".jpg"))
+                .interests(EnumSet.of(
+                        datingapp.core.profile.MatchPreferences.Interest.HIKING,
+                        datingapp.core.profile.MatchPreferences.Interest.COFFEE,
+                        datingapp.core.profile.MatchPreferences.Interest.MUSIC))
+                .smoking(datingapp.core.profile.MatchPreferences.Lifestyle.Smoking.NEVER)
+                .drinking(datingapp.core.profile.MatchPreferences.Lifestyle.Drinking.SOCIALLY)
+                .wantsKids(datingapp.core.profile.MatchPreferences.Lifestyle.WantsKids.SOMEDAY)
+                .lookingFor(datingapp.core.profile.MatchPreferences.Lifestyle.LookingFor.LONG_TERM)
+                .pacePreferences(new datingapp.core.profile.MatchPreferences.PacePreferences(
+                        datingapp.core.profile.MatchPreferences.PacePreferences.MessagingFrequency.OFTEN,
+                        datingapp.core.profile.MatchPreferences.PacePreferences.TimeToFirstDate.FEW_DAYS,
+                        datingapp.core.profile.MatchPreferences.PacePreferences.CommunicationStyle.MIX_OF_EVERYTHING,
+                        datingapp.core.profile.MatchPreferences.PacePreferences.DepthPreference.DEEP_CHAT))
+                .build();
+    }
+
+    private static User sparseBrowseCandidate(
+            UUID id,
+            String name,
+            double lat,
+            double lon,
+            Gender gender,
+            EnumSet<Gender> interestedIn,
+            java.time.Instant updatedAt) {
+        return User.StorageBuilder.create(id, name, AppClock.now())
+                .state(UserState.ACTIVE)
+                .bio("")
+                .birthDate(LocalDate.of(1998, 1, 1))
+                .gender(gender)
+                .interestedIn(interestedIn)
+                .location(lat, lon)
+                .hasLocationSet(true)
+                .maxDistanceKm(100)
+                .photoUrls(List.of())
+                .updatedAt(updatedAt)
                 .build();
     }
 }

@@ -28,6 +28,7 @@ public final class RecommendationService {
     private final DailyLimitService dailyLimitService;
     private final DailyPickService dailyPickService;
     private final StandoutService standoutService;
+    private final BrowseRankingService browseRankingService;
 
     public static Builder builder() {
         return new Builder();
@@ -93,6 +94,8 @@ public final class RecommendationService {
         public RecommendationService build() {
             AppConfig resolvedConfig = Objects.requireNonNull(config, "config cannot be null");
             Clock resolvedClock = clock != null ? clock : AppClock.clock();
+            ProfileService resolvedProfileService =
+                    Objects.requireNonNull(profileService, "profileService cannot be null");
             CandidateFinder resolvedCandidateFinder = candidateFinder;
             if (resolvedCandidateFinder == null) {
                 resolvedCandidateFinder = new CandidateFinder(
@@ -112,18 +115,30 @@ public final class RecommendationService {
                     userStorage,
                     resolvedCandidateFinder,
                     standoutStorage,
-                    profileService,
+                    resolvedProfileService,
                     resolvedConfig,
                     resolvedClock);
-            return new RecommendationService(dailyLimitService, dailyPickService, standoutService);
+            BrowseRankingService browseRankingService =
+                    new DefaultBrowseRankingService(calculator, resolvedProfileService, resolvedConfig);
+            return new RecommendationService(
+                    dailyLimitService, dailyPickService, standoutService, browseRankingService);
         }
     }
 
     public RecommendationService(
             DailyLimitService dailyLimitService, DailyPickService dailyPickService, StandoutService standoutService) {
+        this(dailyLimitService, dailyPickService, standoutService, BrowseRankingService.identity());
+    }
+
+    public RecommendationService(
+            DailyLimitService dailyLimitService,
+            DailyPickService dailyPickService,
+            StandoutService standoutService,
+            BrowseRankingService browseRankingService) {
         this.dailyLimitService = Objects.requireNonNull(dailyLimitService, "dailyLimitService cannot be null");
         this.dailyPickService = Objects.requireNonNull(dailyPickService, "dailyPickService cannot be null");
         this.standoutService = Objects.requireNonNull(standoutService, "standoutService cannot be null");
+        this.browseRankingService = Objects.requireNonNull(browseRankingService, "browseRankingService cannot be null");
     }
 
     /** Whether the user can perform a like action today. */
@@ -200,6 +215,11 @@ public final class RecommendationService {
     /** Resolve standout user IDs to User objects. */
     public Map<UUID, User> resolveUsers(List<Standout> standouts) {
         return standoutService.resolveUsers(standouts);
+    }
+
+    /** Rank eligible browse candidates for the normal browsing flow. */
+    public List<User> rankBrowseCandidates(User seeker, List<User> candidates) {
+        return browseRankingService.rankCandidates(seeker, candidates);
     }
 
     // Keep legacy records for backward compatibility if needed,

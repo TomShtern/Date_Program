@@ -8,6 +8,7 @@ import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
 import datingapp.core.model.User.UserState;
 import datingapp.core.workflow.ProfileActivationPolicy;
+import datingapp.core.workflow.WorkflowDecision;
 import datingapp.ui.NavigationService;
 import datingapp.ui.async.JavaFxUiThreadDispatcher;
 import datingapp.ui.async.UiThreadDispatcher;
@@ -166,18 +167,31 @@ public class LoginViewModel extends BaseViewModel {
         return true;
     }
 
-    public NavigationService.ViewType resolvePostLoginDestination() {
+    public PostLoginDecision resolvePostLoginDecision() {
         if (selectedUser == null) {
-            return NavigationService.ViewType.PROFILE;
+            return PostLoginDecision.START_ONBOARDING;
         }
 
         var activationDecision = activationPolicy.canActivate(selectedUser);
         if (selectedUser.getState() == UserState.ACTIVE
-                || (activationDecision instanceof datingapp.core.workflow.WorkflowDecision.Denied denied
+                || (activationDecision instanceof WorkflowDecision.Denied denied
                         && "ALREADY_ACTIVE".equals(denied.reasonCode()))) {
-            return NavigationService.ViewType.DASHBOARD;
+            return PostLoginDecision.GO_TO_DASHBOARD;
         }
-        return NavigationService.ViewType.PROFILE;
+
+        return PostLoginDecision.START_ONBOARDING;
+    }
+
+    public NavigationService.ViewType resolvePostLoginDestination() {
+        return switch (resolvePostLoginDecision()) {
+            case GO_TO_DASHBOARD -> NavigationService.ViewType.DASHBOARD;
+            case START_ONBOARDING -> NavigationService.ViewType.PROFILE;
+        };
+    }
+
+    public enum PostLoginDecision {
+        GO_TO_DASHBOARD,
+        START_ONBOARDING
     }
 
     /**
