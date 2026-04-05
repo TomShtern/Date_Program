@@ -78,6 +78,18 @@ class DatabaseManagerConfigurationTest {
     }
 
     @Test
+    @DisplayName("PostgreSQL URLs should reject missing external passwords")
+    void postgresqlUrlsRejectMissingExternalPasswords() {
+        IllegalStateException exception = assertThrows(
+                IllegalStateException.class,
+                () -> DatabaseManager.resolvePassword(null, null, "jdbc:postgresql://localhost:5432/datingapp"));
+
+        assertEquals(
+                "Database password must be provided via datingapp.db.password or DATING_APP_DB_PASSWORD",
+                exception.getMessage());
+    }
+
+    @Test
     @DisplayName("resolvePassword should use the provided JDBC URL snapshot")
     void resolvePasswordUsesProvidedJdbcUrlSnapshot() {
         DatabaseManager.setJdbcUrl("jdbc:h2:mem:dbmanager-config-global-" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1");

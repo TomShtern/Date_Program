@@ -555,6 +555,12 @@ class JdbiUserStorageNormalizationTest {
     }
 
     @Test
+    @DisplayName("saveProfileNote should reject null notes")
+    void saveProfileNoteRejectsNullNotes() {
+        assertThrows(NullPointerException.class, () -> storage.saveProfileNote(null));
+    }
+
+    @Test
     @DisplayName("seeded sentinel user should have multiple randomuser portraits")
     void seededSentinelUserHasMultipleRandomuserPortraits() {
         DevDataSeeder.seed(storage);

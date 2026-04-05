@@ -76,11 +76,11 @@
 - Test: `src/test/java/datingapp/storage/DatabaseManagerConfigurationTest.java`
 - Test: `src/test/java/datingapp/app/bootstrap/ApplicationStartupBootstrapTest.java`
 
-- [ ] **Step 1: Write the failing config/runtime tests**
+- [x] **Step 1: Write the failing config/runtime tests**
   - Add a `DatabaseManagerConfigurationTest` case proving a PostgreSQL JDBC URL is preserved verbatim and not rewritten by H2 dev/test logic.
   - Add a startup/config test proving the new storage config fields are loaded from `config/app-config.json` / env override seams without disturbing existing `queryTimeoutSeconds` behavior.
 
-- [ ] **Step 2: Run the focused config/bootstrap pack and confirm the red state**
+- [x] **Step 2: Run the focused config/bootstrap pack and confirm the red state**
 
 Run:
 `mvn -Dtest=DatabaseManagerConfigurationTest,ApplicationStartupBootstrapTest test`
@@ -88,14 +88,14 @@ Run:
 Expected:
 - FAIL because there is no PostgreSQL JDBC dependency and no runtime DB config surface in `AppConfig` / `ApplicationStartup`.
 
-- [ ] **Step 3: Add the new runtime DB settings**
+- [x] **Step 3: Add the new runtime DB settings**
   - Add PostgreSQL JDBC dependency to `pom.xml` while keeping H2.
   - Expand `AppConfig.StorageConfig` beyond `queryTimeoutSeconds`, adding source-backed runtime fields such as database dialect, runtime JDBC URL, and runtime username.
   - Add matching validation in `AppConfigValidator`.
   - Add matching keys to `config/app-config.json` with non-secret defaults/placeholders only.
   - Update `ApplicationStartup.applyEnvironmentOverrides(...)` to support the new DB settings.
 
-- [ ] **Step 4: Re-run the focused config/bootstrap pack until it passes**
+- [x] **Step 4: Re-run the focused config/bootstrap pack until it passes**
 
 Run:
 `mvn -Dtest=DatabaseManagerConfigurationTest,ApplicationStartupBootstrapTest test`
@@ -114,11 +114,11 @@ Expected:
 - Test: `src/test/java/datingapp/storage/StorageFactoryInMemoryTest.java`
 - Test: `src/test/java/datingapp/core/ServiceRegistryTest.java`
 
-- [ ] **Step 1: Write the failing runtime bootstrap tests**
+- [x] **Step 1: Write the failing runtime bootstrap tests**
   - Add a `DatabaseDialectTest` for dialect detection from the configured runtime DB setting and/or JDBC URL.
   - Add a `ServiceRegistryTest`/`StorageFactoryInMemoryTest` assertion proving H2 in-memory registries still work after runtime factory generalization.
 
-- [ ] **Step 2: Run the focused runtime/bootstrap pack and confirm the red state**
+- [x] **Step 2: Run the focused runtime/bootstrap pack and confirm the red state**
 
 Run:
 `mvn -Dtest=DatabaseDialectTest,StorageFactoryInMemoryTest,ServiceRegistryTest test`
@@ -126,13 +126,13 @@ Run:
 Expected:
 - FAIL because runtime bootstrap is still exposed only as `StorageFactory.buildH2(...)` and `DatabaseManager` still assumes H2 URL semantics.
 
-- [ ] **Step 3: Implement generic runtime database bootstrap**
+- [x] **Step 3: Implement generic runtime database bootstrap**
   - Introduce `DatabaseDialect` as the single place that names supported engines (`H2`, `POSTGRESQL`).
   - Generalize `DatabaseManager` so H2-specific URL rewrite/password rules apply only to H2, while PostgreSQL runtime URLs remain untouched.
   - Add a generic `StorageFactory` runtime entrypoint (for example, `buildSqlDatabase(...)` or equivalent) and switch `ApplicationStartup.initialize(...)` to use it.
   - Preserve `StorageFactory.buildInMemory(...)` as an explicitly H2-only test helper.
 
-- [ ] **Step 4: Re-run the focused runtime/bootstrap pack until it passes**
+- [x] **Step 4: Re-run the focused runtime/bootstrap pack until it passes**
 
 Run:
 `mvn -Dtest=DatabaseDialectTest,StorageFactoryInMemoryTest,ServiceRegistryTest test`
@@ -150,11 +150,11 @@ Expected:
 - Test: `src/test/java/datingapp/storage/schema/SchemaInitializerTest.java`
 - Test: `src/test/java/datingapp/storage/DatabaseManagerConfigurationTest.java`
 
-- [ ] **Step 1: Write the failing migration/dialect tests**
+- [x] **Step 1: Write the failing migration/dialect tests**
   - Add unit coverage (likely against `DatabaseDialect` / helper methods) for schema-version recording SQL and foreign-key DDL generation.
   - Keep `SchemaInitializerTest` focused on H2 behavior but add assertions that do not depend on H2-only `MERGE` or `ADD CONSTRAINT IF NOT EXISTS` implementation details.
 
-- [ ] **Step 2: Run the focused schema pack and confirm the red state**
+- [x] **Step 2: Run the focused schema pack and confirm the red state**
 
 Run:
 `mvn -Dtest=SchemaInitializerTest,DatabaseManagerConfigurationTest,DatabaseDialectTest test`
@@ -162,13 +162,13 @@ Run:
 Expected:
 - FAIL because `MigrationRunner.recordSchemaVersion(...)` still uses H2 `MERGE ... KEY (...)`, and `addForeignKeyIfMissing(...)` still uses `ADD CONSTRAINT IF NOT EXISTS`.
 
-- [ ] **Step 3: Implement dialect-aware migration SQL**
+- [x] **Step 3: Implement dialect-aware migration SQL**
   - Replace `recordSchemaVersion(...)` with a portable insert/update path or explicit H2/PostgreSQL dialect branching.
   - Replace `ADD CONSTRAINT IF NOT EXISTS` with metadata preflight + plain `ALTER TABLE ... ADD CONSTRAINT ...`.
   - Keep the partial-index fallback pattern already present in `MigrationRunner.createIndexWithFallback(...)`.
   - Touch `SchemaInitializer` only if a concrete PostgreSQL-incompatible DDL token is confirmed during implementation.
 
-- [ ] **Step 4: Re-run the focused schema pack until it passes**
+- [x] **Step 4: Re-run the focused schema pack until it passes**
 
 Run:
 `mvn -Dtest=SchemaInitializerTest,DatabaseDialectTest test`
@@ -190,11 +190,11 @@ Expected:
 - Test: `src/test/java/datingapp/storage/jdbi/JdbiConnectionStorageAtomicityTest.java`
 - Test: `src/test/java/datingapp/storage/jdbi/SqlRowReadersTest.java`
 
-- [ ] **Step 1: Write the failing storage-dialect tests**
+- [x] **Step 1: Write the failing storage-dialect tests**
   - Add pure helper tests for SQL fragments emitted by `SqlDialectSupport` (upsert statements and the session-duration expression).
   - Keep the existing H2-backed storage tests as the semantic regression safety net.
 
-- [ ] **Step 2: Run the focused storage pack and confirm the red state**
+- [x] **Step 2: Run the focused storage pack and confirm the red state**
 
 Run:
 `mvn -Dtest=JdbiUserStorageMigrationTest,JdbiUserStorageNormalizationTest,JdbiConnectionStorageAtomicityTest,SqlRowReadersTest,DatabaseDialectTest test`
@@ -202,13 +202,13 @@ Run:
 Expected:
 - FAIL because `JdbiUserStorage`, `JdbiMetricsStorage`, and `JdbiMatchmakingStorage` still embed H2-specific `MERGE ... KEY (...)` and `DATEDIFF('SECOND', ...)` SQL.
 
-- [ ] **Step 3: Implement dialect-aware write/query SQL**
+- [x] **Step 3: Implement dialect-aware write/query SQL**
   - Introduce `SqlDialectSupport` for the repeated H2/PostgreSQL SQL divergences.
   - Convert the H2-only `@SqlUpdate MERGE ... KEY (...)` paths into dialect-aware imperative `Handle.createUpdate(...)` or equivalent helper-backed execution.
   - Replace `DATEDIFF('SECOND', started_at, ended_at)` with a dialect-aware expression that preserves current semantics.
   - Keep the H2 trigger-backed rollback test (`JdbiConnectionStorageAtomicityTest`) intact.
 
-- [ ] **Step 4: Re-run the focused storage pack until it passes**
+- [x] **Step 4: Re-run the focused storage pack until it passes**
 
 Run:
 `mvn -Dtest=JdbiUserStorageMigrationTest,JdbiUserStorageNormalizationTest,JdbiConnectionStorageAtomicityTest,SqlRowReadersTest test`
@@ -223,7 +223,7 @@ Expected:
 **Files:**
 - Verify only: touched production/test files above
 
-- [ ] **Step 1: Run the H2-preservation smoke packs**
+- [x] **Step 1: Run the H2-preservation smoke packs**
 
 Run:
 `mvn -Dtest=DatabaseManagerConfigurationTest,StorageFactoryInMemoryTest,SchemaInitializerTest,JdbiUserStorageMigrationTest,JdbiUserStorageNormalizationTest,JdbiConnectionStorageAtomicityTest,ServiceRegistryTest,ApplicationStartupBootstrapTest test`
@@ -231,7 +231,7 @@ Run:
 Expected:
 - PASS, proving H2 tests remain intact after PostgreSQL runtime support work.
 
-- [ ] **Step 2: Run the full quality gate**
+- [x] **Step 2: Run the full quality gate**
 
 Run:
 `mvn spotless:apply verify`
@@ -239,7 +239,7 @@ Run:
 Expected:
 - PASS.
 
-- [ ] **Step 3: Add a small runtime sanity note to the final handoff**
+- [x] **Step 3: Add a small runtime sanity note to the final handoff**
   - Call out whether PostgreSQL runtime support is configured but not yet integration-tested live, or whether a live local PostgreSQL smoke run was added during implementation.
   - Do **not** claim live PostgreSQL success unless it was actually executed in this workspace.
 

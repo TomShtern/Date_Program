@@ -224,6 +224,7 @@ public final class JdbiUserStorage implements UserStorage {
 
     @Override
     public void saveProfileNote(ProfileNote note) {
+        Objects.requireNonNull(note, "note cannot be null");
         jdbi.useHandle(handle -> {
             try (var update = handle.createUpdate(profileNoteUpsertSql)) {
                 update.bind("authorId", note.authorId())

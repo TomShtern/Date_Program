@@ -124,9 +124,6 @@ public final class DatabaseManager {
         config.setConnectionTimeout(5000);
         config.setConnectionTestQuery("SELECT 1");
         config.setValidationTimeout(3000);
-        if (storageState != null && storageState.dialect() != dialect) {
-            runtimeStorageState.set(new RuntimeStorageState(storageState.storageConfig(), dialect));
-        }
         dataSource.set(new HikariDataSource(config));
     }
 

@@ -2,6 +2,8 @@
 
 Generated from verified evidence in `src/main/java`, `src/test/java`, and `pom.xml` on 2026-04-05.
 
+Exact versioned entries in the definitive tech stack guide were cross-checked on 2026-04-05 against official release pages or project release notes for Java 25, JavaFX 25.0.2, Jackson 2.21.0, Jdbi 3.51.0, HikariCP 6.3.0, H2 2.4.240, and JUnit 5.14.2.
+
 ## Version 1 — Balanced
 
 **Project title:** Dating App
@@ -82,6 +84,10 @@ Generated from verified evidence in `src/main/java`, `src/test/java`, and `pom.x
 - Kept business logic out of transport and UI layers by routing adapters through dedicated use-case classes and a centralized `ServiceRegistry`.
 - Supported H2 and PostgreSQL runtime paths through JDBI-based SQL storage and configuration-driven bootstrap code.
 
+**Tech stack:** Java 25, JavaFX 25, Javalin, Jackson, JDBI 3, H2, PostgreSQL JDBC, HikariCP, Maven, JUnit 5.
+
+**Polished paragraph:** Built a multi-interface Java dating application whose shared workflow layer is consumed by a CLI, a JavaFX desktop client, and a localhost REST API. REST behavior stays thin by routing requests into dedicated use-case classes instead of embedding business rules in handlers, while JDBI-backed SQL storage supports both H2 and PostgreSQL runtime paths. This framing works well for résumé use because it highlights reusable application logic and API delivery together.
+
 ## Version 6 — Layered Architecture Focus
 
 **Project title:** Layered Java Dating App
@@ -93,6 +99,10 @@ Generated from verified evidence in `src/main/java`, `src/test/java`, and `pom.x
 - Centralized dependency wiring through explicit composition roots and a `ServiceRegistry` rather than embedding workflow logic in controllers or routes.
 - Isolated business flows into dedicated use-case bundles for matching, messaging, profile mutation, profile insights, notes, verification, and social features.
 - Used an in-process event bus to handle achievement, metrics, and notification side effects from user actions.
+
+**Tech stack:** Java 25, JavaFX 25, Javalin, Jackson, JDBI 3, H2, PostgreSQL JDBC, Maven, JUnit 5.
+
+**Polished paragraph:** Developed a layered Java application that keeps domain logic, application workflows, persistence, and presentation concerns clearly separated. The architecture uses explicit composition roots and a centralized `ServiceRegistry`, with focused use-case bundles and an in-process event bus to coordinate cross-cutting behavior without tangling UI or transport code into the core model. This version is the strongest résumé framing when you want to emphasize software design and maintainability rather than only feature count.
 
 ## Version 7 — Feature Breadth Focus
 
@@ -106,6 +116,10 @@ Generated from verified evidence in `src/main/java`, `src/test/java`, and `pom.x
 - Added conversation management, unread tracking, friend requests, notifications, unmatch and graceful-exit handling, and block/report controls.
 - Exposed the same workflows through CLI, JavaFX, and localhost REST adapters.
 
+**Tech stack:** Java 25, JavaFX 25, Javalin, Jackson, JDBI 3, H2, PostgreSQL JDBC, Maven, JUnit 5.
+
+**Polished paragraph:** Implemented a broad set of dating-app workflows in Java, including onboarding, discovery preferences, recommendation and matching features, messaging, relationship transitions, moderation, and verification. The same features are surfaced through CLI, desktop UI, and REST adapters, which helps position the project as a complete multi-workflow application rather than a narrow demo. Use this version when you want résumé readers to see the range of product functionality you delivered.
+
 ## Version 8 — Engineering Quality Focus
 
 **Project title:** Java Dating App
@@ -117,6 +131,10 @@ Generated from verified evidence in `src/main/java`, `src/test/java`, and `pom.x
 - Reused shared use-case classes across JavaFX ViewModels, CLI handlers, and Javalin REST handlers instead of duplicating business logic per interface.
 - Maintained automated verification with JUnit 5 and repository quality gates using JaCoCo, Spotless, Checkstyle, and PMD.
 - Verified architectural boundaries in tests to keep core domain code isolated from JavaFX, JDBI, Javalin, and Jackson framework dependencies.
+
+**Tech stack:** Java 25, JavaFX 25, Javalin, Jackson, JDBI 3, H2, PostgreSQL JDBC, HikariCP, Maven, JUnit 5, JaCoCo, Spotless, Checkstyle, PMD.
+
+**Polished paragraph:** Built a Java application with strong engineering discipline around architecture, persistence, and verification. Shared use-case logic is reused across desktop, CLI, and REST adapters, while JDBI-backed storage supports both H2 and PostgreSQL runtime paths and the repository is kept healthy with automated tests, formatting, static analysis, and coverage gates. This is the best résumé variant when you want to foreground code quality, maintainability, and delivery rigor.
 
 ## Definitive tech stack guide
 

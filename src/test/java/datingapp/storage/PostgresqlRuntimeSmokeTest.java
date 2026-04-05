@@ -11,6 +11,8 @@ import datingapp.core.connection.ConnectionModels.Like;
 import datingapp.core.metrics.SwipeState.Session;
 import datingapp.core.testutil.TestUserFactory;
 import java.time.Instant;
+import java.util.LinkedHashSet;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -28,6 +30,9 @@ class PostgresqlRuntimeSmokeTest {
     private static final String DB_PASSWORD_PROPERTY = "datingapp.db.password";
     private static final String DB_PROFILE_PROPERTY = "datingapp.db.profile";
 
+    private final Set<UUID> createdUserIds = new LinkedHashSet<>();
+    private ServiceRegistry servicesUnderTest;
+
     @BeforeEach
     void setUp() {
         assumeTrue(isConfigured(), "PostgreSQL smoke test requires datingapp.pgtest.* system properties");
@@ -35,10 +40,13 @@ class PostgresqlRuntimeSmokeTest {
         DatabaseManager.resetInstance();
         System.clearProperty(DB_PROFILE_PROPERTY);
         System.setProperty(DB_PASSWORD_PROPERTY, System.getProperty(PASSWORD_PROPERTY));
+        createdUserIds.clear();
+        servicesUnderTest = null;
     }
 
     @AfterEach
     void tearDown() {
+        cleanupCreatedUsers();
         ApplicationStartup.reset();
         DatabaseManager.resetInstance();
         System.clearProperty(DB_PROFILE_PROPERTY);
@@ -72,10 +80,14 @@ class PostgresqlRuntimeSmokeTest {
         verifyRoundTripStorageFlows(services);
     }
 
-    private static void verifyRoundTripStorageFlows(ServiceRegistry services) {
+    private void verifyRoundTripStorageFlows(ServiceRegistry services) {
+
+        servicesUnderTest = services;
 
         var userA = TestUserFactory.createActiveUser(UUID.randomUUID(), "Postgres-A");
         var userB = TestUserFactory.createActiveUser(UUID.randomUUID(), "Postgres-B");
+        createdUserIds.add(userA.getId());
+        createdUserIds.add(userB.getId());
         services.getUserStorage().save(userA);
         services.getUserStorage().save(userB);
 
@@ -110,6 +122,16 @@ class PostgresqlRuntimeSmokeTest {
                 services.getAnalyticsStorage()
                         .getSessionAggregates(userA.getId())
                         .totalSessions());
+    }
+
+    private void cleanupCreatedUsers() {
+        if (servicesUnderTest == null) {
+            return;
+        }
+
+        createdUserIds.forEach(userId -> servicesUnderTest.getUserStorage().delete(userId));
+        createdUserIds.clear();
+        servicesUnderTest = null;
     }
 
     private static boolean isConfigured() {

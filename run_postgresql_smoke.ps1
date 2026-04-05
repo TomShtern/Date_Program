@@ -28,11 +28,18 @@ $env:DATING_APP_DB_URL = "jdbc:postgresql://localhost:$Port/$Database"
 $env:DATING_APP_DB_USERNAME = $Username
 $env:DATING_APP_DB_PASSWORD = $Password
 
+$mavenExitCode = 0
+
 try {
     & mvn @mavenArgs
+    $mavenExitCode = $LASTEXITCODE
 } finally {
     $env:DATING_APP_DB_DIALECT = $previousDialect
     $env:DATING_APP_DB_URL = $previousUrl
     $env:DATING_APP_DB_USERNAME = $previousUsername
     $env:DATING_APP_DB_PASSWORD = $previousPassword
+}
+
+if ($mavenExitCode -ne 0) {
+    exit $mavenExitCode
 }

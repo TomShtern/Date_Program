@@ -12,6 +12,11 @@ $dataDir = Join-Path $BaseDir 'data'
 $logFile = Join-Path $BaseDir 'postgres.log'
 $passwordFile = Join-Path $BaseDir 'superuser-password.txt'
 $pgVersionFile = Join-Path $dataDir 'PG_VERSION'
+$validatedDatabase = $Database.Trim()
+
+if ($validatedDatabase -notmatch '^[A-Za-z_][A-Za-z0-9_]*$') {
+    throw ('Database name must match ^[A-Za-z_][A-Za-z0-9_]*$: ' + $Database)
+}
 
 New-Item -ItemType Directory -Force -Path $BaseDir | Out-Null
 
@@ -35,16 +40,16 @@ if (-not (Test-PostgresReady -ProbePort $Port)) {
 $env:PGPASSWORD = $Password
 try {
     $databaseExistsOutput =
-        & psql "host=localhost port=$Port dbname=postgres user=$Superuser connect_timeout=5" -w -X -tAc "SELECT 1 FROM pg_database WHERE datname = '$Database'" 2>$null | Out-String
+        & psql "host=localhost port=$Port dbname=postgres user=$Superuser connect_timeout=5" -w -X -tAc "SELECT 1 FROM pg_database WHERE datname = '$validatedDatabase'" 2>$null | Out-String
     $databaseExists = $databaseExistsOutput.Trim()
     if ($databaseExists -ne '1') {
-        & createdb -h localhost -p $Port -U $Superuser $Database | Out-String | Write-Output
+        & createdb -h localhost -p $Port -U $Superuser $validatedDatabase | Out-String | Write-Output
     }
 } finally {
     Remove-Item Env:PGPASSWORD -ErrorAction SilentlyContinue
 }
 
 Write-Output "Local PostgreSQL ready at localhost:$Port"
-Write-Output "Database: $Database"
+Write-Output "Database: $validatedDatabase"
 Write-Output "Data directory: $dataDir"
 Write-Output "Log file: $logFile"
