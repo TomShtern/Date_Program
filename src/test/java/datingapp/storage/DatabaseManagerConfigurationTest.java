@@ -3,9 +3,9 @@ package datingapp.storage;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import java.lang.reflect.Method;
 import java.sql.Connection;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
@@ -54,6 +54,30 @@ class DatabaseManagerConfigurationTest {
     }
 
     @Test
+    @DisplayName("H2 URLs should ignore an unscoped environment password")
+    void h2UrlsIgnoreUnscopedEnvironmentPassword() {
+        String resolvedPassword = DatabaseManager.resolveExplicitPassword(
+                "jdbc:h2:./target/dbmanager-config-" + UUID.randomUUID(),
+                key -> null,
+                key -> "DATING_APP_DB_PASSWORD".equals(key) ? "datingapp" : null,
+                key -> "DATING_APP_DB_PASSWORD".equals(key) ? "datingapp" : null);
+
+        assertNull(resolvedPassword);
+    }
+
+    @Test
+    @DisplayName("PostgreSQL URLs should use environment password fallback")
+    void postgresqlUrlsUseEnvironmentPasswordFallback() {
+        String resolvedPassword = DatabaseManager.resolveExplicitPassword(
+                "jdbc:postgresql://localhost:5432/datingapp",
+                key -> null,
+                key -> "DATING_APP_DB_PASSWORD".equals(key) ? "datingapp" : null,
+                key -> "DATING_APP_DB_PASSWORD".equals(key) ? "datingapp" : null);
+
+        assertEquals("datingapp", resolvedPassword);
+    }
+
+    @Test
     @DisplayName("resolvePassword should use the provided JDBC URL snapshot")
     void resolvePasswordUsesProvidedJdbcUrlSnapshot() {
         DatabaseManager.setJdbcUrl("jdbc:h2:mem:dbmanager-config-global-" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1");
@@ -81,19 +105,19 @@ class DatabaseManagerConfigurationTest {
 
     @Test
     @DisplayName("dev profile should rewrite the implicit default file database path")
-    void devProfileRewritesImplicitDefaultFileDatabasePath() throws Exception {
+    void devProfileRewritesImplicitDefaultFileDatabasePath() {
         assertEquals("jdbc:h2:./data/dating-dev", invokeEffectiveJdbcUrl("jdbc:h2:./data/dating", "dev", null));
     }
 
     @Test
     @DisplayName("test profile should rewrite the implicit default file database path")
-    void testProfileRewritesImplicitDefaultFileDatabasePath() throws Exception {
+    void testProfileRewritesImplicitDefaultFileDatabasePath() {
         assertEquals("jdbc:h2:./data/dating-test", invokeEffectiveJdbcUrl("jdbc:h2:./data/dating", "test", null));
     }
 
     @Test
     @DisplayName("explicit local database paths should not be rewritten for dev profile")
-    void explicitLocalDatabasePathIsNotRewrittenForDevProfile() throws Exception {
+    void explicitLocalDatabasePathIsNotRewrittenForDevProfile() {
         String explicitUrl = "jdbc:h2:./target/dbmanager-config-explicit-" + UUID.randomUUID();
 
         assertEquals(explicitUrl, invokeEffectiveJdbcUrl(explicitUrl, "dev", null));
@@ -101,10 +125,19 @@ class DatabaseManagerConfigurationTest {
 
     @Test
     @DisplayName("implicit default database path should stay unchanged when an explicit password is configured")
-    void implicitDefaultDatabasePathStaysUnchangedWhenExplicitPasswordIsConfigured() throws Exception {
+    void implicitDefaultDatabasePathStaysUnchangedWhenExplicitPasswordIsConfigured() {
         assertEquals(
                 "jdbc:h2:./data/dating",
                 invokeEffectiveJdbcUrl("jdbc:h2:./data/dating", "dev", "super-secret-password"));
+    }
+
+    @Test
+    @DisplayName("postgresql JDBC URLs should not be rewritten for legacy H2 profiles")
+    void postgresqlJdbcUrlsAreNotRewrittenForLegacyProfiles() {
+        String postgresqlUrl = "jdbc:postgresql://localhost:5432/datingapp";
+
+        assertEquals(postgresqlUrl, invokeEffectiveJdbcUrl(postgresqlUrl, "dev", null));
+        assertEquals(postgresqlUrl, invokeEffectiveJdbcUrl(postgresqlUrl, "test", null));
     }
 
     @Test
@@ -117,28 +150,12 @@ class DatabaseManagerConfigurationTest {
         assertEquals("jdbc:h2:./data/dating", currentJdbcUrl());
     }
 
-    private static String invokeEffectiveJdbcUrl(String jdbcUrl, String profile, String explicitPassword)
-            throws Exception {
-        Method method =
-                DatabaseManager.class.getDeclaredMethod("resolveJdbcUrl", String.class, String.class, String.class);
-        method.setAccessible(true);
-        return (String) method.invoke(null, jdbcUrl, profile, explicitPassword);
+    private static String invokeEffectiveJdbcUrl(String jdbcUrl, String profile, String explicitPassword) {
+        return DatabaseManager.resolveJdbcUrl(jdbcUrl, profile, explicitPassword);
     }
 
     private static String invokeResolvedPassword(String explicitPassword, String profile, String jdbcUrl) {
-        try {
-            Method method = DatabaseManager.class.getDeclaredMethod(
-                    "resolvePassword", String.class, String.class, String.class);
-            method.setAccessible(true);
-            return (String) method.invoke(null, explicitPassword, profile, jdbcUrl);
-        } catch (java.lang.reflect.InvocationTargetException exception) {
-            if (exception.getCause() instanceof RuntimeException runtimeException) {
-                throw runtimeException;
-            }
-            throw new RuntimeException(exception);
-        } catch (ReflectiveOperationException exception) {
-            throw new RuntimeException(exception);
-        }
+        return DatabaseManager.resolvePassword(explicitPassword, profile, jdbcUrl);
     }
 
     private static String currentJdbcUrl() throws Exception {

@@ -1,4 +1,4 @@
-> 🚀 **VERIFIED & UPDATED: 2026-03-30**
+> 🚀 **VERIFIED & UPDATED: 2026-04-05**
 > This document merges the repo-wide rules from `.github/copilot-instructions.md`, the verified repo map from `CLAUDE.md`, and the workflow discipline from `AGENTS.md`.
 
 # QWEN.md — Merged Repo Guide
@@ -20,7 +20,7 @@ If any markdown guidance conflicts with the implementation, trust:
 ## 2. Verified environment
 
 - Windows 11
-- PowerShell 7.x
+- PowerShell 7.5.6
 - VS Code Insiders (sometimes IntelliJ)
 - Java 25 with preview enabled
 - JavaFX 25.0.2
@@ -30,10 +30,10 @@ If any markdown guidance conflicts with the implementation, trust:
 
 PowerShell note: when Maven uses a comma-separated `-Dtest=...,...` list, prefer `mvn --% ...`.
 
-## 3. Verified codebase snapshot (2026-03-30)
+## 3. Verified codebase snapshot (2026-04-05)
 
-- Java files: **320 total** (`147` main / `173` test)
-- Java LOC (`tokei src`, Java only): **93,412 total / 75,136 code / 13,289 blank / 4,987 comments**
+- Java files: **373 total** (`175` main / `198` test)
+- Java LOC (`tokei src`, Java only): **104,527 total / 84,743 code / 14,882 blank / 4,902 comments**
 
 ## 4. Architecture snapshot
 
@@ -64,8 +64,8 @@ datingapp/
     storage/{AccountCleanupStorage,AnalyticsStorage,CommunicationStorage,InteractionStorage,PageData,TrustSafetyStorage,UserStorage}.java
     workflow/{ProfileActivationPolicy,RelationshipWorkflowPolicy,WorkflowDecision}.java
   storage/
-    {DatabaseManager,DevDataSeeder,StorageFactory}.java
-    jdbi/{JdbiAccountCleanupStorage,JdbiConnectionStorage,JdbiMatchmakingStorage,JdbiMetricsStorage,JdbiTrustSafetyStorage,JdbiTypeCodecs,JdbiUserStorage}.java
+    {DatabaseDialect,DatabaseManager,DevDataSeeder,StorageFactory}.java
+    jdbi/{JdbiAccountCleanupStorage,JdbiConnectionStorage,JdbiMatchmakingStorage,JdbiMetricsStorage,JdbiTrustSafetyStorage,JdbiTypeCodecs,JdbiUserStorage,SqlDialectSupport}.java
     schema/{MigrationRunner,SchemaInitializer}.java
   ui/
     {DatingApp,ImageCache,LocalPhotoStore,NavigationService,UiAnimations,UiComponents,UiConstants,UiDialogs,UiFeedbackService,UiPreferencesStore,UiThemeService,UiUtils}.java
@@ -105,6 +105,7 @@ AppSession session = AppSession.getInstance();
 - Use `AppClock` as the repo time source: prefer `AppClock.now()` / `AppClock.today()`, or inject `AppClock.clock()` when a service intentionally works with a `Clock`
 - Use deterministic pair IDs via `generateId(UUID a, UUID b)`
 - Use injected `AppConfig` at runtime; reserve `AppConfig.defaults()` for bootstrap/composition/tests
+- Runtime PostgreSQL boot uses `StorageFactory.buildSqlDatabase(...)`; keep `buildH2(...)` / `buildInMemory(...)` for H2-backed compatibility and tests
 - Record-typed JDBI parameters should use `@BindMethods`, not `@BindBean`
 - Use `Locale.ENGLISH` for user-facing date formatters when month/day names are rendered
 - `RestApiServer` is loopback-only; do not assume external host access
@@ -120,6 +121,7 @@ AppSession session = AppSession.getInstance();
 - `UiAsyncTestSupport` complements `JavaFxTestSupport` for async UI tests.
 - `DevDataSeeder` is environment-gated (`DATING_APP_SEED_DATA=true`) and idempotent.
 - The candidates route in `RestApiServer` remains the explicit direct-read exception.
+- Local PostgreSQL validation is now supported through `PostgresqlRuntimeSmokeTest` plus `start_local_postgres.ps1`, `run_postgresql_smoke.ps1`, and `stop_local_postgres.ps1`; Docker is fallback-only when no local PostgreSQL instance is available.
 
 ## 8. Build, test, and quality commands
 
@@ -129,6 +131,10 @@ mvn javafx:run
 mvn test
 mvn -Ptest-output-verbose test
 mvn spotless:apply verify
+
+.\start_local_postgres.ps1
+.\run_postgresql_smoke.ps1
+.\stop_local_postgres.ps1
 ```
 
 `pom.xml` quality gates:
@@ -167,12 +173,15 @@ mvn spotless:apply verify
 
 - `src/main/java/datingapp/app/bootstrap/ApplicationStartup.java`
 - `src/main/java/datingapp/core/ServiceRegistry.java`
+- `src/main/java/datingapp/storage/DatabaseDialect.java`
+- `src/main/java/datingapp/storage/jdbi/SqlDialectSupport.java`
 - `src/main/java/datingapp/app/api/RestApiServer.java`
 - `src/main/java/datingapp/core/profile/LocationService.java`
 - `src/main/java/datingapp/ui/viewmodel/BaseViewModel.java`
 - `src/main/java/datingapp/ui/viewmodel/UiDataAdapters.java`
 - `src/test/java/datingapp/ui/JavaFxTestSupport.java`
 - `src/test/java/datingapp/app/api/RestApiTestFixture.java`
+- `src/test/java/datingapp/storage/PostgresqlRuntimeSmokeTest.java`
 
 ## Agent Changelog (append-only)
 ---AGENT-LOG-START---

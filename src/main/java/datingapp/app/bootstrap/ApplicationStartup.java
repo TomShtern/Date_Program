@@ -11,6 +11,7 @@ import com.fasterxml.jackson.databind.deser.std.StdDeserializer;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 import datingapp.core.AppConfig;
 import datingapp.core.AppSession;
+import datingapp.core.RuntimeEnvironment;
 import datingapp.core.ServiceRegistry;
 import datingapp.storage.DatabaseManager;
 import datingapp.storage.DevDataSeeder;
@@ -108,7 +109,7 @@ public final class ApplicationStartup {
         CleanupScheduler cleanupScheduler = null;
         try {
             initializedDbManager = DatabaseManager.getInstance();
-            ServiceRegistry initializedServices = StorageFactory.buildH2(initializedDbManager, config);
+            ServiceRegistry initializedServices = StorageFactory.buildSqlDatabase(initializedDbManager, config);
 
             dbManager = initializedDbManager;
             services = initializedServices;
@@ -193,9 +194,13 @@ public final class ApplicationStartup {
     }
 
     public static AppConfig fromJson(String json) {
+        return fromJson(json, RuntimeEnvironment::getEnv);
+    }
+
+    public static AppConfig fromJson(String json, UnaryOperator<String> envLookup) {
         AppConfig.Builder builder = AppConfig.builder();
         applyJsonConfig(builder, json);
-        applyEnvironmentOverrides(builder);
+        applyEnvironmentOverrides(builder, envLookup);
         return builder.build();
     }
 
@@ -271,7 +276,7 @@ public final class ApplicationStartup {
      * level are exposed.
      */
     private static void applyEnvironmentOverrides(AppConfig.Builder builder) {
-        applyEnvironmentOverrides(builder, System::getenv);
+        applyEnvironmentOverrides(builder, RuntimeEnvironment::getEnv);
     }
 
     static void applyEnvironmentOverrides(AppConfig.Builder builder, UnaryOperator<String> envLookup) {
@@ -287,6 +292,9 @@ public final class ApplicationStartup {
         applyEnvInt(envLookup, "CLEANUP_RETENTION_DAYS", builder::cleanupRetentionDays);
         applyEnvInt(envLookup, "MIN_AGE", builder::minAge);
         applyEnvInt(envLookup, "MAX_AGE", builder::maxAge);
+        applyEnvString(envLookup, "DB_DIALECT", builder::databaseDialect);
+        applyEnvString(envLookup, "DB_URL", builder::databaseUrl);
+        applyEnvString(envLookup, "DB_USERNAME", builder::databaseUsername);
 
         String tz = envLookup.apply(ENV_PREFIX + "USER_TIME_ZONE");
         if (tz != null && !tz.isBlank()) {
@@ -315,9 +323,17 @@ public final class ApplicationStartup {
         }
     }
 
+    private static void applyEnvString(
+            UnaryOperator<String> envLookup, String suffix, java.util.function.Consumer<String> setter) {
+        String value = envLookup.apply(ENV_PREFIX + suffix);
+        if (value != null && !value.isBlank()) {
+            setter.accept(value);
+        }
+    }
+
     private static Path resolveConfigPath() {
         Path propertyOverride = pathOrNull(System.getProperty(CONFIG_OVERRIDE_PROPERTY));
-        Path envOverride = pathOrNull(System.getenv(CONFIG_OVERRIDE_ENV));
+        Path envOverride = pathOrNull(RuntimeEnvironment.getEnv(CONFIG_OVERRIDE_ENV));
         Path appRelative = Path.of(CONFIG_FILE);
         Path fallback = Path.of("app-config.json");
 

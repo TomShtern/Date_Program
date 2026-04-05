@@ -279,15 +279,40 @@ class AppConfigValidatorTest {
     }
 
     @Test
-    @DisplayName("validateStorage accepts valid query timeout")
-    void validateStorageAcceptsValidQueryTimeout() {
-        assertDoesNotThrow(() -> AppConfigValidator.validateStorage(30));
+    @DisplayName("validateStorage accepts supported database settings")
+    void validateStorageAcceptsSupportedDatabaseSettings() {
+        assertDoesNotThrow(() -> AppConfigValidator.validateStorage(
+                "POSTGRESQL", "jdbc:postgresql://localhost:5432/datingapp", "datingapp", 30));
+    }
+
+    @Test
+    @DisplayName("validateStorage rejects unsupported database dialect")
+    void validateStorageRejectsUnsupportedDatabaseDialect() {
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> AppConfigValidator.validateStorage("sqlite", "jdbc:sqlite::memory:", "datingapp", 30));
+    }
+
+    @Test
+    @DisplayName("validateStorage rejects blank database URL")
+    void validateStorageRejectsBlankDatabaseUrl() {
+        assertThrows(IllegalArgumentException.class, () -> AppConfigValidator.validateStorage("H2", " ", "sa", 30));
+    }
+
+    @Test
+    @DisplayName("validateStorage rejects blank database username")
+    void validateStorageRejectsBlankDatabaseUsername() {
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> AppConfigValidator.validateStorage("H2", "jdbc:h2:./data/dating", " ", 30));
     }
 
     @Test
     @DisplayName("validateStorage rejects out-of-range query timeout")
     void validateStorageRejectsInvalidQueryTimeout() {
-        assertThrows(IllegalArgumentException.class, () -> AppConfigValidator.validateStorage(0));
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> AppConfigValidator.validateStorage("H2", "jdbc:h2:./data/dating", "sa", 0));
     }
 
     @Test

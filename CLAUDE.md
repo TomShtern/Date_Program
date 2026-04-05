@@ -1,4 +1,4 @@
-> 🚀 **VERIFIED & UPDATED: 2026-03-31**
+> 🚀 **VERIFIED & UPDATED: 2026-04-05**
 > This document has been refreshed against the current codebase and build output as of this date.
 
 # CLAUDE.md
@@ -14,15 +14,15 @@ Second-level guidance for AI coding agents working in this repository.
 ## Environment
 
 - Windows 11
-- PowerShell 7.x
+- PowerShell 7.5.6
 - VS Code Insiders (sometimes IntelliJ)
 - Java 25 + JavaFX 25.0.2
 - Maven
 
-## Verified Source Snapshot (2026-03-31)
+## Verified Source Snapshot (2026-04-05)
 
-- Java files: **326 total** (`152` main / `174` test)
-- Java LOC (`tokei src`, Java only): **96,157 total / 77,493 code / 13,642 blank / 5,022 comments**
+- Java files: **373 total** (`175` main / `198` test)
+- Java LOC (`tokei src`, Java only): **104,527 total / 84,743 code / 14,882 blank / 4,902 comments**
 
 ## Architecture (code-verified)
 
@@ -53,8 +53,8 @@ datingapp/
     storage/{AccountCleanupStorage,AnalyticsStorage,CommunicationStorage,InteractionStorage,PageData,TrustSafetyStorage,UserStorage}.java
     workflow/{ProfileActivationPolicy,RelationshipWorkflowPolicy,WorkflowDecision}.java
   storage/
-    {DatabaseManager,DevDataSeeder,StorageFactory}.java
-    jdbi/{JdbiAccountCleanupStorage,JdbiConnectionStorage,JdbiMatchmakingStorage,JdbiMetricsStorage,JdbiTrustSafetyStorage,JdbiTypeCodecs,JdbiUserStorage}.java
+    {DatabaseDialect,DatabaseManager,DevDataSeeder,StorageFactory}.java
+    jdbi/{JdbiAccountCleanupStorage,JdbiConnectionStorage,JdbiMatchmakingStorage,JdbiMetricsStorage,JdbiTrustSafetyStorage,JdbiTypeCodecs,JdbiUserStorage,SqlDialectSupport}.java
     schema/{MigrationRunner,SchemaInitializer}.java
   ui/
     {DatingApp,ImageCache,LocalPhotoStore,NavigationService,UiAnimations,UiComponents,UiConstants,UiDialogs,UiFeedbackService,UiPreferencesStore,UiThemeService,UiUtils}.java
@@ -74,6 +74,7 @@ datingapp/
 | Pair IDs                | `a + "_" + b`                                                          | deterministic `generateId(a, b)`                                                                                           |
 | Event publication       | null/no-op bus in production paths                                     | real injected `AppEventBus`                                                                                                |
 | Runtime config          | `AppConfig.defaults()` in service code                                 | injected `AppConfig` via `ServiceRegistry`                                                                                 |
+| Runtime storage wiring  | assume `StorageFactory.buildH2(...)` is the production path            | use `StorageFactory.buildSqlDatabase(...)` for runtime; keep `buildH2(...)` / `buildInMemory(...)` for H2-backed tests     |
 | JDBI record binding     | `@BindBean` on records                                                 | `@BindMethods` on records                                                                                                  |
 | Date formatting         | locale-implicit month/day names                                        | `Locale.ENGLISH` for user-facing month/day names                                                                           |
 | ViewModel threading     | ad-hoc `Thread.ofVirtual()` / `Platform.runLater()` in normal UI flows | `BaseViewModel` + `ViewModelAsyncScope` + dispatcher abstractions                                                          |
@@ -141,6 +142,9 @@ The current deliberate direct-read exception remains the candidates route in `Re
 - `ConnectionService.getConversationPreview()` provides direct single-conversation lookup without page scanning.
 - `ProfileService` has a narrow `ProfileService(UserStorage)` constructor (truthful) and a wide compatibility overload.
 - `StorageFactory` is split into explicit private assembly stages and internal records.
+- `StorageFactory.buildSqlDatabase(...)` is the production/runtime composition path; `buildH2(...)` and `buildInMemory(...)` remain the H2-only compatibility/test paths.
+- `DatabaseManager` now accepts runtime `AppConfig.StorageConfig` (dialect/url/username/query timeout) and applies PostgreSQL `statement_timeout` instead of H2 `QUERY_TIMEOUT` when appropriate.
+- `DatabaseDialect` and `SqlDialectSupport` centralize the H2/PostgreSQL runtime and SQL divergence points.
 - `ServiceRegistry.Builder` supports an explicit `locationService(...)` setter with a compatibility fallback.
 - `VerificationUseCases` owns email/phone verification flows so adapters do not mutate verification state directly.
 - All current production ViewModels extend `BaseViewModel`.
@@ -154,6 +158,7 @@ The current deliberate direct-read exception remains the candidates route in `Re
 - `DatabaseManager.shutdown()` resets its `initialized` flag; `resetInstance()` calls `shutdown()` first.
 - `DefaultDailyPickService` requires only `DailyLimitService`, `MatchingService`, and `AppConfig` — no storage dependencies.
 - ViewModel `setErrorHandler` methods delegate to `BaseViewModel.setErrorSink()` via the `notifyError(msg, throwable)` dispatch path.
+- `PostgresqlRuntimeSmokeTest` is the local-first PostgreSQL runtime validation seam; `start_local_postgres.ps1`, `run_postgresql_smoke.ps1`, and `stop_local_postgres.ps1` support project-local PostgreSQL validation without Docker.
 
 ## Build & Quality Commands
 
@@ -163,6 +168,11 @@ mvn javafx:run
 mvn test
 mvn -Ptest-output-verbose test
 mvn spotless:apply verify
+
+# Optional local PostgreSQL runtime validation
+.\start_local_postgres.ps1
+.\run_postgresql_smoke.ps1
+.\stop_local_postgres.ps1
 ```
 
 When selecting multiple tests from PowerShell, prefer `mvn --% ...` so comma-separated `-Dtest=` values are passed through intact.
@@ -180,6 +190,8 @@ When selecting multiple tests from PowerShell, prefer `mvn --% ...` so comma-sep
 
 - `src/main/java/datingapp/app/bootstrap/ApplicationStartup.java` — bootstrap, config loading, and Jackson mix-in pattern
 - `src/main/java/datingapp/core/ServiceRegistry.java` — central service and use-case wiring
+- `src/main/java/datingapp/storage/DatabaseDialect.java` — runtime dialect detection and selection
+- `src/main/java/datingapp/storage/jdbi/SqlDialectSupport.java` — dialect-specific upsert and duration SQL generation
 - `src/main/java/datingapp/app/api/RestApiServer.java` and `RestApiDtos.java` — REST route and DTO patterns
 - `src/main/java/datingapp/core/profile/LocationService.java` — shared location dataset and formatting rules
 - `src/main/java/datingapp/ui/viewmodel/BaseViewModel.java` — shared ViewModel lifecycle shell
@@ -187,6 +199,7 @@ When selecting multiple tests from PowerShell, prefer `mvn --% ...` so comma-sep
 - `src/test/java/datingapp/ui/JavaFxTestSupport.java` and `src/test/java/datingapp/ui/async/UiAsyncTestSupport.java` — shared UI test helpers
 - `src/test/java/datingapp/app/api/RestApiTestFixture.java` — shared REST/API test graph builder
 - `src/test/java/datingapp/ui/viewmodel/ViewModelFactoryTest.java` — factory caching, lifecycle, and session-binding contracts
+- `src/test/java/datingapp/storage/PostgresqlRuntimeSmokeTest.java` — live local PostgreSQL smoke validation for the runtime storage path
 
 ## Keep these out of new work
 

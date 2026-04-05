@@ -82,7 +82,7 @@ Use the lower-level docs only to explain or operationalize what the code already
 ## Environment defaults
 
 - Windows 11
-- PowerShell 7.6
+- PowerShell 7.5.6
 - VS Code Insiders (sometimes IntelliJ)
 - Java 25 with preview enabled
 - JavaFX 25.0.2
@@ -116,6 +116,7 @@ Use PowerShell-friendly commands. When Maven test selection uses a comma-separat
   - `User.Gender`, `User.UserState`, `User.VerificationMethod`
   - `Match.MatchState`, `Match.MatchArchiveReason`
 - Use injected `AppConfig` in runtime code; keep `AppConfig.defaults()` at bootstrap/composition/test boundaries.
+- PostgreSQL runtime support now goes through `StorageFactory.buildSqlDatabase(...)`; keep `buildH2(...)` and `buildInMemory(...)` as the H2-backed compatibility/test paths.
 - Record-typed JDBI parameters should use `@BindMethods`, not `@BindBean`.
 - ViewModels should use `BaseViewModel`, `ui/async/*`, and `UiDataAdapters` instead of ad-hoc threading or direct storage coupling.
 - When behavior is config-driven, update all config surfaces together: `AppConfig`, `AppConfigValidator`, runtime config files under `config/`, and the relevant config loader/tests.
@@ -129,6 +130,7 @@ Use PowerShell-friendly commands. When Maven test selection uses a comma-separat
 - If one search/exploration helper path fails because of model or environment instability, switch immediately to a similar available agent instead of retrying the same failing path.
 - Make the smallest correct change first.
 - Avoid unrelated refactors while implementing a task.
+- Prefer validating PostgreSQL changes against an existing local PostgreSQL instance first; use Docker only as an optional disposable fallback when no local PostgreSQL server is available.
 
 ## Planning, review, and meta-workflow defaults
 
@@ -163,6 +165,11 @@ mvn test
 
 # Final repo-wide quality gate
 mvn spotless:apply verify
+
+# Optional local PostgreSQL runtime validation
+.\start_local_postgres.ps1
+.\run_postgresql_smoke.ps1
+.\stop_local_postgres.ps1
 ```
 
 ## Read next

@@ -1,4 +1,4 @@
-# PostgreSQL Runtime Migration Implementation Plan
+# PostgreSQL Runtime Migration Status and Implementation Record
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -10,9 +10,18 @@
 
 **Source of truth used for this plan:** `pom.xml`, `config/app-config.json`, `src/main/java/**`, and `src/test/java/**` only.
 
+**Validation environment note:** Prefer validating against an existing local PostgreSQL instance first when one is available. Treat Docker as an optional disposable fallback for future/live validation work when no local PostgreSQL server or configured PostgreSQL profile exists.
+
+## 2026-04-05 status update
+
+- The implementation described by this document has now been completed in source across the runtime config, bootstrap, migration, and JDBI SQL seams.
+- Local PostgreSQL validation has been completed on this machine using a project-local PostgreSQL cluster and `PostgresqlRuntimeSmokeTest` against `jdbc:postgresql://localhost:55432/datingapp`.
+- Docker is **not** required for the normal local validation path in this repository; it remains an optional future fallback when a local PostgreSQL server is unavailable.
+- The remaining work for this topic is limited to optional ergonomics and future enhancement, not core PostgreSQL-runtime correctness.
+
 ---
 
-## Source-backed current state
+## Historical baseline at planning time
 
 - `pom.xml` includes `com.h2database:h2` and does **not** include a PostgreSQL JDBC dependency.
 - `src/main/java/datingapp/storage/DatabaseManager.java` hard-codes H2 JDBC defaults (`jdbc:h2:./data/dating`, `...-dev`, `...-test`) and H2-specific URL/profile/password behavior.
@@ -250,6 +259,7 @@ Expected:
 - Do **not** replace JDBI or HikariCP.
 - Do **not** convert the Java-embedded schema system into external SQL resources unless implementation discovers that the current Java-based approach becomes unworkable.
 - Do **not** commit credentials or assume a live PostgreSQL server exists unless one is actually configured during implementation.
+- Do **not** require Docker for normal development validation when a local PostgreSQL instance is already available; Docker should remain an optional future fallback, not a mandatory day-to-day prerequisite.
 
 ## Self-review
 

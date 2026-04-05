@@ -11,8 +11,10 @@ import datingapp.core.profile.MatchPreferences.Lifestyle;
 import datingapp.core.profile.MatchPreferences.PacePreferences;
 import datingapp.core.storage.PageData;
 import datingapp.core.storage.UserStorage;
+import datingapp.storage.DatabaseDialect;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Types;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -33,8 +35,6 @@ import org.jdbi.v3.core.mapper.RowMapper;
 import org.jdbi.v3.core.statement.StatementContext;
 import org.jdbi.v3.sqlobject.config.RegisterRowMapper;
 import org.jdbi.v3.sqlobject.customizer.Bind;
-import org.jdbi.v3.sqlobject.customizer.BindBean;
-import org.jdbi.v3.sqlobject.customizer.BindMethods;
 import org.jdbi.v3.sqlobject.statement.SqlQuery;
 import org.jdbi.v3.sqlobject.statement.SqlUpdate;
 
@@ -43,12 +43,29 @@ public final class JdbiUserStorage implements UserStorage {
 
     private static final int MAX_CACHE_SIZE = 500;
     private static final Duration CACHE_TTL = Duration.ofMinutes(5);
+    private static final String AUTHOR_ID_COLUMN = "author_id";
+    private static final String SUBJECT_ID_COLUMN = "subject_id";
+    private static final String CONTENT_BIND = "content";
+    private static final String CREATED_AT_BIND = "createdAt";
+    private static final String UPDATED_AT_BIND = "updatedAt";
+    private static final String DELETED_AT_BIND = "deletedAt";
+    private static final String CREATED_AT_COLUMN = "created_at";
+    private static final String UPDATED_AT_COLUMN = "updated_at";
+    private static final String DELETED_AT_COLUMN = "deleted_at";
     private static final String GENDER_COLUMN = "gender";
+    private static final String STATE_COLUMN = "state";
+    private static final String SMOKING_COLUMN = "smoking";
+    private static final String DRINKING_COLUMN = "drinking";
+    private static final String EDUCATION_COLUMN = "education";
+    private static final String EMAIL_COLUMN = "email";
+    private static final String PHONE_COLUMN = "phone";
 
     private final Jdbi jdbi;
     private final Dao dao;
     private final NormalizedProfileRepository normalizedProfileRepository;
     private final NormalizedProfileHydrator normalizedProfileHydrator;
+    private final String userUpsertSql;
+    private final String profileNoteUpsertSql;
     private final Map<UUID, CacheEntry<User>> userCache = new LinkedHashMap<>(16, 0.75f, true);
 
     enum NormalizedGroup {
@@ -69,6 +86,9 @@ public final class JdbiUserStorage implements UserStorage {
         this.dao = jdbi.onDemand(Dao.class);
         this.normalizedProfileRepository = new NormalizedProfileRepository(jdbi);
         this.normalizedProfileHydrator = new NormalizedProfileHydrator(new DealbreakerAssembler());
+        DatabaseDialect dialect = detectDialect(jdbi);
+        this.userUpsertSql = buildUserUpsertSql(dialect);
+        this.profileNoteUpsertSql = buildProfileNoteUpsertSql(dialect);
     }
 
     /** Clears the user read cache. Primarily for tests. */
@@ -204,7 +224,17 @@ public final class JdbiUserStorage implements UserStorage {
 
     @Override
     public void saveProfileNote(ProfileNote note) {
-        dao.saveProfileNote(note);
+        jdbi.useHandle(handle -> {
+            try (var update = handle.createUpdate(profileNoteUpsertSql)) {
+                update.bind("authorId", note.authorId())
+                        .bind("subjectId", note.subjectId())
+                        .bind(CONTENT_BIND, note.content())
+                        .bind(CREATED_AT_BIND, note.createdAt())
+                        .bind(UPDATED_AT_BIND, note.updatedAt())
+                        .bindNull(DELETED_AT_BIND, Types.TIMESTAMP)
+                        .execute();
+            }
+        });
     }
 
     @Override
@@ -357,7 +387,9 @@ public final class JdbiUserStorage implements UserStorage {
     }
 
     private void saveWithHandle(Handle handle, User user) {
-        handle.attach(Dao.class).save(new UserSqlBindings(user));
+        try (var update = handle.createUpdate(userUpsertSql)) {
+            update.bindBean(new UserSqlBindings(user)).execute();
+        }
         normalizedProfileRepository.saveNormalizedProfileData(handle, user);
     }
 
@@ -419,31 +451,6 @@ public final class JdbiUserStorage implements UserStorage {
     @RegisterRowMapper(ProfileNoteMapper.class)
     private interface Dao {
 
-        @SqlUpdate("""
-                MERGE INTO users (
-                    id, name, bio, birth_date, gender, lat, lon,
-                    has_location_set, max_distance_km, min_age, max_age, state, created_at,
-                    updated_at, smoking, drinking, wants_kids, looking_for, education,
-                    height_cm, db_min_height_cm, db_max_height_cm, db_max_age_diff,
-                    email, phone, is_verified, verification_method,
-                    verification_code, verification_sent_at, verified_at,
-                    pace_messaging_frequency, pace_time_to_first_date,
-                    pace_communication_style, pace_depth_preference, deleted_at
-                ) KEY (id) VALUES (
-                    :id, :name, :bio, :birthDate, :gender,
-                    :lat, :lon, :hasLocationSet, :maxDistanceKm, :minAge, :maxAge,
-                    :state, :createdAt, :updatedAt,
-                    :smoking, :drinking, :wantsKids, :lookingFor,
-                    :education, :heightCm,
-                    :dealbreakerMinHeightCm, :dealbreakerMaxHeightCm, :dealbreakerMaxAgeDiff,
-                    :email, :phone, :verified, :verificationMethod,
-                    :verificationCode, :verificationSentAt, :verifiedAt,
-                    :paceMessagingFrequency, :paceTimeToFirstDate,
-                    :paceCommunicationStyle, :paceDepthPreference, :deletedAt
-                )
-                """)
-        void save(@BindBean UserSqlBindings helper);
-
         @SqlQuery("SELECT * FROM users WHERE id = :id AND deleted_at IS NULL")
         Optional<User> get(@Bind("id") UUID id);
 
@@ -476,13 +483,6 @@ public final class JdbiUserStorage implements UserStorage {
 
         @SqlUpdate("DELETE FROM users WHERE deleted_at IS NOT NULL AND deleted_at < :threshold")
         int purgeDeletedBefore(@Bind("threshold") Instant threshold);
-
-        @SqlUpdate("""
-                MERGE INTO profile_notes (author_id, subject_id, content, created_at, updated_at, deleted_at)
-                KEY (author_id, subject_id)
-                VALUES (:authorId, :subjectId, :content, :createdAt, :updatedAt, NULL)
-                """)
-        void saveProfileNote(@BindMethods ProfileNote note);
 
         @SqlQuery("""
                 SELECT author_id, subject_id, content, created_at, updated_at
@@ -520,7 +520,7 @@ public final class JdbiUserStorage implements UserStorage {
             User user = User.StorageBuilder.create(
                             JdbiTypeCodecs.SqlRowReaders.readUuid(rs, "id"),
                             rs.getString("name"),
-                            JdbiTypeCodecs.SqlRowReaders.readInstant(rs, "created_at"))
+                            JdbiTypeCodecs.SqlRowReaders.readInstant(rs, CREATED_AT_COLUMN))
                     .bio(rs.getString("bio"))
                     .birthDate(JdbiTypeCodecs.SqlRowReaders.readLocalDate(rs, "birth_date"))
                     .gender(JdbiTypeCodecs.SqlRowReaders.readEnum(rs, GENDER_COLUMN, Gender.class))
@@ -528,16 +528,16 @@ public final class JdbiUserStorage implements UserStorage {
                     .hasLocationSet(hasLocationSet)
                     .maxDistanceKm(rs.getInt("max_distance_km"))
                     .ageRange(rs.getInt("min_age"), rs.getInt("max_age"))
-                    .state(JdbiTypeCodecs.SqlRowReaders.readEnum(rs, "state", UserState.class))
-                    .updatedAt(JdbiTypeCodecs.SqlRowReaders.readInstant(rs, "updated_at"))
-                    .smoking(JdbiTypeCodecs.SqlRowReaders.readEnum(rs, "smoking", Lifestyle.Smoking.class))
-                    .drinking(JdbiTypeCodecs.SqlRowReaders.readEnum(rs, "drinking", Lifestyle.Drinking.class))
+                    .state(JdbiTypeCodecs.SqlRowReaders.readEnum(rs, STATE_COLUMN, UserState.class))
+                    .updatedAt(JdbiTypeCodecs.SqlRowReaders.readInstant(rs, UPDATED_AT_COLUMN))
+                    .smoking(JdbiTypeCodecs.SqlRowReaders.readEnum(rs, SMOKING_COLUMN, Lifestyle.Smoking.class))
+                    .drinking(JdbiTypeCodecs.SqlRowReaders.readEnum(rs, DRINKING_COLUMN, Lifestyle.Drinking.class))
                     .wantsKids(JdbiTypeCodecs.SqlRowReaders.readEnum(rs, "wants_kids", Lifestyle.WantsKids.class))
                     .lookingFor(JdbiTypeCodecs.SqlRowReaders.readEnum(rs, "looking_for", Lifestyle.LookingFor.class))
-                    .education(JdbiTypeCodecs.SqlRowReaders.readEnum(rs, "education", Lifestyle.Education.class))
+                    .education(JdbiTypeCodecs.SqlRowReaders.readEnum(rs, EDUCATION_COLUMN, Lifestyle.Education.class))
                     .heightCm(JdbiTypeCodecs.SqlRowReaders.readInteger(rs, "height_cm"))
-                    .email(rs.getString("email"))
-                    .phone(rs.getString("phone"))
+                    .email(rs.getString(EMAIL_COLUMN))
+                    .phone(rs.getString(PHONE_COLUMN))
                     .verified(rs.getObject("is_verified", Boolean.class))
                     .verificationMethod(
                             JdbiTypeCodecs.SqlRowReaders.readEnum(rs, "verification_method", VerificationMethod.class))
@@ -545,7 +545,7 @@ public final class JdbiUserStorage implements UserStorage {
                     .verificationSentAt(JdbiTypeCodecs.SqlRowReaders.readInstant(rs, "verification_sent_at"))
                     .verifiedAt(JdbiTypeCodecs.SqlRowReaders.readInstant(rs, "verified_at"))
                     .pacePreferences(readPacePreferences(rs))
-                    .deletedAt(JdbiTypeCodecs.SqlRowReaders.readInstant(rs, "deleted_at"))
+                    .deletedAt(JdbiTypeCodecs.SqlRowReaders.readInstant(rs, DELETED_AT_COLUMN))
                     .build();
 
             Dealbreakers dealbreakers = readDealbreakers(rs);
@@ -592,11 +592,11 @@ public final class JdbiUserStorage implements UserStorage {
         @Override
         public ProfileNote map(ResultSet rs, StatementContext ctx) throws SQLException {
             return new ProfileNote(
-                    JdbiTypeCodecs.SqlRowReaders.readUuid(rs, "author_id"),
-                    JdbiTypeCodecs.SqlRowReaders.readUuid(rs, "subject_id"),
-                    rs.getString("content"),
-                    JdbiTypeCodecs.SqlRowReaders.readInstant(rs, "created_at"),
-                    JdbiTypeCodecs.SqlRowReaders.readInstant(rs, "updated_at"));
+                    JdbiTypeCodecs.SqlRowReaders.readUuid(rs, AUTHOR_ID_COLUMN),
+                    JdbiTypeCodecs.SqlRowReaders.readUuid(rs, SUBJECT_ID_COLUMN),
+                    rs.getString(CONTENT_BIND),
+                    JdbiTypeCodecs.SqlRowReaders.readInstant(rs, CREATED_AT_COLUMN),
+                    JdbiTypeCodecs.SqlRowReaders.readInstant(rs, UPDATED_AT_COLUMN));
         }
     }
 
@@ -762,5 +762,73 @@ public final class JdbiUserStorage implements UserStorage {
         public Instant getDeletedAt() {
             return user.getDeletedAt();
         }
+    }
+
+    private static DatabaseDialect detectDialect(Jdbi jdbi) {
+        return jdbi.withHandle(handle -> {
+            try {
+                return DatabaseDialect.fromDatabaseProductName(
+                        handle.getConnection().getMetaData().getDatabaseProductName());
+            } catch (SQLException e) {
+                throw new IllegalStateException("Failed to detect database dialect", e);
+            }
+        });
+    }
+
+    private static String buildUserUpsertSql(DatabaseDialect dialect) {
+        return SqlDialectSupport.upsertSql(
+                dialect,
+                "users",
+                List.of(
+                        new SqlDialectSupport.ColumnBinding("id", "id"),
+                        new SqlDialectSupport.ColumnBinding("name", "name"),
+                        new SqlDialectSupport.ColumnBinding("bio", "bio"),
+                        new SqlDialectSupport.ColumnBinding("birth_date", "birthDate"),
+                        new SqlDialectSupport.ColumnBinding(GENDER_COLUMN, GENDER_COLUMN),
+                        new SqlDialectSupport.ColumnBinding("lat", "lat"),
+                        new SqlDialectSupport.ColumnBinding("lon", "lon"),
+                        new SqlDialectSupport.ColumnBinding("has_location_set", "hasLocationSet"),
+                        new SqlDialectSupport.ColumnBinding("max_distance_km", "maxDistanceKm"),
+                        new SqlDialectSupport.ColumnBinding("min_age", "minAge"),
+                        new SqlDialectSupport.ColumnBinding("max_age", "maxAge"),
+                        new SqlDialectSupport.ColumnBinding(STATE_COLUMN, STATE_COLUMN),
+                        new SqlDialectSupport.ColumnBinding(CREATED_AT_COLUMN, CREATED_AT_BIND),
+                        new SqlDialectSupport.ColumnBinding(UPDATED_AT_COLUMN, UPDATED_AT_BIND),
+                        new SqlDialectSupport.ColumnBinding(SMOKING_COLUMN, SMOKING_COLUMN),
+                        new SqlDialectSupport.ColumnBinding(DRINKING_COLUMN, DRINKING_COLUMN),
+                        new SqlDialectSupport.ColumnBinding("wants_kids", "wantsKids"),
+                        new SqlDialectSupport.ColumnBinding("looking_for", "lookingFor"),
+                        new SqlDialectSupport.ColumnBinding(EDUCATION_COLUMN, EDUCATION_COLUMN),
+                        new SqlDialectSupport.ColumnBinding("height_cm", "heightCm"),
+                        new SqlDialectSupport.ColumnBinding("db_min_height_cm", "dealbreakerMinHeightCm"),
+                        new SqlDialectSupport.ColumnBinding("db_max_height_cm", "dealbreakerMaxHeightCm"),
+                        new SqlDialectSupport.ColumnBinding("db_max_age_diff", "dealbreakerMaxAgeDiff"),
+                        new SqlDialectSupport.ColumnBinding(EMAIL_COLUMN, EMAIL_COLUMN),
+                        new SqlDialectSupport.ColumnBinding(PHONE_COLUMN, PHONE_COLUMN),
+                        new SqlDialectSupport.ColumnBinding("is_verified", "verified"),
+                        new SqlDialectSupport.ColumnBinding("verification_method", "verificationMethod"),
+                        new SqlDialectSupport.ColumnBinding("verification_code", "verificationCode"),
+                        new SqlDialectSupport.ColumnBinding("verification_sent_at", "verificationSentAt"),
+                        new SqlDialectSupport.ColumnBinding("verified_at", "verifiedAt"),
+                        new SqlDialectSupport.ColumnBinding("pace_messaging_frequency", "paceMessagingFrequency"),
+                        new SqlDialectSupport.ColumnBinding("pace_time_to_first_date", "paceTimeToFirstDate"),
+                        new SqlDialectSupport.ColumnBinding("pace_communication_style", "paceCommunicationStyle"),
+                        new SqlDialectSupport.ColumnBinding("pace_depth_preference", "paceDepthPreference"),
+                        new SqlDialectSupport.ColumnBinding(DELETED_AT_COLUMN, DELETED_AT_BIND)),
+                List.of("id"));
+    }
+
+    private static String buildProfileNoteUpsertSql(DatabaseDialect dialect) {
+        return SqlDialectSupport.upsertSql(
+                dialect,
+                "profile_notes",
+                List.of(
+                        new SqlDialectSupport.ColumnBinding(AUTHOR_ID_COLUMN, "authorId"),
+                        new SqlDialectSupport.ColumnBinding(SUBJECT_ID_COLUMN, "subjectId"),
+                        new SqlDialectSupport.ColumnBinding(CONTENT_BIND, CONTENT_BIND),
+                        new SqlDialectSupport.ColumnBinding(CREATED_AT_COLUMN, CREATED_AT_BIND),
+                        new SqlDialectSupport.ColumnBinding(UPDATED_AT_COLUMN, UPDATED_AT_BIND),
+                        new SqlDialectSupport.ColumnBinding(DELETED_AT_COLUMN, DELETED_AT_BIND)),
+                List.of(AUTHOR_ID_COLUMN, SUBJECT_ID_COLUMN));
     }
 }

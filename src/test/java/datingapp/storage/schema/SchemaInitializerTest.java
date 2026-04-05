@@ -232,6 +232,12 @@ class SchemaInitializerTest {
         }
 
         @Test
+        @DisplayName("should recognize PostgreSQL missing table SQL state as not applied")
+        void postgresqlMissingSchemaVersionStateIsNotApplied() throws Exception {
+            assertTrue(invokeIsMissingTable(new SQLException("missing table", "42P01")));
+        }
+
+        @Test
         @DisplayName("should add foreign keys and cascade deletes when upgrading a legacy database")
         void legacyDatabaseMigrationAddsForeignKeysAndCascadesOnDelete() throws SQLException {
             try (Statement stmt = connection.createStatement()) {
@@ -646,5 +652,11 @@ class SchemaInitializerTest {
             }
         }
         return columns;
+    }
+
+    private boolean invokeIsMissingTable(SQLException exception) throws Exception {
+        var method = MigrationRunner.class.getDeclaredMethod("isMissingTable", SQLException.class);
+        method.setAccessible(true);
+        return (boolean) method.invoke(null, exception);
     }
 }

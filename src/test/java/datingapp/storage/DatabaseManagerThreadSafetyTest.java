@@ -33,8 +33,8 @@ class DatabaseManagerThreadSafetyTest {
     void setup() {
         System.clearProperty(PROFILE_PROPERTY);
         System.setProperty(PROFILE_PROPERTY, "test");
-        DatabaseManager.setJdbcUrl("jdbc:h2:mem:thread_safety_test_" + UUID.randomUUID());
         DatabaseManager.resetInstance();
+        DatabaseManager.setJdbcUrl("jdbc:h2:mem:thread_safety_test_" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1");
     }
 
     @AfterEach

@@ -5,6 +5,7 @@ import datingapp.core.model.ProfileNote;
 import datingapp.core.model.User;
 import datingapp.core.profile.MatchPreferences.Interest;
 import java.time.ZoneId;
+import java.util.Locale;
 import java.util.Objects;
 
 /** Shared validation rules for {@link AppConfig} sections. */
@@ -192,7 +193,11 @@ final class AppConfigValidator {
         requireNonNegative("standoutActivityWeight", standoutActivityWeight);
     }
 
-    static void validateStorage(int queryTimeoutSeconds) {
+    static void validateStorage(
+            String databaseDialect, String databaseUrl, String databaseUsername, int queryTimeoutSeconds) {
+        requireSupportedDatabaseDialect(databaseDialect);
+        requireJdbcUrl(databaseUrl);
+        requireNonBlank("databaseUsername", databaseUsername);
         requireInRange(queryTimeoutSeconds, 1, 600, "queryTimeoutSeconds");
     }
 
@@ -255,6 +260,28 @@ final class AppConfigValidator {
     private static void requireNonNegative(String name, double value) {
         if (value < 0) {
             throw new IllegalArgumentException(name + " must be non-negative");
+        }
+    }
+
+    private static void requireNonBlank(String name, String value) {
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException(name + " must not be blank");
+        }
+    }
+
+    private static void requireSupportedDatabaseDialect(String databaseDialect) {
+        requireNonBlank("databaseDialect", databaseDialect);
+        String normalizedDialect = databaseDialect.trim().toUpperCase(Locale.ROOT);
+        if (!"H2".equals(normalizedDialect) && !"POSTGRESQL".equals(normalizedDialect)) {
+            throw new IllegalArgumentException(
+                    "databaseDialect must be one of [H2, POSTGRESQL], got: " + databaseDialect);
+        }
+    }
+
+    private static void requireJdbcUrl(String databaseUrl) {
+        requireNonBlank("databaseUrl", databaseUrl);
+        if (!databaseUrl.trim().startsWith("jdbc:")) {
+            throw new IllegalArgumentException("databaseUrl must start with jdbc:");
         }
     }
 

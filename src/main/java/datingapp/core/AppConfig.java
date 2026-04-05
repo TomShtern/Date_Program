@@ -5,6 +5,7 @@ import datingapp.core.model.ProfileNote;
 import datingapp.core.model.User;
 import java.time.Duration;
 import java.time.ZoneId;
+import java.util.Locale;
 import java.util.Objects;
 
 /**
@@ -153,9 +154,13 @@ public record AppConfig(
     // Sub-record: StorageConfig
     // ========================================================================
 
-    public static record StorageConfig(int queryTimeoutSeconds) {
+    public static record StorageConfig(
+            String databaseDialect, String databaseUrl, String databaseUsername, int queryTimeoutSeconds) {
         public StorageConfig {
-            AppConfigValidator.validateStorage(queryTimeoutSeconds);
+            AppConfigValidator.validateStorage(databaseDialect, databaseUrl, databaseUsername, queryTimeoutSeconds);
+            databaseDialect = databaseDialect.trim().toUpperCase(Locale.ROOT);
+            databaseUrl = databaseUrl.trim();
+            databaseUsername = databaseUsername.trim();
         }
     }
 
@@ -310,6 +315,9 @@ public record AppConfig(
         private double standoutCompletenessWeight = 0.10;
         private double standoutActivityWeight = 0.10;
         // StorageConfig fields
+        private String databaseDialect = "H2";
+        private String databaseUrl = "jdbc:h2:./data/dating";
+        private String databaseUsername = "sa";
         private int queryTimeoutSeconds = 30;
         // SafetyConfig fields
         private int autoBanThreshold = 3;
@@ -381,6 +389,21 @@ public record AppConfig(
 
         public Builder queryTimeoutSeconds(int v) {
             this.queryTimeoutSeconds = v;
+            return this;
+        }
+
+        public Builder databaseDialect(String v) {
+            this.databaseDialect = v;
+            return this;
+        }
+
+        public Builder databaseUrl(String v) {
+            this.databaseUrl = v;
+            return this;
+        }
+
+        public Builder databaseUsername(String v) {
+            this.databaseUsername = v;
             return this;
         }
 
@@ -767,7 +790,7 @@ public record AppConfig(
         }
 
         private StorageConfig buildStorageConfig() {
-            return new StorageConfig(queryTimeoutSeconds);
+            return new StorageConfig(databaseDialect, databaseUrl, databaseUsername, queryTimeoutSeconds);
         }
 
         private SafetyConfig buildSafetyConfig() {

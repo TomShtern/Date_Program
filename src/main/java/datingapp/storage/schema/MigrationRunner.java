@@ -373,26 +373,31 @@ public final class MigrationRunner {
     }
 
     private static boolean hasTable(Statement stmt, String tableName) throws SQLException {
-        try (ResultSet rs = stmt.getConnection().getMetaData().getTables(null, null, tableName, null)) {
+        String metadataTableName = metadataIdentifier(stmt.getConnection(), tableName);
+        try (ResultSet rs = stmt.getConnection().getMetaData().getTables(null, null, metadataTableName, null)) {
             return rs.next();
         }
     }
 
     private static boolean hasPrimaryKey(Statement stmt, String tableName) throws SQLException {
-        try (ResultSet rs = stmt.getConnection().getMetaData().getPrimaryKeys(null, null, tableName)) {
+        String metadataTableName = metadataIdentifier(stmt.getConnection(), tableName);
+        try (ResultSet rs = stmt.getConnection().getMetaData().getPrimaryKeys(null, null, metadataTableName)) {
             return rs.next();
         }
     }
 
     private static boolean hasColumn(Statement stmt, String tableName, String columnName) throws SQLException {
-        try (ResultSet rs = stmt.getConnection().getMetaData().getColumns(null, null, tableName, columnName)) {
+        String metadataTableName = metadataIdentifier(stmt.getConnection(), tableName);
+        String metadataColumnName = metadataIdentifier(stmt.getConnection(), columnName);
+        try (ResultSet rs =
+                stmt.getConnection().getMetaData().getColumns(null, null, metadataTableName, metadataColumnName)) {
             return rs.next();
         }
     }
 
     private static boolean hasForeignKey(Statement stmt, String tableName, String foreignKeyName) throws SQLException {
-        try (ResultSet rs =
-                stmt.getConnection().getMetaData().getImportedKeys(null, null, tableName.toUpperCase(Locale.ROOT))) {
+        String metadataTableName = metadataIdentifier(stmt.getConnection(), tableName);
+        try (ResultSet rs = stmt.getConnection().getMetaData().getImportedKeys(null, null, metadataTableName)) {
             while (rs.next()) {
                 if (foreignKeyName.equalsIgnoreCase(rs.getString("FK_NAME"))) {
                     return true;
@@ -432,7 +437,7 @@ public final class MigrationRunner {
 
         stmt.execute("ALTER TABLE "
                 + tableName
-                + " ADD CONSTRAINT IF NOT EXISTS "
+                + " ADD CONSTRAINT "
                 + foreignKeyName
                 + " FOREIGN KEY ("
                 + columnName
@@ -492,6 +497,26 @@ public final class MigrationRunner {
         }
     }
 
+    static String metadataIdentifier(
+            String identifier, boolean storesUpperCaseIdentifiers, boolean storesLowerCaseIdentifiers) {
+        if (identifier == null || identifier.isBlank()) {
+            throw new IllegalArgumentException("identifier cannot be blank");
+        }
+        if (storesUpperCaseIdentifiers) {
+            return identifier.toUpperCase(Locale.ROOT);
+        }
+        if (storesLowerCaseIdentifiers) {
+            return identifier.toLowerCase(Locale.ROOT);
+        }
+        return identifier;
+    }
+
+    private static String metadataIdentifier(Connection connection, String identifier) throws SQLException {
+        var metaData = connection.getMetaData();
+        return metadataIdentifier(
+                identifier, metaData.storesUpperCaseIdentifiers(), metaData.storesLowerCaseIdentifiers());
+    }
+
     // ═══════════════════════════════════════════════════════════════
     // Schema versioning
     // ═══════════════════════════════════════════════════════════════
@@ -530,13 +555,19 @@ public final class MigrationRunner {
      * Records a schema version as applied.
      */
     static void recordSchemaVersion(Statement stmt, int version, String description) throws SQLException {
-        String sql = """
-                MERGE INTO schema_version (version, applied_at, description)
-                KEY (version)
-                VALUES (?, CURRENT_TIMESTAMP, ?)
-                """;
+        String updateSql =
+                "UPDATE schema_version SET applied_at = CURRENT_TIMESTAMP, description = ? WHERE version = ?";
+        try (var pstmt = stmt.getConnection().prepareStatement(updateSql)) {
+            pstmt.setString(1, description);
+            pstmt.setInt(2, version);
+            if (pstmt.executeUpdate() > 0) {
+                return;
+            }
+        }
 
-        try (var pstmt = stmt.getConnection().prepareStatement(sql)) {
+        String insertSql =
+                "INSERT INTO schema_version (version, applied_at, description) VALUES (?, CURRENT_TIMESTAMP, ?)";
+        try (var pstmt = stmt.getConnection().prepareStatement(insertSql)) {
             pstmt.setInt(1, version);
             pstmt.setString(2, description);
             pstmt.executeUpdate();
@@ -554,6 +585,7 @@ public final class MigrationRunner {
     private static boolean isMissingTable(SQLException e) {
         return "42S02".equals(e.getSQLState())
                 || "42S04".equals(e.getSQLState())
+                || "42P01".equals(e.getSQLState())
                 || e.getErrorCode() == 42102
                 || e.getErrorCode() == 42104;
     }

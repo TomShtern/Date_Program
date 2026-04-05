@@ -1,6 +1,6 @@
 # AGENTS.md
 
-> **Updated:** 2026-03-30
+> **Updated:** 2026-04-05
 > **Role in the instruction stack:** lowest-level workflow guide for agents working in this repo.
 > **Hierarchy:** `.github/copilot-instructions.md` → `CLAUDE.md` → `AGENTS.md`.
 
@@ -30,6 +30,7 @@ If any markdown guidance and the code disagree, trust:
 - Use execution-oriented helpers for long Maven/test runs rather than manually chaining shell commands.
 - Prefer symbol-aware rename/usages tools when changing names across files.
 - On Windows PowerShell, use `mvn --% ...` when Maven arguments contain commas or special characters that PowerShell might parse.
+- For PostgreSQL runtime work, prefer an already-running local PostgreSQL instance first; use Docker only as a disposable fallback when no local server is available.
 
 ## Editing discipline
 
@@ -52,7 +53,8 @@ Run verification in this order unless the task clearly needs a different sequenc
 1. Check touched files for errors.
 2. Run focused tests for the changed area.
 3. Run a broader smoke suite if multiple subsystems changed.
-4. Run the full quality gate before claiming completion:
+4. If the work touches PostgreSQL runtime support, run the local smoke path (`.\run_postgresql_smoke.ps1` or equivalent property-driven `PostgresqlRuntimeSmokeTest`) before final completion claims.
+5. Run the full quality gate before claiming completion:
 
 ```powershell
 mvn spotless:apply verify
@@ -78,6 +80,7 @@ mvn --% -Dcheckstyle.skip=true -Dtest=ProfileUseCasesTest,MatchingUseCasesTest t
 
 - Prefer targeted tests during implementation.
 - Prefer the full quality gate before final handoff.
+- For PostgreSQL runtime changes, prefer the repo-local helpers `start_local_postgres.ps1`, `run_postgresql_smoke.ps1`, and `stop_local_postgres.ps1` over ad-hoc Docker-first validation.
 - Use shared test helpers when available:
   - `JavaFxTestSupport`
   - `UiAsyncTestSupport`

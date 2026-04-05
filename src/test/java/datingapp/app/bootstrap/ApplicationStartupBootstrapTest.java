@@ -102,6 +102,27 @@ class ApplicationStartupBootstrapTest {
     }
 
     @Test
+    @DisplayName("applyEnvironmentOverrides should apply storage database overrides")
+    void storageDatabaseEnvOverridesAreApplied() {
+        AppConfig.Builder builder = AppConfig.builder();
+
+        ApplicationStartup.applyEnvironmentOverrides(builder, name -> switch (name) {
+            case "DATING_APP_DB_DIALECT" -> "POSTGRESQL";
+            case "DATING_APP_DB_URL" -> "jdbc:postgresql://localhost:5432/datingapp";
+            case "DATING_APP_DB_USERNAME" -> "datingapp";
+            default -> null;
+        });
+
+        AppConfig config = builder.build();
+
+        assertEquals("POSTGRESQL", config.storage().databaseDialect());
+        assertEquals(
+                "jdbc:postgresql://localhost:5432/datingapp", config.storage().databaseUrl());
+        assertEquals("datingapp", config.storage().databaseUsername());
+        assertEquals(30, config.storage().queryTimeoutSeconds());
+    }
+
+    @Test
     @DisplayName("getServices should require initialize and shutdown should clear access")
     void getServicesRequiresInitializeAndShutdownClearsAccess() {
         IllegalStateException beforeInit = assertThrows(IllegalStateException.class, ApplicationStartup::getServices);

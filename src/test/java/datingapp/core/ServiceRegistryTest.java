@@ -49,7 +49,7 @@ class ServiceRegistryTest {
         DatabaseManager.resetInstance();
         DatabaseManager.setJdbcUrl("jdbc:h2:mem:test_service_registry_" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1");
         dbManager = DatabaseManager.getInstance();
-        registry = StorageFactory.buildH2(dbManager, AppConfig.defaults());
+        registry = StorageFactory.buildSqlDatabase(dbManager, AppConfig.defaults());
     }
 
     @AfterAll
@@ -59,7 +59,7 @@ class ServiceRegistryTest {
     }
 
     @Nested
-    @DisplayName("Builder.buildH2")
+    @DisplayName("Builder.buildSqlDatabase")
     class BuilderTests {
 
         @Test
@@ -74,7 +74,7 @@ class ServiceRegistryTest {
             AppConfig customConfig = AppConfig.builder().dailyLikeLimit(50).build();
             // Note: Using same dbManager since we can't easily create isolated instances
             // Config customization is the key thing being tested
-            ServiceRegistry customRegistry = StorageFactory.buildH2(dbManager, customConfig);
+            ServiceRegistry customRegistry = StorageFactory.buildSqlDatabase(dbManager, customConfig);
 
             assertSame(customConfig, customRegistry.getConfig());
         }
@@ -83,18 +83,18 @@ class ServiceRegistryTest {
         @DisplayName("Uses explicit builder default config")
         void usesExplicitBuilderDefaultConfig() {
             AppConfig defaultConfig = AppConfig.builder().build();
-            ServiceRegistry defaultRegistry = StorageFactory.buildH2(dbManager, defaultConfig);
+            ServiceRegistry defaultRegistry = StorageFactory.buildSqlDatabase(dbManager, defaultConfig);
 
             assertNotNull(defaultRegistry.getConfig());
             assertSame(defaultConfig, defaultRegistry.getConfig());
         }
 
         @Test
-        @DisplayName("buildH2(DatabaseManager) overload no longer exists")
-        void buildH2OverloadRemovedWithoutAppConfig() {
+        @DisplayName("buildSqlDatabase(DatabaseManager) overload no longer exists")
+        void buildSqlDatabaseOverloadRemovedWithoutAppConfig() {
             assertThrows(
                     NoSuchMethodException.class,
-                    () -> StorageFactory.class.getMethod("buildH2", DatabaseManager.class));
+                    () -> StorageFactory.class.getMethod("buildSqlDatabase", DatabaseManager.class));
         }
     }
 

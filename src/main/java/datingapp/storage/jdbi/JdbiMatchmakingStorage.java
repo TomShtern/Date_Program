@@ -13,9 +13,11 @@ import datingapp.core.model.Match.MatchArchiveReason;
 import datingapp.core.model.Match.MatchState;
 import datingapp.core.storage.InteractionStorage;
 import datingapp.core.storage.PageData;
+import datingapp.storage.DatabaseDialect;
 import datingapp.storage.DatabaseManager.StorageException;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Types;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -23,13 +25,14 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import org.jdbi.v3.core.Handle;
 import org.jdbi.v3.core.Jdbi;
 import org.jdbi.v3.core.mapper.RowMapper;
 import org.jdbi.v3.core.statement.StatementContext;
+import org.jdbi.v3.core.statement.Update;
 import org.jdbi.v3.sqlobject.config.RegisterRowMapper;
 import org.jdbi.v3.sqlobject.customizer.Bind;
 import org.jdbi.v3.sqlobject.customizer.BindBean;
-import org.jdbi.v3.sqlobject.customizer.BindMethods;
 import org.jdbi.v3.sqlobject.statement.SqlQuery;
 import org.jdbi.v3.sqlobject.statement.SqlUpdate;
 
@@ -55,8 +58,13 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
     private static final String PARAM_ARCHIVE_REASON_B = "archiveReasonB";
     private static final String PARAM_VISIBLE_TO_USER_A = "visibleToUserA";
     private static final String PARAM_VISIBLE_TO_USER_B = "visibleToUserB";
+    private static final String PARAM_USER_A = "userA";
+    private static final String PARAM_USER_B = "userB";
+    private static final String COLUMN_USER_ID = "user_id";
     private static final String COLUMN_WHO_LIKES = "who_likes";
+    private static final String COLUMN_WHO_GOT_LIKED = "who_got_liked";
     private static final String COLUMN_CREATED_AT = "created_at";
+    private static final String COLUMN_DELETED_AT = "deleted_at";
     private static final String ERR_USER_ID_NULL = "userId cannot be null";
     private static final String ERR_UPDATED_MATCH_NULL = "updatedMatch cannot be null";
     private static final String ERR_ARCHIVED_CONVERSATION_NULL = "archivedConversation cannot be null";
@@ -86,12 +94,6 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
                             AND deleted_at IS NULL
                         """;
 
-    private static final String SQL_UPSERT_LIKE = """
-            MERGE INTO likes (id, who_likes, who_got_liked, direction, created_at, deleted_at)
-            KEY (who_likes, who_got_liked)
-            VALUES (:id, :whoLikes, :whoGotLiked, :direction, :createdAt, NULL)
-            """;
-
     private static final String SQL_MUTUAL_LIKE_EXISTS = """
             SELECT EXISTS (
             SELECT 1
@@ -109,15 +111,6 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
 
     private static final String SQL_ACTIVE_MATCH_EXISTS =
             "SELECT EXISTS(SELECT 1 FROM matches WHERE id = :id AND deleted_at IS NULL)";
-
-    private static final String SQL_UPSERT_MATCH = """
-            MERGE INTO matches (
-            id, user_a, user_b, created_at, updated_at, state, ended_at, ended_by, end_reason, deleted_at
-            ) KEY (id)
-            VALUES (
-            :id, :userA, :userB, :createdAt, :updatedAt, :state, :endedAt, :endedBy, :endReason, :deletedAt
-            )
-            """;
 
     private static final String SQL_UPDATE_MATCH_TRANSITION = """
             UPDATE matches
@@ -188,6 +181,9 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
     private final MatchDao matchDao;
     private final UndoDao undoDao;
     private final Undo.Storage undoStorage;
+    private final String likeUpsertSql;
+    private final String matchUpsertSql;
+    private final String undoUpsertSql;
 
     public JdbiMatchmakingStorage(Jdbi jdbi) {
         this.jdbi = Objects.requireNonNull(jdbi, "jdbi cannot be null");
@@ -195,6 +191,10 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
         this.matchDao = jdbi.onDemand(MatchDao.class);
         this.undoDao = jdbi.onDemand(UndoDao.class);
         this.undoStorage = new UndoStorageAdapter();
+        DatabaseDialect dialect = detectDialect(jdbi);
+        this.likeUpsertSql = buildLikeUpsertSql(dialect);
+        this.matchUpsertSql = buildMatchUpsertSql(dialect);
+        this.undoUpsertSql = buildUndoUpsertSql(dialect);
     }
 
     public Undo.Storage undoStorage() {
@@ -214,7 +214,7 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
 
     @Override
     public void save(Like like) {
-        likeDao.save(like);
+        jdbi.useHandle(handle -> saveLike(handle, like));
     }
 
     @Override
@@ -250,7 +250,7 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
         }
     }
 
-    private static boolean activeLikeExists(org.jdbi.v3.core.Handle handle, Like like) {
+    private static boolean activeLikeExists(Handle handle, Like like) {
         try (var query = handle.createQuery(SQL_ACTIVE_LIKE_EXISTS)) {
             return query.bind(PARAM_WHO_LIKES, like.whoLikes())
                     .bind(PARAM_WHO_GOT_LIKED, like.whoGotLiked())
@@ -259,18 +259,38 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
         }
     }
 
-    private static void saveLike(org.jdbi.v3.core.Handle handle, Like like) {
-        try (var update = handle.createUpdate(SQL_UPSERT_LIKE)) {
+    private void saveLike(Handle handle, Like like) {
+        try (var update = handle.createUpdate(likeUpsertSql)) {
             update.bind(PARAM_ID, like.id())
                     .bind(PARAM_WHO_LIKES, like.whoLikes())
                     .bind(PARAM_WHO_GOT_LIKED, like.whoGotLiked())
                     .bind(PARAM_DIRECTION, like.direction().name())
                     .bind(PARAM_CREATED_AT, like.createdAt())
+                    .bindNull(PARAM_DELETED_AT, Types.TIMESTAMP)
                     .execute();
         }
     }
 
-    private static boolean mutualLikeExists(org.jdbi.v3.core.Handle handle, Like like) {
+    private void saveMatch(Handle handle, Match match) {
+        try (var update = handle.createUpdate(matchUpsertSql)) {
+            update.bind(PARAM_ID, match.getId())
+                    .bind(PARAM_USER_A, match.getUserA())
+                    .bind(PARAM_USER_B, match.getUserB())
+                    .bind(PARAM_CREATED_AT, match.getCreatedAt())
+                    .bind(PARAM_UPDATED_AT, match.getUpdatedAt())
+                    .bind(PARAM_STATE, match.getState().name());
+            bindNullableInstant(update, PARAM_ENDED_AT, match.getEndedAt());
+            bindNullableUuid(update, PARAM_ENDED_BY, match.getEndedBy());
+            bindNullableString(
+                    update,
+                    PARAM_END_REASON,
+                    match.getEndReason() != null ? match.getEndReason().name() : null);
+            bindNullableInstant(update, PARAM_DELETED_AT, match.getDeletedAt());
+            update.execute();
+        }
+    }
+
+    private static boolean mutualLikeExists(Handle handle, Like like) {
         try (var query = handle.createQuery(SQL_MUTUAL_LIKE_EXISTS)) {
             return query.bind(PARAM_WHO_LIKES, like.whoLikes())
                     .bind(PARAM_WHO_GOT_LIKED, like.whoGotLiked())
@@ -279,8 +299,7 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
         }
     }
 
-    private static Optional<LikeMatchWriteResult> handleExistingMatch(
-            org.jdbi.v3.core.Handle handle, Like like, String matchId) {
+    private static Optional<LikeMatchWriteResult> handleExistingMatch(Handle handle, Like like, String matchId) {
         boolean activeMatchExists;
         try (var query = handle.createQuery(SQL_ACTIVE_MATCH_EXISTS)) {
             activeMatchExists =
@@ -315,23 +334,9 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
         return Optional.of(LikeMatchWriteResult.likeAndMatch(reactivatedMatch));
     }
 
-    private static LikeMatchWriteResult createFreshMatch(org.jdbi.v3.core.Handle handle, Like like) {
+    private LikeMatchWriteResult createFreshMatch(Handle handle, Like like) {
         Match match = Match.create(like.whoLikes(), like.whoGotLiked());
-        try (var update = handle.createUpdate(SQL_UPSERT_MATCH)) {
-            update.bind(PARAM_ID, match.getId())
-                    .bind("userA", match.getUserA())
-                    .bind("userB", match.getUserB())
-                    .bind(PARAM_CREATED_AT, match.getCreatedAt())
-                    .bind(PARAM_UPDATED_AT, match.getUpdatedAt())
-                    .bind(PARAM_STATE, match.getState().name())
-                    .bind(PARAM_ENDED_AT, match.getEndedAt())
-                    .bind(PARAM_ENDED_BY, match.getEndedBy())
-                    .bind(
-                            PARAM_END_REASON,
-                            match.getEndReason() != null ? match.getEndReason().name() : null)
-                    .bind(PARAM_DELETED_AT, match.getDeletedAt())
-                    .execute();
-        }
+        saveMatch(handle, match);
         return LikeMatchWriteResult.likeAndMatch(match);
     }
 
@@ -404,7 +409,7 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
 
     @Override
     public void save(Match match) {
-        matchDao.save(match);
+        jdbi.useHandle(handle -> saveMatch(handle, match));
     }
 
     @Override
@@ -520,18 +525,7 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
 
         try {
             return jdbi.inTransaction(handle -> {
-                int matchRows = handle.createUpdate(SQL_UPDATE_MATCH_TRANSITION)
-                        .bind(PARAM_ID, updatedMatch.getId())
-                        .bind(PARAM_STATE, updatedMatch.getState().name())
-                        .bind(PARAM_UPDATED_AT, updatedMatch.getUpdatedAt())
-                        .bind(PARAM_ENDED_AT, updatedMatch.getEndedAt())
-                        .bind(PARAM_ENDED_BY, updatedMatch.getEndedBy())
-                        .bind(
-                                PARAM_END_REASON,
-                                updatedMatch.getEndReason() != null
-                                        ? updatedMatch.getEndReason().name()
-                                        : null)
-                        .bind(PARAM_DELETED_AT, updatedMatch.getDeletedAt())
+                int matchRows = bindMatchTransition(handle.createUpdate(SQL_UPDATE_MATCH_TRANSITION), updatedMatch)
                         .execute();
                 if (matchRows != 1) {
                     return false;
@@ -566,18 +560,7 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
 
         try {
             return jdbi.inTransaction(handle -> {
-                int matchRows = handle.createUpdate(SQL_UPDATE_MATCH_TRANSITION)
-                        .bind(PARAM_ID, updatedMatch.getId())
-                        .bind(PARAM_STATE, updatedMatch.getState().name())
-                        .bind(PARAM_UPDATED_AT, updatedMatch.getUpdatedAt())
-                        .bind(PARAM_ENDED_AT, updatedMatch.getEndedAt())
-                        .bind(PARAM_ENDED_BY, updatedMatch.getEndedBy())
-                        .bind(
-                                PARAM_END_REASON,
-                                updatedMatch.getEndReason() != null
-                                        ? updatedMatch.getEndReason().name()
-                                        : null)
-                        .bind(PARAM_DELETED_AT, updatedMatch.getDeletedAt())
+                int matchRows = bindMatchTransition(handle.createUpdate(SQL_UPDATE_MATCH_TRANSITION), updatedMatch)
                         .execute();
                 if (matchRows != 1) {
                     return false;
@@ -616,26 +599,15 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
 
         try {
             return jdbi.inTransaction(handle -> {
-                int matchRows = handle.createUpdate(SQL_UPDATE_MATCH_TRANSITION)
-                        .bind(PARAM_ID, updatedMatch.getId())
-                        .bind(PARAM_STATE, updatedMatch.getState().name())
-                        .bind(PARAM_UPDATED_AT, updatedMatch.getUpdatedAt())
-                        .bind(PARAM_ENDED_AT, updatedMatch.getEndedAt())
-                        .bind(PARAM_ENDED_BY, updatedMatch.getEndedBy())
-                        .bind(
-                                PARAM_END_REASON,
-                                updatedMatch.getEndReason() != null
-                                        ? updatedMatch.getEndReason().name()
-                                        : null)
-                        .bind(PARAM_DELETED_AT, updatedMatch.getDeletedAt())
+                int matchRows = bindMatchTransition(handle.createUpdate(SQL_UPDATE_MATCH_TRANSITION), updatedMatch)
                         .execute();
                 if (matchRows != 1) {
                     return false;
                 }
 
                 handle.createUpdate(SQL_SOFT_DELETE_PAIR_LIKES)
-                        .bind("userA", updatedMatch.getUserA())
-                        .bind("userB", updatedMatch.getUserB())
+                        .bind(PARAM_USER_A, updatedMatch.getUserA())
+                        .bind(PARAM_USER_B, updatedMatch.getUserB())
                         .bind("deletedAt", updatedMatch.getUpdatedAt())
                         .execute();
 
@@ -686,30 +658,18 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
         }
     }
 
-    private static boolean persistBlockMatch(org.jdbi.v3.core.Handle handle, Optional<Match> updatedMatch) {
+    private static boolean persistBlockMatch(Handle handle, Optional<Match> updatedMatch) {
         if (updatedMatch.isEmpty()) {
             return true;
         }
 
         Match match = updatedMatch.get();
-        int matchRows;
-        try (var update = handle.createUpdate(SQL_UPDATE_MATCH_TRANSITION)) {
-            matchRows = update.bind(PARAM_ID, match.getId())
-                    .bind(PARAM_STATE, match.getState().name())
-                    .bind(PARAM_UPDATED_AT, match.getUpdatedAt())
-                    .bind(PARAM_ENDED_AT, match.getEndedAt())
-                    .bind(PARAM_ENDED_BY, match.getEndedBy())
-                    .bind(
-                            PARAM_END_REASON,
-                            match.getEndReason() != null ? match.getEndReason().name() : null)
-                    .bind(PARAM_DELETED_AT, match.getDeletedAt())
-                    .execute();
-        }
+        int matchRows = bindMatchTransition(handle.createUpdate(SQL_UPDATE_MATCH_TRANSITION), match)
+                .execute();
         return matchRows == 1;
     }
 
-    private static void persistBlockedConversation(
-            org.jdbi.v3.core.Handle handle, Optional<Conversation> archivedConversation) {
+    private static void persistBlockedConversation(Handle handle, Optional<Conversation> archivedConversation) {
         if (archivedConversation.isEmpty()) {
             return;
         }
@@ -750,7 +710,7 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
         return matchDao.purgeDeletedBefore(threshold);
     }
 
-    private void saveNotification(org.jdbi.v3.core.Handle handle, Notification notification) {
+    private void saveNotification(Handle handle, Notification notification) {
         String dataJson = serializeNotificationData(notification.data());
         handle.execute(
                 SQL_INSERT_NOTIFICATION,
@@ -868,7 +828,19 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
 
         @Override
         public void save(Undo state) {
-            undoDao.upsert(new UndoStateBindings(state));
+            jdbi.useHandle(handle -> {
+                try (var update = handle.createUpdate(undoUpsertSql)) {
+                    update.bind("userId", state.userId())
+                            .bind("likeId", state.like().id())
+                            .bind("whoLikes", state.like().whoLikes())
+                            .bind("whoGotLiked", state.like().whoGotLiked())
+                            .bind("direction", state.like().direction().name())
+                            .bind("likeCreatedAt", state.like().createdAt())
+                            .bind("expiresAt", state.expiresAt());
+                    bindNullableString(update, "matchId", state.matchId());
+                    update.execute();
+                }
+            });
         }
 
         @Override
@@ -907,13 +879,6 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
 
         @SqlQuery(SQL_ACTIVE_LIKE_BY_ID)
         Optional<Like> getLikeById(@Bind("likeId") UUID likeId);
-
-        @SqlUpdate("""
-                MERGE INTO likes (id, who_likes, who_got_liked, direction, created_at, deleted_at)
-                KEY (who_likes, who_got_liked)
-                VALUES (:id, :whoLikes, :whoGotLiked, :direction, :createdAt, NULL)
-                """)
-        void save(@BindMethods Like like);
 
         @SqlQuery("""
                 SELECT EXISTS (
@@ -1027,16 +992,6 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
                 "id, user_a, user_b, created_at, updated_at, state, ended_at, ended_by, end_reason, deleted_at";
 
         @SqlUpdate("""
-                MERGE INTO matches (
-                    id, user_a, user_b, created_at, updated_at, state, ended_at, ended_by, end_reason, deleted_at
-                ) KEY (id)
-                VALUES (
-                    :id, :userA, :userB, :createdAt, :updatedAt, :state, :endedAt, :endedBy, :endReason, :deletedAt
-                )
-                """)
-        void save(@BindBean Match match);
-
-        @SqlUpdate("""
                 UPDATE matches
                 SET state = :state,
                     updated_at = :updatedAt,
@@ -1109,14 +1064,6 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
     @RegisterRowMapper(UndoStateMapper.class)
     private interface UndoDao {
 
-        @SqlUpdate("""
-                MERGE INTO undo_states (
-                    user_id, like_id, who_likes, who_got_liked, direction, like_created_at, match_id, expires_at
-                ) KEY (user_id)
-                VALUES (:userId, :likeId, :whoLikes, :whoGotLiked, :direction, :likeCreatedAt, :matchId, :expiresAt)
-                """)
-        void upsert(@BindBean UndoStateBindings bindings);
-
         @SqlQuery("""
                 SELECT user_id, like_id, who_likes, who_got_liked, direction, like_created_at, match_id, expires_at
                 FROM undo_states
@@ -1154,7 +1101,7 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
         public Like map(ResultSet rs, StatementContext ctx) throws SQLException {
             var id = JdbiTypeCodecs.SqlRowReaders.readUuid(rs, PARAM_ID);
             var whoLikes = JdbiTypeCodecs.SqlRowReaders.readUuid(rs, COLUMN_WHO_LIKES);
-            var whoGotLiked = JdbiTypeCodecs.SqlRowReaders.readUuid(rs, "who_got_liked");
+            var whoGotLiked = JdbiTypeCodecs.SqlRowReaders.readUuid(rs, COLUMN_WHO_GOT_LIKED);
             var direction = JdbiTypeCodecs.SqlRowReaders.readEnum(rs, PARAM_DIRECTION, Like.Direction.class);
             var createdAt = JdbiTypeCodecs.SqlRowReaders.readInstant(rs, COLUMN_CREATED_AT);
 
@@ -1175,17 +1122,17 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
                     JdbiTypeCodecs.SqlRowReaders.readInstant(rs, "ended_at"),
                     JdbiTypeCodecs.SqlRowReaders.readUuid(rs, "ended_by"),
                     JdbiTypeCodecs.SqlRowReaders.readEnum(rs, "end_reason", MatchArchiveReason.class),
-                    JdbiTypeCodecs.SqlRowReaders.readInstant(rs, "deleted_at"));
+                    JdbiTypeCodecs.SqlRowReaders.readInstant(rs, COLUMN_DELETED_AT));
         }
     }
 
     public static class UndoStateMapper implements RowMapper<Undo> {
         @Override
         public Undo map(ResultSet rs, StatementContext ctx) throws SQLException {
-            UUID userId = JdbiTypeCodecs.SqlRowReaders.readUuid(rs, "user_id");
+            UUID userId = JdbiTypeCodecs.SqlRowReaders.readUuid(rs, COLUMN_USER_ID);
             UUID likeId = JdbiTypeCodecs.SqlRowReaders.readUuid(rs, "like_id");
             UUID whoLikes = JdbiTypeCodecs.SqlRowReaders.readUuid(rs, COLUMN_WHO_LIKES);
-            UUID whoGotLiked = JdbiTypeCodecs.SqlRowReaders.readUuid(rs, "who_got_liked");
+            UUID whoGotLiked = JdbiTypeCodecs.SqlRowReaders.readUuid(rs, COLUMN_WHO_GOT_LIKED);
             Like.Direction direction = Like.Direction.valueOf(rs.getString(PARAM_DIRECTION));
             Instant likeCreatedAt = JdbiTypeCodecs.SqlRowReaders.readInstant(rs, "like_created_at");
             String matchId = rs.getString("match_id");
@@ -1195,5 +1142,102 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
                     new ConnectionModels.Like(likeId, whoLikes, whoGotLiked, direction, likeCreatedAt);
             return new Undo(userId, like, matchId, expiresAt);
         }
+    }
+
+    private static DatabaseDialect detectDialect(Jdbi jdbi) {
+        return jdbi.withHandle(handle -> {
+            try {
+                return DatabaseDialect.fromDatabaseProductName(
+                        handle.getConnection().getMetaData().getDatabaseProductName());
+            } catch (SQLException exception) {
+                throw new IllegalStateException("Failed to detect database dialect", exception);
+            }
+        });
+    }
+
+    private static Update bindMatchTransition(Update update, Match match) {
+        update.bind(PARAM_ID, match.getId())
+                .bind(PARAM_STATE, match.getState().name())
+                .bind(PARAM_UPDATED_AT, match.getUpdatedAt());
+        bindNullableInstant(update, PARAM_ENDED_AT, match.getEndedAt());
+        bindNullableUuid(update, PARAM_ENDED_BY, match.getEndedBy());
+        bindNullableString(
+                update,
+                PARAM_END_REASON,
+                match.getEndReason() != null ? match.getEndReason().name() : null);
+        bindNullableInstant(update, PARAM_DELETED_AT, match.getDeletedAt());
+        return update;
+    }
+
+    private static void bindNullableUuid(Update update, String parameter, UUID value) {
+        if (value != null) {
+            update.bind(parameter, value);
+            return;
+        }
+        update.bindNull(parameter, Types.OTHER);
+    }
+
+    private static void bindNullableInstant(Update update, String parameter, Instant value) {
+        if (value != null) {
+            update.bind(parameter, value);
+            return;
+        }
+        update.bindNull(parameter, Types.TIMESTAMP);
+    }
+
+    private static void bindNullableString(Update update, String parameter, String value) {
+        if (value != null) {
+            update.bind(parameter, value);
+            return;
+        }
+        update.bindNull(parameter, Types.VARCHAR);
+    }
+
+    private static String buildLikeUpsertSql(DatabaseDialect dialect) {
+        return SqlDialectSupport.upsertSql(
+                dialect,
+                "likes",
+                List.of(
+                        new SqlDialectSupport.ColumnBinding("id", "id"),
+                        new SqlDialectSupport.ColumnBinding("who_likes", "whoLikes"),
+                        new SqlDialectSupport.ColumnBinding(COLUMN_WHO_GOT_LIKED, "whoGotLiked"),
+                        new SqlDialectSupport.ColumnBinding("direction", "direction"),
+                        new SqlDialectSupport.ColumnBinding("created_at", "createdAt"),
+                        new SqlDialectSupport.ColumnBinding(COLUMN_DELETED_AT, "deletedAt")),
+                List.of("who_likes", COLUMN_WHO_GOT_LIKED));
+    }
+
+    private static String buildMatchUpsertSql(DatabaseDialect dialect) {
+        return SqlDialectSupport.upsertSql(
+                dialect,
+                "matches",
+                List.of(
+                        new SqlDialectSupport.ColumnBinding("id", "id"),
+                        new SqlDialectSupport.ColumnBinding("user_a", PARAM_USER_A),
+                        new SqlDialectSupport.ColumnBinding("user_b", PARAM_USER_B),
+                        new SqlDialectSupport.ColumnBinding("created_at", "createdAt"),
+                        new SqlDialectSupport.ColumnBinding("updated_at", PARAM_UPDATED_AT),
+                        new SqlDialectSupport.ColumnBinding("state", "state"),
+                        new SqlDialectSupport.ColumnBinding("ended_at", "endedAt"),
+                        new SqlDialectSupport.ColumnBinding("ended_by", "endedBy"),
+                        new SqlDialectSupport.ColumnBinding("end_reason", "endReason"),
+                        new SqlDialectSupport.ColumnBinding(COLUMN_DELETED_AT, "deletedAt")),
+                List.of("id"));
+    }
+
+    private static String buildUndoUpsertSql(DatabaseDialect dialect) {
+        return SqlDialectSupport.upsertSql(
+                dialect,
+                "undo_states",
+                List.of(
+                        new SqlDialectSupport.ColumnBinding(COLUMN_USER_ID, "userId"),
+                        new SqlDialectSupport.ColumnBinding("like_id", "likeId"),
+                        new SqlDialectSupport.ColumnBinding("who_likes", "whoLikes"),
+                        new SqlDialectSupport.ColumnBinding(COLUMN_WHO_GOT_LIKED, "whoGotLiked"),
+                        new SqlDialectSupport.ColumnBinding("direction", "direction"),
+                        new SqlDialectSupport.ColumnBinding("like_created_at", "likeCreatedAt"),
+                        new SqlDialectSupport.ColumnBinding("match_id", "matchId"),
+                        new SqlDialectSupport.ColumnBinding("expires_at", "expiresAt")),
+                List.of(COLUMN_USER_ID));
     }
 }

@@ -2,12 +2,15 @@ package datingapp.storage;
 
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
+import datingapp.core.AppConfig;
+import datingapp.core.RuntimeEnvironment;
 import datingapp.storage.schema.MigrationRunner;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.UnaryOperator;
 
 /**
  * Manages H2 database connection pooling and lifecycle. Schema creation is
@@ -32,6 +35,7 @@ public final class DatabaseManager {
     private static DatabaseManager instance;
     private final String configuredJdbcUrlOverride;
     private final AtomicReference<HikariDataSource> dataSource = new AtomicReference<>();
+    private final AtomicReference<RuntimeStorageState> runtimeStorageState = new AtomicReference<>();
     private volatile boolean initialized = false;
     private volatile int queryTimeoutSeconds = 30;
 
@@ -67,6 +71,29 @@ public final class DatabaseManager {
         this.queryTimeoutSeconds = timeoutSeconds;
     }
 
+    public synchronized void configureStorage(AppConfig.StorageConfig storageConfig) {
+        configureStorage(
+                storageConfig,
+                DatabaseDialect.fromConfig(storageConfig.databaseDialect(), storageConfig.databaseUrl()));
+    }
+
+    synchronized void configureStorage(AppConfig.StorageConfig storageConfig, DatabaseDialect dialect) {
+        Objects.requireNonNull(storageConfig, "storageConfig cannot be null");
+        Objects.requireNonNull(dialect, "dialect cannot be null");
+        if (dataSource.get() != null || initialized) {
+            shutdown();
+        }
+        runtimeStorageState.set(new RuntimeStorageState(storageConfig, dialect));
+        configureQueryTimeoutSeconds(storageConfig.queryTimeoutSeconds());
+    }
+
+    synchronized void clearRuntimeStorageConfiguration() {
+        if (dataSource.get() != null || initialized) {
+            shutdown();
+        }
+        runtimeStorageState.set(null);
+    }
+
     public static synchronized DatabaseManager getInstance() {
         if (instance == null) {
             instance = new DatabaseManager();
@@ -84,21 +111,42 @@ public final class DatabaseManager {
         }
         final String configuredJdbcUrl = effectiveJdbcUrl();
         String configuredProfile = resolveConfiguredProfile();
-        String explicitPassword = resolveExplicitPassword();
+        String explicitPassword = resolveExplicitPassword(configuredJdbcUrl);
+        RuntimeStorageState storageState = runtimeStorageState.get();
+        DatabaseDialect dialect =
+                storageState != null ? storageState.dialect() : DatabaseDialect.fromJdbcUrl(configuredJdbcUrl);
         HikariConfig config = new HikariConfig();
-        config.setJdbcUrl(resolveJdbcUrl(configuredJdbcUrl, configuredProfile, explicitPassword));
-        config.setUsername(USER);
-        config.setPassword(resolvePassword(explicitPassword, configuredProfile, configuredJdbcUrl));
+        config.setJdbcUrl(resolveJdbcUrl(configuredJdbcUrl, configuredProfile, explicitPassword, dialect));
+        config.setUsername(resolveUsername());
+        config.setPassword(resolvePassword(explicitPassword, configuredProfile, configuredJdbcUrl, dialect));
         config.setMaximumPoolSize(10);
         config.setMinimumIdle(2);
         config.setConnectionTimeout(5000);
         config.setConnectionTestQuery("SELECT 1");
         config.setValidationTimeout(3000);
+        if (storageState != null && storageState.dialect() != dialect) {
+            runtimeStorageState.set(new RuntimeStorageState(storageState.storageConfig(), dialect));
+        }
         dataSource.set(new HikariDataSource(config));
     }
 
     private String effectiveJdbcUrl() {
-        return configuredJdbcUrlOverride != null ? configuredJdbcUrlOverride : jdbcUrl;
+        RuntimeStorageState storageState = runtimeStorageState.get();
+        if (configuredJdbcUrlOverride != null) {
+            return configuredJdbcUrlOverride;
+        }
+        if (storageState != null) {
+            String runtimeJdbcUrl = storageState.storageConfig().databaseUrl();
+            if (!DEFAULT_JDBC_URL.equals(runtimeJdbcUrl)) {
+                return runtimeJdbcUrl;
+            }
+        }
+        return jdbcUrl;
+    }
+
+    private String resolveUsername() {
+        RuntimeStorageState storageState = runtimeStorageState.get();
+        return storageState != null ? storageState.storageConfig().databaseUsername() : USER;
     }
 
     /**
@@ -176,23 +224,90 @@ public final class DatabaseManager {
 
     static String getConfiguredPassword() {
         String configuredJdbcUrl = jdbcUrl;
-        return resolvePassword(resolveExplicitPassword(), resolveConfiguredProfile(), configuredJdbcUrl);
+        return resolvePassword(
+                resolveExplicitPassword(configuredJdbcUrl),
+                resolveConfiguredProfile(),
+                configuredJdbcUrl,
+                DatabaseDialect.fromJdbcUrl(configuredJdbcUrl));
     }
 
-    private static String resolveExplicitPassword() {
-        return firstNonBlank(System.getProperty(DB_PASSWORD_PROPERTY), System.getenv(DB_PASSWORD_ENV));
+    private static String resolveExplicitPassword(String configuredJdbcUrl) {
+        return resolveExplicitPassword(
+                configuredJdbcUrl, System::getProperty, System::getenv, RuntimeEnvironment::getEnv);
     }
 
-    private static String resolvePassword(String explicitPassword, String configuredProfile, String configuredJdbcUrl) {
+    static String resolveExplicitPassword(
+            String configuredJdbcUrl,
+            UnaryOperator<String> propertyLookup,
+            UnaryOperator<String> envLookup,
+            UnaryOperator<String> runtimeEnvLookup) {
+        String propertyPassword = propertyLookup.apply(DB_PASSWORD_PROPERTY);
+        if (propertyPassword != null && !propertyPassword.isBlank()) {
+            return propertyPassword;
+        }
+
+        DatabaseDialect dialect = DatabaseDialect.fromJdbcUrl(configuredJdbcUrl);
+        String processEnvPassword = envLookup.apply(DB_PASSWORD_ENV);
+        if (processEnvPassword != null && !processEnvPassword.isBlank()) {
+            boolean requireExplicitRuntimeMatch = dialect == DatabaseDialect.H2;
+            if (matchesConfiguredRuntime(dialect, configuredJdbcUrl, envLookup, requireExplicitRuntimeMatch)) {
+                return processEnvPassword;
+            }
+        }
+
+        if (dialect != DatabaseDialect.POSTGRESQL) {
+            return null;
+        }
+
+        String dotEnvPassword = runtimeEnvLookup.apply(DB_PASSWORD_ENV);
+        if (dotEnvPassword == null || dotEnvPassword.isBlank()) {
+            return null;
+        }
+
+        if (!matchesConfiguredRuntime(dialect, configuredJdbcUrl, runtimeEnvLookup, false)) {
+            return null;
+        }
+
+        return dotEnvPassword;
+    }
+
+    private static boolean matchesConfiguredRuntime(
+            DatabaseDialect dialect,
+            String configuredJdbcUrl,
+            UnaryOperator<String> envLookup,
+            boolean requireExplicitRuntimeMatch) {
+        String configuredDialect = envLookup.apply("DATING_APP_DB_DIALECT");
+        String configuredRuntimeUrl = envLookup.apply("DATING_APP_DB_URL");
+        boolean hasExplicitRuntimeMatch = false;
+
+        if (configuredDialect != null && !configuredDialect.isBlank()) {
+            if (DatabaseDialect.fromConfig(configuredDialect, configuredJdbcUrl) != dialect) {
+                return false;
+            }
+            hasExplicitRuntimeMatch = true;
+        }
+
+        if (configuredRuntimeUrl != null && !configuredRuntimeUrl.isBlank()) {
+            if (!configuredRuntimeUrl.equals(configuredJdbcUrl)) {
+                return false;
+            }
+            hasExplicitRuntimeMatch = true;
+        }
+
+        return !requireExplicitRuntimeMatch || hasExplicitRuntimeMatch;
+    }
+
+    private static String resolvePassword(
+            String explicitPassword, String configuredProfile, String configuredJdbcUrl, DatabaseDialect dialect) {
         if (explicitPassword != null) {
             return explicitPassword;
         }
 
-        if (isExplicitDevOrTestProfile(configuredProfile)) {
+        if (dialect == DatabaseDialect.H2 && isExplicitDevOrTestProfile(configuredProfile)) {
             return "";
         }
 
-        if (isLocalFileUrl(configuredJdbcUrl)) {
+        if (dialect == DatabaseDialect.H2 && isLocalFileUrl(configuredJdbcUrl)) {
             throw new IllegalStateException(
                     "Local file databases require an explicit password or an explicit database profile (test/dev)");
         }
@@ -201,7 +316,21 @@ public final class DatabaseManager {
                 "Database password must be provided via datingapp.db.password or DATING_APP_DB_PASSWORD");
     }
 
-    private static String resolveJdbcUrl(String configuredJdbcUrl, String configuredProfile, String explicitPassword) {
+    static String resolvePassword(String explicitPassword, String configuredProfile, String configuredJdbcUrl) {
+        return resolvePassword(
+                explicitPassword, configuredProfile, configuredJdbcUrl, DatabaseDialect.fromJdbcUrl(configuredJdbcUrl));
+    }
+
+    static String resolveJdbcUrl(String configuredJdbcUrl, String configuredProfile, String explicitPassword) {
+        return resolveJdbcUrl(
+                configuredJdbcUrl, configuredProfile, explicitPassword, DatabaseDialect.fromJdbcUrl(configuredJdbcUrl));
+    }
+
+    private static String resolveJdbcUrl(
+            String configuredJdbcUrl, String configuredProfile, String explicitPassword, DatabaseDialect dialect) {
+        if (dialect == DatabaseDialect.POSTGRESQL) {
+            return configuredJdbcUrl;
+        }
         if (explicitPassword != null || !DEFAULT_JDBC_URL.equals(configuredJdbcUrl)) {
             return configuredJdbcUrl;
         }
@@ -219,27 +348,22 @@ public final class DatabaseManager {
     }
 
     private static String resolveConfiguredProfile() {
-        return firstNonBlank(System.getProperty(DB_PROFILE_PROPERTY), System.getenv(DB_PROFILE_ENV));
+        return RuntimeEnvironment.lookup(DB_PROFILE_PROPERTY, DB_PROFILE_ENV);
     }
 
     private static boolean isExplicitDevOrTestProfile(String profile) {
         return TEST_PROFILE.equalsIgnoreCase(profile) || DEV_PROFILE.equalsIgnoreCase(profile);
     }
 
-    private static String firstNonBlank(String first, String second) {
-        if (first != null && !first.isBlank()) {
-            return first;
-        }
-        if (second != null && !second.isBlank()) {
-            return second;
-        }
-        return null;
-    }
-
     private void applySessionQueryTimeout(Connection connection) {
         long timeoutMillisLong = queryTimeoutSeconds * 1000L;
         long safeTimeoutMillis = Math.min(timeoutMillisLong, Integer.MAX_VALUE);
-        String sql = "SET QUERY_TIMEOUT " + safeTimeoutMillis;
+        RuntimeStorageState storageState = runtimeStorageState.get();
+        DatabaseDialect dialect =
+                storageState != null ? storageState.dialect() : DatabaseDialect.fromJdbcUrl(effectiveJdbcUrl());
+        String sql = dialect == DatabaseDialect.POSTGRESQL
+                ? "SET statement_timeout TO " + safeTimeoutMillis
+                : "SET QUERY_TIMEOUT " + safeTimeoutMillis;
         try (Statement statement = connection.createStatement()) {
             statement.execute(sql);
         } catch (SQLException e) {
@@ -251,6 +375,8 @@ public final class DatabaseManager {
             throw new StorageException("Failed to apply query timeout", e);
         }
     }
+
+    private record RuntimeStorageState(AppConfig.StorageConfig storageConfig, DatabaseDialect dialect) {}
 
     // ═══════════════════════════════════════════════════════════════
     // StorageException (nested)

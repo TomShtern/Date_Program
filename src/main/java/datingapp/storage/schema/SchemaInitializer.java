@@ -20,6 +20,8 @@ import java.sql.Statement;
  */
 public final class SchemaInitializer {
 
+    static final String FLOAT64_SQL_TYPE = "DOUBLE PRECISION";
+
     private SchemaInitializer() {
         // Utility class — static methods only
     }
@@ -77,8 +79,8 @@ public final class SchemaInitializer {
                 + "birth_date DATE, "
                 + "gender VARCHAR(20), "
                 + "interested_in VARCHAR(100), "
-                + "lat DOUBLE, "
-                + "lon DOUBLE, "
+                + "lat " + FLOAT64_SQL_TYPE + ", "
+                + "lon " + FLOAT64_SQL_TYPE + ", "
                 + "has_location_set BOOLEAN DEFAULT FALSE, "
                 + "max_distance_km INT DEFAULT 50, "
                 + "min_age INT DEFAULT 18, "
@@ -179,21 +181,21 @@ public final class SchemaInitializer {
                     total_swipes_given INT NOT NULL DEFAULT 0,
                     likes_given INT NOT NULL DEFAULT 0,
                     passes_given INT NOT NULL DEFAULT 0,
-                    like_ratio DOUBLE NOT NULL DEFAULT 0.0,
+                    like_ratio DOUBLE PRECISION NOT NULL DEFAULT 0.0,
                     total_swipes_received INT NOT NULL DEFAULT 0,
                     likes_received INT NOT NULL DEFAULT 0,
                     passes_received INT NOT NULL DEFAULT 0,
-                    incoming_like_ratio DOUBLE NOT NULL DEFAULT 0.0,
+                    incoming_like_ratio DOUBLE PRECISION NOT NULL DEFAULT 0.0,
                     total_matches INT NOT NULL DEFAULT 0,
                     active_matches INT NOT NULL DEFAULT 0,
-                    match_rate DOUBLE NOT NULL DEFAULT 0.0,
+                    match_rate DOUBLE PRECISION NOT NULL DEFAULT 0.0,
                     blocks_given INT NOT NULL DEFAULT 0,
                     blocks_received INT NOT NULL DEFAULT 0,
                     reports_given INT NOT NULL DEFAULT 0,
                     reports_received INT NOT NULL DEFAULT 0,
-                    reciprocity_score DOUBLE NOT NULL DEFAULT 0.0,
-                    selectiveness_score DOUBLE NOT NULL DEFAULT 0.5,
-                    attractiveness_score DOUBLE NOT NULL DEFAULT 0.5,
+                    reciprocity_score DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+                    selectiveness_score DOUBLE PRECISION NOT NULL DEFAULT 0.5,
+                    attractiveness_score DOUBLE PRECISION NOT NULL DEFAULT 0.5,
                     CONSTRAINT fk_user_stats_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
                 )
                 """);
@@ -205,10 +207,10 @@ public final class SchemaInitializer {
                     id UUID PRIMARY KEY,
                     computed_at TIMESTAMP NOT NULL,
                     total_active_users INT NOT NULL DEFAULT 0,
-                    avg_likes_received DOUBLE NOT NULL DEFAULT 0.0,
-                    avg_likes_given DOUBLE NOT NULL DEFAULT 0.0,
-                    avg_match_rate DOUBLE NOT NULL DEFAULT 0.0,
-                    avg_like_ratio DOUBLE NOT NULL DEFAULT 0.5
+                    avg_likes_received DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+                    avg_likes_given DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+                    avg_match_rate DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+                    avg_like_ratio DOUBLE PRECISION NOT NULL DEFAULT 0.5
                 )
                 """);
     }

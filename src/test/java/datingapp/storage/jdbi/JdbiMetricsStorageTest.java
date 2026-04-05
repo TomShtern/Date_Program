@@ -11,6 +11,7 @@ import datingapp.core.matching.Standout;
 import datingapp.core.metrics.EngagementDomain.UserStats;
 import datingapp.core.metrics.SwipeState.Session;
 import datingapp.core.model.User;
+import datingapp.core.storage.AnalyticsStorage;
 import datingapp.storage.DatabaseManager;
 import java.sql.Timestamp;
 import java.time.Instant;
@@ -243,5 +244,46 @@ class JdbiMetricsStorageTest {
         assertEquals(
                 UUID.fromString("22222222-2222-2222-2222-222222222222"),
                 latest.get(0).id());
+    }
+
+    @Test
+    @DisplayName("getSessionAggregates preserves completed-session duration semantics")
+    void getSessionAggregatesPreservesCompletedSessionDurationSemantics() {
+        Session first = new Session(
+                UUID.randomUUID(),
+                viewer.getId(),
+                Instant.parse("2026-03-25T12:00:00Z"),
+                Instant.parse("2026-03-25T12:00:10Z"),
+                Instant.parse("2026-03-25T12:00:10Z"),
+                Session.MatchState.COMPLETED,
+                4,
+                3,
+                1,
+                1);
+        Session second = new Session(
+                UUID.randomUUID(),
+                viewer.getId(),
+                Instant.parse("2026-03-25T12:01:00Z"),
+                Instant.parse("2026-03-25T12:01:20Z"),
+                Instant.parse("2026-03-25T12:01:20Z"),
+                Session.MatchState.COMPLETED,
+                6,
+                2,
+                4,
+                0);
+
+        storage.saveSession(first);
+        storage.saveSession(second);
+
+        AnalyticsStorage.SessionAggregates aggregates = storage.getSessionAggregates(viewer.getId());
+
+        assertEquals(2, aggregates.totalSessions());
+        assertEquals(10, aggregates.totalSwipes());
+        assertEquals(5, aggregates.totalLikes());
+        assertEquals(5, aggregates.totalPasses());
+        assertEquals(1, aggregates.totalMatches());
+        assertEquals(15.0, aggregates.avgSessionDurationSeconds(), 0.0001);
+        assertEquals(5.0, aggregates.avgSwipesPerSession(), 0.0001);
+        assertEquals(10.0 / 30.0, aggregates.avgSwipeVelocity(), 0.0001);
     }
 }

@@ -44,6 +44,12 @@ class AppConfigTest {
             assertTrue(
                     defaults.matching().suspiciousSwipeVelocityBlockingEnabled(),
                     "Default suspicious swipe blocking should be enabled");
+            assertEquals("H2", defaults.storage().databaseDialect(), "Default database dialect should be H2");
+            assertEquals(
+                    "jdbc:h2:./data/dating",
+                    defaults.storage().databaseUrl(),
+                    "Default database URL should keep the existing H2 runtime path");
+            assertEquals("sa", defaults.storage().databaseUsername(), "Default database username should be sa");
             assertEquals(30, defaults.storage().queryTimeoutSeconds(), "Default query timeout should be 30");
             assertEquals(10, defaults.validation().maxInterests(), "Default max interests should be 10");
             assertEquals(
@@ -125,6 +131,9 @@ class AppConfigTest {
             assertSame(builder, builder.maxReportDescLength(1));
             assertSame(builder, builder.maxMessageLength(1));
             assertSame(builder, builder.maxProfileNoteLength(1));
+            assertSame(builder, builder.databaseDialect("POSTGRESQL"));
+            assertSame(builder, builder.databaseUrl("jdbc:postgresql://localhost:5432/datingapp"));
+            assertSame(builder, builder.databaseUsername("datingapp"));
             assertSame(builder, builder.queryTimeoutSeconds(1));
             assertSame(builder, builder.standoutDiversityDays(1));
             assertSame(builder, builder.standoutMinScore(1));
@@ -183,6 +192,11 @@ class AppConfigTest {
         void builderMapsStorageFieldsIntoCorrectSubRecord() {
             AppConfig config = createCustomConfig();
 
+            assertEquals("POSTGRESQL", config.storage().databaseDialect());
+            assertEquals(
+                    "jdbc:postgresql://localhost:5432/datingapp",
+                    config.storage().databaseUrl());
+            assertEquals("datingapp", config.storage().databaseUsername());
             assertEquals(62, config.storage().queryTimeoutSeconds());
         }
 
@@ -341,6 +355,9 @@ class AppConfigTest {
                     .lifestyleFieldTarget(6)
                     .cleanupRetentionDays(61)
                     .softDeleteRetentionDays(91)
+                    .databaseDialect("POSTGRESQL")
+                    .databaseUrl("jdbc:postgresql://localhost:5432/datingapp")
+                    .databaseUsername("datingapp")
                     .queryTimeoutSeconds(62)
                     .build();
         }

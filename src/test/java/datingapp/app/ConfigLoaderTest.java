@@ -98,7 +98,7 @@ class ConfigLoaderTest {
                     }
                     """;
 
-            AppConfig config = ApplicationStartup.fromJson(json);
+            AppConfig config = ApplicationStartup.fromJson(json, name -> null);
 
             assertEquals(10, config.safety().autoBanThreshold());
             assertEquals(50, config.matching().dailyLikeLimit());
@@ -126,13 +126,33 @@ class ConfigLoaderTest {
                     }
                     """;
 
-            AppConfig config = ApplicationStartup.fromJson(json);
+            AppConfig config = ApplicationStartup.fromJson(json, name -> null);
 
             assertEquals(60, config.safety().sessionTimeoutMinutes());
             assertEquals(45, config.storage().queryTimeoutSeconds());
             assertEquals(200, config.matching().maxSwipesPerSession());
             assertEquals(2.5, config.matching().suspiciousSwipeVelocity(), 0.01);
             assertFalse(config.matching().suspiciousSwipeVelocityBlockingEnabled());
+        }
+
+        @Test
+        @DisplayName("Should parse storage database settings")
+        void parsesStorageDatabaseSettings() {
+            String json = """
+                    {
+                      "databaseDialect": "POSTGRESQL",
+                      "databaseUrl": "jdbc:postgresql://localhost:5432/datingapp",
+                      "databaseUsername": "datingapp"
+                    }
+                    """;
+
+            AppConfig config = ApplicationStartup.fromJson(json, name -> null);
+
+            assertEquals("POSTGRESQL", config.storage().databaseDialect());
+            assertEquals(
+                    "jdbc:postgresql://localhost:5432/datingapp",
+                    config.storage().databaseUrl());
+            assertEquals("datingapp", config.storage().databaseUsername());
         }
 
         @Test

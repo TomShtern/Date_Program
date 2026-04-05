@@ -44,4 +44,19 @@ class StorageFactoryInMemoryTest {
                 second.getUserStorage().findAll().isEmpty(),
                 "second in-memory registry should not see first registry data");
     }
+
+    @Test
+    @DisplayName("buildInMemory should remain H2-backed even when runtime config targets PostgreSQL")
+    void buildInMemoryRemainsH2BackedWhenRuntimeConfigTargetsPostgresql() {
+        AppConfig postgresqlRuntimeConfig = AppConfig.builder()
+                .databaseDialect("POSTGRESQL")
+                .databaseUrl("jdbc:postgresql://localhost:5432/datingapp")
+                .databaseUsername("datingapp")
+                .build();
+
+        ServiceRegistry registry = StorageFactory.buildInMemory(postgresqlRuntimeConfig);
+        registry.getUserStorage().save(new User(UUID.randomUUID(), "H2 In-Memory User"));
+
+        assertEquals(1, registry.getUserStorage().findAll().size());
+    }
 }

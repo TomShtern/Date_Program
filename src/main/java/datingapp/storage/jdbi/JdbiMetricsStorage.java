@@ -8,8 +8,10 @@ import datingapp.core.metrics.EngagementDomain.PlatformStats;
 import datingapp.core.metrics.EngagementDomain.UserStats;
 import datingapp.core.metrics.SwipeState.Session;
 import datingapp.core.storage.AnalyticsStorage;
+import datingapp.storage.DatabaseDialect;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Types;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -20,9 +22,9 @@ import java.util.UUID;
 import org.jdbi.v3.core.Jdbi;
 import org.jdbi.v3.core.mapper.RowMapper;
 import org.jdbi.v3.core.statement.StatementContext;
+import org.jdbi.v3.core.statement.Update;
 import org.jdbi.v3.sqlobject.config.RegisterRowMapper;
 import org.jdbi.v3.sqlobject.customizer.Bind;
-import org.jdbi.v3.sqlobject.customizer.BindBean;
 import org.jdbi.v3.sqlobject.customizer.BindMethods;
 import org.jdbi.v3.sqlobject.statement.SqlQuery;
 import org.jdbi.v3.sqlobject.statement.SqlUpdate;
@@ -34,17 +36,45 @@ import org.jdbi.v3.sqlobject.statement.SqlUpdate;
 public final class JdbiMetricsStorage implements AnalyticsStorage, Standout.Storage {
 
     private static final String USER_ID_COLUMN = "user_id";
+    private static final String USER_ID_BIND = "userId";
+    private static final String VIEWED_AT_COLUMN = "viewed_at";
+    private static final String ACHIEVEMENT_COLUMN = "achievement";
+    private static final String CREATED_AT_BIND = "createdAt";
+    private static final String CREATED_AT_COLUMN = "created_at";
+    private static final String STATE_COLUMN = "state";
+    private static final String SCORE_COLUMN = "score";
+    private static final String REASON_COLUMN = "reason";
+    private static final String STARTED_AT_COLUMN = "started_at";
+    private static final String ENDED_AT_COLUMN = "ended_at";
+    private static final String FEATURED_DATE_COLUMN = "featured_date";
+    private static final String SEEKER_ID_COLUMN = "seeker_id";
+    private static final String STANDOUT_USER_ID_COLUMN = "standout_user_id";
 
     private final Jdbi jdbi;
     private final StatsDao statsDao;
     private final SessionDao sessionDao;
     private final StandoutDao standoutDao;
+    private final String profileViewUpsertSql;
+    private final String userAchievementUpsertSql;
+    private final String dailyPickViewUpsertSql;
+    private final String dailyPickUserUpsertSql;
+    private final String sessionUpsertSql;
+    private final String sessionAggregatesSql;
+    private final String standoutUpsertSql;
 
     public JdbiMetricsStorage(Jdbi jdbi) {
         this.jdbi = Objects.requireNonNull(jdbi, "jdbi cannot be null");
         this.statsDao = jdbi.onDemand(StatsDao.class);
         this.sessionDao = jdbi.onDemand(SessionDao.class);
         this.standoutDao = jdbi.onDemand(StandoutDao.class);
+        DatabaseDialect dialect = detectDialect(jdbi);
+        this.profileViewUpsertSql = buildProfileViewUpsertSql(dialect);
+        this.userAchievementUpsertSql = buildUserAchievementUpsertSql(dialect);
+        this.dailyPickViewUpsertSql = buildDailyPickViewUpsertSql(dialect);
+        this.dailyPickUserUpsertSql = buildDailyPickUserUpsertSql(dialect);
+        this.sessionUpsertSql = buildSessionUpsertSql(dialect);
+        this.sessionAggregatesSql = buildSessionAggregatesSql(dialect);
+        this.standoutUpsertSql = buildStandoutUpsertSql(dialect);
     }
 
     @Override
@@ -89,7 +119,17 @@ public final class JdbiMetricsStorage implements AnalyticsStorage, Standout.Stor
 
     @Override
     public void recordProfileView(UUID viewerId, UUID viewedId) {
-        statsDao.recordProfileView(viewerId, viewedId);
+        if (viewerId.equals(viewedId)) {
+            return;
+        }
+        jdbi.useHandle(handle -> {
+            try (var update = handle.createUpdate(profileViewUpsertSql)) {
+                update.bind("viewerId", viewerId)
+                        .bind("viewedId", viewedId)
+                        .bind("viewedAt", AppClock.now())
+                        .execute();
+            }
+        });
     }
 
     @Override
@@ -114,7 +154,15 @@ public final class JdbiMetricsStorage implements AnalyticsStorage, Standout.Stor
 
     @Override
     public void saveUserAchievement(UserAchievement achievement) {
-        statsDao.saveUserAchievement(achievement);
+        jdbi.useHandle(handle -> {
+            try (var update = handle.createUpdate(userAchievementUpsertSql)) {
+                update.bind("id", achievement.id())
+                        .bind(USER_ID_BIND, achievement.userId())
+                        .bind(ACHIEVEMENT_COLUMN, achievement.achievement())
+                        .bind("unlockedAt", achievement.unlockedAt())
+                        .execute();
+            }
+        });
     }
 
     @Override
@@ -134,7 +182,14 @@ public final class JdbiMetricsStorage implements AnalyticsStorage, Standout.Stor
 
     @Override
     public void markDailyPickAsViewed(UUID userId, LocalDate date) {
-        statsDao.markDailyPickAsViewed(userId, date);
+        jdbi.useHandle(handle -> {
+            try (var update = handle.createUpdate(dailyPickViewUpsertSql)) {
+                update.bind(USER_ID_BIND, userId)
+                        .bind("date", date)
+                        .bind("at", AppClock.now())
+                        .execute();
+            }
+        });
     }
 
     @Override
@@ -149,7 +204,15 @@ public final class JdbiMetricsStorage implements AnalyticsStorage, Standout.Stor
 
     @Override
     public void saveDailyPickUser(UUID userId, UUID pickedUserId, LocalDate date) {
-        statsDao.saveDailyPickUser(userId, pickedUserId, date, AppClock.now());
+        jdbi.useHandle(handle -> {
+            try (var update = handle.createUpdate(dailyPickUserUpsertSql)) {
+                update.bind(USER_ID_BIND, userId)
+                        .bind("pickedUserId", pickedUserId)
+                        .bind("date", date)
+                        .bind(CREATED_AT_BIND, AppClock.now())
+                        .execute();
+            }
+        });
     }
 
     @Override
@@ -174,7 +237,21 @@ public final class JdbiMetricsStorage implements AnalyticsStorage, Standout.Stor
 
     @Override
     public void saveSession(Session session) {
-        sessionDao.save(session);
+        jdbi.useHandle(handle -> {
+            try (var update = handle.createUpdate(sessionUpsertSql)) {
+                update.bind("id", session.getId())
+                        .bind(USER_ID_BIND, session.getUserId())
+                        .bind("startedAt", session.getStartedAt())
+                        .bind("lastActivityAt", session.getLastActivityAt())
+                        .bind(STATE_COLUMN, session.getState())
+                        .bind("swipeCount", session.getSwipeCount())
+                        .bind("likeCount", session.getLikeCount())
+                        .bind("passCount", session.getPassCount())
+                        .bind("matchCount", session.getMatchCount());
+                bindNullableInstant(update, "endedAt", session.getEndedAt());
+                update.execute();
+            }
+        });
     }
 
     @Override
@@ -199,7 +276,18 @@ public final class JdbiMetricsStorage implements AnalyticsStorage, Standout.Stor
 
     @Override
     public SessionAggregates getSessionAggregates(UUID userId) {
-        return sessionDao.getAggregates(userId);
+        return jdbi.withHandle(handle -> handle.createQuery(sessionAggregatesSql)
+                .bind(USER_ID_BIND, userId)
+                .map((rs, ctx) -> new SessionAggregates(
+                        rs.getInt("total_sessions"),
+                        rs.getInt("total_swipes"),
+                        rs.getInt("total_likes"),
+                        rs.getInt("total_passes"),
+                        rs.getInt("total_matches"),
+                        rs.getDouble("avg_session_duration_seconds"),
+                        rs.getDouble("avg_swipes_per_session"),
+                        rs.getDouble("avg_swipe_velocity")))
+                .one());
     }
 
     @Override
@@ -222,7 +310,6 @@ public final class JdbiMetricsStorage implements AnalyticsStorage, Standout.Stor
         }
 
         jdbi.useTransaction(handle -> {
-            StandoutDao txStandoutDao = handle.attach(StandoutDao.class);
             for (Standout standout : standouts) {
                 if (standout == null) {
                     continue;
@@ -242,7 +329,18 @@ public final class JdbiMetricsStorage implements AnalyticsStorage, Standout.Stor
                             standout.interactedAt());
                 }
 
-                txStandoutDao.upsert(new StandoutBindingHelper(normalized));
+                try (var update = handle.createUpdate(standoutUpsertSql)) {
+                    update.bind("id", normalized.id())
+                            .bind("seekerId", normalized.seekerId())
+                            .bind("standoutUserId", normalized.standoutUserId())
+                            .bind("featuredDate", normalized.featuredDate())
+                            .bind("rank", normalized.rank())
+                            .bind(SCORE_COLUMN, normalized.score())
+                            .bind(REASON_COLUMN, normalized.reason())
+                            .bind(CREATED_AT_BIND, normalized.createdAt());
+                    bindNullableInstant(update, "interactedAt", normalized.interactedAt());
+                    update.execute();
+                }
             }
         });
     }
@@ -361,21 +459,6 @@ public final class JdbiMetricsStorage implements AnalyticsStorage, Standout.Stor
         @RegisterRowMapper(PlatformStatsMapper.class)
         List<PlatformStats> getPlatformStatsHistory(@Bind("limit") int limit);
 
-        @SqlUpdate("""
-            MERGE INTO profile_views (viewer_id, viewed_id, viewed_at)
-            KEY (viewer_id, viewed_id, viewed_at)
-            VALUES (:viewerId, :viewedId, :viewedAt)
-            """)
-        void insertView(
-                @Bind("viewerId") UUID viewerId, @Bind("viewedId") UUID viewedId, @Bind("viewedAt") Instant viewedAt);
-
-        default void recordProfileView(UUID viewerId, UUID viewedId) {
-            if (viewerId.equals(viewedId)) {
-                return;
-            }
-            insertView(viewerId, viewedId, AppClock.now());
-        }
-
         @SqlQuery("SELECT COUNT(*) FROM profile_views WHERE viewed_id = :userId")
         int getProfileViewCount(@Bind("userId") UUID userId);
 
@@ -405,13 +488,6 @@ public final class JdbiMetricsStorage implements AnalyticsStorage, Standout.Stor
                 """)
         boolean hasViewedProfile(@Bind("viewerId") UUID viewerId, @Bind("viewedId") UUID viewedId);
 
-        @SqlUpdate("""
-                MERGE INTO user_achievements (id, user_id, achievement, unlocked_at)
-                KEY (user_id, achievement)
-                VALUES (:id, :userId, :achievement, :unlockedAt)
-                """)
-        void saveUserAchievement(@BindMethods UserAchievement achievement);
-
         @SqlQuery("""
                 SELECT id, user_id, achievement, unlocked_at
                 FROM user_achievements
@@ -429,27 +505,11 @@ public final class JdbiMetricsStorage implements AnalyticsStorage, Standout.Stor
         @SqlQuery("SELECT COUNT(*) FROM user_achievements WHERE user_id = :userId")
         int countUnlockedAchievements(@Bind("userId") UUID userId);
 
-        @SqlUpdate(
-                "MERGE INTO daily_pick_views (user_id, viewed_date, viewed_at) KEY (user_id, viewed_date) VALUES (:userId, :date, :at)")
-        void saveDailyPickView(@Bind("userId") UUID userId, @Bind("date") LocalDate date, @Bind("at") Instant at);
-
-        default void markDailyPickAsViewed(UUID userId, LocalDate date) {
-            saveDailyPickView(userId, date, AppClock.now());
-        }
-
         @SqlQuery("SELECT COUNT(*) > 0 FROM daily_pick_views WHERE user_id = :userId AND viewed_date = :date")
         boolean isDailyPickViewed(@Bind("userId") UUID userId, @Bind("date") LocalDate date);
 
         @SqlQuery("SELECT picked_user_id FROM daily_picks WHERE user_id = :userId AND pick_date = :date")
         Optional<UUID> getDailyPickUser(@Bind("userId") UUID userId, @Bind("date") LocalDate date);
-
-        @SqlUpdate("MERGE INTO daily_picks (user_id, pick_date, picked_user_id, created_at) "
-                + "KEY (user_id, pick_date) VALUES (:userId, :date, :pickedUserId, :createdAt)")
-        void saveDailyPickUser(
-                @Bind("userId") UUID userId,
-                @Bind("pickedUserId") UUID pickedUserId,
-                @Bind("date") LocalDate date,
-                @Bind("createdAt") Instant createdAt);
 
         @SqlUpdate("DELETE FROM daily_pick_views WHERE viewed_date < :before")
         int deleteDailyPickViewsOlderThan(@Bind("before") LocalDate before);
@@ -460,15 +520,6 @@ public final class JdbiMetricsStorage implements AnalyticsStorage, Standout.Stor
 
     @RegisterRowMapper(SwipeSessionMapper.class)
     private interface SessionDao {
-
-        @SqlUpdate("""
-                MERGE INTO swipe_sessions (id, user_id, started_at, last_activity_at, ended_at,
-                                           state, swipe_count, like_count, pass_count, match_count)
-                KEY (id)
-                VALUES (:id, :userId, :startedAt, :lastActivityAt, :endedAt,
-                        :state, :swipeCount, :likeCount, :passCount, :matchCount)
-                """)
-        void save(@BindBean Session session);
 
         @SqlQuery("""
                 SELECT id, user_id, started_at, last_activity_at, ended_at,
@@ -504,42 +555,6 @@ public final class JdbiMetricsStorage implements AnalyticsStorage, Standout.Stor
         List<Session> getSessionsInRange(
                 @Bind("userId") UUID userId, @Bind("start") Instant start, @Bind("end") Instant end);
 
-        @SqlQuery("""
-                SELECT
-                    COUNT(*) as total_sessions,
-                    COALESCE(SUM(swipe_count), 0) as total_swipes,
-                    COALESCE(SUM(like_count), 0) as total_likes,
-                    COALESCE(SUM(pass_count), 0) as total_passes,
-                    COALESCE(SUM(match_count), 0) as total_matches,
-                    COALESCE(AVG(
-                        CASE WHEN ended_at IS NOT NULL
-                        THEN DATEDIFF('SECOND', started_at, ended_at)
-                        ELSE NULL END
-                    ), 0) as avg_session_duration_seconds,
-                    CASE
-                        WHEN COUNT(*) = 0 THEN 0
-                        ELSE COALESCE(SUM(swipe_count), 0) * 1.0 / COUNT(*)
-                    END as avg_swipes_per_session,
-                    CASE
-                        WHEN COALESCE(SUM(
-                            CASE WHEN ended_at IS NOT NULL
-                            THEN DATEDIFF('SECOND', started_at, ended_at)
-                            ELSE 0 END
-                        ), 0) = 0 THEN 0
-                        ELSE COALESCE(SUM(
-                            CASE WHEN ended_at IS NOT NULL THEN swipe_count ELSE 0 END
-                        ), 0) * 1.0 /
-                            COALESCE(SUM(
-                                CASE WHEN ended_at IS NOT NULL
-                                THEN DATEDIFF('SECOND', started_at, ended_at)
-                                ELSE 0 END
-                            ), 0)
-                    END as avg_swipe_velocity
-                FROM swipe_sessions
-                WHERE user_id = :userId
-                """)
-        SessionAggregates getAggregates(@Bind("userId") UUID userId);
-
         @SqlUpdate("""
                 UPDATE swipe_sessions
                 SET state = 'COMPLETED', ended_at = :now
@@ -559,16 +574,6 @@ public final class JdbiMetricsStorage implements AnalyticsStorage, Standout.Stor
 
     @RegisterRowMapper(StandoutMapper.class)
     private interface StandoutDao {
-
-        @SqlUpdate("""
-                MERGE INTO standouts (
-                    id, seeker_id, standout_user_id, featured_date, rank, score, reason, created_at, interacted_at
-                ) KEY (seeker_id, standout_user_id, featured_date)
-                VALUES (
-                    :id, :seekerId, :standoutUserId, :featuredDate, :rank, :score, :reason, :createdAt, :interactedAt
-                )
-                """)
-        void upsert(@BindBean StandoutBindingHelper standout);
 
         @SqlQuery("""
                 SELECT id, seeker_id, standout_user_id, featured_date, rank, score, reason, created_at, interacted_at
@@ -646,7 +651,7 @@ public final class JdbiMetricsStorage implements AnalyticsStorage, Standout.Stor
         public UserAchievement map(ResultSet rs, StatementContext ctx) throws SQLException {
             var id = JdbiTypeCodecs.SqlRowReaders.readUuid(rs, "id");
             var userId = JdbiTypeCodecs.SqlRowReaders.readUuid(rs, USER_ID_COLUMN);
-            var achievement = JdbiTypeCodecs.SqlRowReaders.readEnum(rs, "achievement", Achievement.class);
+            var achievement = JdbiTypeCodecs.SqlRowReaders.readEnum(rs, ACHIEVEMENT_COLUMN, Achievement.class);
             var unlockedAt = JdbiTypeCodecs.SqlRowReaders.readInstant(rs, "unlocked_at");
             return UserAchievement.of(id, userId, achievement, unlockedAt);
         }
@@ -657,10 +662,10 @@ public final class JdbiMetricsStorage implements AnalyticsStorage, Standout.Stor
         public Session map(ResultSet rs, StatementContext ctx) throws SQLException {
             UUID id = JdbiTypeCodecs.SqlRowReaders.readUuid(rs, "id");
             UUID userId = JdbiTypeCodecs.SqlRowReaders.readUuid(rs, USER_ID_COLUMN);
-            var startedAt = JdbiTypeCodecs.SqlRowReaders.readInstant(rs, "started_at");
+            var startedAt = JdbiTypeCodecs.SqlRowReaders.readInstant(rs, STARTED_AT_COLUMN);
             var lastActivityAt = JdbiTypeCodecs.SqlRowReaders.readInstant(rs, "last_activity_at");
-            var endedAt = JdbiTypeCodecs.SqlRowReaders.readInstant(rs, "ended_at");
-            String stateStr = rs.getString("state");
+            var endedAt = JdbiTypeCodecs.SqlRowReaders.readInstant(rs, ENDED_AT_COLUMN);
+            String stateStr = rs.getString(STATE_COLUMN);
             Session.MatchState state =
                     stateStr == null ? Session.MatchState.ACTIVE : Session.MatchState.valueOf(stateStr);
             int swipeCount = rs.getInt("swipe_count");
@@ -730,20 +735,160 @@ public final class JdbiMetricsStorage implements AnalyticsStorage, Standout.Stor
         @Override
         public Standout map(ResultSet rs, StatementContext ctx) throws SQLException {
             Instant interactedAt = JdbiTypeCodecs.SqlRowReaders.readInstant(rs, "interacted_at");
-            LocalDate featuredDate = JdbiTypeCodecs.SqlRowReaders.readLocalDate(rs, "featured_date");
+            LocalDate featuredDate = JdbiTypeCodecs.SqlRowReaders.readLocalDate(rs, FEATURED_DATE_COLUMN);
             if (featuredDate == null) {
                 featuredDate = AppClock.today();
             }
             return Standout.fromDatabase(
                     JdbiTypeCodecs.SqlRowReaders.readUuid(rs, "id"),
-                    JdbiTypeCodecs.SqlRowReaders.readUuid(rs, "seeker_id"),
-                    JdbiTypeCodecs.SqlRowReaders.readUuid(rs, "standout_user_id"),
+                    JdbiTypeCodecs.SqlRowReaders.readUuid(rs, SEEKER_ID_COLUMN),
+                    JdbiTypeCodecs.SqlRowReaders.readUuid(rs, STANDOUT_USER_ID_COLUMN),
                     featuredDate,
                     rs.getInt("rank"),
-                    rs.getInt("score"),
-                    rs.getString("reason"),
-                    JdbiTypeCodecs.SqlRowReaders.readInstant(rs, "created_at"),
+                    rs.getInt(SCORE_COLUMN),
+                    rs.getString(REASON_COLUMN),
+                    JdbiTypeCodecs.SqlRowReaders.readInstant(rs, CREATED_AT_COLUMN),
                     interactedAt);
         }
+    }
+
+    private static DatabaseDialect detectDialect(Jdbi jdbi) {
+        return jdbi.withHandle(handle -> {
+            try {
+                return DatabaseDialect.fromDatabaseProductName(
+                        handle.getConnection().getMetaData().getDatabaseProductName());
+            } catch (SQLException exception) {
+                throw new IllegalStateException("Failed to detect database dialect", exception);
+            }
+        });
+    }
+
+    private static void bindNullableInstant(Update update, String parameter, Instant value) {
+        if (value != null) {
+            update.bind(parameter, value);
+            return;
+        }
+        update.bindNull(parameter, Types.TIMESTAMP);
+    }
+
+    private static String buildProfileViewUpsertSql(DatabaseDialect dialect) {
+        return SqlDialectSupport.upsertSql(
+                dialect,
+                "profile_views",
+                List.of(
+                        new SqlDialectSupport.ColumnBinding("viewer_id", "viewerId"),
+                        new SqlDialectSupport.ColumnBinding("viewed_id", "viewedId"),
+                        new SqlDialectSupport.ColumnBinding(VIEWED_AT_COLUMN, "viewedAt")),
+                List.of("viewer_id", "viewed_id", VIEWED_AT_COLUMN));
+    }
+
+    private static String buildUserAchievementUpsertSql(DatabaseDialect dialect) {
+        return SqlDialectSupport.upsertSql(
+                dialect,
+                "user_achievements",
+                List.of(
+                        new SqlDialectSupport.ColumnBinding("id", "id"),
+                        new SqlDialectSupport.ColumnBinding(USER_ID_COLUMN, USER_ID_BIND),
+                        new SqlDialectSupport.ColumnBinding(ACHIEVEMENT_COLUMN, ACHIEVEMENT_COLUMN),
+                        new SqlDialectSupport.ColumnBinding("unlocked_at", "unlockedAt")),
+                List.of(USER_ID_COLUMN, ACHIEVEMENT_COLUMN));
+    }
+
+    private static String buildDailyPickViewUpsertSql(DatabaseDialect dialect) {
+        return SqlDialectSupport.upsertSql(
+                dialect,
+                "daily_pick_views",
+                List.of(
+                        new SqlDialectSupport.ColumnBinding(USER_ID_COLUMN, USER_ID_BIND),
+                        new SqlDialectSupport.ColumnBinding("viewed_date", "date"),
+                        new SqlDialectSupport.ColumnBinding(VIEWED_AT_COLUMN, "at")),
+                List.of(USER_ID_COLUMN, "viewed_date"));
+    }
+
+    private static String buildDailyPickUserUpsertSql(DatabaseDialect dialect) {
+        return SqlDialectSupport.upsertSql(
+                dialect,
+                "daily_picks",
+                List.of(
+                        new SqlDialectSupport.ColumnBinding(USER_ID_COLUMN, USER_ID_BIND),
+                        new SqlDialectSupport.ColumnBinding("pick_date", "date"),
+                        new SqlDialectSupport.ColumnBinding("picked_user_id", "pickedUserId"),
+                        new SqlDialectSupport.ColumnBinding(CREATED_AT_COLUMN, CREATED_AT_BIND)),
+                List.of(USER_ID_COLUMN, "pick_date"));
+    }
+
+    private static String buildSessionUpsertSql(DatabaseDialect dialect) {
+        return SqlDialectSupport.upsertSql(
+                dialect,
+                "swipe_sessions",
+                List.of(
+                        new SqlDialectSupport.ColumnBinding("id", "id"),
+                        new SqlDialectSupport.ColumnBinding(USER_ID_COLUMN, USER_ID_BIND),
+                        new SqlDialectSupport.ColumnBinding(STARTED_AT_COLUMN, "startedAt"),
+                        new SqlDialectSupport.ColumnBinding("last_activity_at", "lastActivityAt"),
+                        new SqlDialectSupport.ColumnBinding(ENDED_AT_COLUMN, "endedAt"),
+                        new SqlDialectSupport.ColumnBinding(STATE_COLUMN, STATE_COLUMN),
+                        new SqlDialectSupport.ColumnBinding("swipe_count", "swipeCount"),
+                        new SqlDialectSupport.ColumnBinding("like_count", "likeCount"),
+                        new SqlDialectSupport.ColumnBinding("pass_count", "passCount"),
+                        new SqlDialectSupport.ColumnBinding("match_count", "matchCount")),
+                List.of("id"));
+    }
+
+    private static String buildSessionAggregatesSql(DatabaseDialect dialect) {
+        String sessionDurationSecondsExpression =
+                SqlDialectSupport.sessionDurationSecondsExpression(dialect, STARTED_AT_COLUMN, ENDED_AT_COLUMN);
+        return """
+                SELECT
+                    COUNT(*) as total_sessions,
+                    COALESCE(SUM(swipe_count), 0) as total_swipes,
+                    COALESCE(SUM(like_count), 0) as total_likes,
+                    COALESCE(SUM(pass_count), 0) as total_passes,
+                    COALESCE(SUM(match_count), 0) as total_matches,
+                    COALESCE(AVG(
+                        CASE WHEN ended_at IS NOT NULL
+                        THEN %s
+                        ELSE NULL END
+                    ), 0) as avg_session_duration_seconds,
+                    CASE
+                        WHEN COUNT(*) = 0 THEN 0
+                        ELSE COALESCE(SUM(swipe_count), 0) * 1.0 / COUNT(*)
+                    END as avg_swipes_per_session,
+                    CASE
+                        WHEN COALESCE(SUM(
+                            CASE WHEN ended_at IS NOT NULL
+                            THEN %s
+                            ELSE 0 END
+                        ), 0) = 0 THEN 0
+                        ELSE COALESCE(SUM(
+                            CASE WHEN ended_at IS NOT NULL THEN swipe_count ELSE 0 END
+                        ), 0) * 1.0 /
+                            COALESCE(SUM(
+                                CASE WHEN ended_at IS NOT NULL
+                                THEN %s
+                                ELSE 0 END
+                            ), 0)
+                    END as avg_swipe_velocity
+                FROM swipe_sessions
+                WHERE user_id = :userId
+                """.formatted(
+                sessionDurationSecondsExpression, sessionDurationSecondsExpression, sessionDurationSecondsExpression);
+    }
+
+    private static String buildStandoutUpsertSql(DatabaseDialect dialect) {
+        return SqlDialectSupport.upsertSql(
+                dialect,
+                "standouts",
+                List.of(
+                        new SqlDialectSupport.ColumnBinding("id", "id"),
+                        new SqlDialectSupport.ColumnBinding(SEEKER_ID_COLUMN, "seekerId"),
+                        new SqlDialectSupport.ColumnBinding(STANDOUT_USER_ID_COLUMN, "standoutUserId"),
+                        new SqlDialectSupport.ColumnBinding(FEATURED_DATE_COLUMN, "featuredDate"),
+                        new SqlDialectSupport.ColumnBinding("rank", "rank"),
+                        new SqlDialectSupport.ColumnBinding(SCORE_COLUMN, SCORE_COLUMN),
+                        new SqlDialectSupport.ColumnBinding(REASON_COLUMN, REASON_COLUMN),
+                        new SqlDialectSupport.ColumnBinding(CREATED_AT_COLUMN, CREATED_AT_BIND),
+                        new SqlDialectSupport.ColumnBinding("interacted_at", "interactedAt")),
+                List.of(SEEKER_ID_COLUMN, STANDOUT_USER_ID_COLUMN, FEATURED_DATE_COLUMN));
     }
 }

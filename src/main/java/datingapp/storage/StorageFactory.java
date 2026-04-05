@@ -59,9 +59,23 @@ public final class StorageFactory {
 
     private StorageFactory() {}
 
+    public static ServiceRegistry buildSqlDatabase(DatabaseManager dbManager, AppConfig config) {
+        Objects.requireNonNull(dbManager, "dbManager cannot be null");
+        Objects.requireNonNull(config, "config cannot be null");
+        dbManager.configureStorage(config.storage());
+
+        return buildRegistry(dbManager, config);
+    }
+
     public static ServiceRegistry buildH2(DatabaseManager dbManager, AppConfig config) {
         Objects.requireNonNull(dbManager, "dbManager cannot be null");
         Objects.requireNonNull(config, "config cannot be null");
+        dbManager.clearRuntimeStorageConfiguration();
+
+        return buildRegistry(dbManager, config);
+    }
+
+    private static ServiceRegistry buildRegistry(DatabaseManager dbManager, AppConfig config) {
         dbManager.configureQueryTimeoutSeconds(config.storage().queryTimeoutSeconds());
 
         Jdbi jdbi = createJdbi(dbManager);
