@@ -44,14 +44,12 @@ public class SafetyHandler implements LoggingSupport {
     private final AppConfig config;
 
     public SafetyHandler(
-            datingapp.core.matching.TrustSafetyService trustSafetyService,
             SocialUseCases socialUseCases,
             ProfileUseCases profileUseCases,
             VerificationUseCases verificationUseCases,
             AppSession session,
             InputReader inputReader,
             AppConfig config) {
-        Objects.requireNonNull(trustSafetyService, "trustSafetyService cannot be null");
         this.socialUseCases = Objects.requireNonNull(socialUseCases);
         this.profileUseCases = Objects.requireNonNull(profileUseCases);
         this.verificationUseCases = Objects.requireNonNull(verificationUseCases);
@@ -63,7 +61,6 @@ public class SafetyHandler implements LoggingSupport {
     public static SafetyHandler fromServices(ServiceRegistry services, AppSession session, InputReader inputReader) {
         Objects.requireNonNull(services, "services cannot be null");
         return new SafetyHandler(
-                services.getTrustSafetyService(),
                 services.getSocialUseCases(),
                 services.getProfileUseCases(),
                 services.getVerificationUseCases(),

@@ -97,9 +97,7 @@ final class RestApiDtos {
         static BrowseCandidatesResponse from(
                 datingapp.app.usecase.matching.MatchingUseCases.BrowseCandidatesResult result, ZoneId userTimeZone) {
             return new BrowseCandidatesResponse(
-                    result.candidates().stream()
-                            .map(candidate -> UserSummary.from(candidate, userTimeZone))
-                            .toList(),
+                    UserSummary.fromUsers(result.candidates(), userTimeZone),
                     result.dailyPick()
                             .map(dailyPick -> DailyPickDto.from(dailyPick, userTimeZone))
                             .orElse(null),

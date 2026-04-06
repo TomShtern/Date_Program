@@ -76,14 +76,12 @@ public class ProfileHandler implements LoggingSupport {
     private static final String PROMPT_CHOICE = "Your choice: ";
 
     public ProfileHandler(
-            datingapp.core.storage.UserStorage userStorage,
             ValidationService validationService,
             LocationService locationService,
             ProfileUseCases profileUseCases,
             AppConfig config,
             AppSession session,
             InputReader inputReader) {
-        Objects.requireNonNull(userStorage, "userStorage cannot be null");
         this.validationService = Objects.requireNonNull(validationService, "validationService cannot be null");
         this.locationService = Objects.requireNonNull(locationService, "locationService cannot be null");
         this.profileUseCases = Objects.requireNonNull(profileUseCases, "profileUseCases cannot be null");
@@ -94,27 +92,9 @@ public class ProfileHandler implements LoggingSupport {
         this.inputReader = inputReader;
     }
 
-    public ProfileHandler(
-            datingapp.core.storage.UserStorage userStorage,
-            ValidationService validationService,
-            ProfileUseCases profileUseCases,
-            AppConfig config,
-            AppSession session,
-            InputReader inputReader) {
-        this(
-                userStorage,
-                validationService,
-                new LocationService(validationService),
-                profileUseCases,
-                config,
-                session,
-                inputReader);
-    }
-
     public static ProfileHandler fromServices(ServiceRegistry services, AppSession session, InputReader inputReader) {
         Objects.requireNonNull(services, "services cannot be null");
         return new ProfileHandler(
-                services.getUserStorage(),
                 services.getValidationService(),
                 services.getLocationService(),
                 services.getProfileUseCases(),

@@ -112,7 +112,7 @@ class LikerBrowserHandlerTest {
                 config,
                 session,
                 inputReader,
-                null,
+                () -> {},
                 matchingUseCases,
                 socialUseCases); // profileCompleteCallback is optional (nullable) — not needed in tests
         return new MatchingHandler(deps);

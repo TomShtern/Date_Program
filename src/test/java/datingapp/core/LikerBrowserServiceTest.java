@@ -18,8 +18,8 @@ import datingapp.core.model.User.Gender;
 import datingapp.core.model.User.UserState;
 import datingapp.core.profile.ProfileService;
 import datingapp.core.storage.InteractionStorage;
+import datingapp.core.storage.OperationalUserStorage;
 import datingapp.core.storage.TrustSafetyStorage;
-import datingapp.core.storage.UserStorage;
 import datingapp.core.testutil.TestStorages;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -133,7 +133,9 @@ class LikerBrowserServiceTest {
     }
 
     private static MatchingService buildMatchingService(
-            InteractionStorage interactionStorage, TrustSafetyStorage trustSafetyStorage, UserStorage userStorage) {
+            InteractionStorage interactionStorage,
+            TrustSafetyStorage trustSafetyStorage,
+            OperationalUserStorage userStorage) {
         AppConfig config = AppConfig.defaults();
         TestStorages.Analytics analyticsStorage = new TestStorages.Analytics();
         CandidateFinder candidateFinder =
@@ -437,7 +439,7 @@ class LikerBrowserServiceTest {
         }
     }
 
-    private static class InMemoryUserStorage implements UserStorage {
+    private static class InMemoryUserStorage implements OperationalUserStorage {
         private final Map<UUID, User> users = new HashMap<>();
         private final Map<String, ProfileNote> profileNotes = new java.util.concurrent.ConcurrentHashMap<>();
 
@@ -465,6 +467,21 @@ class LikerBrowserServiceTest {
         }
 
         @Override
+        public Map<UUID, User> findByIds(Set<UUID> ids) {
+            if (ids == null || ids.isEmpty()) {
+                return Map.of();
+            }
+            Map<UUID, User> found = new HashMap<>();
+            for (UUID id : ids) {
+                User user = users.get(id);
+                if (user != null) {
+                    found.put(id, user);
+                }
+            }
+            return found;
+        }
+
+        @Override
         public List<User> findActive() {
             return users.values().stream()
                     .filter(user -> user.getState() == UserState.ACTIVE)
@@ -474,6 +491,11 @@ class LikerBrowserServiceTest {
         @Override
         public void delete(UUID id) {
             users.remove(id);
+        }
+
+        @Override
+        public int purgeDeletedBefore(Instant threshold) {
+            return 0;
         }
 
         @Override
@@ -497,6 +519,13 @@ class LikerBrowserServiceTest {
         @Override
         public boolean deleteProfileNote(UUID authorId, UUID subjectId) {
             return profileNotes.remove(noteKey(authorId, subjectId)) != null;
+        }
+
+        @Override
+        public void executeWithUserLock(UUID userId, Runnable operation) {
+            java.util.Objects.requireNonNull(userId, "userId cannot be null");
+            java.util.Objects.requireNonNull(operation, "operation cannot be null");
+            operation.run();
         }
     }
 }

@@ -21,6 +21,10 @@ final class RestApiUserDtos {
             UserDtoMapper.UserFields fields = UserDtoMapper.map(user, userTimeZone, null);
             return new UserSummary(user.getId(), user.getName(), fields.age(), fields.state());
         }
+
+        static List<UserSummary> fromUsers(List<User> users, ZoneId userTimeZone) {
+            return users.stream().map(user -> from(user, userTimeZone)).toList();
+        }
     }
 
     static record UserDetail(

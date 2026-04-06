@@ -8,6 +8,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.app.event.InProcessAppEventBus;
 import datingapp.app.usecase.common.UseCaseResult;
+import datingapp.app.usecase.profile.ProfileInsightsUseCases;
+import datingapp.app.usecase.profile.ProfileMutationUseCases;
+import datingapp.app.usecase.profile.ProfileNotesUseCases;
+import datingapp.app.usecase.profile.ProfileUseCases;
 import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
 import datingapp.core.AppSession;
@@ -21,9 +25,11 @@ import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
 import datingapp.core.profile.MatchPreferences.PacePreferences;
 import datingapp.core.profile.ProfileService;
+import datingapp.core.profile.ValidationService;
 import datingapp.core.testutil.TestAchievementService;
 import datingapp.core.testutil.TestClock;
 import datingapp.core.testutil.TestStorages;
+import datingapp.core.workflow.ProfileActivationPolicy;
 import datingapp.ui.async.UiAsyncTestSupport;
 import datingapp.ui.viewmodel.UiDataAdapters.NoOpUiPresenceDataAccess;
 import datingapp.ui.viewmodel.UiDataAdapters.NoOpUiProfileNoteDataAccess;
@@ -92,16 +98,7 @@ class ChatViewModelTest {
         connectionService = new ConnectionService(config, communications, interactions, users);
         TrustSafetyService trustSafetyService = TrustSafetyService.builder(trustSafety, interactions, users, config)
                 .build();
-        ProfileService profileService = new ProfileService(users);
-        var noteUseCases = new datingapp.app.usecase.profile.ProfileUseCases(
-                users,
-                profileService,
-                null,
-                null,
-                TestAchievementService.empty(),
-                config,
-                new datingapp.core.workflow.ProfileActivationPolicy(),
-                eventBus);
+        var noteUseCases = createProfileUseCases(users, config, eventBus);
         var messagingUseCases = new datingapp.app.usecase.messaging.MessagingUseCases(connectionService, eventBus);
         var socialUseCases = new datingapp.app.usecase.social.SocialUseCases(connectionService, trustSafetyService);
         UiPresenceDataAccess presenceDataAccess = new UiPresenceDataAccess() {
@@ -175,6 +172,24 @@ class ChatViewModelTest {
         return condition.getAsBoolean();
     }
 
+    private boolean waitUntil(
+            UiAsyncTestSupport.QueuedUiThreadDispatcher dispatcher, BooleanSupplier condition, Duration timeout)
+            throws InterruptedException {
+        long deadlineNanos = System.nanoTime() + timeout.toNanos();
+        while (System.nanoTime() < deadlineNanos) {
+            dispatcher.drainAll();
+            if (condition.getAsBoolean()) {
+                return true;
+            }
+            UiAsyncTestSupport.pauseMillis(20);
+            if (Thread.currentThread().isInterrupted()) {
+                throw new InterruptedException("Interrupted while waiting for queued UI condition");
+            }
+        }
+        dispatcher.drainAll();
+        return condition.getAsBoolean();
+    }
+
     @Test
     @DisplayName("refreshConversations updates conversation list on FX thread")
     void shouldRefreshConversations() throws InterruptedException {
@@ -226,47 +241,87 @@ class ChatViewModelTest {
         connectionService.sendMessage(otherUser.getId(), currentUser.getId(), "Msg from Other");
         connectionService.sendMessage(user3.getId(), currentUser.getId(), "Msg from User3");
 
-        viewModel.refreshConversations();
-        assertTrue(waitUntil(() -> viewModel.getConversations().size() == 2, 5000));
+        var eventBus = new InProcessAppEventBus();
+        var isolatedMessagingUseCases =
+                new datingapp.app.usecase.messaging.MessagingUseCases(connectionService, eventBus);
+        var isolatedSocialUseCases = new datingapp.app.usecase.social.SocialUseCases(
+                connectionService,
+                TrustSafetyService.builder(trustSafety, interactions, users, AppConfig.defaults())
+                        .build());
+        var isolatedProfileUseCases = createProfileUseCases(users, AppConfig.defaults(), eventBus);
+        UiAsyncTestSupport.QueuedUiThreadDispatcher queuedDispatcher =
+                new UiAsyncTestSupport.QueuedUiThreadDispatcher();
+        ChatViewModel isolatedViewModel = new ChatViewModel(
+                isolatedMessagingUseCases,
+                isolatedSocialUseCases,
+                AppSession.getInstance(),
+                queuedDispatcher,
+                Duration.ofHours(1),
+                Duration.ofHours(1),
+                new ChatViewModel.ChatUiDependencies(
+                        new UseCaseUiProfileNoteDataAccess(isolatedProfileUseCases.getProfileNotesUseCases()),
+                        new UiPresenceDataAccess() {
+                            @Override
+                            public PresenceStatus getPresence(UUID userId) {
+                                return presenceStatus.get();
+                            }
 
-        assertEquals(2, viewModel.getConversations().size());
+                            @Override
+                            public boolean isTyping(UUID userId) {
+                                return remoteTyping.get();
+                            }
+                        }));
 
-        // Resolve conversations by user identity, not by list index.
-        // Conversations are sorted by lastMessageAt: both timestamps are equal under
-        // the
-        // fixed clock, so HashMap iteration order is non-deterministic.
-        final UUID user3Id = user3.getId();
-        ConversationPreview otherUserConv = viewModel.getConversations().stream()
-                .filter(p -> !p.otherUser().getId().equals(user3Id))
-                .findFirst()
-                .orElseThrow(() -> new AssertionError("otherUser conversation not found"));
-        ConversationPreview user3Conv = viewModel.getConversations().stream()
-                .filter(p -> p.otherUser().getId().equals(user3Id))
-                .findFirst()
-                .orElseThrow(() -> new AssertionError("user3 conversation not found"));
+        try {
+            isolatedViewModel.setCurrentUser(currentUser);
+            assertTrue(waitUntil(
+                    queuedDispatcher, () -> !isolatedViewModel.loadingProperty().get(), Duration.ofSeconds(5)));
 
-        // Select otherUser first, then immediately select User3.
-        // The stale load (token 1) should be skipped; only the User3 load (token 2)
-        // completes.
-        viewModel.selectedConversationProperty().set(otherUserConv);
-        viewModel.selectedConversationProperty().set(user3Conv);
+            isolatedViewModel.refreshConversations();
+            assertTrue(waitUntil(
+                    queuedDispatcher, () -> isolatedViewModel.getConversations().size() == 2, Duration.ofSeconds(5)));
 
-        assertTrue(waitUntil(
-                () -> viewModel.selectedConversationProperty().get() != null
-                        && viewModel
-                                .selectedConversationProperty()
-                                .get()
-                                .otherUser()
-                                .getId()
-                                .equals(user3Id)
-                        && viewModel.getActiveMessages().size() == 1
-                        && !viewModel.loadingProperty().get(),
-                10000));
+            assertEquals(2, isolatedViewModel.getConversations().size());
 
-        // The active messages should reflect the 2nd (User3) conversation only
-        assertEquals(1, viewModel.getActiveMessages().size());
-        assertEquals("Msg from User3", viewModel.getActiveMessages().get(0).content());
-        assertFalse(viewModel.loadingProperty().get(), "Loading should complete and finish");
+            // Resolve conversations by user identity, not by list index.
+            // Conversations are sorted by lastMessageAt: both timestamps are equal under
+            // the fixed clock, so iteration order is non-deterministic.
+            UUID user3Id = user3.getId();
+            ConversationPreview otherUserConv = isolatedViewModel.getConversations().stream()
+                    .filter(p -> !p.otherUser().getId().equals(user3Id))
+                    .findFirst()
+                    .orElseThrow(() -> new AssertionError("otherUser conversation not found"));
+            ConversationPreview user3Conv = isolatedViewModel.getConversations().stream()
+                    .filter(p -> p.otherUser().getId().equals(user3Id))
+                    .findFirst()
+                    .orElseThrow(() -> new AssertionError("user3 conversation not found"));
+
+            // Select otherUser first, then immediately select User3.
+            // The stale load should be skipped; only the latest selection should win.
+            isolatedViewModel.selectedConversationProperty().set(otherUserConv);
+            isolatedViewModel.selectedConversationProperty().set(user3Conv);
+
+            assertTrue(waitUntil(
+                    queuedDispatcher,
+                    () -> isolatedViewModel.selectedConversationProperty().get() != null
+                            && isolatedViewModel
+                                    .selectedConversationProperty()
+                                    .get()
+                                    .otherUser()
+                                    .getId()
+                                    .equals(user3Id)
+                            && isolatedViewModel.getActiveMessages().size() == 1
+                            && !isolatedViewModel.loadingProperty().get(),
+                    Duration.ofSeconds(5)));
+
+            assertEquals(1, isolatedViewModel.getActiveMessages().size());
+            assertEquals(
+                    "Msg from User3",
+                    isolatedViewModel.getActiveMessages().get(0).content());
+            assertFalse(isolatedViewModel.loadingProperty().get(), "Loading should complete and finish");
+        } finally {
+            isolatedViewModel.dispose();
+        }
     }
 
     @Test
@@ -302,16 +357,7 @@ class ChatViewModelTest {
         CountDownLatch sendStarted = new CountDownLatch(1);
         CountDownLatch releaseSend = new CountDownLatch(1);
         var eventBus = new InProcessAppEventBus();
-        ProfileService profileService = new ProfileService(users);
-        var noteUseCases = new datingapp.app.usecase.profile.ProfileUseCases(
-                users,
-                profileService,
-                null,
-                null,
-                TestAchievementService.empty(),
-                AppConfig.defaults(),
-                new datingapp.core.workflow.ProfileActivationPolicy(),
-                eventBus);
+        var noteUseCases = createProfileUseCases(users, AppConfig.defaults(), eventBus);
         var socialUseCases = new datingapp.app.usecase.social.SocialUseCases(
                 connectionService,
                 TrustSafetyService.builder(trustSafety, interactions, users, AppConfig.defaults())
@@ -428,16 +474,7 @@ class ChatViewModelTest {
                 connectionService,
                 TrustSafetyService.builder(trustSafety, interactions, users, AppConfig.defaults())
                         .build());
-        ProfileService profileService = new ProfileService(users);
-        var noteUseCases = new datingapp.app.usecase.profile.ProfileUseCases(
-                users,
-                profileService,
-                null,
-                null,
-                TestAchievementService.empty(),
-                AppConfig.defaults(),
-                new datingapp.core.workflow.ProfileActivationPolicy(),
-                eventBus);
+        var noteUseCases = createProfileUseCases(users, AppConfig.defaults(), eventBus);
         ChatViewModel localViewModel = new ChatViewModel(
                 countingMessagingUseCases,
                 socialUseCases,
@@ -658,16 +695,7 @@ class ChatViewModelTest {
                 connectionService,
                 TrustSafetyService.builder(trustSafety, interactions, users, AppConfig.defaults())
                         .build());
-        ProfileService profileService = new ProfileService(users);
-        var noteUseCases = new datingapp.app.usecase.profile.ProfileUseCases(
-                users,
-                profileService,
-                null,
-                null,
-                TestAchievementService.empty(),
-                AppConfig.defaults(),
-                new datingapp.core.workflow.ProfileActivationPolicy(),
-                eventBus);
+        var noteUseCases = createProfileUseCases(users, AppConfig.defaults(), eventBus);
         ChatViewModel flakyViewModel = new ChatViewModel(
                 flakyMessagingUseCases,
                 socialUseCases,
@@ -745,5 +773,23 @@ class ChatViewModelTest {
                 PacePreferences.DepthPreference.DEEP_CHAT));
         user.activate();
         return user;
+    }
+
+    private static ProfileUseCases createProfileUseCases(
+            TestStorages.Users users, AppConfig config, InProcessAppEventBus eventBus) {
+        ValidationService validationService = new ValidationService(config);
+        return new ProfileUseCases(
+                users,
+                new ProfileService(users),
+                validationService,
+                new ProfileMutationUseCases(
+                        users,
+                        validationService,
+                        TestAchievementService.empty(),
+                        config,
+                        new ProfileActivationPolicy(),
+                        eventBus),
+                new ProfileNotesUseCases(users, validationService, config, eventBus),
+                new ProfileInsightsUseCases(TestAchievementService.empty(), null));
     }
 }

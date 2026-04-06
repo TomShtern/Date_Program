@@ -10,8 +10,6 @@ import datingapp.core.connection.ConnectionService;
 import datingapp.core.model.Match;
 import datingapp.core.model.Match.MatchArchiveReason;
 import datingapp.core.model.Match.MatchState;
-import datingapp.core.storage.CommunicationStorage;
-import datingapp.core.storage.InteractionStorage;
 import datingapp.core.testutil.TestStorages;
 import java.util.List;
 import java.util.UUID;
@@ -24,8 +22,8 @@ import org.junit.jupiter.api.Timeout;
 @Timeout(value = 5, unit = TimeUnit.SECONDS)
 class RelationshipTransitionServiceTest {
 
-    private InteractionStorage interactionStorage;
-    private CommunicationStorage communicationStorage;
+    private TestStorages.Interactions interactionStorage;
+    private TestStorages.Communications communicationStorage;
     private ConnectionService service;
 
     private final UUID aliceId = UUID.randomUUID();
@@ -36,8 +34,8 @@ class RelationshipTransitionServiceTest {
     void setUp() {
         communicationStorage = new TestStorages.Communications();
         interactionStorage = new TestStorages.Interactions(communicationStorage);
-        service = new ConnectionService(
-                AppConfig.defaults(), communicationStorage, interactionStorage, new TestStorages.Users());
+        TestStorages.Users userStorage = new TestStorages.Users();
+        service = new ConnectionService(AppConfig.defaults(), communicationStorage, interactionStorage, userStorage);
 
         // Create a match between Alice and Bob
         Match match = Match.create(aliceId, bobId);

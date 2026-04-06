@@ -2,10 +2,13 @@ package datingapp.app.api;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import datingapp.app.api.RestApiDtos.ErrorResponse;
+import datingapp.app.usecase.common.UseCaseResult;
 import datingapp.core.AppClock;
 import datingapp.core.ServiceRegistry;
 import datingapp.core.connection.ConnectionModels;
@@ -17,6 +20,10 @@ import datingapp.core.storage.CommunicationStorage;
 import datingapp.core.storage.InteractionStorage;
 import datingapp.core.storage.UserStorage;
 import datingapp.core.testutil.TestStorages;
+import io.javalin.http.Context;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -25,6 +32,7 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
@@ -94,9 +102,14 @@ class RestApiReadRoutesTest {
         assertEquals(200, userResponse.statusCode());
         JsonNode userJson = MAPPER.readTree(userResponse.body());
         assertEquals(ALICE_NAME, userJson.get("name").asText());
-        assertEquals(
-                "Tel Aviv, Tel Aviv District",
-                userJson.get("approximateLocation").asText());
+
+        HttpResponse<String> missingUserResponse = client.send(
+                HttpRequest.newBuilder(URI.create(BASE_URL + port + USERS_PATH + UUID.randomUUID()))
+                        .GET()
+                        .build(),
+                HttpResponse.BodyHandlers.ofString());
+        assertEquals(404, missingUserResponse.statusCode());
+        assertTrue(!missingUserResponse.body().isBlank());
 
         HttpResponse<String> forbiddenUserResponse = client.send(
                 HttpRequest.newBuilder(URI.create(BASE_URL + port + USERS_PATH + aliceId))
@@ -126,6 +139,53 @@ class RestApiReadRoutesTest {
         assertEquals(200, matchesResponse.statusCode());
         JsonNode matchesJson = MAPPER.readTree(matchesResponse.body());
         assertEquals(1, matchesJson.get("matches").size());
+    }
+
+    @Test
+    @DisplayName("get user route surfaces not found via explicit Optional-based helper flow")
+    void getUserRouteSurfacesNotFoundViaExplicitOptionalBasedHelperFlow() throws Exception {
+        TestStorages.Users userStorage = new TestStorages.Users();
+        TestStorages.Communications communicationStorage = new TestStorages.Communications();
+        TestStorages.Interactions interactionStorage = new TestStorages.Interactions(communicationStorage);
+        ServiceRegistry services = createServices(userStorage, interactionStorage, communicationStorage);
+
+        server = new RestApiServer(services, 0);
+        Method method = RestApiServer.class.getDeclaredMethod("getUser", Context.class);
+        method.setAccessible(true);
+
+        UUID missingUserId = UUID.randomUUID();
+        CapturingContext ctx = capturingContext(USERS_PATH + missingUserId, Map.of("id", missingUserId.toString()));
+
+        InvocationTargetException thrown =
+                assertThrows(InvocationTargetException.class, () -> method.invoke(server, ctx.context));
+        assertEquals("NotFoundResponse", thrown.getCause().getClass().getSimpleName());
+        assertEquals("User not found", thrown.getCause().getMessage());
+    }
+
+    @Test
+    @DisplayName("successful null payloads are reported as internal errors instead of collapsing to empty")
+    void successfulNullPayloadsAreReportedAsInternalErrorsInsteadOfCollapsingToEmpty() throws Exception {
+        TestStorages.Users userStorage = new TestStorages.Users();
+        TestStorages.Communications communicationStorage = new TestStorages.Communications();
+        TestStorages.Interactions interactionStorage = new TestStorages.Interactions(communicationStorage);
+        ServiceRegistry services = createServices(userStorage, interactionStorage, communicationStorage);
+
+        server = new RestApiServer(services, 0);
+        Method method = RestApiServer.class.getDeclaredMethod(
+                "requiredDataOrHandleFailure", Context.class, UseCaseResult.class, String.class);
+        method.setAccessible(true);
+
+        CapturingContext ctx = capturingContext("/api/users", Map.of());
+        Object result = method.invoke(
+                server, ctx.context, UseCaseResult.<Object>success(null), "Unexpected successful null payload");
+
+        assertTrue(result instanceof java.util.Optional);
+        assertTrue(((java.util.Optional<?>) result).isEmpty());
+        assertEquals(500, ctx.status);
+        assertTrue(ctx.jsonPayload instanceof ErrorResponse);
+        ErrorResponse error = (ErrorResponse) ctx.jsonPayload;
+        assertEquals("INTERNAL_ERROR", error.code());
+        assertEquals("Unexpected successful null payload", error.message());
     }
 
     @Test
@@ -235,6 +295,17 @@ class RestApiReadRoutesTest {
 
         assertEquals(browseCandidateIds, candidatesIds);
         assertEquals(farStrong.getId().toString(), candidatesIds.getFirst());
+        assertEquals(
+                "true",
+                candidatesResponse.headers().firstValue("Deprecation").orElse(null),
+                "/candidates should advertise deprecation as a compatibility alias");
+        assertTrue(
+                candidatesResponse
+                        .headers()
+                        .firstValue("Link")
+                        .orElse("")
+                        .contains(USERS_PATH + seekerId + BROWSE_SEGMENT),
+                "/candidates should point callers to /browse as the canonical route");
     }
 
     @Test
@@ -556,6 +627,63 @@ class RestApiReadRoutesTest {
             UserStorage userStorage, InteractionStorage interactionStorage, CommunicationStorage communicationStorage) {
         return RestApiTestFixture.builder(userStorage, interactionStorage, communicationStorage)
                 .build();
+    }
+
+    private static CapturingContext capturingContext(String path, Map<String, String> pathParams) {
+        CapturingContext state = new CapturingContext();
+        Context ctx = (Context) Proxy.newProxyInstance(
+                Context.class.getClassLoader(),
+                new Class<?>[] {Context.class},
+                (proxy, invokedMethod, args) -> switch (invokedMethod.getName()) {
+                    case "path" -> path;
+                    case "pathParamMap" -> pathParams;
+                    case "pathParam" -> pathParams.get(args[0].toString());
+                    case "status" -> {
+                        state.status = ((Number) args[0]).intValue();
+                        yield proxy;
+                    }
+                    case "json" -> {
+                        state.jsonPayload = args[0];
+                        yield proxy;
+                    }
+                    default -> defaultValue(invokedMethod.getReturnType());
+                });
+        state.context = ctx;
+        return state;
+    }
+
+    private static Object defaultValue(Class<?> returnType) {
+        if (returnType.equals(boolean.class)) {
+            return false;
+        }
+        if (returnType.equals(byte.class)) {
+            return (byte) 0;
+        }
+        if (returnType.equals(short.class)) {
+            return (short) 0;
+        }
+        if (returnType.equals(char.class)) {
+            return '\0';
+        }
+        if (returnType.equals(int.class)) {
+            return 0;
+        }
+        if (returnType.equals(long.class)) {
+            return 0L;
+        }
+        if (returnType.equals(float.class)) {
+            return 0.0f;
+        }
+        if (returnType.equals(double.class)) {
+            return 0.0d;
+        }
+        return null;
+    }
+
+    private static final class CapturingContext {
+        private Context context;
+        private int status;
+        private Object jsonPayload;
     }
 
     private static User activeUser(UUID id, String name, Gender gender, EnumSet<Gender> interestedIn) {

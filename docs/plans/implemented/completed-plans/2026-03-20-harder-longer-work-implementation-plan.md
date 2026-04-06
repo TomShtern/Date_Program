@@ -12,6 +12,11 @@
 - ✅ Chunk 4 completed (V067)
 - ✅ Full quality gate completed (`mvn spotless:apply verify`)
 
+## ✅ Follow-up completions (2026-04-06)
+
+- ✅ PostgreSQL verification routine completed: `./run_verify.ps1` now runs the Maven quality gate plus PostgreSQL smoke with cleanup, and CI now includes the PostgreSQL runtime smoke path.
+- ✅ REST browse/candidates consolidation completed: `/api/users/{id}/browse` is the canonical browse contract, while `/api/users/{id}/candidates` remains as a deprecated compatibility alias that projects the canonical browse candidate list.
+
 **Architecture:** This tranche is intentionally sequenced from the bottom up. First stabilize storage read paths and schema support, because every higher layer depends on them. Then tighten contracts so silent no-op defaults and duplicated rules cannot drift. Only after the substrate is stable should we refactor the REST/UI boundary and event publishing paths. This keeps the work testable, minimizes regression risk, and gives each step a clear rollback boundary.
 
 **Tech Stack:** Java 25, Maven, JDBI/H2, JavaFX 25, JUnit 5, existing `ServiceRegistry`, `ProfileService`, `RestApiServer`, `ProfileController`, `ImageCache`, `ValidationService`, `AppEventBus`.

@@ -13,6 +13,7 @@ import datingapp.core.profile.ValidationService;
 import datingapp.core.storage.UserStorage;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -43,10 +44,9 @@ public class ProfileNotesUseCases {
         if (query == null || query.context() == null) {
             return UseCaseResult.failure(UseCaseError.validation("Context is required"));
         }
-        UseCaseResult<List<ProfileNote>> authorCheck =
-                requireAuthorExists(query.context().userId());
-        if (authorCheck != null) {
-            return authorCheck;
+        Optional<UseCaseError> authorError = validateAuthor(query.context().userId());
+        if (authorError.isPresent()) {
+            return UseCaseResult.failure(authorError.get());
         }
         try {
             return UseCaseResult.success(List.copyOf(
@@ -60,10 +60,9 @@ public class ProfileNotesUseCases {
         if (query == null || query.context() == null || query.subjectId() == null) {
             return UseCaseResult.failure(UseCaseError.validation(CONTEXT_AND_SUBJECT_REQUIRED));
         }
-        UseCaseResult<ProfileNote> authorCheck =
-                requireAuthorExists(query.context().userId());
-        if (authorCheck != null) {
-            return authorCheck;
+        Optional<UseCaseError> authorError = validateAuthor(query.context().userId());
+        if (authorError.isPresent()) {
+            return UseCaseResult.failure(authorError.get());
         }
         try {
             return userStorage
@@ -79,10 +78,9 @@ public class ProfileNotesUseCases {
         if (command == null || command.context() == null || command.subjectId() == null) {
             return UseCaseResult.failure(UseCaseError.validation(CONTEXT_AND_SUBJECT_REQUIRED));
         }
-        UseCaseResult<ProfileNote> authorCheck =
-                requireAuthorExists(command.context().userId());
-        if (authorCheck != null) {
-            return authorCheck;
+        Optional<UseCaseError> authorError = validateAuthor(command.context().userId());
+        if (authorError.isPresent()) {
+            return UseCaseResult.failure(authorError.get());
         }
         if (userStorage.get(command.subjectId()).isEmpty()) {
             return UseCaseResult.failure(UseCaseError.notFound("Subject user not found"));
@@ -90,20 +88,9 @@ public class ProfileNotesUseCases {
 
         try {
             String sanitizedContent = SanitizerUtils.sanitize(command.content());
-            if (validationService != null) {
-                var validationResult = validationService.validateProfileNoteContent(sanitizedContent);
-                if (!validationResult.valid()) {
-                    String errorMessage = validationResult.errors().isEmpty()
-                            ? "Profile note content is invalid"
-                            : validationResult.errors().getFirst();
-                    return UseCaseResult.failure(UseCaseError.validation(errorMessage));
-                }
-            } else {
-                int maxProfileNoteLength = config.validation().maxProfileNoteLength();
-                if (sanitizedContent != null && sanitizedContent.length() > maxProfileNoteLength) {
-                    return UseCaseResult.failure(
-                            UseCaseError.validation(PROFILE_NOTE_TOO_LONG.formatted(maxProfileNoteLength)));
-                }
+            Optional<UseCaseError> contentError = validateSanitizedContent(sanitizedContent);
+            if (contentError.isPresent()) {
+                return UseCaseResult.failure(contentError.get());
             }
             ProfileNote note = userStorage
                     .getProfileNote(command.context().userId(), command.subjectId())
@@ -130,9 +117,9 @@ public class ProfileNotesUseCases {
         if (command == null || command.context() == null || command.subjectId() == null) {
             return UseCaseResult.failure(UseCaseError.validation(CONTEXT_AND_SUBJECT_REQUIRED));
         }
-        UseCaseResult<Void> authorCheck = requireAuthorExists(command.context().userId());
-        if (authorCheck != null) {
-            return authorCheck;
+        Optional<UseCaseError> authorError = validateAuthor(command.context().userId());
+        if (authorError.isPresent()) {
+            return UseCaseResult.failure(authorError.get());
         }
         try {
             boolean deleted = userStorage.deleteProfileNote(command.context().userId(), command.subjectId());
@@ -153,14 +140,33 @@ public class ProfileNotesUseCases {
         return validationService;
     }
 
-    private <T> UseCaseResult<T> requireAuthorExists(UUID authorId) {
+    private Optional<UseCaseError> validateAuthor(UUID authorId) {
         if (userStorage == null) {
-            return UseCaseResult.failure(UseCaseError.dependency(USER_STORAGE_REQUIRED));
+            return Optional.of(UseCaseError.dependency(USER_STORAGE_REQUIRED));
         }
         if (userStorage.get(authorId).isEmpty()) {
-            return UseCaseResult.failure(UseCaseError.notFound(AUTHOR_NOT_FOUND));
+            return Optional.of(UseCaseError.notFound(AUTHOR_NOT_FOUND));
         }
-        return null;
+        return Optional.empty();
+    }
+
+    private Optional<UseCaseError> validateSanitizedContent(String sanitizedContent) {
+        if (validationService != null) {
+            var validationResult = validationService.validateProfileNoteContent(sanitizedContent);
+            if (!validationResult.valid()) {
+                String errorMessage = validationResult.errors().isEmpty()
+                        ? "Profile note content is invalid"
+                        : validationResult.errors().getFirst();
+                return Optional.of(UseCaseError.validation(errorMessage));
+            }
+            return Optional.empty();
+        }
+
+        int maxProfileNoteLength = config.validation().maxProfileNoteLength();
+        if (sanitizedContent != null && sanitizedContent.length() > maxProfileNoteLength) {
+            return Optional.of(UseCaseError.validation(PROFILE_NOTE_TOO_LONG.formatted(maxProfileNoteLength)));
+        }
+        return Optional.empty();
     }
 
     private void publishEvent(AppEvent event, String failureMessage) {

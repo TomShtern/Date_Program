@@ -10,6 +10,9 @@ import datingapp.app.cli.CliTextAndInput.InputReader;
 import datingapp.app.event.InProcessAppEventBus;
 import datingapp.app.testutil.TestEventBus;
 import datingapp.app.usecase.common.UseCaseResult;
+import datingapp.app.usecase.profile.ProfileInsightsUseCases;
+import datingapp.app.usecase.profile.ProfileMutationUseCases;
+import datingapp.app.usecase.profile.ProfileNotesUseCases;
 import datingapp.app.usecase.profile.ProfileUseCases;
 import datingapp.app.usecase.profile.VerificationUseCases;
 import datingapp.app.usecase.social.SocialUseCases;
@@ -85,13 +88,17 @@ class SafetyHandlerTest {
                 userStorage,
                 new ProfileService(userStorage),
                 new ValidationService(config),
-                null,
-                TestAchievementService.empty(),
-                config,
-                new datingapp.core.workflow.ProfileActivationPolicy(),
-                new InProcessAppEventBus());
+                new ProfileMutationUseCases(
+                        userStorage,
+                        new ValidationService(config),
+                        TestAchievementService.empty(),
+                        config,
+                        new datingapp.core.workflow.ProfileActivationPolicy(),
+                        new InProcessAppEventBus()),
+                new ProfileNotesUseCases(
+                        userStorage, new ValidationService(config), config, new InProcessAppEventBus()),
+                new ProfileInsightsUseCases(TestAchievementService.empty(), null));
         return new SafetyHandler(
-                trustSafetyService,
                 new SocialUseCases(trustSafetyService),
                 profileUseCases,
                 new VerificationUseCases(userStorage, trustSafetyService),
@@ -213,11 +220,19 @@ class SafetyHandlerTest {
                             userStorage,
                             new ProfileService(userStorage),
                             new ValidationService(AppConfig.defaults()),
-                            null,
-                            TestAchievementService.empty(),
-                            AppConfig.defaults(),
-                            new datingapp.core.workflow.ProfileActivationPolicy(),
-                            new InProcessAppEventBus()) {
+                            new ProfileMutationUseCases(
+                                    userStorage,
+                                    new ValidationService(AppConfig.defaults()),
+                                    TestAchievementService.empty(),
+                                    AppConfig.defaults(),
+                                    new datingapp.core.workflow.ProfileActivationPolicy(),
+                                    new InProcessAppEventBus()),
+                            new ProfileNotesUseCases(
+                                    userStorage,
+                                    new ValidationService(AppConfig.defaults()),
+                                    AppConfig.defaults(),
+                                    new InProcessAppEventBus()),
+                            new ProfileInsightsUseCases(TestAchievementService.empty(), null)) {
                         @Override
                         public UseCaseResult<List<User>> listUsers() {
                             return UseCaseResult.success(List.of(testUser, otherUser));
@@ -225,7 +240,6 @@ class SafetyHandlerTest {
                     };
 
             SafetyHandler handler = new SafetyHandler(
-                    trustSafetyService,
                     new SocialUseCases(trustSafetyService),
                     profileUseCases,
                     new VerificationUseCases(userStorage, trustSafetyService),
@@ -431,14 +445,21 @@ class SafetyHandlerTest {
                     userStorage,
                     new ProfileService(userStorage),
                     new ValidationService(AppConfig.defaults()),
-                    null,
-                    TestAchievementService.empty(),
-                    AppConfig.defaults(),
-                    new datingapp.core.workflow.ProfileActivationPolicy(),
-                    new TestEventBus());
+                    new ProfileMutationUseCases(
+                            userStorage,
+                            new ValidationService(AppConfig.defaults()),
+                            TestAchievementService.empty(),
+                            AppConfig.defaults(),
+                            new datingapp.core.workflow.ProfileActivationPolicy(),
+                            new TestEventBus()),
+                    new ProfileNotesUseCases(
+                            userStorage,
+                            new ValidationService(AppConfig.defaults()),
+                            AppConfig.defaults(),
+                            new TestEventBus()),
+                    new ProfileInsightsUseCases(TestAchievementService.empty(), null));
 
             SafetyHandler handler = new SafetyHandler(
-                    trustSafetyService,
                     socialUseCases,
                     profileUseCases,
                     new VerificationUseCases(userStorage, trustSafetyService),
@@ -480,13 +501,16 @@ class SafetyHandlerTest {
                     userStorage,
                     new ProfileService(userStorage),
                     new ValidationService(config),
-                    null,
-                    TestAchievementService.empty(),
-                    config,
-                    new datingapp.core.workflow.ProfileActivationPolicy(),
-                    new TestEventBus());
+                    new ProfileMutationUseCases(
+                            userStorage,
+                            new ValidationService(config),
+                            TestAchievementService.empty(),
+                            config,
+                            new datingapp.core.workflow.ProfileActivationPolicy(),
+                            new TestEventBus()),
+                    new ProfileNotesUseCases(userStorage, new ValidationService(config), config, new TestEventBus()),
+                    new ProfileInsightsUseCases(TestAchievementService.empty(), null));
             SafetyHandler handler = new SafetyHandler(
-                    trustSafetyService,
                     new SocialUseCases(trustSafetyService),
                     profileUseCases,
                     new VerificationUseCases(userStorage, trustSafetyService),
@@ -561,16 +585,23 @@ class SafetyHandlerTest {
                     userStorage,
                     new ProfileService(userStorage),
                     new ValidationService(AppConfig.defaults()),
-                    null,
-                    TestAchievementService.empty(),
-                    AppConfig.defaults(),
-                    new datingapp.core.workflow.ProfileActivationPolicy(),
-                    new TestEventBus());
+                    new ProfileMutationUseCases(
+                            userStorage,
+                            new ValidationService(AppConfig.defaults()),
+                            TestAchievementService.empty(),
+                            AppConfig.defaults(),
+                            new datingapp.core.workflow.ProfileActivationPolicy(),
+                            new TestEventBus()),
+                    new ProfileNotesUseCases(
+                            userStorage,
+                            new ValidationService(AppConfig.defaults()),
+                            AppConfig.defaults(),
+                            new TestEventBus()),
+                    new ProfileInsightsUseCases(TestAchievementService.empty(), null));
             RecordingVerificationUseCases verificationUseCases =
                     new RecordingVerificationUseCases(userStorage, trustSafetyService);
 
             SafetyHandler handler = new SafetyHandler(
-                    trustSafetyService,
                     new SocialUseCases(trustSafetyService),
                     profileUseCases,
                     verificationUseCases,

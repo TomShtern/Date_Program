@@ -66,12 +66,10 @@ public class MessagingUseCases {
         try {
             Conversation conversation =
                     connectionService.getOrCreateConversation(command.context().userId(), command.otherUserId());
-            ConversationPreview preview =
-                    connectionService.getConversationPreview(command.context().userId(), conversation.getId());
-            if (preview == null) {
-                return UseCaseResult.failure(UseCaseError.notFound("Conversation preview not found"));
-            }
-            return UseCaseResult.success(new OpenConversationResult(conversation, preview));
+            return connectionService
+                    .getConversationPreview(command.context().userId(), conversation.getId())
+                    .map(preview -> UseCaseResult.success(new OpenConversationResult(conversation, preview)))
+                    .orElseGet(() -> UseCaseResult.failure(UseCaseError.notFound("Conversation not found")));
         } catch (Exception e) {
             return internalFailure("open conversation", e);
         }

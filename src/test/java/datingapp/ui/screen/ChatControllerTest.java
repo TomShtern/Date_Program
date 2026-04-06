@@ -5,6 +5,10 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.app.event.InProcessAppEventBus;
+import datingapp.app.usecase.profile.ProfileInsightsUseCases;
+import datingapp.app.usecase.profile.ProfileMutationUseCases;
+import datingapp.app.usecase.profile.ProfileNotesUseCases;
+import datingapp.app.usecase.profile.ProfileUseCases;
 import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
 import datingapp.core.AppSession;
@@ -17,6 +21,7 @@ import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
 import datingapp.core.profile.MatchPreferences.PacePreferences;
 import datingapp.core.profile.ProfileService;
+import datingapp.core.profile.ValidationService;
 import datingapp.core.testutil.TestAchievementService;
 import datingapp.core.testutil.TestStorages;
 import datingapp.core.workflow.ProfileActivationPolicy;
@@ -431,16 +436,7 @@ class ChatControllerTest {
         private final ChatViewModel viewModel;
 
         private Fixture() {
-            ProfileService profileService = new ProfileService(users);
-            var noteUseCases = new datingapp.app.usecase.profile.ProfileUseCases(
-                    users,
-                    profileService,
-                    null,
-                    null,
-                    TestAchievementService.empty(),
-                    config,
-                    new ProfileActivationPolicy(),
-                    new InProcessAppEventBus());
+            var noteUseCases = createProfileUseCases(users, config);
             var messagingUseCases = new datingapp.app.usecase.messaging.MessagingUseCases(
                     connectionService, new InProcessAppEventBus());
             var socialUseCases = new datingapp.app.usecase.social.SocialUseCases(connectionService, trustSafetyService);
@@ -514,5 +510,23 @@ class ChatControllerTest {
             user.activate();
             return user;
         }
+    }
+
+    private static ProfileUseCases createProfileUseCases(TestStorages.Users users, AppConfig config) {
+        InProcessAppEventBus eventBus = new InProcessAppEventBus();
+        ValidationService validationService = new ValidationService(config);
+        return new ProfileUseCases(
+                users,
+                new ProfileService(users),
+                validationService,
+                new ProfileMutationUseCases(
+                        users,
+                        validationService,
+                        TestAchievementService.empty(),
+                        config,
+                        new ProfileActivationPolicy(),
+                        eventBus),
+                new ProfileNotesUseCases(users, validationService, config, eventBus),
+                new ProfileInsightsUseCases(TestAchievementService.empty(), null));
     }
 }

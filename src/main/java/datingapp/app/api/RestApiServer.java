@@ -244,7 +244,8 @@ public class RestApiServer {
     // ── User Handlers ───────────────────────────────────────────────────
 
     void listUsers(Context ctx) {
-        Optional<List<User>> usersResult = dataOrHandleFailure(ctx, profileUseCases.listUsers());
+        Optional<List<User>> usersResult =
+                requiredDataOrHandleFailure(ctx, profileUseCases.listUsers(), "User list returned no data");
         if (usersResult.isEmpty()) {
             return;
         }
@@ -256,11 +257,11 @@ public class RestApiServer {
 
     void getUser(Context ctx) {
         UUID id = parseUuid(ctx.pathParam("id"));
-        User user = loadUser(ctx, id);
-        if (user == null) {
+        Optional<User> user = loadExistingUser(ctx, id);
+        if (user.isEmpty()) {
             return;
         }
-        ctx.json(UserDetail.from(user, userTimeZone, locationLabel(user)));
+        ctx.json(UserDetail.from(user.get(), userTimeZone, locationLabel(user.get())));
     }
 
     void listLocationCountries(Context ctx) {
@@ -300,22 +301,22 @@ public class RestApiServer {
 
     void browseCandidates(Context ctx) {
         UUID id = parseUuid(ctx.pathParam("id"));
-        User user = loadUser(ctx, id);
-        if (user == null) {
+        Optional<User> user = loadExistingUser(ctx, id);
+        if (user.isEmpty()) {
             return;
         }
-        ensureActiveCandidateBrowser(user);
+        ensureActiveCandidateBrowser(user.get());
 
-        Optional<MatchingUseCases.BrowseCandidatesResult> result = loadBrowseCandidates(ctx, id, user);
-        if (result.isEmpty()) {
+        Optional<BrowseCandidatesResponse> response = loadBrowseResponse(ctx, id, user.get());
+        if (response.isEmpty()) {
             return;
         }
-        ctx.json(BrowseCandidatesResponse.from(result.get(), userTimeZone));
+        ctx.json(response.get());
     }
 
     void updateProfile(Context ctx) {
         UUID userId = parseUuid(ctx.pathParam("id"));
-        if (loadUser(ctx, userId) == null) {
+        if (loadExistingUser(ctx, userId).isEmpty()) {
             return;
         }
         ProfileUpdateRequest request = ctx.bodyAsClass(ProfileUpdateRequest.class);
@@ -333,7 +334,7 @@ public class RestApiServer {
         Double longitude =
                 resolvedLocation.map(ResolvedProfileLocation::longitude).orElse(request.longitude());
 
-        Optional<ProfileMutationUseCases.ProfileSaveResult> result = dataOrHandleFailure(
+        Optional<ProfileMutationUseCases.ProfileSaveResult> result = requiredDataOrHandleFailure(
                 ctx,
                 profileMutationUseCases.updateProfile(new UpdateProfileCommand(
                         UserContext.api(userId),
@@ -353,7 +354,8 @@ public class RestApiServer {
                         request.lookingFor(),
                         request.education(),
                         request.interests(),
-                        request.dealbreakers())));
+                        request.dealbreakers())),
+                "Profile update returned no data");
         if (result.isEmpty()) {
             return;
         }
@@ -366,7 +368,7 @@ public class RestApiServer {
 
     void deleteUser(Context ctx) {
         UUID userId = parseUuid(ctx.pathParam("id"));
-        if (loadUser(ctx, userId) == null) {
+        if (loadExistingUser(ctx, userId).isEmpty()) {
             return;
         }
 
@@ -381,20 +383,17 @@ public class RestApiServer {
 
     void getCandidates(Context ctx) {
         UUID id = parseUuid(ctx.pathParam("id"));
-        User user = loadUser(ctx, id);
-        if (user == null) {
+        Optional<User> user = loadExistingUser(ctx, id);
+        if (user.isEmpty()) {
             return;
         }
-        ensureActiveCandidateBrowser(user);
-        Optional<MatchingUseCases.BrowseCandidatesResult> result = loadBrowseCandidates(ctx, id, user);
-        if (result.isEmpty()) {
+        ensureActiveCandidateBrowser(user.get());
+        Optional<BrowseCandidatesResponse> response = loadBrowseResponse(ctx, id, user.get());
+        if (response.isEmpty()) {
             return;
         }
-
-        List<UserSummary> candidates = result.get().candidates().stream()
-                .map(candidate -> UserSummary.from(candidate, userTimeZone))
-                .toList();
-        ctx.json(candidates);
+        markCandidatesCompatibilityAlias(ctx, id);
+        ctx.json(response.get().candidates());
     }
 
     private Optional<ResolvedProfileLocation> resolveProfileLocation(ProfileUpdateRequest request) {
@@ -433,7 +432,7 @@ public class RestApiServer {
         if (offset < 0) {
             throw new IllegalArgumentException("offset must be non-negative");
         }
-        if (loadUser(ctx, userId) == null) {
+        if (loadExistingUser(ctx, userId).isEmpty()) {
             return;
         }
 
@@ -458,8 +457,10 @@ public class RestApiServer {
             return;
         }
 
-        Optional<List<datingapp.core.connection.ConnectionModels.FriendRequest>> result = dataOrHandleFailure(
-                ctx, socialUseCases.pendingFriendRequests(new FriendRequestsQuery(UserContext.api(userId))));
+        Optional<List<datingapp.core.connection.ConnectionModels.FriendRequest>> result = requiredDataOrHandleFailure(
+                ctx,
+                socialUseCases.pendingFriendRequests(new FriendRequestsQuery(UserContext.api(userId))),
+                "Friend requests returned no data");
         if (result.isEmpty()) {
             return;
         }
@@ -475,13 +476,14 @@ public class RestApiServer {
             return;
         }
 
-        Optional<MatchingUseCases.RecordLikeResult> result = dataOrHandleFailure(
+        Optional<MatchingUseCases.RecordLikeResult> result = requiredDataOrHandleFailure(
                 ctx,
                 matchingUseCases.recordLike(new RecordLikeCommand(
                         UserContext.api(userId),
                         targetId,
                         datingapp.core.connection.ConnectionModels.Like.Direction.LIKE,
-                        true)));
+                        true)),
+                "Like result returned no data");
         if (result.isEmpty()) {
             return;
         }
@@ -527,8 +529,10 @@ public class RestApiServer {
             return;
         }
 
-        Optional<MatchingUseCases.UndoOutcome> result =
-                dataOrHandleFailure(ctx, matchingUseCases.undoSwipe(new UndoSwipeCommand(UserContext.api(userId))));
+        Optional<MatchingUseCases.UndoOutcome> result = requiredDataOrHandleFailure(
+                ctx,
+                matchingUseCases.undoSwipe(new UndoSwipeCommand(UserContext.api(userId))),
+                "Undo swipe returned no data");
         if (result.isEmpty()) {
             return;
         }
@@ -541,8 +545,10 @@ public class RestApiServer {
             return;
         }
 
-        Optional<List<datingapp.core.matching.MatchingService.PendingLiker>> result = dataOrHandleFailure(
-                ctx, matchingUseCases.pendingLikers(new PendingLikersQuery(UserContext.api(userId))));
+        Optional<List<datingapp.core.matching.MatchingService.PendingLiker>> result = requiredDataOrHandleFailure(
+                ctx,
+                matchingUseCases.pendingLikers(new PendingLikersQuery(UserContext.api(userId))),
+                "Pending likers returned no data");
         if (result.isEmpty()) {
             return;
         }
@@ -553,12 +559,12 @@ public class RestApiServer {
 
     void getStandouts(Context ctx) {
         UUID userId = parseUuid(ctx.pathParam("id"));
-        User currentUser = loadUser(ctx, userId);
-        if (currentUser == null) {
+        Optional<User> currentUser = loadExistingUser(ctx, userId);
+        if (currentUser.isEmpty()) {
             return;
         }
 
-        var result = matchingUseCases.standouts(new StandoutsQuery(UserContext.api(userId), currentUser));
+        var result = matchingUseCases.standouts(new StandoutsQuery(UserContext.api(userId), currentUser.get()));
         if (!result.success()) {
             handleUseCaseFailure(ctx, result.error());
             return;
@@ -577,7 +583,7 @@ public class RestApiServer {
     void archiveMatch(Context ctx) {
         UUID userId = parseUuid(ctx.pathParam("id"));
         String matchId = ctx.pathParam(PATH_MATCH_ID);
-        if (loadUser(ctx, userId) == null) {
+        if (loadExistingUser(ctx, userId).isEmpty()) {
             return;
         }
 
@@ -592,7 +598,7 @@ public class RestApiServer {
     void getMatchQuality(Context ctx) {
         UUID userId = parseUuid(ctx.pathParam("id"));
         String matchId = ctx.pathParam(PATH_MATCH_ID);
-        if (loadUser(ctx, userId) == null) {
+        if (loadExistingUser(ctx, userId).isEmpty()) {
             return;
         }
 
@@ -606,7 +612,7 @@ public class RestApiServer {
 
     void getStats(Context ctx) {
         UUID userId = parseUuid(ctx.pathParam("id"));
-        if (loadUser(ctx, userId) == null) {
+        if (loadExistingUser(ctx, userId).isEmpty()) {
             return;
         }
 
@@ -620,7 +626,7 @@ public class RestApiServer {
 
     void getAchievements(Context ctx) {
         UUID userId = parseUuid(ctx.pathParam("id"));
-        if (loadUser(ctx, userId) == null) {
+        if (loadExistingUser(ctx, userId).isEmpty()) {
             return;
         }
         boolean checkForNew =
@@ -637,7 +643,7 @@ public class RestApiServer {
 
     void getNotifications(Context ctx) {
         UUID userId = parseUuid(ctx.pathParam("id"));
-        if (loadUser(ctx, userId) == null) {
+        if (loadExistingUser(ctx, userId).isEmpty()) {
             return;
         }
         boolean unreadOnly = ctx.queryParamAsClass("unreadOnly", Boolean.class).getOrDefault(false);
@@ -653,7 +659,7 @@ public class RestApiServer {
     void markNotificationRead(Context ctx) {
         UUID userId = parseUuid(ctx.pathParam("id"));
         UUID notificationId = parseUuid(ctx.pathParam(PATH_NOTIFICATION_ID));
-        if (loadUser(ctx, userId) == null) {
+        if (loadExistingUser(ctx, userId).isEmpty()) {
             return;
         }
 
@@ -668,7 +674,7 @@ public class RestApiServer {
 
     void markAllNotificationsRead(Context ctx) {
         UUID userId = parseUuid(ctx.pathParam("id"));
-        if (loadUser(ctx, userId) == null) {
+        if (loadExistingUser(ctx, userId).isEmpty()) {
             return;
         }
 
@@ -684,7 +690,7 @@ public class RestApiServer {
     void requestFriendZone(Context ctx) {
         UUID userId = parseUuid(ctx.pathParam("id"));
         UUID targetId = parseUuid(ctx.pathParam(PATH_TARGET_ID));
-        if (loadUser(ctx, userId) == null || loadUser(ctx, targetId) == null) {
+        if (!ensureUsersExist(ctx, userId, targetId)) {
             return;
         }
 
@@ -708,7 +714,7 @@ public class RestApiServer {
     private void respondToFriendRequest(Context ctx, FriendRequestAction action) {
         UUID userId = parseUuid(ctx.pathParam("id"));
         UUID requestId = parseUuid(ctx.pathParam("requestId"));
-        if (loadUser(ctx, userId) == null) {
+        if (loadExistingUser(ctx, userId).isEmpty()) {
             return;
         }
 
@@ -724,7 +730,7 @@ public class RestApiServer {
     void gracefulExit(Context ctx) {
         UUID userId = parseUuid(ctx.pathParam("id"));
         UUID targetId = parseUuid(ctx.pathParam(PATH_TARGET_ID));
-        if (loadUser(ctx, userId) == null || loadUser(ctx, targetId) == null) {
+        if (!ensureUsersExist(ctx, userId, targetId)) {
             return;
         }
 
@@ -739,7 +745,7 @@ public class RestApiServer {
     void unmatch(Context ctx) {
         UUID userId = parseUuid(ctx.pathParam("id"));
         UUID targetId = parseUuid(ctx.pathParam(PATH_TARGET_ID));
-        if (loadUser(ctx, userId) == null || loadUser(ctx, targetId) == null) {
+        if (!ensureUsersExist(ctx, userId, targetId)) {
             return;
         }
 
@@ -754,7 +760,7 @@ public class RestApiServer {
     void blockUser(Context ctx) {
         UUID userId = parseUuid(ctx.pathParam("id"));
         UUID targetId = parseUuid(ctx.pathParam(PATH_TARGET_ID));
-        if (loadUser(ctx, userId) == null || loadUser(ctx, targetId) == null) {
+        if (!ensureUsersExist(ctx, userId, targetId)) {
             return;
         }
 
@@ -769,7 +775,7 @@ public class RestApiServer {
 
     void getBlockedUsers(Context ctx) {
         UUID userId = parseUuid(ctx.pathParam("id"));
-        if (loadUser(ctx, userId) == null) {
+        if (loadExistingUser(ctx, userId).isEmpty()) {
             return;
         }
 
@@ -784,7 +790,7 @@ public class RestApiServer {
     void unblockUser(Context ctx) {
         UUID userId = parseUuid(ctx.pathParam("id"));
         UUID targetId = parseUuid(ctx.pathParam(PATH_TARGET_ID));
-        if (loadUser(ctx, userId) == null || loadUser(ctx, targetId) == null) {
+        if (!ensureUsersExist(ctx, userId, targetId)) {
             return;
         }
 
@@ -799,7 +805,7 @@ public class RestApiServer {
     void reportUser(Context ctx) {
         UUID userId = parseUuid(ctx.pathParam("id"));
         UUID targetId = parseUuid(ctx.pathParam(PATH_TARGET_ID));
-        if (loadUser(ctx, userId) == null || loadUser(ctx, targetId) == null) {
+        if (!ensureUsersExist(ctx, userId, targetId)) {
             return;
         }
 
@@ -820,7 +826,7 @@ public class RestApiServer {
 
     void startVerification(Context ctx) {
         UUID userId = parseUuid(ctx.pathParam("id"));
-        if (loadUser(ctx, userId) == null) {
+        if (loadExistingUser(ctx, userId).isEmpty()) {
             return;
         }
 
@@ -836,7 +842,7 @@ public class RestApiServer {
 
     void confirmVerification(Context ctx) {
         UUID userId = parseUuid(ctx.pathParam("id"));
-        if (loadUser(ctx, userId) == null) {
+        if (loadExistingUser(ctx, userId).isEmpty()) {
             return;
         }
 
@@ -862,7 +868,7 @@ public class RestApiServer {
         if (offset < 0) {
             throw new IllegalArgumentException("offset must be non-negative");
         }
-        if (loadUser(ctx, userId) == null) {
+        if (loadExistingUser(ctx, userId).isEmpty()) {
             return;
         }
         var listResult =
@@ -892,7 +898,7 @@ public class RestApiServer {
     void deleteConversation(Context ctx) {
         UUID userId = parseUuid(ctx.pathParam("id"));
         String conversationId = ctx.pathParam(PATH_CONVERSATION_ID);
-        if (loadUser(ctx, userId) == null) {
+        if (loadExistingUser(ctx, userId).isEmpty()) {
             return;
         }
 
@@ -908,7 +914,7 @@ public class RestApiServer {
     void archiveConversation(Context ctx) {
         UUID userId = parseUuid(ctx.pathParam("id"));
         String conversationId = ctx.pathParam(PATH_CONVERSATION_ID);
-        if (loadUser(ctx, userId) == null) {
+        if (loadExistingUser(ctx, userId).isEmpty()) {
             return;
         }
 
@@ -996,7 +1002,7 @@ public class RestApiServer {
 
     void listProfileNotes(Context ctx) {
         UUID authorId = parseUuid(ctx.pathParam(PATH_AUTHOR_ID));
-        if (loadUser(ctx, authorId) == null) {
+        if (loadExistingUser(ctx, authorId).isEmpty()) {
             return;
         }
         var result = profileNotesUseCases.listProfileNotes(
@@ -1011,7 +1017,7 @@ public class RestApiServer {
     void getProfileNote(Context ctx) {
         UUID authorId = parseUuid(ctx.pathParam(PATH_AUTHOR_ID));
         UUID subjectId = parseUuid(ctx.pathParam(PATH_SUBJECT_ID));
-        if (loadUser(ctx, authorId) == null) {
+        if (loadExistingUser(ctx, authorId).isEmpty()) {
             return;
         }
         var result = profileNotesUseCases.getProfileNote(
@@ -1026,7 +1032,7 @@ public class RestApiServer {
     void upsertProfileNote(Context ctx) {
         UUID authorId = parseUuid(ctx.pathParam(PATH_AUTHOR_ID));
         UUID subjectId = parseUuid(ctx.pathParam(PATH_SUBJECT_ID));
-        if (loadUser(ctx, authorId) == null || loadUser(ctx, subjectId) == null) {
+        if (!ensureUsersExist(ctx, authorId, subjectId)) {
             return;
         }
         RestApiDtos.ProfileNoteUpsertRequest request = ctx.bodyAsClass(RestApiDtos.ProfileNoteUpsertRequest.class);
@@ -1046,7 +1052,7 @@ public class RestApiServer {
     void deleteProfileNote(Context ctx) {
         UUID authorId = parseUuid(ctx.pathParam(PATH_AUTHOR_ID));
         UUID subjectId = parseUuid(ctx.pathParam(PATH_SUBJECT_ID));
-        if (loadUser(ctx, authorId) == null || loadUser(ctx, subjectId) == null) {
+        if (!ensureUsersExist(ctx, authorId, subjectId)) {
             return;
         }
         var result = profileNotesUseCases.deleteProfileNote(
@@ -1068,22 +1074,22 @@ public class RestApiServer {
         }
     }
 
-    private User loadUser(Context ctx, UUID userId) {
-        var result = profileUseCases.getUserById(userId);
-        if (result.success()) {
-            return result.data();
-        }
-        handleUseCaseFailure(ctx, result.error());
-        return null;
-    }
-
     private Optional<User> loadExistingUser(Context ctx, UUID userId) {
-        return Optional.ofNullable(loadUser(ctx, userId));
+        var result = profileUseCases.getUserById(userId);
+        if (!result.success()) {
+            handleUseCaseFailure(ctx, result.error());
+            return Optional.empty();
+        }
+        if (result.data() == null) {
+            ctx.status(500).json(new ErrorResponse(INTERNAL_ERROR, "User lookup returned no data"));
+            return Optional.empty();
+        }
+        return Optional.of(result.data());
     }
 
     private boolean ensureUsersExist(Context ctx, UUID... userIds) {
         for (UUID userId : userIds) {
-            if (loadUser(ctx, userId) == null) {
+            if (loadExistingUser(ctx, userId).isEmpty()) {
                 return false;
             }
         }
@@ -1098,17 +1104,32 @@ public class RestApiServer {
         return true;
     }
 
-    private <T> Optional<T> dataOrHandleFailure(Context ctx, UseCaseResult<T> result) {
+    private <T> Optional<T> requiredDataOrHandleFailure(
+            Context ctx, UseCaseResult<T> result, String unexpectedNullMessage) {
         if (handleFailureIfNeeded(ctx, result)) {
             return Optional.empty();
         }
-        return Optional.ofNullable(result.data());
+        if (result.data() == null) {
+            ctx.status(500).json(new ErrorResponse(INTERNAL_ERROR, unexpectedNullMessage));
+            return Optional.empty();
+        }
+        return Optional.of(result.data());
     }
 
     private Optional<MatchingUseCases.BrowseCandidatesResult> loadBrowseCandidates(
             Context ctx, UUID userId, User user) {
-        return dataOrHandleFailure(
-                ctx, matchingUseCases.browseCandidates(new BrowseCandidatesCommand(UserContext.api(userId), user)));
+        return requiredDataOrHandleFailure(
+                ctx,
+                matchingUseCases.browseCandidates(new BrowseCandidatesCommand(UserContext.api(userId), user)),
+                "Browse candidates returned no data");
+    }
+
+    private Optional<BrowseCandidatesResponse> loadBrowseResponse(Context ctx, UUID userId, User user) {
+        Optional<MatchingUseCases.BrowseCandidatesResult> result = loadBrowseCandidates(ctx, userId, user);
+        if (result.isEmpty()) {
+            return Optional.empty();
+        }
+        return Optional.of(BrowseCandidatesResponse.from(result.get(), userTimeZone));
     }
 
     private MatchSummary toMatchSummary(Match match, UUID currentUserId, Map<UUID, User> usersById) {
@@ -1140,6 +1161,11 @@ public class RestApiServer {
         if (user.getState() != UserState.ACTIVE) {
             throw new IllegalStateException("User must be ACTIVE to browse candidates");
         }
+    }
+
+    private void markCandidatesCompatibilityAlias(Context ctx, UUID userId) {
+        ctx.header("Deprecation", "true");
+        ctx.header("Link", "</api/users/" + userId + "/browse>; rel=\"successor-version\"");
     }
 
     private Optional<UUID> resolveActingUserId(Context ctx) {

@@ -6,6 +6,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.app.event.InProcessAppEventBus;
 import datingapp.app.usecase.matching.MatchingUseCases;
+import datingapp.app.usecase.profile.ProfileInsightsUseCases;
+import datingapp.app.usecase.profile.ProfileMutationUseCases;
+import datingapp.app.usecase.profile.ProfileNotesUseCases;
 import datingapp.app.usecase.profile.ProfileUseCases;
 import datingapp.app.usecase.social.SocialUseCases;
 import datingapp.core.AppConfig;
@@ -118,11 +121,15 @@ class MatchesViewModelTest {
                 users,
                 profileService,
                 new ValidationService(config),
-                null,
-                TestAchievementService.empty(),
-                config,
-                new datingapp.core.workflow.ProfileActivationPolicy(),
-                new InProcessAppEventBus());
+                new ProfileMutationUseCases(
+                        users,
+                        new ValidationService(config),
+                        TestAchievementService.empty(),
+                        config,
+                        new datingapp.core.workflow.ProfileActivationPolicy(),
+                        new InProcessAppEventBus()),
+                new ProfileNotesUseCases(users, new ValidationService(config), config, new InProcessAppEventBus()),
+                new ProfileInsightsUseCases(TestAchievementService.empty(), null));
         TrustSafetyService trustSafetyService = TrustSafetyService.builder(
                         trustSafetyStorage, interactions, users, config, communications)
                 .build();

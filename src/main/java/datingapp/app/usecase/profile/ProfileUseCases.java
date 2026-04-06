@@ -1,17 +1,12 @@
 package datingapp.app.usecase.profile;
 
-import datingapp.app.event.AppEventBus;
 import datingapp.app.usecase.common.UseCaseError;
 import datingapp.app.usecase.common.UseCaseResult;
-import datingapp.core.AppConfig;
-import datingapp.core.metrics.ActivityMetricsService;
 import datingapp.core.model.ProfileNote;
 import datingapp.core.model.User;
 import datingapp.core.profile.ProfileService;
 import datingapp.core.profile.ValidationService;
-import datingapp.core.storage.AccountCleanupStorage;
 import datingapp.core.storage.UserStorage;
-import datingapp.core.workflow.ProfileActivationPolicy;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -21,7 +16,6 @@ import java.util.Set;
 import java.util.UUID;
 
 /** Profile and user-progress application use-cases shared across adapters. */
-@SuppressWarnings("java:S107")
 public class ProfileUseCases {
     private static final String USER_STORAGE_REQUIRED = "UserStorage is required";
     private static final String PROFILE_SERVICE_REQUIRED = "ProfileService is required";
@@ -34,187 +28,21 @@ public class ProfileUseCases {
     private final ProfileNotesUseCases profileNotesUseCases;
     private final ProfileInsightsUseCases profileInsightsUseCases;
 
-    public static Builder builder() {
-        return new Builder();
-    }
-
-    @SuppressWarnings("java:S107")
     public ProfileUseCases(
             UserStorage userStorage,
             ProfileService profileService,
             ValidationService validationService,
-            ActivityMetricsService activityMetricsService,
-            datingapp.core.metrics.AchievementService achievementService,
-            AppConfig config,
-            ProfileActivationPolicy activationPolicy,
-            AppEventBus eventBus) {
-        this(
-                userStorage,
-                profileService,
-                validationService,
-                activityMetricsService,
-                achievementService,
-                config,
-                activationPolicy,
-                eventBus,
-                null,
-                null,
-                null,
-                null);
-    }
-
-    @SuppressWarnings("java:S107")
-    public ProfileUseCases(
-            UserStorage userStorage,
-            ProfileService profileService,
-            ValidationService validationService,
-            ActivityMetricsService activityMetricsService,
-            datingapp.core.metrics.AchievementService achievementService,
-            AppConfig config,
-            ProfileActivationPolicy activationPolicy,
-            AppEventBus eventBus,
-            AccountCleanupStorage accountCleanupStorage) {
-        this(
-                userStorage,
-                profileService,
-                validationService,
-                activityMetricsService,
-                achievementService,
-                config,
-                activationPolicy,
-                eventBus,
-                null,
-                accountCleanupStorage,
-                null,
-                null);
-    }
-
-    @SuppressWarnings("java:S107")
-    public ProfileUseCases(
-            UserStorage userStorage,
-            ProfileService profileService,
-            ValidationService validationService,
-            ActivityMetricsService activityMetricsService,
-            datingapp.core.metrics.AchievementService achievementService,
-            AppConfig config,
-            ProfileActivationPolicy activationPolicy,
-            AppEventBus eventBus,
             ProfileMutationUseCases profileMutationUseCases,
-            AccountCleanupStorage accountCleanupStorage,
             ProfileNotesUseCases profileNotesUseCases,
             ProfileInsightsUseCases profileInsightsUseCases) {
-        this.userStorage = userStorage;
-        this.profileService = profileService;
-        this.validationService = validationService;
-        this.profileMutationUseCases = profileMutationUseCases != null
-                ? profileMutationUseCases
-                : new ProfileMutationUseCases(
-                        userStorage,
-                        validationService,
-                        achievementService,
-                        config,
-                        activationPolicy,
-                        eventBus,
-                        accountCleanupStorage);
-        this.profileNotesUseCases = profileNotesUseCases != null
-                ? profileNotesUseCases
-                : new ProfileNotesUseCases(userStorage, validationService, config, eventBus);
-        this.profileInsightsUseCases = profileInsightsUseCases != null
-                ? profileInsightsUseCases
-                : new ProfileInsightsUseCases(achievementService, activityMetricsService);
-    }
-
-    public static final class Builder {
-        private UserStorage userStorage;
-        private ProfileService profileService;
-        private ValidationService validationService;
-        private ActivityMetricsService activityMetricsService;
-        private datingapp.core.metrics.AchievementService achievementService;
-        private AccountCleanupStorage accountCleanupStorage;
-        private ProfileMutationUseCases profileMutationUseCases;
-        private ProfileNotesUseCases profileNotesUseCases;
-        private ProfileInsightsUseCases profileInsightsUseCases;
-        private AppConfig config;
-        private ProfileActivationPolicy activationPolicy = new ProfileActivationPolicy();
-        private AppEventBus eventBus;
-
-        private Builder() {}
-
-        public Builder userStorage(UserStorage userStorage) {
-            this.userStorage = userStorage;
-            return this;
-        }
-
-        public Builder profileService(ProfileService profileService) {
-            this.profileService = profileService;
-            return this;
-        }
-
-        public Builder validationService(ValidationService validationService) {
-            this.validationService = validationService;
-            return this;
-        }
-
-        public Builder activityMetricsService(ActivityMetricsService activityMetricsService) {
-            this.activityMetricsService = activityMetricsService;
-            return this;
-        }
-
-        public Builder achievementService(datingapp.core.metrics.AchievementService achievementService) {
-            this.achievementService = achievementService;
-            return this;
-        }
-
-        public Builder accountCleanupStorage(AccountCleanupStorage accountCleanupStorage) {
-            this.accountCleanupStorage = accountCleanupStorage;
-            return this;
-        }
-
-        public Builder profileMutationUseCases(ProfileMutationUseCases profileMutationUseCases) {
-            this.profileMutationUseCases = profileMutationUseCases;
-            return this;
-        }
-
-        public Builder profileNotesUseCases(ProfileNotesUseCases profileNotesUseCases) {
-            this.profileNotesUseCases = profileNotesUseCases;
-            return this;
-        }
-
-        public Builder profileInsightsUseCases(ProfileInsightsUseCases profileInsightsUseCases) {
-            this.profileInsightsUseCases = profileInsightsUseCases;
-            return this;
-        }
-
-        public Builder config(AppConfig config) {
-            this.config = config;
-            return this;
-        }
-
-        public Builder activationPolicy(ProfileActivationPolicy activationPolicy) {
-            this.activationPolicy = activationPolicy;
-            return this;
-        }
-
-        public Builder eventBus(AppEventBus eventBus) {
-            this.eventBus = eventBus;
-            return this;
-        }
-
-        public ProfileUseCases build() {
-            return new ProfileUseCases(
-                    userStorage,
-                    profileService,
-                    validationService,
-                    activityMetricsService,
-                    achievementService,
-                    config,
-                    activationPolicy,
-                    eventBus,
-                    profileMutationUseCases,
-                    accountCleanupStorage,
-                    profileNotesUseCases,
-                    profileInsightsUseCases);
-        }
+        this.userStorage = Objects.requireNonNull(userStorage, "userStorage cannot be null");
+        this.profileService = Objects.requireNonNull(profileService, "profileService cannot be null");
+        this.validationService = Objects.requireNonNull(validationService, "validationService cannot be null");
+        this.profileMutationUseCases =
+                Objects.requireNonNull(profileMutationUseCases, "profileMutationUseCases cannot be null");
+        this.profileNotesUseCases = Objects.requireNonNull(profileNotesUseCases, "profileNotesUseCases cannot be null");
+        this.profileInsightsUseCases =
+                Objects.requireNonNull(profileInsightsUseCases, "profileInsightsUseCases cannot be null");
     }
 
     public UseCaseResult<ProfileMutationUseCases.ProfileSaveResult> saveProfile(

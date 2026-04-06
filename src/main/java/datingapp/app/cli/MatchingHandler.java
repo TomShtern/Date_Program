@@ -63,6 +63,11 @@ import org.slf4j.LoggerFactory;
 public class MatchingHandler implements LoggingSupport {
     private static final Logger logger = LoggerFactory.getLogger(MatchingHandler.class);
     private static final String ERR_FAILED = "❌ Failed: {}\n";
+    private static final Runnable NO_OP = MatchingHandler::noOp;
+
+    private static void noOp() {
+        // Intentionally empty.
+    }
 
     private final UserStorage userStorage;
     private final AnalyticsStorage analyticsStorage;
@@ -119,6 +124,7 @@ public class MatchingHandler implements LoggingSupport {
             Objects.requireNonNull(config);
             Objects.requireNonNull(userSession);
             Objects.requireNonNull(inputReader);
+            profileCompleteCallback = profileCompleteCallback == null ? NO_OP : profileCompleteCallback;
             Objects.requireNonNull(matchingUseCases);
             Objects.requireNonNull(socialUseCases);
         }
@@ -147,7 +153,7 @@ public class MatchingHandler implements LoggingSupport {
         }
 
         public static Dependencies fromServices(ServiceRegistry services, AppSession session, InputReader inputReader) {
-            return fromServices(services, session, inputReader, null);
+            return fromServices(services, session, inputReader, NO_OP);
         }
     }
 

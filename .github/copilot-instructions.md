@@ -55,11 +55,11 @@ Explicit contracts: types + schemas + pre/post conditions. Use OpenAPI/JSON Sche
 Small modules & functions: tiny units of behavior that are easy to test and swap.
 Idempotent interfaces: safe to retry; clear state transitions.
 Observability: structured logs, metrics, clear errors — machines need signals.
-Stable public surface: semantic versioning, changelogs, and strict backward-compat rules.
+Stable public surface: semantic versioning, changelogs.
 Concrete rules / thresholds (safe defaults)
-Max function length: ≤ 85 lines.
-Max nesting depth: ≤ 4.
-Cyclomatic complexity per function: ≤ 9.
+Max function length: ≤ 100 lines.
+Max nesting depth: ≤ 5.
+Cyclomatic complexity per function: ≤ 10.
 One responsibility per function/module (SRP).
 
 
@@ -83,7 +83,7 @@ Use the lower-level docs only to explain or operationalize what the code already
 
 - Windows 11
 - PowerShell 7.5.6
-- VS Code Insiders (sometimes IntelliJ)
+- VS Code Insiders
 - Java 25 with preview enabled
 - JavaFX 25.0.2
 - Maven
@@ -128,9 +128,9 @@ Use PowerShell-friendly commands. When Maven test selection uses a comma-separat
 - Prefer `ast-grep` / syntax-aware search when code structure matters.
 - Use focused subagents for independent read-only investigation or execution batches.
 - If one search/exploration helper path fails because of model or environment instability, switch immediately to a similar available agent instead of retrying the same failing path.
-- Make the smallest correct change first.
+- Make the smallest correct change first when appropriate, but do not limit yourself when broader changes are necessary.
 - Avoid unrelated refactors while implementing a task.
-- Prefer validating PostgreSQL changes against an existing local PostgreSQL instance first; use Docker only as an optional disposable fallback when no local PostgreSQL server is available.
+- Prefer validating PostgreSQL changes against an existing local PostgreSQL instance first; use Docker only as an optional disposable fallback when no local PostgreSQL server is available(we will use docker as the app matures further).
 
 ## Planning, review, and meta-workflow defaults
 
@@ -150,6 +150,7 @@ Before claiming work is complete:
 2. Run targeted tests for the changed area.
 3. Run broader smoke coverage if multiple subsystems changed.
 4. Run `mvn spotless:apply verify` before concluding substantial work.
+5. Use `.\run_verify.ps1` as the repo-level full local verification path when you need the Maven gate plus routine PostgreSQL smoke validation.
 
 ## Canonical commands
 
@@ -163,10 +164,13 @@ mvn javafx:run
 # Run the full test suite
 mvn test
 
+# Full local verification (Maven quality gate + PostgreSQL smoke)
+.\run_verify.ps1
+
 # Final repo-wide quality gate
 mvn spotless:apply verify
 
-# Optional local PostgreSQL runtime validation
+# Optional direct local PostgreSQL runtime validation helpers
 .\start_local_postgres.ps1
 .\run_postgresql_smoke.ps1
 .\stop_local_postgres.ps1

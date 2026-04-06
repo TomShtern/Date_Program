@@ -10,12 +10,8 @@ import datingapp.core.connection.ConnectionModels.Message;
 import datingapp.core.connection.ConnectionService;
 import datingapp.core.model.Match;
 import datingapp.core.model.Match.MatchArchiveReason;
-import datingapp.core.model.ProfileNote;
 import datingapp.core.model.User;
 import datingapp.core.model.User.UserState;
-import datingapp.core.storage.CommunicationStorage;
-import datingapp.core.storage.InteractionStorage;
-import datingapp.core.storage.UserStorage;
 import datingapp.core.testutil.TestClock;
 import datingapp.core.testutil.TestStorages;
 import java.time.Instant;
@@ -89,9 +85,9 @@ class MessagingServiceTest {
         }
     }
 
-    private CommunicationStorage messagingStorage;
-    private InteractionStorage matchStorage;
-    private InMemoryUserStorage userStorage;
+    private TestStorages.Communications messagingStorage;
+    private TestStorages.Interactions matchStorage;
+    private TestStorages.Users userStorage;
     private ConnectionService messagingService;
 
     private UUID userA;
@@ -105,7 +101,7 @@ class MessagingServiceTest {
         TestClock.setFixed(FIXED_INSTANT);
         messagingStorage = new TestStorages.Communications();
         matchStorage = new TestStorages.Interactions(messagingStorage);
-        userStorage = new InMemoryUserStorage();
+        userStorage = new TestStorages.Users();
         messagingService = new ConnectionService(AppConfig.defaults(), messagingStorage, matchStorage, userStorage);
 
         // Create test users
@@ -763,67 +759,6 @@ class MessagingServiceTest {
 
             assertFalse(result.success());
             assertNotNull(result.errorMessage());
-        }
-    }
-
-    // ===== In-Memory Test Implementations =====
-
-    static class InMemoryUserStorage implements UserStorage {
-        private final Map<UUID, User> users = new HashMap<>();
-        private final Map<String, ProfileNote> profileNotes = new java.util.concurrent.ConcurrentHashMap<>();
-
-        private static String noteKey(UUID authorId, UUID subjectId) {
-            return authorId + "_" + subjectId;
-        }
-
-        @Override
-        public void save(User user) {
-            users.put(user.getId(), user);
-        }
-
-        @Override
-        public Optional<User> get(UUID id) {
-            return Optional.ofNullable(users.get(id));
-        }
-
-        @Override
-        public List<User> findActive() {
-            return users.values().stream()
-                    .filter(u -> u.getState() == UserState.ACTIVE)
-                    .toList();
-        }
-
-        @Override
-        public List<User> findAll() {
-            return List.copyOf(users.values());
-        }
-
-        @Override
-        public void delete(UUID id) {
-            users.remove(id);
-        }
-
-        @Override
-        public void saveProfileNote(ProfileNote note) {
-            profileNotes.put(noteKey(note.authorId(), note.subjectId()), note);
-        }
-
-        @Override
-        public Optional<ProfileNote> getProfileNote(UUID authorId, UUID subjectId) {
-            return Optional.ofNullable(profileNotes.get(noteKey(authorId, subjectId)));
-        }
-
-        @Override
-        public List<ProfileNote> getProfileNotesByAuthor(UUID authorId) {
-            return profileNotes.values().stream()
-                    .filter(note -> note.authorId().equals(authorId))
-                    .sorted((a, b) -> b.updatedAt().compareTo(a.updatedAt()))
-                    .toList();
-        }
-
-        @Override
-        public boolean deleteProfileNote(UUID authorId, UUID subjectId) {
-            return profileNotes.remove(noteKey(authorId, subjectId)) != null;
         }
     }
 }

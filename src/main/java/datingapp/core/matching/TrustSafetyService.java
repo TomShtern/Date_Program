@@ -10,7 +10,7 @@ import datingapp.core.model.Match.MatchArchiveReason;
 import datingapp.core.model.User;
 import datingapp.core.model.User.UserState;
 import datingapp.core.storage.CommunicationStorage;
-import datingapp.core.storage.InteractionStorage;
+import datingapp.core.storage.OperationalInteractionStorage;
 import datingapp.core.storage.TrustSafetyStorage;
 import datingapp.core.storage.UserStorage;
 import datingapp.core.workflow.RelationshipWorkflowPolicy;
@@ -46,7 +46,7 @@ public final class TrustSafetyService {
     public static final Duration DEFAULT_VERIFICATION_TTL = Duration.ofMinutes(15);
 
     private final TrustSafetyStorage trustSafetyStorage;
-    private final InteractionStorage interactionStorage;
+    private final OperationalInteractionStorage interactionStorage;
     private final UserStorage userStorage;
     private final AppConfig config;
     private final CommunicationStorage communicationStorage; // nullable
@@ -62,7 +62,7 @@ public final class TrustSafetyService {
 
     public static Builder builder(
             TrustSafetyStorage trustSafetyStorage,
-            InteractionStorage interactionStorage,
+            OperationalInteractionStorage interactionStorage,
             UserStorage userStorage,
             AppConfig config,
             CommunicationStorage communicationStorage) {
@@ -76,7 +76,7 @@ public final class TrustSafetyService {
 
     public static Builder builder(
             TrustSafetyStorage trustSafetyStorage,
-            InteractionStorage interactionStorage,
+            OperationalInteractionStorage interactionStorage,
             UserStorage userStorage,
             AppConfig config) {
         return builder()
@@ -103,7 +103,7 @@ public final class TrustSafetyService {
 
     public static final class Builder {
         private TrustSafetyStorage trustSafetyStorage;
-        private InteractionStorage interactionStorage;
+        private OperationalInteractionStorage interactionStorage;
         private UserStorage userStorage;
         private AppConfig config;
         private CommunicationStorage communicationStorage;
@@ -118,7 +118,7 @@ public final class TrustSafetyService {
             return this;
         }
 
-        public Builder interactionStorage(InteractionStorage interactionStorage) {
+        public Builder interactionStorage(OperationalInteractionStorage interactionStorage) {
             this.interactionStorage = interactionStorage;
             return this;
         }
@@ -511,28 +511,10 @@ public final class TrustSafetyService {
     }
 
     private void applyBlockTransition(UUID blockerId, UUID blockedId, BlockTransitionData transitionData) {
-        if (interactionStorage.supportsAtomicBlockTransition()) {
-            boolean persisted = interactionStorage.blockTransition(
-                    blockerId, blockedId, transitionData.updatedMatch(), transitionData.archivedConversation());
-            if (!persisted) {
-                throw new StorageException("Atomic block transition could not be persisted");
-            }
-            invalidateCandidateCaches(blockerId, blockedId);
-            return;
-        }
-
-        if (logger.isWarnEnabled()) {
-            logger.warn(
-                    "Interaction storage {} does not support atomic block transitions; using explicit fallback",
-                    interactionStorage.getClass().getSimpleName());
-        }
-
-        transitionData.updatedMatch().ifPresent(interactionStorage::update);
-        if (communicationStorage != null) {
-            transitionData.archivedConversation().ifPresent(conversation -> {
-                communicationStorage.archiveConversation(conversation.getId(), blockerId, MatchArchiveReason.BLOCK);
-                communicationStorage.setConversationVisibility(conversation.getId(), blockerId, false);
-            });
+        boolean persisted = interactionStorage.blockTransition(
+                blockerId, blockedId, transitionData.updatedMatch(), transitionData.archivedConversation());
+        if (!persisted) {
+            throw new StorageException("Atomic block transition could not be persisted");
         }
 
         invalidateCandidateCaches(blockerId, blockedId);

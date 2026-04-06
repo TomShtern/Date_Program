@@ -11,7 +11,7 @@ import datingapp.core.metrics.SwipeState.Undo;
 import datingapp.core.model.Match;
 import datingapp.core.model.Match.MatchArchiveReason;
 import datingapp.core.model.Match.MatchState;
-import datingapp.core.storage.InteractionStorage;
+import datingapp.core.storage.OperationalInteractionStorage;
 import datingapp.core.storage.PageData;
 import datingapp.storage.DatabaseDialect;
 import datingapp.storage.DatabaseManager.StorageException;
@@ -37,7 +37,7 @@ import org.jdbi.v3.sqlobject.statement.SqlQuery;
 import org.jdbi.v3.sqlobject.statement.SqlUpdate;
 
 /** Consolidated JDBI storage for likes and matches. */
-public final class JdbiMatchmakingStorage implements InteractionStorage {
+public final class JdbiMatchmakingStorage implements OperationalInteractionStorage {
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
     private static final String PARAM_ID = "id";
@@ -505,16 +505,6 @@ public final class JdbiMatchmakingStorage implements InteractionStorage {
     public int countActiveMatchesFor(UUID userId) {
         Objects.requireNonNull(userId, ERR_USER_ID_NULL);
         return matchDao.countActiveMatchesFor(userId);
-    }
-
-    @Override
-    public boolean supportsAtomicRelationshipTransitions() {
-        return true;
-    }
-
-    @Override
-    public boolean supportsAtomicBlockTransition() {
-        return true;
     }
 
     @Override

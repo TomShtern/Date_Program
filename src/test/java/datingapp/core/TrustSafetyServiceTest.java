@@ -437,8 +437,8 @@ class TrustSafetyServiceTest {
         void setUp() {
             userStorage = new InMemoryUserStorage();
             trustSafetyStorage = new TestStorages.TrustSafety();
-            interactionStorage = new TestStorages.Interactions();
             communicationStorage = new TestStorages.Communications();
+            interactionStorage = new TestStorages.Interactions(communicationStorage);
             service = TrustSafetyService.builder(
                             trustSafetyStorage,
                             interactionStorage,

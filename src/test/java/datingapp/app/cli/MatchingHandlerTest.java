@@ -140,7 +140,7 @@ class MatchingHandlerTest {
                 config,
                 session,
                 inputReader,
-                null,
+                () -> {},
                 matchingUseCases,
                 socialUseCases);
         return new MatchingHandler(deps);

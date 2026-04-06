@@ -11,7 +11,7 @@ import datingapp.core.connection.ConnectionModels.Message;
 import datingapp.core.connection.ConnectionModels.Notification;
 import datingapp.core.connection.ConnectionModels.Notification.Type;
 import datingapp.core.model.Match.MatchArchiveReason;
-import datingapp.core.storage.CommunicationStorage;
+import datingapp.core.storage.OperationalCommunicationStorage;
 import datingapp.storage.DatabaseManager.StorageException;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -36,7 +36,7 @@ import org.jdbi.v3.sqlobject.statement.SqlUpdate;
  * Consolidated JDBI storage for conversations, messages, friend requests, and
  * notifications.
  */
-public final class JdbiConnectionStorage implements CommunicationStorage {
+public final class JdbiConnectionStorage implements OperationalCommunicationStorage {
 
     private static final String ERR_CONVERSATION_IDS_NULL = "conversationIds cannot be null";
     private static final String ERR_USER_ID_NULL = "userId cannot be null";

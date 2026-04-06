@@ -1,0 +1,47 @@
+name: verify
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: datingapp
+          POSTGRES_PASSWORD: datingapp
+          POSTGRES_DB: datingapp
+        ports:
+          - 55432:5432
+        options: >-
+          --health-cmd "pg_isready -U datingapp -d datingapp"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "25"
+          cache: maven
+
+      - name: Maven quality gate
+        run: mvn spotless:apply verify
+
+      - name: PostgreSQL smoke
+        run: >-
+          mvn -Dcheckstyle.skip=true
+          -Dtest=PostgresqlRuntimeSmokeTest
+          -Ddatingapp.pgtest.url=jdbc:postgresql://localhost:55432/datingapp
+          -Ddatingapp.pgtest.username=datingapp
+          -Ddatingapp.pgtest.password=datingapp
+          test

@@ -7,7 +7,6 @@ import datingapp.app.usecase.profile.ProfileInsightsUseCases;
 import datingapp.app.usecase.profile.ProfileInsightsUseCases.AchievementSnapshot;
 import datingapp.app.usecase.profile.ProfileInsightsUseCases.AchievementsQuery;
 import datingapp.app.usecase.profile.ProfileInsightsUseCases.StatsQuery;
-import datingapp.app.usecase.profile.ProfileUseCases;
 import datingapp.core.AppSession;
 import datingapp.core.LoggingSupport;
 import datingapp.core.ServiceRegistry;
@@ -27,7 +26,6 @@ public class StatsHandler implements LoggingSupport {
     private static final String PRESS_ENTER_PROMPT = "Press Enter to return...";
     private static final String USER_TIME_ZONE_NULL = "userTimeZone cannot be null";
 
-    private final ProfileUseCases profileUseCases;
     private final ProfileInsightsUseCases profileInsightsUseCases;
     private final AppSession session;
     private final InputReader inputReader;
@@ -42,18 +40,6 @@ public class StatsHandler implements LoggingSupport {
             ZoneId userTimeZone) {
         this.profileInsightsUseCases =
                 java.util.Objects.requireNonNull(profileInsightsUseCases, "profileInsightsUseCases cannot be null");
-        this.profileUseCases = null;
-        this.session = java.util.Objects.requireNonNull(session, "session cannot be null");
-        this.inputReader = java.util.Objects.requireNonNull(inputReader, "inputReader cannot be null");
-        this.userTimeZone = java.util.Objects.requireNonNull(userTimeZone, USER_TIME_ZONE_NULL);
-        this.dateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").withZone(this.userTimeZone);
-        this.dateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd").withZone(this.userTimeZone);
-    }
-
-    public StatsHandler(
-            ProfileUseCases profileUseCases, AppSession session, InputReader inputReader, ZoneId userTimeZone) {
-        this.profileUseCases = java.util.Objects.requireNonNull(profileUseCases, "profileUseCases cannot be null");
-        this.profileInsightsUseCases = null;
         this.session = java.util.Objects.requireNonNull(session, "session cannot be null");
         this.inputReader = java.util.Objects.requireNonNull(inputReader, "inputReader cannot be null");
         this.userTimeZone = java.util.Objects.requireNonNull(userTimeZone, USER_TIME_ZONE_NULL);
@@ -247,16 +233,10 @@ public class StatsHandler implements LoggingSupport {
     }
 
     private UseCaseResult<UserStats> loadStats(java.util.UUID userId) {
-        if (profileInsightsUseCases != null) {
-            return profileInsightsUseCases.getOrComputeStats(new StatsQuery(UserContext.cli(userId)));
-        }
-        return profileUseCases.getOrComputeStats(new StatsQuery(UserContext.cli(userId)));
+        return profileInsightsUseCases.getOrComputeStats(new StatsQuery(UserContext.cli(userId)));
     }
 
     private UseCaseResult<AchievementSnapshot> loadAchievements(java.util.UUID userId, boolean checkForNew) {
-        if (profileInsightsUseCases != null) {
-            return profileInsightsUseCases.getAchievements(new AchievementsQuery(UserContext.cli(userId), checkForNew));
-        }
-        return profileUseCases.getAchievements(new AchievementsQuery(UserContext.cli(userId), checkForNew));
+        return profileInsightsUseCases.getAchievements(new AchievementsQuery(UserContext.cli(userId), checkForNew));
     }
 }

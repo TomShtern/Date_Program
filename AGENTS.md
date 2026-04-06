@@ -53,11 +53,17 @@ Run verification in this order unless the task clearly needs a different sequenc
 1. Check touched files for errors.
 2. Run focused tests for the changed area.
 3. Run a broader smoke suite if multiple subsystems changed.
-4. If the work touches PostgreSQL runtime support, run the local smoke path (`.\run_postgresql_smoke.ps1` or equivalent property-driven `PostgresqlRuntimeSmokeTest`) before final completion claims.
-5. Run the full quality gate before claiming completion:
+4. If the work touches PostgreSQL runtime support, run the local smoke path (`.\run_postgresql_smoke.ps1` or equivalent property-driven `PostgresqlRuntimeSmokeTest`) during targeted validation.
+5. Run the full Maven quality gate before claiming completion:
 
 ```powershell
 mvn spotless:apply verify
+```
+
+6. Run the repo-level full local verification path when the change is substantial or affects runtime/verification seams:
+
+```powershell
+.\run_verify.ps1
 ```
 
 Use targeted Maven test selection for faster iteration, e.g.:
@@ -80,6 +86,7 @@ mvn --% -Dcheckstyle.skip=true -Dtest=ProfileUseCasesTest,MatchingUseCasesTest t
 
 - Prefer targeted tests during implementation.
 - Prefer the full quality gate before final handoff.
+- Treat `.\run_verify.ps1` as the canonical repo-level full local verification path; it runs the Maven quality gate and PostgreSQL smoke together.
 - For PostgreSQL runtime changes, prefer the repo-local helpers `start_local_postgres.ps1`, `run_postgresql_smoke.ps1`, and `stop_local_postgres.ps1` over ad-hoc Docker-first validation.
 - Use shared test helpers when available:
   - `JavaFxTestSupport`

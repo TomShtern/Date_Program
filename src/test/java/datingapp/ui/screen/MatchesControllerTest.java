@@ -21,6 +21,7 @@ import datingapp.core.profile.ProfileService;
 import datingapp.core.profile.ValidationService;
 import datingapp.core.testutil.TestAchievementService;
 import datingapp.core.testutil.TestStorages;
+import datingapp.core.workflow.ProfileActivationPolicy;
 import datingapp.ui.JavaFxTestSupport;
 import datingapp.ui.NavigationService;
 import datingapp.ui.viewmodel.MatchesViewModel;
@@ -216,15 +217,7 @@ class MatchesControllerTest {
                     new ConnectionService(config, communications, interactions, users),
                     trustSafetyService,
                     communications);
-            var profileUseCases = new datingapp.app.usecase.profile.ProfileUseCases(
-                    users,
-                    profileService,
-                    new ValidationService(config),
-                    null,
-                    TestAchievementService.empty(),
-                    config,
-                    new datingapp.core.workflow.ProfileActivationPolicy(),
-                    new datingapp.app.event.InProcessAppEventBus());
+            var profileUseCases = createProfileUseCases(users, config);
 
             this.viewModel = new MatchesViewModel(
                     new MatchesViewModel.Dependencies(
@@ -266,6 +259,25 @@ class MatchesControllerTest {
                     PacePreferences.DepthPreference.DEEP_CHAT));
             user.activate();
             return user;
+        }
+
+        private static datingapp.app.usecase.profile.ProfileUseCases createProfileUseCases(
+                TestStorages.Users users, AppConfig config) {
+            datingapp.app.event.InProcessAppEventBus eventBus = new datingapp.app.event.InProcessAppEventBus();
+            ValidationService validationService = new ValidationService(config);
+            return new datingapp.app.usecase.profile.ProfileUseCases(
+                    users,
+                    new ProfileService(users),
+                    validationService,
+                    new datingapp.app.usecase.profile.ProfileMutationUseCases(
+                            users,
+                            validationService,
+                            TestAchievementService.empty(),
+                            config,
+                            new ProfileActivationPolicy(),
+                            eventBus),
+                    new datingapp.app.usecase.profile.ProfileNotesUseCases(users, validationService, config, eventBus),
+                    new datingapp.app.usecase.profile.ProfileInsightsUseCases(TestAchievementService.empty(), null));
         }
     }
 

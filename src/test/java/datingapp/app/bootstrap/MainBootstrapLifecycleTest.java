@@ -1,4 +1,4 @@
-package datingapp;
+package datingapp.app.bootstrap;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -7,10 +7,12 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
-import datingapp.app.bootstrap.ApplicationStartup;
+import datingapp.Main;
 import datingapp.storage.DatabaseManager;
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -23,16 +25,30 @@ import org.slf4j.LoggerFactory;
 @DisplayName("Main bootstrap lifecycle")
 class MainBootstrapLifecycleTest {
 
+    private static final String CONFIG_OVERRIDE_PROPERTY = "datingapp.config";
     private static final String PROFILE_PROPERTY = "datingapp.db.profile";
     private InputStream originalIn;
+    private Path tempConfigFile;
 
     @BeforeEach
-    void setUp() {
+    void setUp() throws Exception {
         originalIn = System.in;
         ApplicationStartup.reset();
         DatabaseManager.resetInstance();
+        ApplicationStartup.setEnvironmentLookupForTests(key -> null);
         System.setProperty(PROFILE_PROPERTY, "test");
-        DatabaseManager.setJdbcUrl("jdbc:h2:mem:main-bootstrap-" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1");
+
+        tempConfigFile = Files.createTempFile("main-bootstrap-config-", ".json");
+        Files.writeString(tempConfigFile, """
+                {
+                  "databaseDialect": "H2",
+                  "databaseUrl": "%s",
+                  "databaseUsername": "sa",
+                  "queryTimeoutSeconds": 30
+                }
+                """.formatted(
+                        "jdbc:h2:mem:main-bootstrap-" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1"));
+        System.setProperty(CONFIG_OVERRIDE_PROPERTY, tempConfigFile.toString());
     }
 
     @AfterEach
@@ -40,7 +56,16 @@ class MainBootstrapLifecycleTest {
         System.setIn(originalIn);
         ApplicationStartup.reset();
         DatabaseManager.resetInstance();
+        ApplicationStartup.setEnvironmentLookupForTests(null);
         System.clearProperty(PROFILE_PROPERTY);
+        System.clearProperty(CONFIG_OVERRIDE_PROPERTY);
+        if (tempConfigFile != null) {
+            try {
+                Files.deleteIfExists(tempConfigFile);
+            } catch (Exception _) {
+                // Best-effort temp-file cleanup for test isolation.
+            }
+        }
     }
 
     @Test

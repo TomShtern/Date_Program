@@ -38,6 +38,7 @@ import datingapp.core.profile.MatchPreferences.PacePreferences.TimeToFirstDate;
 import datingapp.core.profile.ProfileService;
 import datingapp.core.profile.ValidationService;
 import datingapp.core.storage.AccountCleanupStorage;
+import datingapp.core.storage.UserStorage;
 import datingapp.core.testutil.TestAchievementService;
 import datingapp.core.testutil.TestStorages;
 import datingapp.core.testutil.TestUserFactory;
@@ -84,15 +85,8 @@ class ProfileUseCasesTest {
         achievementService = TestAchievementService.empty();
         eventBus = new TestEventBus();
 
-        useCases = new ProfileUseCases(
-                userStorage,
-                profileService,
-                validationService,
-                metricsService,
-                achievementService,
-                config,
-                new ProfileActivationPolicy(),
-                eventBus);
+        useCases = createProfileUseCases(
+                userStorage, profileService, validationService, metricsService, achievementService, config, eventBus);
     }
 
     @Test
@@ -145,14 +139,13 @@ class ProfileUseCasesTest {
                 .build();
 
         List<AppEvent> publishedEvents = new ArrayList<>();
-        ProfileUseCases eventUseCases = new ProfileUseCases(
+        ProfileUseCases eventUseCases = createProfileUseCases(
                 userStorage,
                 profileService,
                 validationService,
                 metricsService,
                 achievementService,
                 config,
-                new ProfileActivationPolicy(),
                 capturingEventBus(publishedEvents));
 
         var result = eventUseCases.saveProfile(new SaveProfileCommand(UserContext.cli(user.getId()), user));
@@ -175,14 +168,13 @@ class ProfileUseCasesTest {
                 .build();
 
         List<AppEvent> publishedEvents = new ArrayList<>();
-        ProfileUseCases eventUseCases = new ProfileUseCases(
+        ProfileUseCases eventUseCases = createProfileUseCases(
                 userStorage,
                 profileService,
                 validationService,
                 metricsService,
                 achievementService,
                 config,
-                new ProfileActivationPolicy(),
                 capturingEventBus(publishedEvents));
 
         var result = eventUseCases.saveProfile(new SaveProfileCommand(UserContext.cli(user.getId()), user));
@@ -213,14 +205,13 @@ class ProfileUseCasesTest {
         User user = TestUserFactory.createActiveUser(UUID.randomUUID(), "Failure User");
 
         AtomicBoolean eventPublished = new AtomicBoolean(false);
-        ProfileUseCases failingUseCases = new ProfileUseCases(
+        ProfileUseCases failingUseCases = createProfileUseCases(
                 userStorage,
                 profileService,
                 validationService,
                 metricsService,
                 throwingAchievementService("achievements down"),
                 config,
-                new ProfileActivationPolicy(),
                 recordingEventBus(eventPublished));
 
         var result = failingUseCases.saveProfile(new SaveProfileCommand(UserContext.cli(user.getId()), user));
@@ -239,14 +230,13 @@ class ProfileUseCasesTest {
         User user = TestUserFactory.createActiveUser(UUID.randomUUID(), "Event Failure User");
 
         AtomicBoolean eventPublished = new AtomicBoolean(false);
-        ProfileUseCases failingUseCases = new ProfileUseCases(
+        ProfileUseCases failingUseCases = createProfileUseCases(
                 userStorage,
                 profileService,
                 validationService,
                 metricsService,
                 noOpAchievementService(),
                 config,
-                new ProfileActivationPolicy(),
                 throwingEventBus(eventPublished));
 
         var result = failingUseCases.saveProfile(new SaveProfileCommand(UserContext.cli(user.getId()), user));
@@ -282,14 +272,13 @@ class ProfileUseCasesTest {
         userStorage.save(subject);
 
         List<AppEvent> publishedEvents = new ArrayList<>();
-        ProfileUseCases eventUseCases = new ProfileUseCases(
+        ProfileUseCases eventUseCases = createProfileUseCases(
                 userStorage,
                 profileService,
                 validationService,
                 metricsService,
                 achievementService,
                 config,
-                new ProfileActivationPolicy(),
                 capturingEventBus(publishedEvents));
 
         var result = eventUseCases.upsertProfileNote(
@@ -314,14 +303,13 @@ class ProfileUseCasesTest {
         userStorage.saveProfileNote(ProfileNote.create(author.getId(), subject.getId(), "Legacy note"));
 
         List<AppEvent> publishedEvents = new ArrayList<>();
-        ProfileUseCases eventUseCases = new ProfileUseCases(
+        ProfileUseCases eventUseCases = createProfileUseCases(
                 userStorage,
                 profileService,
                 validationService,
                 metricsService,
                 achievementService,
                 config,
-                new ProfileActivationPolicy(),
                 capturingEventBus(publishedEvents));
 
         var result = eventUseCases.deleteProfileNote(
@@ -436,12 +424,16 @@ class ProfileUseCasesTest {
                 userStorage,
                 profileService,
                 validationService,
-                metricsService,
-                achievementService,
-                config,
-                new ProfileActivationPolicy(),
-                eventBus,
-                cleanupStorage);
+                new ProfileMutationUseCases(
+                        userStorage,
+                        validationService,
+                        achievementService,
+                        config,
+                        new ProfileActivationPolicy(),
+                        eventBus,
+                        cleanupStorage),
+                new ProfileNotesUseCases(userStorage, validationService, config, eventBus),
+                new ProfileInsightsUseCases(achievementService, metricsService));
 
         var result = cleanupUseCases.deleteAccount(
                 new DeleteAccountCommand(UserContext.cli(user.getId()), AppEvent.DeletionReason.PRIVACY_REQUEST));
@@ -466,12 +458,16 @@ class ProfileUseCasesTest {
                 userStorage,
                 profileService,
                 validationService,
-                metricsService,
-                achievementService,
-                config,
-                new ProfileActivationPolicy(),
-                capturingEventBus(publishedEvents),
-                cleanupStorage);
+                new ProfileMutationUseCases(
+                        userStorage,
+                        validationService,
+                        achievementService,
+                        config,
+                        new ProfileActivationPolicy(),
+                        capturingEventBus(publishedEvents),
+                        cleanupStorage),
+                new ProfileNotesUseCases(userStorage, validationService, config, capturingEventBus(publishedEvents)),
+                new ProfileInsightsUseCases(achievementService, metricsService));
 
         var result = eventUseCases.deleteAccount(
                 new DeleteAccountCommand(UserContext.cli(user.getId()), AppEvent.DeletionReason.PRIVACY_REQUEST));
@@ -496,12 +492,16 @@ class ProfileUseCasesTest {
                 userStorage,
                 profileService,
                 validationService,
-                metricsService,
-                achievementService,
-                config,
-                new ProfileActivationPolicy(),
-                recordingEventBus(eventPublished),
-                new ThrowingAccountCleanupStorage());
+                new ProfileMutationUseCases(
+                        userStorage,
+                        validationService,
+                        achievementService,
+                        config,
+                        new ProfileActivationPolicy(),
+                        recordingEventBus(eventPublished),
+                        new ThrowingAccountCleanupStorage()),
+                new ProfileNotesUseCases(userStorage, validationService, config, recordingEventBus(eventPublished)),
+                new ProfileInsightsUseCases(achievementService, metricsService));
 
         var result = failingUseCases.deleteAccount(
                 new DeleteAccountCommand(UserContext.cli(user.getId()), AppEvent.DeletionReason.PRIVACY_REQUEST));
@@ -524,14 +524,13 @@ class ProfileUseCasesTest {
         userStorage.save(user);
 
         List<AppEvent> publishedEvents = new ArrayList<>();
-        ProfileUseCases eventUseCases = new ProfileUseCases(
+        ProfileUseCases eventUseCases = createProfileUseCases(
                 userStorage,
                 profileService,
                 validationService,
                 metricsService,
                 achievementService,
                 config,
-                new ProfileActivationPolicy(),
                 capturingEventBus(publishedEvents));
 
         var result = eventUseCases.updateProfile(new UpdateProfileCommand(
@@ -685,24 +684,6 @@ class ProfileUseCasesTest {
     }
 
     @Test
-    @DisplayName("builder rejects missing event bus for production wiring")
-    void builderRejectsMissingEventBusForProductionWiring() {
-        NullPointerException exception =
-                assertThrows(NullPointerException.class, this::buildProfileUseCasesWithoutEventBus);
-
-        assertEquals("eventBus cannot be null", exception.getMessage());
-    }
-
-    @Test
-    @DisplayName("constructor requires non-null event bus")
-    void constructorRequiresNonNullEventBus() {
-        NullPointerException exception =
-                assertThrows(NullPointerException.class, this::newProfileUseCasesWithoutEventBus);
-
-        assertEquals("eventBus cannot be null", exception.getMessage());
-    }
-
-    @Test
     @DisplayName("getAchievements uses AchievementService without ProfileService fallback")
     void getAchievementsUsesAchievementServiceWithoutProfileServiceFallback() {
         UUID userId = UUID.randomUUID();
@@ -711,13 +692,17 @@ class ProfileUseCasesTest {
                         userId, datingapp.core.metrics.EngagementDomain.Achievement.FIRST_SPARK));
         ProfileUseCases achievementOnlyUseCases = new ProfileUseCases(
                 userStorage,
-                null,
+                new ProfileService(userStorage),
                 validationService,
-                metricsService,
-                unlockedService,
-                config,
-                new ProfileActivationPolicy(),
-                new TestEventBus());
+                new ProfileMutationUseCases(
+                        userStorage,
+                        validationService,
+                        unlockedService,
+                        config,
+                        new ProfileActivationPolicy(),
+                        new TestEventBus()),
+                new ProfileNotesUseCases(userStorage, validationService, config, new TestEventBus()),
+                new ProfileInsightsUseCases(unlockedService, metricsService));
 
         var result = achievementOnlyUseCases.getAchievements(new AchievementsQuery(UserContext.cli(userId), false));
 
@@ -728,28 +713,58 @@ class ProfileUseCasesTest {
                 result.data().unlocked().getFirst().achievement());
     }
 
-    private ProfileUseCases buildProfileUseCasesWithoutEventBus() {
-        return ProfileUseCases.builder()
-                .userStorage(userStorage)
-                .profileService(profileService)
-                .validationService(validationService)
-                .activityMetricsService(metricsService)
-                .achievementService(achievementService)
-                .config(config)
-                .activationPolicy(new ProfileActivationPolicy())
-                .build();
+    @Test
+    @DisplayName("canonical constructor requires all slice dependencies")
+    void canonicalConstructorRequiresAllSliceDependencies() {
+        ProfileMutationUseCases mutationUseCases = new ProfileMutationUseCases(
+                userStorage, validationService, achievementService, config, new ProfileActivationPolicy(), eventBus);
+        ProfileNotesUseCases notesUseCases = new ProfileNotesUseCases(userStorage, validationService, config, eventBus);
+
+        NullPointerException error = assertThrows(
+                NullPointerException.class,
+                () -> new ProfileUseCases(
+                        userStorage, profileService, validationService, mutationUseCases, notesUseCases, null));
+
+        assertEquals("profileInsightsUseCases cannot be null", error.getMessage());
     }
 
-    private ProfileUseCases newProfileUseCasesWithoutEventBus() {
+    @Test
+    @DisplayName("canonical constructor keeps the facade thin and delegates to provided slices")
+    void canonicalConstructorKeepsFacadeThinAndDelegatesToProvidedSlices() {
+        ProfileMutationUseCases mutationUseCases = new ProfileMutationUseCases(
+                userStorage, validationService, achievementService, config, new ProfileActivationPolicy(), eventBus);
+        ProfileNotesUseCases notesUseCases = new ProfileNotesUseCases(userStorage, validationService, config, eventBus);
+        ProfileInsightsUseCases insightsUseCases = new ProfileInsightsUseCases(achievementService, metricsService);
+
+        ProfileUseCases canonicalUseCases = new ProfileUseCases(
+                userStorage, profileService, validationService, mutationUseCases, notesUseCases, insightsUseCases);
+
+        assertSame(mutationUseCases, canonicalUseCases.getProfileMutationUseCases());
+        assertSame(notesUseCases, canonicalUseCases.getProfileNotesUseCases());
+        assertSame(insightsUseCases, canonicalUseCases.getProfileInsightsUseCases());
+    }
+
+    private ProfileUseCases createProfileUseCases(
+            UserStorage userStorage,
+            ProfileService profileService,
+            ValidationService validationService,
+            ActivityMetricsService metricsService,
+            AchievementService achievementService,
+            AppConfig config,
+            AppEventBus eventBus) {
         return new ProfileUseCases(
                 userStorage,
                 profileService,
                 validationService,
-                metricsService,
-                achievementService,
-                config,
-                new ProfileActivationPolicy(),
-                null);
+                new ProfileMutationUseCases(
+                        userStorage,
+                        validationService,
+                        achievementService,
+                        config,
+                        new ProfileActivationPolicy(),
+                        eventBus),
+                new ProfileNotesUseCases(userStorage, validationService, config, eventBus),
+                new ProfileInsightsUseCases(achievementService, metricsService));
     }
 
     private static AchievementService noOpAchievementService() {

@@ -10,6 +10,9 @@ import datingapp.app.usecase.common.UserContext;
 import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
 import datingapp.core.model.User.UserState;
+import datingapp.core.storage.OperationalCommunicationStorage;
+import datingapp.core.storage.OperationalInteractionStorage;
+import datingapp.core.storage.OperationalUserStorage;
 import datingapp.core.testutil.TestUserFactory;
 import datingapp.storage.DatabaseManager;
 import datingapp.storage.StorageFactory;
@@ -124,6 +127,14 @@ class ServiceRegistryTest {
         @DisplayName("getAnalyticsStorage returns non-null")
         void getAnalyticsStorage() {
             assertNotNull(registry.getAnalyticsStorage());
+        }
+
+        @Test
+        @DisplayName("runtime storage graph exposes operational storage capabilities")
+        void runtimeStorageGraphExposesOperationalStorageCapabilities() {
+            assertTrue(registry.getUserStorage() instanceof OperationalUserStorage);
+            assertTrue(registry.getInteractionStorage() instanceof OperationalInteractionStorage);
+            assertTrue(registry.getCommunicationStorage() instanceof OperationalCommunicationStorage);
         }
     }
 

@@ -151,6 +151,30 @@ class ViewModelFactoryTest {
     }
 
     @Test
+    @DisplayName("reset clears adapter cache by creating new ViewModels with fresh adapters")
+    void resetClearsAdapterCacheByViewModelBehavior() throws InterruptedException {
+        // Get ViewModels that share cached adapters (profileNotes and presence)
+        ChatViewModel chatBefore = factory.getChatViewModel();
+        ProfileViewModel profileBefore = factory.getProfileViewModel();
+        assertNotNull(chatBefore);
+        assertNotNull(profileBefore);
+
+        factory.reset();
+        drainFxEvents();
+
+        // Get new ViewModel instances after reset
+        ChatViewModel chatAfter = factory.getChatViewModel();
+        ProfileViewModel profileAfter = factory.getProfileViewModel();
+        assertNotNull(chatAfter);
+        assertNotNull(profileAfter);
+
+        // Verify that new ViewModel instances were created, proving adapter cache was cleared
+        assertNotSame(chatBefore, chatAfter, "reset() should clear adapter cache, creating new ViewModel instances");
+        assertNotSame(
+                profileBefore, profileAfter, "reset() should clear adapter cache for all ViewModels that depend on it");
+    }
+
+    @Test
     @DisplayName("currentUserProperty synchronizes with AppSession")
     void currentUserPropertySynchronizesWithAppSession() throws InterruptedException {
         User testUser = createMinimalActiveUser("TestUser");

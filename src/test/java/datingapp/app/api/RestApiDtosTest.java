@@ -124,6 +124,22 @@ class RestApiDtosTest {
         }
 
         @Test
+        @DisplayName("UserSummary list helper preserves order and timezone mapping")
+        void userSummaryListHelperPreservesOrderAndTimezoneMapping() {
+            User first = testUser();
+            User second = testUser();
+            ZoneId utc = ZoneId.of("UTC");
+
+            List<UserSummary> summaries = UserSummary.fromUsers(List.of(first, second), utc);
+
+            assertEquals(2, summaries.size());
+            assertEquals(first.getId(), summaries.get(0).id());
+            assertEquals(second.getId(), summaries.get(1).id());
+            assertEquals(first.getAge(utc).orElseThrow(), summaries.get(0).age());
+            assertEquals(second.getAge(utc).orElseThrow(), summaries.get(1).age());
+        }
+
+        @Test
         @DisplayName("UserDetail uses provided timezone for age")
         void userDetailUsesProvidedTimezoneForAge() {
             User user = testUser();

@@ -159,6 +159,7 @@ The current deliberate direct-read exception remains the candidates route in `Re
 - `DefaultDailyPickService` requires only `DailyLimitService`, `MatchingService`, and `AppConfig` — no storage dependencies.
 - ViewModel `setErrorHandler` methods delegate to `BaseViewModel.setErrorSink()` via the `notifyError(msg, throwable)` dispatch path.
 - `PostgresqlRuntimeSmokeTest` is the local-first PostgreSQL runtime validation seam; `start_local_postgres.ps1`, `run_postgresql_smoke.ps1`, and `stop_local_postgres.ps1` support project-local PostgreSQL validation without Docker.
+- `.\run_verify.ps1` is the canonical repo-level full local verification path; it keeps `mvn spotless:apply verify` as the Maven-only quality gate and then runs the PostgreSQL smoke path.
 
 ## Build & Quality Commands
 
@@ -167,6 +168,11 @@ mvn compile && mvn exec:exec
 mvn javafx:run
 mvn test
 mvn -Ptest-output-verbose test
+
+# Full local verification (Maven quality gate + PostgreSQL smoke)
+.\run_verify.ps1
+
+# Maven-only quality gate
 mvn spotless:apply verify
 
 # Optional local PostgreSQL runtime validation

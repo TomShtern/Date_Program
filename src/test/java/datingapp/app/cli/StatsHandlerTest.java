@@ -10,8 +10,7 @@ import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import datingapp.app.cli.CliTextAndInput.InputReader;
-import datingapp.app.event.InProcessAppEventBus;
-import datingapp.app.usecase.profile.ProfileUseCases;
+import datingapp.app.usecase.profile.ProfileInsightsUseCases;
 import datingapp.core.AppConfig;
 import datingapp.core.AppSession;
 import datingapp.core.metrics.ActivityMetricsService;
@@ -22,9 +21,7 @@ import datingapp.core.metrics.EngagementDomain.UserStats;
 import datingapp.core.model.Match;
 import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
-import datingapp.core.profile.ProfileService;
 import datingapp.core.testutil.TestStorages;
-import datingapp.core.workflow.ProfileActivationPolicy;
 import java.io.StringReader;
 import java.util.EnumSet;
 import java.util.Scanner;
@@ -69,24 +66,17 @@ class StatsHandlerTest {
         InputReader inputReader = new InputReader(new Scanner(new StringReader(input)));
         ActivityMetricsService statsService = new ActivityMetricsService(
                 interactionStorage, trustSafetyStorage, analyticsStorage, AppConfig.defaults());
-        ProfileService achievementService = new ProfileService(userStorage);
-        ProfileUseCases profileUseCases = new ProfileUseCases(
-                userStorage,
-                achievementService,
-                null,
-                statsService,
+        ProfileInsightsUseCases profileInsightsUseCases = new ProfileInsightsUseCases(
                 new DefaultAchievementService(
                         AppConfig.defaults(),
                         analyticsStorage,
                         interactionStorage,
                         trustSafetyStorage,
                         userStorage,
-                        achievementService),
-                AppConfig.defaults(),
-                new ProfileActivationPolicy(),
-                new InProcessAppEventBus());
+                        new datingapp.core.profile.ProfileService(userStorage)),
+                statsService);
         return new StatsHandler(
-                profileUseCases,
+                profileInsightsUseCases,
                 session,
                 inputReader,
                 AppConfig.defaults().safety().userTimeZone());

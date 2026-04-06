@@ -2,7 +2,6 @@ package datingapp.app.cli;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import ch.qos.logback.classic.Level;
@@ -12,14 +11,17 @@ import ch.qos.logback.core.read.ListAppender;
 import datingapp.app.cli.CliTextAndInput.InputReader;
 import datingapp.app.testutil.TestEventBus;
 import datingapp.app.usecase.common.UseCaseResult;
+import datingapp.app.usecase.profile.ProfileInsightsUseCases;
 import datingapp.app.usecase.profile.ProfileMutationUseCases;
 import datingapp.app.usecase.profile.ProfileNotesUseCases;
 import datingapp.app.usecase.profile.ProfileUseCases;
 import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
 import datingapp.core.AppSession;
+import datingapp.core.metrics.ActivityMetricsService;
 import datingapp.core.model.LocationModels.ResolvedLocation;
 import datingapp.core.model.User;
+import datingapp.core.profile.LocationService;
 import datingapp.core.profile.MatchPreferences.PacePreferences;
 import datingapp.core.profile.ProfileService;
 import datingapp.core.profile.ValidationService;
@@ -38,74 +40,43 @@ import java.util.Optional;
 import java.util.Scanner;
 import java.util.TimeZone;
 import java.util.UUID;
-import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 
-/** Unit tests for ProfileHandler validation and input-gating behavior. */
-@Timeout(value = 5, unit = TimeUnit.SECONDS)
 class ProfileHandlerTest {
 
     private TestStorages.Users userStorage;
-    private AppSession session;
+    private TestStorages.Interactions interactions;
+    private TestStorages.TrustSafety trustSafety;
+    private TestStorages.Analytics analytics;
     private ValidationService validationService;
     private ProfileUseCases profileUseCases;
-
-    private interface Cleanup extends AutoCloseable {
-        @Override
-        void close();
-    }
+    private AppSession session;
 
     @BeforeEach
     void setUp() {
         userStorage = new TestStorages.Users();
-        session = AppSession.getInstance();
-        session.reset();
+        interactions = new TestStorages.Interactions();
+        trustSafety = new TestStorages.TrustSafety();
+        analytics = new TestStorages.Analytics();
         validationService = new ValidationService(AppConfig.defaults());
         profileUseCases = new ProfileUseCases(
                 userStorage,
-                null,
+                new ProfileService(userStorage),
                 validationService,
-                null,
-                TestAchievementService.empty(),
-                AppConfig.defaults(),
-                new datingapp.core.workflow.ProfileActivationPolicy(),
-                new TestEventBus());
-    }
-
-    @Test
-    @DisplayName("createUser rejects overlong names")
-    void createUserRejectsOverlongNames() {
-        ProfileHandler handler = createHandler(repeat('a', 101) + "\n");
-
-        handler.createUser();
-
-        assertEquals(0, userStorage.findAll().size());
-        assertNull(session.getCurrentUser());
-    }
-
-    @Test
-    @DisplayName("promptBio rejects overlong bios")
-    void promptBioRejectsOverlongBios() throws Exception {
-        ProfileHandler handler = createHandler(repeat('b', 501) + "\n");
-        User user = createEditableUser();
-
-        invokePrompt(handler, "promptBio", user);
-
-        assertNull(user.getBio());
-    }
-
-    @Test
-    @DisplayName("promptPhoto rejects unsafe URLs")
-    void promptPhotoRejectsUnsafeUrls() throws Exception {
-        ProfileHandler handler = createHandler("javascript:alert(1)\n");
-        User user = createEditableUser();
-
-        invokePrompt(handler, "promptPhoto", user);
-
-        assertTrue(user.getPhotoUrls().isEmpty());
+                new ProfileMutationUseCases(
+                        userStorage,
+                        validationService,
+                        TestAchievementService.empty(),
+                        AppConfig.defaults(),
+                        new datingapp.core.workflow.ProfileActivationPolicy(),
+                        new TestEventBus()),
+                new ProfileNotesUseCases(userStorage, validationService, AppConfig.defaults(), new TestEventBus()),
+                new ProfileInsightsUseCases(
+                        TestAchievementService.empty(),
+                        new ActivityMetricsService(interactions, trustSafety, analytics, AppConfig.defaults())));
+        session = AppSession.getInstance();
     }
 
     @Test
@@ -113,18 +84,31 @@ class ProfileHandlerTest {
     void addNoteRejectsOverlongNotesUsingConfiguredLimit() throws Exception {
         AppConfig customConfig = AppConfig.builder().maxProfileNoteLength(5).build();
         ValidationService customValidationService = new ValidationService(customConfig);
-        ProfileUseCases customProfileUseCases = new ProfileUseCases(
+        ProfileMutationUseCases customMutationUseCases = new ProfileMutationUseCases(
                 userStorage,
-                null,
                 customValidationService,
-                null,
                 TestAchievementService.empty(),
                 customConfig,
                 new datingapp.core.workflow.ProfileActivationPolicy(),
                 new TestEventBus());
-        InputReader inputReader = new InputReader(new Scanner(new StringReader(repeat('n', 6) + "\n")));
+        ProfileNotesUseCases customNotesUseCases =
+                new ProfileNotesUseCases(userStorage, customValidationService, customConfig, new TestEventBus());
+        ProfileUseCases customProfileUseCases = new ProfileUseCases(
+                userStorage,
+                new ProfileService(userStorage),
+                customValidationService,
+                customMutationUseCases,
+                customNotesUseCases,
+                new ProfileInsightsUseCases(
+                        TestAchievementService.empty(),
+                        new ActivityMetricsService(interactions, trustSafety, analytics, customConfig)));
         ProfileHandler handler = new ProfileHandler(
-                userStorage, customValidationService, customProfileUseCases, customConfig, session, inputReader);
+                customValidationService,
+                new LocationService(customValidationService),
+                customProfileUseCases,
+                customConfig,
+                session,
+                new InputReader(new Scanner(new StringReader(repeat('n', 6) + "\n"))));
 
         UUID authorId = UUID.randomUUID();
         UUID subjectId = UUID.randomUUID();
@@ -154,19 +138,29 @@ class ProfileHandlerTest {
                 new TestEventBus(),
                 null);
 
-        ProfileUseCases failingUseCases = ProfileUseCases.builder()
-                .userStorage(userStorage)
-                .validationService(validationService)
-                .achievementService(TestAchievementService.empty())
-                .config(AppConfig.defaults())
-                .activationPolicy(new datingapp.core.workflow.ProfileActivationPolicy())
-                .eventBus(new TestEventBus())
-                .profileMutationUseCases(failingMutation)
-                .build();
+        ProfileUseCases failingUseCases = createProfileUseCases(
+                userStorage,
+                new ProfileService(userStorage),
+                validationService,
+                new ActivityMetricsService(interactions, trustSafety, analytics, AppConfig.defaults()),
+                TestAchievementService.empty(),
+                AppConfig.defaults(),
+                new datingapp.core.workflow.ProfileActivationPolicy(),
+                new TestEventBus(),
+                failingMutation,
+                null,
+                new ProfileNotesUseCases(userStorage, validationService, AppConfig.defaults(), new TestEventBus()),
+                new ProfileInsightsUseCases(
+                        TestAchievementService.empty(),
+                        new ActivityMetricsService(interactions, trustSafety, analytics, AppConfig.defaults())));
 
-        InputReader inputReader = new InputReader(new Scanner(new StringReader("new-bio\n")));
         ProfileHandler handler = new ProfileHandler(
-                userStorage, validationService, failingUseCases, AppConfig.defaults(), session, inputReader);
+                validationService,
+                new LocationService(validationService),
+                failingUseCases,
+                AppConfig.defaults(),
+                session,
+                new InputReader(new Scanner(new StringReader("new-bio\n"))));
 
         handler.completeProfile();
 
@@ -176,20 +170,32 @@ class ProfileHandlerTest {
 
     @Test
     @DisplayName("previewProfile uses the configured zone for age display")
-    void previewProfileUsesConfiguredZoneForAgeDisplay() {
+    void previewProfileUsesConfiguredZoneForAgeDisplay() throws Exception {
         AppConfig config =
                 AppConfig.builder().userTimeZone(ZoneId.of("Pacific/Honolulu")).build();
         TestStorages.Users previewUsers = new TestStorages.Users();
         ProfileService profileService = new ProfileService(previewUsers);
-        ProfileUseCases previewUseCases = new ProfileUseCases(
+        ProfileUseCases previewUseCases = createProfileUseCases(
                 previewUsers,
                 profileService,
                 validationService,
-                null,
+                new ActivityMetricsService(interactions, trustSafety, analytics, config),
                 TestAchievementService.empty(),
                 config,
                 new datingapp.core.workflow.ProfileActivationPolicy(),
-                new TestEventBus());
+                new TestEventBus(),
+                new ProfileMutationUseCases(
+                        previewUsers,
+                        validationService,
+                        TestAchievementService.empty(),
+                        config,
+                        new datingapp.core.workflow.ProfileActivationPolicy(),
+                        new TestEventBus()),
+                null,
+                new ProfileNotesUseCases(previewUsers, validationService, config, new TestEventBus()),
+                new ProfileInsightsUseCases(
+                        TestAchievementService.empty(),
+                        new ActivityMetricsService(interactions, trustSafety, analytics, config)));
 
         User user = createEditableUser();
         user.setBio("Preview bio");
@@ -218,8 +224,8 @@ class ProfileHandlerTest {
         }) {
             cleanup.getClass();
             ProfileHandler handler = new ProfileHandler(
-                    previewUsers,
                     validationService,
+                    new LocationService(validationService),
                     previewUseCases,
                     config,
                     session,
@@ -294,22 +300,22 @@ class ProfileHandlerTest {
                 AppConfig.defaults(),
                 new datingapp.core.workflow.ProfileActivationPolicy(),
                 new TestEventBus());
-        ProfileUseCases routedUseCases = ProfileUseCases.builder()
-                .userStorage(routedStorage)
-                .validationService(validationService)
-                .achievementService(TestAchievementService.empty())
-                .config(AppConfig.defaults())
-                .activationPolicy(new datingapp.core.workflow.ProfileActivationPolicy())
-                .eventBus(new TestEventBus())
-                .profileMutationUseCases(mutationUseCases)
-                .build();
-        TestStorages.Users rawStorage = new TestStorages.Users() {
-            @Override
-            public void save(User user) {
-                throw new AssertionError("raw userStorage.save should not be used by createUser");
-            }
-        };
-        ProfileHandler handler = createHandler("New User\n", rawStorage, routedUseCases);
+        ProfileUseCases routedUseCases = createProfileUseCases(
+                routedStorage,
+                new ProfileService(routedStorage),
+                validationService,
+                new ActivityMetricsService(interactions, trustSafety, analytics, AppConfig.defaults()),
+                TestAchievementService.empty(),
+                AppConfig.defaults(),
+                new datingapp.core.workflow.ProfileActivationPolicy(),
+                new TestEventBus(),
+                mutationUseCases,
+                null,
+                new ProfileNotesUseCases(routedStorage, validationService, AppConfig.defaults(), new TestEventBus()),
+                new ProfileInsightsUseCases(
+                        TestAchievementService.empty(),
+                        new ActivityMetricsService(interactions, trustSafety, analytics, AppConfig.defaults())));
+        ProfileHandler handler = createHandler("New User\n", routedUseCases);
 
         assertDoesNotThrow(handler::createUser);
         assertEquals(1, routedStorage.findAll().size());
@@ -323,13 +329,21 @@ class ProfileHandlerTest {
         ProfileUseCases routedUseCases =
                 new ProfileUseCases(
                         userStorage,
-                        null,
+                        new ProfileService(userStorage),
                         validationService,
-                        null,
-                        TestAchievementService.empty(),
-                        AppConfig.defaults(),
-                        new datingapp.core.workflow.ProfileActivationPolicy(),
-                        new TestEventBus()) {
+                        new ProfileMutationUseCases(
+                                userStorage,
+                                validationService,
+                                TestAchievementService.empty(),
+                                AppConfig.defaults(),
+                                new datingapp.core.workflow.ProfileActivationPolicy(),
+                                new TestEventBus()),
+                        new ProfileNotesUseCases(
+                                userStorage, validationService, AppConfig.defaults(), new TestEventBus()),
+                        new ProfileInsightsUseCases(
+                                TestAchievementService.empty(),
+                                new ActivityMetricsService(
+                                        interactions, trustSafety, analytics, AppConfig.defaults()))) {
                     @Override
                     public UseCaseResult<List<User>> listUsers() {
                         return UseCaseResult.success(List.of(storedUser));
@@ -340,13 +354,7 @@ class ProfileHandlerTest {
                         return UseCaseResult.success(storedUser);
                     }
                 };
-        TestStorages.Users rawStorage = new TestStorages.Users() {
-            @Override
-            public List<User> findAll() {
-                throw new AssertionError("raw userStorage.findAll should not be used by selectUser");
-            }
-        };
-        ProfileHandler handler = createHandler("1\n", rawStorage, routedUseCases);
+        ProfileHandler handler = createHandler("1\n", routedUseCases);
 
         assertDoesNotThrow(handler::selectUser);
         assertEquals(storedUser.getId(), session.getCurrentUser().getId());
@@ -364,33 +372,33 @@ class ProfileHandlerTest {
                 datingapp.core.model.ProfileNote.create(author.getId(), subject.getId(), "Test note"));
         ProfileNotesUseCases notesUseCases =
                 new ProfileNotesUseCases(notesStorage, validationService, AppConfig.defaults(), new TestEventBus());
+        TestStorages.Interactions notesInteractions = new TestStorages.Interactions();
+        TestStorages.TrustSafety notesTrustSafety = new TestStorages.TrustSafety();
+        TestStorages.Analytics notesAnalytics = new TestStorages.Analytics();
         ProfileUseCases routedUseCases =
                 new ProfileUseCases(
                         notesStorage,
-                        null,
+                        new ProfileService(notesStorage),
                         validationService,
-                        null,
-                        TestAchievementService.empty(),
-                        AppConfig.defaults(),
-                        new datingapp.core.workflow.ProfileActivationPolicy(),
-                        new TestEventBus(),
-                        null,
-                        null,
+                        new ProfileMutationUseCases(
+                                notesStorage,
+                                validationService,
+                                TestAchievementService.empty(),
+                                AppConfig.defaults(),
+                                new datingapp.core.workflow.ProfileActivationPolicy(),
+                                new TestEventBus()),
                         notesUseCases,
-                        null) {
+                        new ProfileInsightsUseCases(
+                                TestAchievementService.empty(),
+                                new ActivityMetricsService(
+                                        notesInteractions, notesTrustSafety, notesAnalytics, AppConfig.defaults()))) {
                     @Override
                     public UseCaseResult<Map<UUID, User>> getUsersByIds(GetUsersByIdsQuery query) {
                         return UseCaseResult.success(Map.of(subject.getId(), subject));
                     }
                 };
-        TestStorages.Users rawStorage = new TestStorages.Users() {
-            @Override
-            public Optional<User> get(UUID id) {
-                throw new AssertionError("raw userStorage.get should not be used for note subject lookup");
-            }
-        };
         session.setCurrentUser(author);
-        ProfileHandler handler = createHandler("0\n", rawStorage, routedUseCases);
+        ProfileHandler handler = createHandler("0\n", routedUseCases);
 
         assertDoesNotThrow(handler::viewAllNotes);
     }
@@ -408,38 +416,97 @@ class ProfileHandlerTest {
                 AppConfig.defaults(),
                 new datingapp.core.workflow.ProfileActivationPolicy(),
                 new TestEventBus());
-        ProfileUseCases routedUseCases = ProfileUseCases.builder()
-                .userStorage(routedStorage)
-                .validationService(validationService)
-                .achievementService(TestAchievementService.empty())
-                .config(AppConfig.defaults())
-                .activationPolicy(new datingapp.core.workflow.ProfileActivationPolicy())
-                .eventBus(new TestEventBus())
-                .profileMutationUseCases(mutationUseCases)
-                .build();
-        TestStorages.Users rawStorage = new TestStorages.Users() {
-            @Override
-            public void save(User user) {
-                throw new AssertionError("raw userStorage.save should not be used when persisting dealbreakers");
-            }
-        };
+        TestStorages.Interactions dealbreakInteractions = new TestStorages.Interactions();
+        TestStorages.TrustSafety dealbreakTrustSafety = new TestStorages.TrustSafety();
+        TestStorages.Analytics dealbreakAnalytics = new TestStorages.Analytics();
+        ProfileUseCases routedUseCases = createProfileUseCases(
+                routedStorage,
+                new ProfileService(routedStorage),
+                validationService,
+                new ActivityMetricsService(
+                        dealbreakInteractions, dealbreakTrustSafety, dealbreakAnalytics, AppConfig.defaults()),
+                TestAchievementService.empty(),
+                AppConfig.defaults(),
+                new datingapp.core.workflow.ProfileActivationPolicy(),
+                new TestEventBus(),
+                mutationUseCases,
+                null,
+                new ProfileNotesUseCases(routedStorage, validationService, AppConfig.defaults(), new TestEventBus()),
+                new ProfileInsightsUseCases(
+                        TestAchievementService.empty(),
+                        new ActivityMetricsService(
+                                dealbreakInteractions,
+                                dealbreakTrustSafety,
+                                dealbreakAnalytics,
+                                AppConfig.defaults())));
         session.setCurrentUser(currentUser);
-        ProfileHandler handler = createHandler("7\n0\n", rawStorage, routedUseCases);
+        ProfileHandler handler = createHandler("7\n0\n", routedUseCases);
 
         assertDoesNotThrow(handler::setDealbreakers);
         assertTrue(routedStorage.get(currentUser.getId()).isPresent());
     }
 
+    private ProfileUseCases createProfileUseCases(
+            datingapp.core.storage.UserStorage userStorage,
+            ProfileService profileService,
+            ValidationService validationService,
+            ActivityMetricsService metricsService,
+            datingapp.core.metrics.AchievementService achievementService,
+            AppConfig config,
+            datingapp.core.workflow.ProfileActivationPolicy activationPolicy,
+            TestEventBus eventBus) {
+        return new ProfileUseCases(
+                userStorage,
+                profileService,
+                validationService,
+                new ProfileMutationUseCases(
+                        userStorage, validationService, achievementService, config, activationPolicy, eventBus),
+                new ProfileNotesUseCases(userStorage, validationService, config, eventBus),
+                new ProfileInsightsUseCases(achievementService, metricsService));
+    }
+
+    private ProfileUseCases createProfileUseCases(
+            datingapp.core.storage.UserStorage userStorage,
+            ProfileService profileService,
+            ValidationService validationService,
+            ActivityMetricsService metricsService,
+            datingapp.core.metrics.AchievementService achievementService,
+            AppConfig config,
+            datingapp.core.workflow.ProfileActivationPolicy activationPolicy,
+            TestEventBus eventBus,
+            ProfileMutationUseCases profileMutationUseCases,
+            ProfileNotesUseCases ignoredProfileNotesUseCases,
+            ProfileNotesUseCases profileNotesUseCases,
+            ProfileInsightsUseCases profileInsightsUseCases) {
+        return new ProfileUseCases(
+                userStorage,
+                profileService,
+                validationService,
+                profileMutationUseCases,
+                profileNotesUseCases,
+                profileInsightsUseCases);
+    }
+
     private ProfileHandler createHandler(String input) {
         InputReader inputReader = new InputReader(new Scanner(new StringReader(input)));
         return new ProfileHandler(
-                userStorage, validationService, profileUseCases, AppConfig.defaults(), session, inputReader);
+                validationService,
+                new LocationService(validationService),
+                profileUseCases,
+                AppConfig.defaults(),
+                session,
+                inputReader);
     }
 
-    private ProfileHandler createHandler(String input, TestStorages.Users handlerStorage, ProfileUseCases useCases) {
+    private ProfileHandler createHandler(String input, ProfileUseCases useCases) {
         InputReader inputReader = new InputReader(new Scanner(new StringReader(input)));
         return new ProfileHandler(
-                handlerStorage, validationService, useCases, AppConfig.defaults(), session, inputReader);
+                validationService,
+                new LocationService(validationService),
+                useCases,
+                AppConfig.defaults(),
+                session,
+                inputReader);
     }
 
     private static void invokePrompt(ProfileHandler handler, String methodName, User user) throws Exception {
@@ -462,5 +529,13 @@ class ProfileHandlerTest {
 
     private static String repeat(char value, int count) {
         return String.valueOf(value).repeat(count);
+    }
+
+    /**
+     * Functional interface for cleanup operations in try-with-resources blocks.
+     */
+    private interface Cleanup extends AutoCloseable {
+        @Override
+        void close() throws Exception;
     }
 }

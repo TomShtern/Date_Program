@@ -6,6 +6,9 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.app.event.InProcessAppEventBus;
+import datingapp.app.usecase.profile.ProfileInsightsUseCases;
+import datingapp.app.usecase.profile.ProfileMutationUseCases;
+import datingapp.app.usecase.profile.ProfileNotesUseCases;
 import datingapp.app.usecase.profile.ProfileUseCases;
 import datingapp.app.usecase.profile.VerificationUseCases;
 import datingapp.app.usecase.social.SocialUseCases;
@@ -139,11 +142,17 @@ class SafetyViewModelTest {
                 users,
                 new ProfileService(users),
                 new ValidationService(config),
-                new ActivityMetricsService(interactions, trustSafetyStorage, analytics, config),
-                TestAchievementService.empty(),
-                config,
-                new ProfileActivationPolicy(),
-                new InProcessAppEventBus());
+                new ProfileMutationUseCases(
+                        users,
+                        new ValidationService(config),
+                        TestAchievementService.empty(),
+                        config,
+                        new ProfileActivationPolicy(),
+                        new InProcessAppEventBus()),
+                new ProfileNotesUseCases(users, new ValidationService(config), config, new InProcessAppEventBus()),
+                new ProfileInsightsUseCases(
+                        TestAchievementService.empty(),
+                        new ActivityMetricsService(interactions, trustSafetyStorage, analytics, config)));
         SocialUseCases socialUseCases = new SocialUseCases(
                 new datingapp.core.connection.ConnectionService(config, communications, interactions, users),
                 trustSafetyService,
@@ -194,11 +203,17 @@ class SafetyViewModelTest {
                 users,
                 new ProfileService(users),
                 new ValidationService(config),
-                new ActivityMetricsService(interactions, trustSafetyStorage, analytics, config),
-                TestAchievementService.empty(),
-                config,
-                new ProfileActivationPolicy(),
-                new InProcessAppEventBus());
+                new ProfileMutationUseCases(
+                        users,
+                        new ValidationService(config),
+                        TestAchievementService.empty(),
+                        config,
+                        new ProfileActivationPolicy(),
+                        new InProcessAppEventBus()),
+                new ProfileNotesUseCases(users, new ValidationService(config), config, new InProcessAppEventBus()),
+                new ProfileInsightsUseCases(
+                        TestAchievementService.empty(),
+                        new ActivityMetricsService(interactions, trustSafetyStorage, analytics, config)));
         TrustSafetyService trustSafetyService = TrustSafetyService.builder(
                         trustSafetyStorage, interactions, users, config, new TestStorages.Communications())
                 .build();

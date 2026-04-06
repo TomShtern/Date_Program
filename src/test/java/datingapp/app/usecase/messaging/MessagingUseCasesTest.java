@@ -17,6 +17,7 @@ import datingapp.app.usecase.messaging.MessagingUseCases.DeleteConversationComma
 import datingapp.app.usecase.messaging.MessagingUseCases.DeleteMessageCommand;
 import datingapp.app.usecase.messaging.MessagingUseCases.ListConversationsQuery;
 import datingapp.app.usecase.messaging.MessagingUseCases.LoadConversationQuery;
+import datingapp.app.usecase.messaging.MessagingUseCases.OpenConversationCommand;
 import datingapp.app.usecase.messaging.MessagingUseCases.SendMessageCommand;
 import datingapp.core.AppConfig;
 import datingapp.core.connection.ConnectionModels.Conversation;
@@ -140,7 +141,28 @@ class MessagingUseCasesTest {
     }
 
     @Test
-    @DisplayName("openConversation returns a preview for a newly created empty conversation")
+    @DisplayName("openConversation maps a missing conversation preview to NOT_FOUND")
+    void openConversationMapsMissingPreviewToNotFound() {
+        ConnectionService missingPreviewConnectionService =
+                new ConnectionService(AppConfig.defaults(), communicationStorage, interactionStorage, userStorage) {
+                    @Override
+                    public java.util.Optional<ConnectionService.ConversationPreview> getConversationPreview(
+                            UUID userId, String conversationId) {
+                        return java.util.Optional.empty();
+                    }
+                };
+
+        MessagingUseCases missingPreviewUseCases =
+                new MessagingUseCases(missingPreviewConnectionService, new TestEventBus());
+
+        var result = missingPreviewUseCases.openConversation(
+                new OpenConversationCommand(UserContext.cli(sender.getId()), recipient.getId()));
+
+        assertFalse(result.success());
+        assertEquals(UseCaseError.Code.NOT_FOUND, result.error().code());
+        assertEquals("Conversation not found", result.error().message());
+    }
+
     void openConversationReturnsPreviewForNewlyCreatedEmptyConversation() {
         var result = useCases.openConversation(
                 new MessagingUseCases.OpenConversationCommand(UserContext.cli(sender.getId()), recipient.getId()));

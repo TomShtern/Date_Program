@@ -31,9 +31,12 @@ A working dating app on the user's Android phone, backed by a Kotlin server depl
 
 ---
 
-## Code Reality Snapshot (2026-04-03) 🧪
+## Code Reality Snapshot (2026-04-05) 🧪
 
-> **Status markers below are based on the current code** in `src/main/java`, `src/test/java`, and `pom.xml`, plus a fresh `mvn spotless:apply verify` run on 2026-04-03 — not on older docs.
+> **Status markers below are based on a fresh source-only audit** of `src/main/java`, `src/test/java`, and `pom.xml`, plus a fresh `mvn spotless:apply verify` run on 2026-04-05 — not on older docs.
+
+- Java files: **176 main / 199 test / 375 total**
+- Java LOC (`tokei src`, Java only): **104,842 total / 85,009 code / 14,930 blank / 4,903 comments**
 
 ### Legend
 
@@ -44,70 +47,72 @@ A working dating app on the user's Android phone, backed by a Kotlin server depl
 
 ### High-level phase status
 
-| Phase                         | Status | Current code reality                                                                                                                                                                                                                                               |
-|-------------------------------|--------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Phase 1: Stabilize Core       | 🟡     | Core matching / profile / messaging / stats / safety logic is largely real; blocking remaining work is onboarding, recommendation-ranked browse, REST parity cleanup, and stabilizing the `ChatViewModelTest.shouldSkipStaleBackgroundLoads` suite-stability flake |
-| Phase 2: PostgreSQL Migration | 🔴     | Runtime still uses H2; `pom.xml` has no PostgreSQL dependency or runtime migration path yet                                                                                                                                                                        |
-| Phase 3: Kotlin Migration     | 🔴     | No Kotlin plugin, no mixed Java/Kotlin build, no Kotlin sources                                                                                                                                                                                                    |
-| Phase 4: Android App          | 🔴     | No Android project yet; REST server is still localhost-only                                                                                                                                                                                                        |
-| Phase 5: Cloud & Services     | ⚪      | Still a future phase; cloud/auth/photo/push infrastructure is not started in code                                                                                                                                                                                  |
+| Phase                         | Status | Current code reality                                                                                                                                                                                                                                           |
+|-------------------------------|--------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Phase 1: Stabilize Core       | 🟡     | Core matching / profile / messaging / stats / safety logic is implemented across CLI, JavaFX, and REST; remaining work is mostly hardening, consistency cleanup, and scope choices rather than missing core subsystems                                         |
+| Phase 2: PostgreSQL Migration | 🟡     | PostgreSQL runtime support, dialect-aware SQL generation, config wiring, schema migrations, dev seeding, and a live smoke test already exist; the remaining work is broader PostgreSQL-first verification and reducing H2-first assumptions in routine testing |
+| Phase 3: Kotlin Migration     | 🔴     | No Kotlin plugin, no mixed Java/Kotlin build, no Kotlin sources                                                                                                                                                                                                |
+| Phase 4: Android App          | 🔴     | No Android project yet; REST server is still localhost-only                                                                                                                                                                                                    |
+| Phase 5: Cloud & Services     | ⚪      | Still a future phase; cloud/auth/photo/push infrastructure is not started in code                                                                                                                                                                              |
 
 ### Phase 1 reality check
 
 #### 1a. Semantic / logic fixes
 
-| Item                               | Status | Code reality                                                                                                        |
-|------------------------------------|--------|---------------------------------------------------------------------------------------------------------------------|
-| Paused users ghost-matchable       | ✅      | `CandidateFinder` rejects non-`ACTIVE` candidates                                                                   |
-| One-way blocking                   | ✅      | Candidate filtering checks blocks in either direction                                                               |
-| No re-match cooldown               | ✅      | Recently unmatched pairs are excluded until cooldown expires                                                        |
-| Friend-zone doesn't clean up       | 🟡     | Relationship transition APIs and tests exist, but storage-backed cleanup/failure semantics should still be hardened |
-| Undo silently expires              | ✅      | Undo availability, countdown, and expired-window messaging are surfaced through `MatchingUseCases`, CLI, and JavaFX |
-| Location silently kills experience | ✅      | Missing-location state is surfaced in CLI, JavaFX, and REST via browse-result empty-state messaging                 |
+| Item                               | Status | Code reality                                                                                                                                 |
+|------------------------------------|--------|----------------------------------------------------------------------------------------------------------------------------------------------|
+| Paused users ghost-matchable       | ✅      | `CandidateFinder` rejects non-`ACTIVE` candidates                                                                                            |
+| One-way blocking                   | ✅      | Candidate filtering checks blocks in either direction                                                                                        |
+| No re-match cooldown               | ✅      | Recently unmatched pairs are excluded until cooldown expires                                                                                 |
+| Friend-zone doesn't clean up       | ✅      | Relationship transitions, conversation cleanup, and atomic failure handling are covered through `ConnectionService` and storage-backed tests |
+| Undo silently expires              | ✅      | Undo availability, countdown, and expired-window messaging are surfaced through `MatchingUseCases`, CLI, and JavaFX                          |
+| Location silently kills experience | ✅      | Missing-location state is surfaced in CLI, JavaFX, and REST via browse-result empty-state messaging                                          |
 
 #### 1b. Hollow features → real features
 
-| Feature                       | Status | Code reality                                                                                                                                                           |
-|-------------------------------|--------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| MatchQuality scores           | ✅      | Surfaced in CLI, JavaFX, and REST                                                                                                                                      |
-| RecommendationService ranking | 🟡     | Daily picks / standouts are real, but normal browse flow still returns `CandidateFinder.findCandidatesForUser(...)` results rather than recommendation-ranked browsing |
-| ActivityMetrics               | ✅      | Exposed through stats/achievements flows in CLI, JavaFX, and REST                                                                                                      |
-| ProfileCompletion score       | ✅      | Surfaced as dashboard/profile-completion nudges and guidance in JavaFX and app-layer dashboard flows                                                                   |
-| Event handlers                | ✅      | Achievements and notifications have visible surfaced outputs                                                                                                           |
+| Feature                       | Status | Code reality                                                                                                          |
+|-------------------------------|--------|-----------------------------------------------------------------------------------------------------------------------|
+| MatchQuality scores           | ✅      | Surfaced in CLI, JavaFX, and REST                                                                                     |
+| RecommendationService ranking | ✅      | Browse candidates are ranked through the recommendation/browse-ranking path rather than returned in raw storage order |
+| ActivityMetrics               | ✅      | Exposed through stats/achievements flows in CLI, JavaFX, and REST                                                     |
+| ProfileCompletion score       | ✅      | Surfaced as dashboard/profile-completion nudges and guidance in JavaFX and app-layer dashboard flows                  |
+| Event handlers                | ✅      | Achievements and notifications have visible surfaced outputs                                                          |
 
 #### 1c. User journey gaps
 
-| Gap                                    | Status | Code reality                                                                                           |
-|----------------------------------------|--------|--------------------------------------------------------------------------------------------------------|
-| Signup auto-fills garbage              | ✅      | Current account creation is minimal and no longer auto-fills fake bio/photo/location or auto-activates |
-| No first-launch experience             | 🔴     | Still missing a real guided onboarding / first-run flow                                                |
-| No profile editing in JavaFX           | ✅      | JavaFX profile editing exists, including preferences, photos, and dealbreakers                         |
-| 5 REST endpoints bypass use-case layer | 🟡     | Most routes use use cases now, but some adapter exceptions remain (notably direct candidate reads)     |
+| Gap                                    | Status | Code reality                                                                                                                                                                                               |
+|----------------------------------------|--------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Signup auto-fills garbage              | ✅      | Current account creation is minimal and no longer auto-fills fake bio/photo/location or auto-activates                                                                                                     |
+| No first-launch experience             | 🟡     | JavaFX has a real onboarding / incomplete-profile flow with tested banner, save, and exit behavior; CLI and REST still lean on general profile-completion flows rather than a dedicated first-run contract |
+| No profile editing in JavaFX           | ✅      | JavaFX profile editing exists, including preferences, photos, and dealbreakers                                                                                                                             |
+| 5 REST endpoints bypass use-case layer | ✅      | REST routes are broadly use-case-backed; the remaining `/candidates` carve-out is a transport compatibility shape, not a bypass around matching use cases                                                  |
 
 #### 1d. Testing & validation
 
-| Goal                                                      | Status | Code reality                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-|-----------------------------------------------------------|--------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| CLI exercises every feature                               | 🟡     | CLI coverage is broad across profile, matching, messaging, safety, stats, and relationship flows, but a final explicit end-to-end pass is still worth doing                                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| REST API exposes every feature through the use-case layer | 🟡     | REST is broad, but safety parity is incomplete and one deliberate direct-read exception remains                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| All semantic fixes get regression tests                   | 🟡     | Strong regression coverage exists for many matching/relationship/storage cases, but policy/guard seams still need targeted tests                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| Quality gate passes                                       | 🟡     | A fresh `mvn spotless:apply verify` run on 2026-04-03 currently fails on `ChatViewModelTest.shouldSkipStaleBackgroundLoads()[8]` timing out; treat this as blocking Phase 1 remaining work by reproducing the flake locally and in CI, instrumenting the `ChatViewModel` latest-wins/polling path, replacing real-thread sleeps and implicit timing with deterministic scheduling, mocks/fake clocks, or explicit synchronization, and only considering timeout changes after the nondeterminism is removed; add CI retry mitigation plus a follow-up audit of other flaky tests once this seam is stable |
+| Goal                                                      | Status | Code reality                                                                                                                                                                                  |
+|-----------------------------------------------------------|--------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| CLI exercises every feature                               | 🟡     | CLI coverage is broad across profile, matching, messaging, safety, stats, and relationship flows, but a final explicit end-to-end pass is still worth doing                                   |
+| REST API exposes every feature through the use-case layer | ✅      | REST route coverage is broad and enforced through request guards and identity policy; the remaining compatibility candidate route still delegates to `MatchingUseCases.browseCandidates(...)` |
+| All semantic fixes get regression tests                   | ✅      | Matching, relationship, undo, trust-safety, profile-completion, metrics, and storage atomicity seams all have focused regression suites in `src/test/java`                                    |
+| Quality gate passes                                       | ✅      | Fresh `mvn spotless:apply verify` on 2026-04-05 succeeded with **1772 tests, 0 failures, 0 errors, 2 skipped**, plus passing Spotless, Checkstyle, PMD, and JaCoCo                            |
 
 ### Bottom line right now
 
 - ✅ **Core engine work is much further along than the roadmap implies**
-- 🟡 **The main remaining Phase 1 work is onboarding, recommendation-ranked browse, REST parity cleanup, and blocking quality-gate stabilization centered on `ChatViewModelTest.shouldSkipStaleBackgroundLoads`**
-- 🔴 **Phases 2-4 are still largely ahead of the current codebase**
+- ✅ **JavaFX, CLI, and REST are all substantial adapters, not thin placeholders**
+- 🟡 **The main remaining near-term work is hardening and consistency: PostgreSQL-first verification, routine smoke coverage, location-scope decisions, and any remaining async edge-case cleanup**
+- 🟡 **Phase 2 is already underway in code; Phases 3-4 are still largely ahead of the current codebase**
 
 ### Phase 1 remaining work now
 
-- Investigate and fix `ChatViewModelTest.shouldSkipStaleBackgroundLoads` as a blocking suite-stability item.
-- Reproduce the failure both locally and in CI before changing production or test timing behavior.
-- Instrument the `ChatViewModel` concurrency/timing path and replace real-thread sleeps or timer races with deterministic scheduling, fake clocks, mocks, or explicit synchronization.
-- Only consider adjusting test timeouts after the underlying nondeterminism is removed.
-- Add CI retry mitigation for the stabilized suite and schedule a follow-up audit of other flaky tests.
+- Promote PostgreSQL verification from opt-in smoke coverage to a more routine part of local and CI validation.
+- Decide whether to keep the REST `/candidates` compatibility route or consolidate on the richer `/browse` contract.
+- Expand location availability beyond the currently supported `IL` path only if broader regional support is a real product goal.
+- Continue hardening async UI seams where useful, but this is no longer blocking the quality gate.
 
-## Phase 1: Stabilize Core (Java, H2, CLI) 🟡
+> The detailed Phase 1 section below is the original plan scope. Use the reality snapshot above as the current implementation status.
+
+## Phase 1: Stabilize Core (Java, CLI/JavaFX/REST, SQL runtime) 🟡
 
 **Goal:** Make the core business logic correct and complete. Test everything via CLI and REST API. No technology changes.
 
@@ -158,28 +163,27 @@ A working dating app on the user's Android phone, backed by a Kotlin server depl
 
 ---
 
-## Phase 2: PostgreSQL Migration (still Java) 🔴
+## Phase 2: PostgreSQL Migration (still Java) 🟡
 
-**Goal:** Replace H2 with PostgreSQL for runtime. Keep H2 for tests.
+**Goal:** Complete PostgreSQL as the default verified runtime while keeping H2 compatibility where it still adds value for tests and fast local iteration.
 
 ### Work Items
 
-- Swap HikariCP DataSource from H2 to PostgreSQL (connection string, driver dependency)
-- Audit all SQL in JDBI storage classes and schema files for H2-specific syntax that has no direct PostgreSQL equivalent (e.g., `MERGE` → `INSERT ... ON CONFLICT`, H2 identity column syntax, date arithmetic functions). The implementation plan will enumerate the specific tokens found.
-- Update `SchemaInitializer` DDL for PostgreSQL column types and constraints
-- Update `MigrationRunner` migrations for PostgreSQL compatibility
-- Ensure `DevDataSeeder` works on PostgreSQL
-- Local PostgreSQL setup (Docker container or native install)
-- Config-driven database selection: `AppConfig` determines H2 (tests) vs PostgreSQL (runtime)
-- Connection pooling tuning for PostgreSQL
+- ✅ Add PostgreSQL driver dependency and runtime config support in `pom.xml`, `DatabaseManager`, and `StorageFactory.buildSqlDatabase(...)`
+- ✅ Introduce dialect-aware SQL generation through `DatabaseDialect` and `SqlDialectSupport`
+- ✅ Update Java-embedded schema and migration paths for PostgreSQL-aware execution
+- ✅ Keep `DevDataSeeder` working on the SQL runtime path
+- ✅ Add local PostgreSQL smoke validation via `PostgresqlRuntimeSmokeTest`
+- 🟡 Broaden PostgreSQL validation beyond opt-in smoke coverage so routine regression work exercises the real runtime path more often
+- 🟡 Reduce remaining H2-first assumptions in storage tests and compatibility helpers where they no longer provide unique value
 
 ### Phase 2 Exit Criteria
 
-- Backend runs against local PostgreSQL
-- All tests pass against H2 (unchanged)
-- DevDataSeeder populates PostgreSQL correctly
-- REST API works identically on PostgreSQL as it did on H2
-- `mvn spotless:apply verify` passes
+- Backend runs against local PostgreSQL through the default SQL runtime path
+- H2-backed compatibility tests still pass where they remain intentionally retained
+- PostgreSQL smoke coverage is exercised as a normal part of validation, not just an optional one-off check
+- REST/API behavior is verified on PostgreSQL beyond a narrow startup smoke
+- `mvn spotless:apply verify` passes alongside the PostgreSQL-specific validation path
 
 ---
 

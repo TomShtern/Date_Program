@@ -10,8 +10,8 @@ import datingapp.core.model.Match;
 import datingapp.core.model.Match.MatchArchiveReason;
 import datingapp.core.model.User;
 import datingapp.core.profile.SanitizerUtils;
-import datingapp.core.storage.CommunicationStorage;
-import datingapp.core.storage.InteractionStorage;
+import datingapp.core.storage.OperationalCommunicationStorage;
+import datingapp.core.storage.OperationalInteractionStorage;
 import datingapp.core.storage.UserStorage;
 import datingapp.core.workflow.RelationshipWorkflowPolicy;
 import datingapp.core.workflow.WorkflowDecision;
@@ -36,19 +36,17 @@ public class ConnectionService {
     private static final String CONVERSATION_NOT_FOUND = "Conversation not found";
     private static final String EMPTY_MESSAGE = "Message cannot be empty";
     private static final String MESSAGE_TOO_LONG = "Message too long (max %d characters)";
-    private static final String ATOMIC_TRANSITIONS_REQUIRED = "Relationship transition requires atomic storage support";
-
     private final AppConfig config;
-    private final CommunicationStorage communicationStorage;
-    private final InteractionStorage interactionStorage;
+    private final OperationalCommunicationStorage communicationStorage;
+    private final OperationalInteractionStorage interactionStorage;
     private final UserStorage userStorage;
     private final RelationshipWorkflowPolicy workflowPolicy;
 
     /** Compatibility constructor for tests. */
     public ConnectionService(
             AppConfig config,
-            CommunicationStorage communicationStorage,
-            InteractionStorage interactionStorage,
+            OperationalCommunicationStorage communicationStorage,
+            OperationalInteractionStorage interactionStorage,
             UserStorage userStorage) {
         this(config, communicationStorage, interactionStorage, userStorage, new RelationshipWorkflowPolicy());
     }
@@ -56,8 +54,8 @@ public class ConnectionService {
     /** Canonical constructor — all dependencies explicit. */
     public ConnectionService(
             AppConfig config,
-            CommunicationStorage communicationStorage,
-            InteractionStorage interactionStorage,
+            OperationalCommunicationStorage communicationStorage,
+            OperationalInteractionStorage interactionStorage,
             UserStorage userStorage,
             RelationshipWorkflowPolicy workflowPolicy) {
         this.config = Objects.requireNonNull(config, "config cannot be null");
@@ -213,24 +211,24 @@ public class ConnectionService {
         return previews;
     }
 
-    public ConversationPreview getConversationPreview(UUID userId, String conversationId) {
+    public Optional<ConversationPreview> getConversationPreview(UUID userId, String conversationId) {
         Objects.requireNonNull(userId, USER_ID_REQUIRED);
         Objects.requireNonNull(conversationId, CONVERSATION_ID_REQUIRED);
 
         Optional<Conversation> conversationOpt = findAuthorizedConversation(userId, conversationId);
         if (conversationOpt.isEmpty()) {
-            return null;
+            return Optional.empty();
         }
 
         Conversation conversation = conversationOpt.get();
-        User otherUser = userStorage.get(conversation.getOtherUser(userId)).orElse(null);
-        if (otherUser == null) {
-            return null;
+        Optional<User> otherUser = userStorage.get(conversation.getOtherUser(userId));
+        if (otherUser.isEmpty()) {
+            return Optional.empty();
         }
 
         Optional<Message> lastMessage = communicationStorage.getLatestMessage(conversationId);
         int unreadCount = calculateUnreadCount(userId, conversation);
-        return new ConversationPreview(conversation, otherUser, lastMessage, unreadCount);
+        return Optional.of(new ConversationPreview(conversation, otherUser.get(), lastMessage, unreadCount));
     }
 
     public void markAsRead(UUID userId, String conversationId) {
@@ -442,10 +440,6 @@ public class ConnectionService {
                 FriendRequest.Status.ACCEPTED,
                 AppClock.now());
 
-        if (!interactionStorage.supportsAtomicRelationshipTransitions()) {
-            return TransitionResult.failure(ATOMIC_TRANSITIONS_REQUIRED);
-        }
-
         try {
             updatedMatch.transitionToFriends(request.fromUserId());
             boolean transitioned = interactionStorage.acceptFriendZoneTransition(updatedMatch, updated, null);
@@ -497,10 +491,6 @@ public class ConnectionService {
             return TransitionResult.failure("Relationship has already ended.");
         }
 
-        if (!interactionStorage.supportsAtomicRelationshipTransitions()) {
-            return TransitionResult.failure(ATOMIC_TRANSITIONS_REQUIRED);
-        }
-
         Optional<Conversation> convoOpt = communicationStorage.getConversationByUsers(initiatorId, targetUserId);
         Optional<Conversation> archivedConversation = convoOpt.map(ConnectionService::copyConversation);
         archivedConversation.ifPresent(convo -> {
@@ -542,10 +532,6 @@ public class ConnectionService {
         WorkflowDecision decision = workflowPolicy.canUnmatch(match);
         if (decision.isDenied()) {
             return TransitionResult.failure("Match cannot be unmatched from its current state.");
-        }
-
-        if (!interactionStorage.supportsAtomicRelationshipTransitions()) {
-            return TransitionResult.failure(ATOMIC_TRANSITIONS_REQUIRED);
         }
 
         // Archive the conversation for both participants, if one exists.

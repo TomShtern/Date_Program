@@ -86,6 +86,7 @@ public final class ApplicationStartup {
     private static final AtomicReference<CleanupScheduler> CLEANUP_SCHEDULER_REF = new AtomicReference<>();
     private static final AtomicReference<Thread> SHUTDOWN_HOOK_REF = new AtomicReference<>();
     private static final AtomicReference<Runnable> INITIALIZATION_COMPLETE_HOOK = new AtomicReference<>();
+    private static final AtomicReference<UnaryOperator<String>> ENV_LOOKUP_OVERRIDE_FOR_TESTS = new AtomicReference<>();
     private static volatile boolean initialized = false;
 
     private ApplicationStartup() {}
@@ -162,6 +163,14 @@ public final class ApplicationStartup {
     public static synchronized void reset() {
         shutdown();
         AppSession.getInstance().reset();
+    }
+
+    static void setInitializationCompleteHookForTests(Runnable hook) {
+        INITIALIZATION_COMPLETE_HOOK.set(hook);
+    }
+
+    static void setEnvironmentLookupForTests(UnaryOperator<String> envLookup) {
+        ENV_LOOKUP_OVERRIDE_FOR_TESTS.set(envLookup);
     }
 
     // ========================================================================
@@ -276,7 +285,7 @@ public final class ApplicationStartup {
      * level are exposed.
      */
     private static void applyEnvironmentOverrides(AppConfig.Builder builder) {
-        applyEnvironmentOverrides(builder, RuntimeEnvironment::getEnv);
+        applyEnvironmentOverrides(builder, environmentLookup());
     }
 
     static void applyEnvironmentOverrides(AppConfig.Builder builder, UnaryOperator<String> envLookup) {
@@ -333,7 +342,7 @@ public final class ApplicationStartup {
 
     private static Path resolveConfigPath() {
         Path propertyOverride = pathOrNull(System.getProperty(CONFIG_OVERRIDE_PROPERTY));
-        Path envOverride = pathOrNull(RuntimeEnvironment.getEnv(CONFIG_OVERRIDE_ENV));
+        Path envOverride = pathOrNull(environmentLookup().apply(CONFIG_OVERRIDE_ENV));
         Path appRelative = Path.of(CONFIG_FILE);
         Path fallback = Path.of("app-config.json");
 
@@ -525,5 +534,10 @@ public final class ApplicationStartup {
         if (hook != null) {
             hook.run();
         }
+    }
+
+    private static UnaryOperator<String> environmentLookup() {
+        UnaryOperator<String> override = ENV_LOOKUP_OVERRIDE_FOR_TESTS.get();
+        return override != null ? override : RuntimeEnvironment::getEnv;
     }
 }

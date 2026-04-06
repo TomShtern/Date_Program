@@ -1,6 +1,8 @@
 package datingapp.app.bootstrap;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -155,6 +157,29 @@ class ApplicationStartupBootstrapTest {
 
         IllegalStateException afterReset = assertThrows(IllegalStateException.class, ApplicationStartup::getServices);
         assertTrue(afterReset.getMessage().contains("initialize"));
+    }
+
+    @Test
+    @DisplayName("reset after a failed initialize allows a fresh successful initialize")
+    void resetAfterFailedInitializeAllowsFreshSuccessfulInitialize() {
+        ApplicationStartup.setInitializationCompleteHookForTests(() -> {
+            throw new IllegalStateException("synthetic startup failure");
+        });
+
+        assertThrows(IllegalStateException.class, this::initializeWithDefaults);
+
+        ApplicationStartup.setInitializationCompleteHookForTests(null);
+
+        assertDoesNotThrow(ApplicationStartup::reset);
+
+        ServiceRegistry services = ApplicationStartup.initialize(AppConfig.defaults());
+
+        assertNotNull(services);
+        assertSame(services, ApplicationStartup.getServices());
+    }
+
+    private ServiceRegistry initializeWithDefaults() {
+        return ApplicationStartup.initialize(AppConfig.defaults());
     }
 
     private static void restoreSystemProperty(String key, String previousValue) {

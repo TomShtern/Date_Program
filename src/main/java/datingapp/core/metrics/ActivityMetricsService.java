@@ -8,9 +8,9 @@ import datingapp.core.metrics.EngagementDomain.UserStats;
 import datingapp.core.metrics.SwipeState.Session;
 import datingapp.core.model.Match;
 import datingapp.core.storage.AnalyticsStorage;
-import datingapp.core.storage.InteractionStorage;
+import datingapp.core.storage.OperationalInteractionStorage;
+import datingapp.core.storage.OperationalUserStorage;
 import datingapp.core.storage.TrustSafetyStorage;
-import datingapp.core.storage.UserStorage;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -30,8 +30,8 @@ public class ActivityMetricsService {
             "Unusually fast swiping detected. Take a moment to review profiles!";
     private static final String SUSPICIOUS_VELOCITY_BLOCKED = "Unusually fast swiping detected. Swipe blocked for now.";
 
-    private final UserStorage userStorage;
-    private final InteractionStorage interactionStorage;
+    private final OperationalUserStorage userStorage;
+    private final OperationalInteractionStorage interactionStorage;
     private final TrustSafetyStorage trustSafetyStorage;
     private final AnalyticsStorage analyticsStorage;
     private final AppConfig config;
@@ -44,7 +44,7 @@ public class ActivityMetricsService {
 
     /** Canonical constructor — all dependencies are required. */
     public ActivityMetricsService(
-            InteractionStorage interactionStorage,
+            OperationalInteractionStorage interactionStorage,
             TrustSafetyStorage trustSafetyStorage,
             AnalyticsStorage analyticsStorage,
             AppConfig config) {
@@ -53,8 +53,8 @@ public class ActivityMetricsService {
 
     /** Canonical constructor — all dependencies are required. */
     public ActivityMetricsService(
-            UserStorage userStorage,
-            InteractionStorage interactionStorage,
+            OperationalUserStorage userStorage,
+            OperationalInteractionStorage interactionStorage,
             TrustSafetyStorage trustSafetyStorage,
             AnalyticsStorage analyticsStorage,
             AppConfig config) {
@@ -62,8 +62,8 @@ public class ActivityMetricsService {
     }
 
     private ActivityMetricsService(
-            UserStorage userStorage,
-            InteractionStorage interactionStorage,
+            OperationalUserStorage userStorage,
+            OperationalInteractionStorage interactionStorage,
             TrustSafetyStorage trustSafetyStorage,
             AnalyticsStorage analyticsStorage,
             AppConfig config,

@@ -5,9 +5,13 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.app.event.InProcessAppEventBus;
+import datingapp.app.usecase.common.UseCaseError;
 import datingapp.app.usecase.common.UserContext;
 import datingapp.core.AppConfig;
+import datingapp.core.metrics.ActivityMetricsService;
 import datingapp.core.model.User;
+import datingapp.core.profile.ProfileService;
+import datingapp.core.profile.ValidationService;
 import datingapp.core.testutil.TestAchievementService;
 import datingapp.core.testutil.TestStorages;
 import datingapp.core.workflow.ProfileActivationPolicy;
@@ -20,6 +24,22 @@ import org.junit.jupiter.api.Test;
 class ProfileUseCasesNotesTest {
 
     @Test
+    @DisplayName("missing author is rejected through the canonical ProfileUseCases construction path")
+    void missingAuthorReturnsNotFoundThroughCanonicalProfileUseCasesConstructor() {
+        TestStorages.Users users = new TestStorages.Users();
+        UUID authorId = UUID.randomUUID();
+        users.save(new User(UUID.randomUUID(), "Subject"));
+
+        ProfileUseCases useCases = createProfileUseCases(users, AppConfig.defaults());
+
+        var result = useCases.listProfileNotes(new ProfileNotesUseCases.ProfileNotesQuery(UserContext.ui(authorId)));
+
+        assertFalse(result.success());
+        assertEquals(UseCaseError.Code.NOT_FOUND, result.error().code());
+        assertEquals("Author not found", result.error().message());
+    }
+
+    @Test
     @DisplayName("upsert, get, list, and delete note for an author")
     void upsertGetListAndDeleteNoteForAuthor() {
         TestStorages.Users users = new TestStorages.Users();
@@ -28,15 +48,7 @@ class ProfileUseCasesNotesTest {
         users.save(new User(authorId, "Author"));
         users.save(new User(subjectId, "Subject"));
 
-        ProfileUseCases useCases = new ProfileUseCases(
-                users,
-                null,
-                null,
-                null,
-                TestAchievementService.empty(),
-                AppConfig.defaults(),
-                new ProfileActivationPolicy(),
-                new InProcessAppEventBus());
+        ProfileUseCases useCases = createProfileUseCases(users, AppConfig.defaults());
 
         var createResult = useCases.upsertProfileNote(new ProfileNotesUseCases.UpsertProfileNoteCommand(
                 UserContext.ui(authorId), subjectId, "Met at coffee shop"));
@@ -74,15 +86,7 @@ class ProfileUseCasesNotesTest {
         UUID authorId = UUID.randomUUID();
         users.save(new User(authorId, "Author"));
 
-        ProfileUseCases useCases = new ProfileUseCases(
-                users,
-                null,
-                null,
-                null,
-                TestAchievementService.empty(),
-                AppConfig.defaults(),
-                new ProfileActivationPolicy(),
-                new InProcessAppEventBus());
+        ProfileUseCases useCases = createProfileUseCases(users, AppConfig.defaults());
         var result = useCases.upsertProfileNote(new ProfileNotesUseCases.UpsertProfileNoteCommand(
                 UserContext.ui(authorId), UUID.randomUUID(), "Hello"));
 
@@ -100,22 +104,29 @@ class ProfileUseCasesNotesTest {
         users.save(new User(subjectId, "Subject"));
 
         AppConfig config = AppConfig.builder().maxProfileNoteLength(5).build();
-        ProfileUseCases useCases = new ProfileUseCases(
-                users,
-                null,
-                null,
-                null,
-                TestAchievementService.empty(),
-                config,
-                new ProfileActivationPolicy(),
-                new InProcessAppEventBus());
+        ProfileUseCases useCases = createProfileUseCases(users, config);
 
         var result = useCases.upsertProfileNote(
                 new ProfileNotesUseCases.UpsertProfileNoteCommand(UserContext.ui(authorId), subjectId, "123456"));
 
         assertFalse(result.success());
-        assertEquals(
-                "Note content exceeds maximum length of 5 characters",
-                result.error().message());
+        assertEquals("Note too long (max 5 characters)", result.error().message());
+    }
+
+    private static ProfileUseCases createProfileUseCases(TestStorages.Users users, AppConfig config) {
+        ValidationService validationService = new ValidationService(config);
+        return new ProfileUseCases(
+                users,
+                new ProfileService(users),
+                validationService,
+                new ProfileMutationUseCases(
+                        users,
+                        validationService,
+                        TestAchievementService.empty(),
+                        config,
+                        new ProfileActivationPolicy(),
+                        new InProcessAppEventBus()),
+                new ProfileNotesUseCases(users, validationService, config, new InProcessAppEventBus()),
+                new ProfileInsightsUseCases(TestAchievementService.empty(), (ActivityMetricsService) null));
     }
 }

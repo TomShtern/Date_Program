@@ -24,11 +24,11 @@ import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
 import datingapp.core.model.User.UserState;
 import datingapp.core.storage.AnalyticsStorage;
-import datingapp.core.storage.CommunicationStorage;
-import datingapp.core.storage.InteractionStorage;
+import datingapp.core.storage.OperationalCommunicationStorage;
+import datingapp.core.storage.OperationalInteractionStorage;
+import datingapp.core.storage.OperationalUserStorage;
 import datingapp.core.storage.PageData;
 import datingapp.core.storage.TrustSafetyStorage;
-import datingapp.core.storage.UserStorage;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -68,7 +68,7 @@ public final class TestStorages {
         return seekerId + STANDOUT_DELIMITER + date;
     }
 
-    public static class Users implements UserStorage {
+    public static class Users implements OperationalUserStorage {
         private final Map<UUID, User> users = new HashMap<>();
         private final Map<String, ProfileNote> profileNotes = new HashMap<>();
         private Instant lastPurgeCutoff;
@@ -209,17 +209,17 @@ public final class TestStorages {
         }
     }
 
-    public static class Interactions implements InteractionStorage {
+    public static class Interactions implements OperationalInteractionStorage {
         private final Map<UUID, Like> likes = new HashMap<>();
         private final Map<String, Match> matches = new HashMap<>();
-        private final CommunicationStorage communicationStorage;
+        private final OperationalCommunicationStorage communicationStorage;
         private Instant lastPurgeCutoff;
 
         public Interactions() {
             this(null);
         }
 
-        public Interactions(CommunicationStorage communicationStorage) {
+        public Interactions(OperationalCommunicationStorage communicationStorage) {
             this.communicationStorage = communicationStorage;
         }
 
@@ -519,16 +519,6 @@ public final class TestStorages {
         }
 
         @Override
-        public boolean supportsAtomicRelationshipTransitions() {
-            return true;
-        }
-
-        @Override
-        public boolean supportsAtomicBlockTransition() {
-            return communicationStorage != null;
-        }
-
-        @Override
         public boolean acceptFriendZoneTransition(
                 Match updatedMatch, FriendRequest acceptedRequest, Notification notification) {
             update(updatedMatch);
@@ -628,7 +618,7 @@ public final class TestStorages {
         }
     }
 
-    public static class Communications implements CommunicationStorage {
+    public static class Communications implements OperationalCommunicationStorage {
         private final Map<String, Conversation> conversations = new HashMap<>();
         private final Map<String, List<Message>> messagesByConversation = new HashMap<>();
         private final Map<UUID, FriendRequest> friendRequests = new HashMap<>();
@@ -859,6 +849,12 @@ public final class TestStorages {
         @Override
         public void saveFriendRequest(FriendRequest request) {
             friendRequests.put(request.id(), request);
+        }
+
+        @Override
+        public void saveFriendRequestWithNotification(FriendRequest request, Notification notification) {
+            saveFriendRequest(request);
+            saveNotification(notification);
         }
 
         @Override

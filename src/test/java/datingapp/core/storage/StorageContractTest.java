@@ -131,6 +131,24 @@ class StorageContractTest {
     }
 
     @Test
+    @DisplayName("In-memory user storage implements the operational user contract")
+    void inMemoryUserStorageImplementsOperationalUserStorage() {
+        assertTrue(new TestStorages.Users() instanceof OperationalUserStorage);
+    }
+
+    @Test
+    @DisplayName("In-memory interaction storage implements the operational interaction contract")
+    void inMemoryInteractionStorageImplementsOperationalInteractionStorage() {
+        assertTrue(new TestStorages.Interactions() instanceof OperationalInteractionStorage);
+    }
+
+    @Test
+    @DisplayName("In-memory communication storage implements the operational communication contract")
+    void inMemoryCommunicationStorageImplementsOperationalCommunicationStorage() {
+        assertTrue(new TestStorages.Communications() instanceof OperationalCommunicationStorage);
+    }
+
+    @Test
     @DisplayName("UserStorage withUserLock exposes explicit get/save access")
     void userStorageWithUserLockExposesExplicitGetSaveAccess() {
         TestStorages.Users storage = new TestStorages.Users();

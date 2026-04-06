@@ -9,8 +9,8 @@ import datingapp.core.model.User.VerificationMethod;
 import datingapp.core.profile.MatchPreferences.Dealbreakers;
 import datingapp.core.profile.MatchPreferences.Lifestyle;
 import datingapp.core.profile.MatchPreferences.PacePreferences;
+import datingapp.core.storage.OperationalUserStorage;
 import datingapp.core.storage.PageData;
-import datingapp.core.storage.UserStorage;
 import datingapp.storage.DatabaseDialect;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -39,7 +39,7 @@ import org.jdbi.v3.sqlobject.statement.SqlQuery;
 import org.jdbi.v3.sqlobject.statement.SqlUpdate;
 
 /** Consolidated JDBI-backed user storage implementation. */
-public final class JdbiUserStorage implements UserStorage {
+public final class JdbiUserStorage implements OperationalUserStorage {
 
     private static final int MAX_CACHE_SIZE = 500;
     private static final Duration CACHE_TTL = Duration.ofMinutes(5);
@@ -264,7 +264,7 @@ public final class JdbiUserStorage implements UserStorage {
     }
 
     @Override
-    public <T> T withUserLock(UUID userId, Function<UserStorage.LockedUserAccess, T> operation) {
+    public <T> T withUserLock(UUID userId, Function<LockedUserAccess, T> operation) {
         Objects.requireNonNull(userId, "userId cannot be null");
         Objects.requireNonNull(operation, "operation cannot be null");
         return withLockedHandle(

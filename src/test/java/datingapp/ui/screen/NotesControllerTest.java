@@ -6,6 +6,9 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.app.event.InProcessAppEventBus;
+import datingapp.app.usecase.profile.ProfileInsightsUseCases;
+import datingapp.app.usecase.profile.ProfileMutationUseCases;
+import datingapp.app.usecase.profile.ProfileNotesUseCases;
 import datingapp.app.usecase.profile.ProfileUseCases;
 import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
@@ -15,6 +18,7 @@ import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
 import datingapp.core.profile.MatchPreferences.PacePreferences;
 import datingapp.core.profile.ProfileService;
+import datingapp.core.profile.ValidationService;
 import datingapp.core.testutil.TestAchievementService;
 import datingapp.core.testutil.TestStorages;
 import datingapp.core.workflow.ProfileActivationPolicy;
@@ -176,16 +180,7 @@ class NotesControllerTest {
     void fxmlLoadsSavedNotesIntoListAndHidesEmptyState() throws Exception {
         TestStorages.Users users = new TestStorages.Users();
         AppConfig config = AppConfig.defaults();
-        ProfileService profileService = new ProfileService(users);
-        ProfileUseCases profileUseCases = new ProfileUseCases(
-                users,
-                profileService,
-                null,
-                null,
-                TestAchievementService.empty(),
-                config,
-                new ProfileActivationPolicy(),
-                new InProcessAppEventBus());
+        ProfileUseCases profileUseCases = createProfileUseCases(users, config);
 
         User author = createUser("Morgan", Gender.FEMALE, EnumSet.of(Gender.MALE));
         User subject = createUser("Riley", Gender.MALE, EnumSet.of(Gender.FEMALE));
@@ -221,16 +216,7 @@ class NotesControllerTest {
     void fxmlShowsEmptyStateWhenNoNotesSaved() throws Exception {
         TestStorages.Users users = new TestStorages.Users();
         AppConfig config = AppConfig.defaults();
-        ProfileService profileService = new ProfileService(users);
-        ProfileUseCases profileUseCases = new ProfileUseCases(
-                users,
-                profileService,
-                null,
-                null,
-                TestAchievementService.empty(),
-                config,
-                new ProfileActivationPolicy(),
-                new InProcessAppEventBus());
+        ProfileUseCases profileUseCases = createProfileUseCases(users, config);
 
         User author = createUser("Alex", Gender.MALE, EnumSet.of(Gender.FEMALE));
         User subject = createUser("Jordan", Gender.FEMALE, EnumSet.of(Gender.MALE));
@@ -333,16 +319,7 @@ class NotesControllerTest {
     private final class Fixture {
         private final TestStorages.Users users = new TestStorages.Users();
         private final AppConfig config = AppConfig.defaults();
-        private final ProfileService profileService = new ProfileService(users);
-        private final ProfileUseCases profileUseCases = new ProfileUseCases(
-                users,
-                profileService,
-                null,
-                null,
-                TestAchievementService.empty(),
-                config,
-                new ProfileActivationPolicy(),
-                new InProcessAppEventBus());
+        private final ProfileUseCases profileUseCases = createProfileUseCases(users, config);
         private final User author = createUser("Morgan", Gender.FEMALE, EnumSet.of(Gender.MALE));
         private final User subject = createUser("Riley", Gender.MALE, EnumSet.of(Gender.FEMALE));
 
@@ -368,6 +345,24 @@ class NotesControllerTest {
                     config.safety().userTimeZone(),
                     TEST_DISPATCHER);
         }
+    }
+
+    private static ProfileUseCases createProfileUseCases(TestStorages.Users users, AppConfig config) {
+        ValidationService validationService = new ValidationService(config);
+        ProfileService profileService = new ProfileService(users);
+        return new ProfileUseCases(
+                users,
+                profileService,
+                validationService,
+                new ProfileMutationUseCases(
+                        users,
+                        validationService,
+                        TestAchievementService.empty(),
+                        config,
+                        new ProfileActivationPolicy(),
+                        new InProcessAppEventBus()),
+                new ProfileNotesUseCases(users, validationService, config, new InProcessAppEventBus()),
+                new ProfileInsightsUseCases(TestAchievementService.empty(), null));
     }
 
     private static final class TrackingNotesController extends NotesController {

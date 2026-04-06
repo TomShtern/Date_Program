@@ -162,13 +162,7 @@ public final class ServiceRegistry {
                 this.userStorage,
                 this.profileService,
                 this.validationService,
-                this.activityMetricsService,
-                this.achievementService,
-                this.config,
-                this.activationPolicy,
-                this.eventBus,
                 this.profileMutationUseCases,
-                this.accountCleanupStorage,
                 this.profileNotesUseCases,
                 this.profileInsightsUseCases);
         this.verificationUseCases = new VerificationUseCases(this.userStorage, this.trustSafetyService);

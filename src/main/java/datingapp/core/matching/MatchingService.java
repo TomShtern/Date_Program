@@ -7,9 +7,9 @@ import datingapp.core.model.Match;
 import datingapp.core.model.User;
 import datingapp.core.model.User.UserState;
 import datingapp.core.storage.InteractionStorage;
+import datingapp.core.storage.OperationalUserStorage;
 import datingapp.core.storage.PageData;
 import datingapp.core.storage.TrustSafetyStorage;
-import datingapp.core.storage.UserStorage;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -30,7 +30,7 @@ public final class MatchingService {
 
     private final InteractionStorage interactionStorage;
     private final TrustSafetyStorage trustSafetyStorage;
-    private final UserStorage userStorage;
+    private final OperationalUserStorage userStorage;
     private final Map<String, Object> swipeInFlight = new ConcurrentHashMap<>();
     private final Optional<ActivityMetricsService> activityMetricsService;
     private final UndoService undoService;
@@ -41,7 +41,7 @@ public final class MatchingService {
     public MatchingService(
             InteractionStorage interactionStorage,
             TrustSafetyStorage trustSafetyStorage,
-            UserStorage userStorage,
+            OperationalUserStorage userStorage,
             ActivityMetricsService activityMetricsService,
             UndoService undoService,
             RecommendationService dailyService) {
@@ -58,7 +58,7 @@ public final class MatchingService {
     public MatchingService(
             InteractionStorage interactionStorage,
             TrustSafetyStorage trustSafetyStorage,
-            UserStorage userStorage,
+            OperationalUserStorage userStorage,
             ActivityMetricsService activityMetricsService,
             UndoService undoService,
             RecommendationService dailyService,
@@ -79,7 +79,7 @@ public final class MatchingService {
     public static class Builder {
         private InteractionStorage interactionStorage;
         private TrustSafetyStorage trustSafetyStorage;
-        private UserStorage userStorage;
+        private OperationalUserStorage userStorage;
         private ActivityMetricsService activityMetricsService;
         private UndoService undoService;
         private RecommendationService dailyService;
@@ -95,7 +95,7 @@ public final class MatchingService {
             return this;
         }
 
-        public Builder userStorage(UserStorage storage) {
+        public Builder userStorage(OperationalUserStorage storage) {
             this.userStorage = storage;
             return this;
         }
@@ -346,7 +346,9 @@ public final class MatchingService {
     }
 
     private static CandidateFinder defaultCandidateFinder(
-            InteractionStorage interactionStorage, TrustSafetyStorage trustSafetyStorage, UserStorage userStorage) {
+            InteractionStorage interactionStorage,
+            TrustSafetyStorage trustSafetyStorage,
+            OperationalUserStorage userStorage) {
         return new CandidateFinder(
                 Objects.requireNonNull(userStorage, "userStorage cannot be null"),
                 Objects.requireNonNull(interactionStorage, "interactionStorage cannot be null"),

@@ -21,12 +21,9 @@ import datingapp.ui.screen.SafetyController;
 import datingapp.ui.screen.SocialController;
 import datingapp.ui.screen.StandoutsController;
 import datingapp.ui.screen.StatsController;
-import datingapp.ui.viewmodel.UiDataAdapters.MetricsUiPresenceDataAccess;
 import datingapp.ui.viewmodel.UiDataAdapters.StorageUiSocialDataAccess;
-import datingapp.ui.viewmodel.UiDataAdapters.StorageUiUserStore;
 import datingapp.ui.viewmodel.UiDataAdapters.UiProfileNoteDataAccess;
 import datingapp.ui.viewmodel.UiDataAdapters.UiUserStore;
-import datingapp.ui.viewmodel.UiDataAdapters.UseCaseUiProfileNoteDataAccess;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -64,10 +61,8 @@ public class ViewModelFactory {
     // Generic cache for ViewModels (lazy-initialized singletons within UI context)
     private final Map<Class<?>, Object> viewModelCache = new HashMap<>();
 
-    // Cached UI adapter singletons — created once per factory lifecycle
-    private UiUserStore cachedUiUserStore;
-    private UiProfileNoteDataAccess cachedUiProfileNoteDataAccess;
-    private UiDataAdapters.UiPresenceDataAccess cachedUiPresenceDataAccess;
+    // Adapter cache — delegates lifecycle management of shared UI adapters
+    private final UiAdapterCache uiAdapterCache = new UiAdapterCache();
 
     private final Map<Class<?>, Supplier<Object>> controllerFactories;
 
@@ -358,31 +353,19 @@ public class ViewModelFactory {
         });
 
         viewModelCache.clear();
-        cachedUiUserStore = null;
-        cachedUiProfileNoteDataAccess = null;
-        cachedUiPresenceDataAccess = null;
+        uiAdapterCache.reset();
     }
 
     private UiUserStore createUiUserStore() {
-        if (cachedUiUserStore == null) {
-            cachedUiUserStore = new StorageUiUserStore(services.getUserStorage());
-        }
-        return cachedUiUserStore;
+        return uiAdapterCache.userStore(services);
     }
 
     private UiProfileNoteDataAccess createUiProfileNoteDataAccess() {
-        if (cachedUiProfileNoteDataAccess == null) {
-            cachedUiProfileNoteDataAccess = new UseCaseUiProfileNoteDataAccess(services.getProfileNotesUseCases());
-        }
-        return cachedUiProfileNoteDataAccess;
+        return uiAdapterCache.profileNotes(services);
     }
 
     private UiDataAdapters.UiPresenceDataAccess createUiPresenceDataAccess() {
-        if (cachedUiPresenceDataAccess == null) {
-            cachedUiPresenceDataAccess =
-                    new MetricsUiPresenceDataAccess(services.getActivityMetricsService(), services.getConfig());
-        }
-        return cachedUiPresenceDataAccess;
+        return uiAdapterCache.presence(services);
     }
 
     private void logDebug(String message, Object... args) {

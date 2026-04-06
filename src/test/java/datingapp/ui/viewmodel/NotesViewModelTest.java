@@ -5,6 +5,9 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.app.event.InProcessAppEventBus;
+import datingapp.app.usecase.profile.ProfileInsightsUseCases;
+import datingapp.app.usecase.profile.ProfileMutationUseCases;
+import datingapp.app.usecase.profile.ProfileNotesUseCases;
 import datingapp.app.usecase.profile.ProfileUseCases;
 import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
@@ -14,6 +17,7 @@ import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
 import datingapp.core.profile.MatchPreferences.PacePreferences;
 import datingapp.core.profile.ProfileService;
+import datingapp.core.profile.ValidationService;
 import datingapp.core.testutil.TestAchievementService;
 import datingapp.core.testutil.TestStorages;
 import datingapp.core.workflow.ProfileActivationPolicy;
@@ -63,16 +67,7 @@ class NotesViewModelTest {
     void initializeLoadsNotesWithNames() throws InterruptedException {
         TestStorages.Users users = new TestStorages.Users();
         AppConfig config = AppConfig.defaults();
-        ProfileService profileService = new ProfileService(users);
-        ProfileUseCases profileUseCases = new ProfileUseCases(
-                users,
-                profileService,
-                null,
-                null,
-                TestAchievementService.empty(),
-                config,
-                new ProfileActivationPolicy(),
-                new InProcessAppEventBus());
+        ProfileUseCases profileUseCases = createProfileUseCases(users, config);
 
         User author = createUser(AUTHOR_NAME, Gender.FEMALE, EnumSet.of(Gender.MALE));
         User subjectOne = createUser(SUBJECT_ONE_NAME, Gender.MALE, EnumSet.of(Gender.FEMALE));
@@ -111,16 +106,7 @@ class NotesViewModelTest {
             TestStorages.Users users = new TestStorages.Users();
             AppConfig config = AppConfig.defaults();
             ZoneId configuredZone = ZoneId.of("Pacific/Honolulu");
-            ProfileService profileService = new ProfileService(users);
-            ProfileUseCases profileUseCases = new ProfileUseCases(
-                    users,
-                    profileService,
-                    null,
-                    null,
-                    TestAchievementService.empty(),
-                    config,
-                    new ProfileActivationPolicy(),
-                    new InProcessAppEventBus());
+            ProfileUseCases profileUseCases = createProfileUseCases(users, config);
 
             User author = createUser(AUTHOR_NAME, Gender.FEMALE, EnumSet.of(Gender.MALE));
             User subject = createUser(SUBJECT_ONE_NAME, Gender.MALE, EnumSet.of(Gender.FEMALE));
@@ -163,16 +149,7 @@ class NotesViewModelTest {
     void initializeLeavesEmptyStateForNoNotes() throws InterruptedException {
         TestStorages.Users users = new TestStorages.Users();
         AppConfig config = AppConfig.defaults();
-        ProfileService profileService = new ProfileService(users);
-        ProfileUseCases profileUseCases = new ProfileUseCases(
-                users,
-                profileService,
-                null,
-                null,
-                TestAchievementService.empty(),
-                config,
-                new ProfileActivationPolicy(),
-                new InProcessAppEventBus());
+        ProfileUseCases profileUseCases = createProfileUseCases(users, config);
 
         User author = createUser("Jordan", Gender.FEMALE, EnumSet.of(Gender.MALE));
         users.save(author);
@@ -195,16 +172,7 @@ class NotesViewModelTest {
     void saveSelectedNoteUpdatesStorageAndList() throws InterruptedException {
         TestStorages.Users users = new TestStorages.Users();
         AppConfig config = AppConfig.defaults();
-        ProfileService profileService = new ProfileService(users);
-        ProfileUseCases profileUseCases = new ProfileUseCases(
-                users,
-                profileService,
-                null,
-                null,
-                TestAchievementService.empty(),
-                config,
-                new ProfileActivationPolicy(),
-                new InProcessAppEventBus());
+        ProfileUseCases profileUseCases = createProfileUseCases(users, config);
 
         User author = createUser(AUTHOR_NAME, Gender.FEMALE, EnumSet.of(Gender.MALE));
         User subject = createUser(SUBJECT_ONE_NAME, Gender.MALE, EnumSet.of(Gender.FEMALE));
@@ -242,16 +210,7 @@ class NotesViewModelTest {
     void deleteSelectedNoteRemovesStorageAndList() throws InterruptedException {
         TestStorages.Users users = new TestStorages.Users();
         AppConfig config = AppConfig.defaults();
-        ProfileService profileService = new ProfileService(users);
-        ProfileUseCases profileUseCases = new ProfileUseCases(
-                users,
-                profileService,
-                null,
-                null,
-                TestAchievementService.empty(),
-                config,
-                new ProfileActivationPolicy(),
-                new InProcessAppEventBus());
+        ProfileUseCases profileUseCases = createProfileUseCases(users, config);
 
         User author = createUser("Jordan", Gender.FEMALE, EnumSet.of(Gender.MALE));
         User subject = createUser(SUBJECT_TWO_NAME, Gender.MALE, EnumSet.of(Gender.FEMALE));
@@ -301,5 +260,23 @@ class NotesViewModelTest {
     private static java.util.Optional<String> fixtureNoteContent(
             TestStorages.Users users, UUID authorId, UUID subjectId) {
         return users.getProfileNote(authorId, subjectId).map(ProfileNote::content);
+    }
+
+    private static ProfileUseCases createProfileUseCases(TestStorages.Users users, AppConfig config) {
+        ValidationService validationService = new ValidationService(config);
+        ProfileService profileService = new ProfileService(users);
+        return new ProfileUseCases(
+                users,
+                profileService,
+                validationService,
+                new ProfileMutationUseCases(
+                        users,
+                        validationService,
+                        TestAchievementService.empty(),
+                        config,
+                        new ProfileActivationPolicy(),
+                        new InProcessAppEventBus()),
+                new ProfileNotesUseCases(users, validationService, config, new InProcessAppEventBus()),
+                new ProfileInsightsUseCases(TestAchievementService.empty(), null));
     }
 }

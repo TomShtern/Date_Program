@@ -216,11 +216,6 @@ class ConnectionServiceTransitionTest {
         private Optional<ConnectionModels.Conversation> archivedConversation = Optional.empty();
 
         @Override
-        public boolean supportsAtomicRelationshipTransitions() {
-            return true;
-        }
-
-        @Override
         public void update(Match match) {
             directUpdateCalls++;
             super.update(match);
@@ -262,11 +257,6 @@ class ConnectionServiceTransitionTest {
 
         private FailingAtomicInteractionStorage(TestStorages.Communications communications) {
             super(communications);
-        }
-
-        @Override
-        public boolean supportsAtomicRelationshipTransitions() {
-            return true;
         }
 
         @Override

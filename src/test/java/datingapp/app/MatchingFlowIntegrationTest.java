@@ -42,9 +42,6 @@ import datingapp.core.model.User.UserState;
 import datingapp.core.profile.LocationService;
 import datingapp.core.profile.ProfileService;
 import datingapp.core.profile.ValidationService;
-import datingapp.core.storage.CommunicationStorage;
-import datingapp.core.storage.InteractionStorage;
-import datingapp.core.storage.UserStorage;
 import datingapp.core.testutil.TestStorages;
 import java.time.Duration;
 import java.time.Instant;
@@ -62,9 +59,9 @@ class MatchingFlowIntegrationTest {
     @Test
     @DisplayName("browse swipe match then message succeeds end-to-end")
     void browseSwipeMatchThenMessageSucceedsEndToEnd() {
-        TestStorages.Users userStorage = new TestStorages.Users();
-        TestStorages.Interactions interactionStorage = new TestStorages.Interactions();
         TestStorages.Communications communicationStorage = new TestStorages.Communications();
+        TestStorages.Users userStorage = new TestStorages.Users();
+        TestStorages.Interactions interactionStorage = new TestStorages.Interactions(communicationStorage);
         TestStorages.Standouts standoutStorage = new TestStorages.Standouts();
         AppConfig config = AppConfig.defaults();
 
@@ -119,9 +116,9 @@ class MatchingFlowIntegrationTest {
     void matchThenUnmatchThenRematchAfterCooldownSucceedsEndToEnd() {
         AppClock.setFixed(Instant.parse("2026-03-30T00:00:00Z"));
         try {
-            TestStorages.Users userStorage = new TestStorages.Users();
-            TestStorages.Interactions interactionStorage = new TestStorages.Interactions();
             TestStorages.Communications communicationStorage = new TestStorages.Communications();
+            TestStorages.Users userStorage = new TestStorages.Users();
+            TestStorages.Interactions interactionStorage = new TestStorages.Interactions(communicationStorage);
             TestStorages.Standouts standoutStorage = new TestStorages.Standouts();
             AppConfig config = AppConfig.defaults();
 
@@ -182,9 +179,9 @@ class MatchingFlowIntegrationTest {
 
     private static ServiceRegistry createServices(
             AppConfig config,
-            UserStorage userStorage,
-            InteractionStorage interactionStorage,
-            CommunicationStorage communicationStorage,
+            TestStorages.Users userStorage,
+            TestStorages.Interactions interactionStorage,
+            TestStorages.Communications communicationStorage,
             Standout.Storage standoutStorage) {
         TestStorages.Analytics analyticsStorage = new TestStorages.Analytics();
         TestStorages.TrustSafety trustSafetyStorage = new TestStorages.TrustSafety();

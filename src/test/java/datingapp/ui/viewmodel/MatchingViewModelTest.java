@@ -5,6 +5,10 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.app.event.InProcessAppEventBus;
+import datingapp.app.usecase.profile.ProfileInsightsUseCases;
+import datingapp.app.usecase.profile.ProfileMutationUseCases;
+import datingapp.app.usecase.profile.ProfileNotesUseCases;
+import datingapp.app.usecase.profile.ProfileUseCases;
 import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
 import datingapp.core.AppSession;
@@ -20,8 +24,10 @@ import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
 import datingapp.core.profile.MatchPreferences.PacePreferences;
 import datingapp.core.profile.ProfileService;
+import datingapp.core.profile.ValidationService;
 import datingapp.core.testutil.TestAchievementService;
 import datingapp.core.testutil.TestStorages;
+import datingapp.core.workflow.ProfileActivationPolicy;
 import datingapp.ui.async.UiThreadDispatcher;
 import datingapp.ui.viewmodel.UiDataAdapters.NoOpUiProfileNoteDataAccess;
 import datingapp.ui.viewmodel.UiDataAdapters.UiProfileNoteDataAccess;
@@ -393,17 +399,22 @@ class MatchingViewModelTest {
                     dispatcher);
         }
 
-        private datingapp.app.usecase.profile.ProfileUseCases createNoteUseCases() {
-            ProfileService noteProfileService = new ProfileService(users);
-            return new datingapp.app.usecase.profile.ProfileUseCases(
+        private ProfileUseCases createNoteUseCases() {
+            InProcessAppEventBus eventBus = new InProcessAppEventBus();
+            ValidationService validationService = new ValidationService(config);
+            return new ProfileUseCases(
                     users,
-                    noteProfileService,
-                    null,
-                    null,
-                    TestAchievementService.empty(),
-                    config,
-                    new datingapp.core.workflow.ProfileActivationPolicy(),
-                    new InProcessAppEventBus());
+                    new ProfileService(users),
+                    validationService,
+                    new ProfileMutationUseCases(
+                            users,
+                            validationService,
+                            TestAchievementService.empty(),
+                            config,
+                            new ProfileActivationPolicy(),
+                            eventBus),
+                    new ProfileNotesUseCases(users, validationService, config, eventBus),
+                    new ProfileInsightsUseCases(TestAchievementService.empty(), null));
         }
 
         private void saveNote(String content) {

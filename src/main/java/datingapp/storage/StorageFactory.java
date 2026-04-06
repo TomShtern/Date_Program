@@ -33,10 +33,10 @@ import datingapp.core.profile.ProfileService;
 import datingapp.core.profile.ValidationService;
 import datingapp.core.storage.AccountCleanupStorage;
 import datingapp.core.storage.AnalyticsStorage;
-import datingapp.core.storage.CommunicationStorage;
-import datingapp.core.storage.InteractionStorage;
+import datingapp.core.storage.OperationalCommunicationStorage;
+import datingapp.core.storage.OperationalInteractionStorage;
+import datingapp.core.storage.OperationalUserStorage;
 import datingapp.core.storage.TrustSafetyStorage;
-import datingapp.core.storage.UserStorage;
 import datingapp.core.workflow.ProfileActivationPolicy;
 import datingapp.core.workflow.RelationshipWorkflowPolicy;
 import datingapp.storage.jdbi.JdbiAccountCleanupStorage;
@@ -110,9 +110,9 @@ public final class StorageFactory {
     }
 
     private static PersistenceComponents createPersistenceComponents(Jdbi jdbi) {
-        UserStorage userStorage = new JdbiUserStorage(jdbi);
+        OperationalUserStorage userStorage = new JdbiUserStorage(jdbi);
         JdbiMatchmakingStorage matchmakingStorage = new JdbiMatchmakingStorage(jdbi);
-        CommunicationStorage communicationStorage = new JdbiConnectionStorage(jdbi);
+        OperationalCommunicationStorage communicationStorage = new JdbiConnectionStorage(jdbi);
         JdbiMetricsStorage metricsStorage = new JdbiMetricsStorage(jdbi);
         TrustSafetyStorage trustSafetyStorage = jdbi.onDemand(JdbiTrustSafetyStorage.class);
         AccountCleanupStorage accountCleanupStorage = new JdbiAccountCleanupStorage(jdbi);
@@ -254,9 +254,9 @@ public final class StorageFactory {
     }
 
     private record PersistenceComponents(
-            UserStorage userStorage,
-            InteractionStorage interactionStorage,
-            CommunicationStorage communicationStorage,
+            OperationalUserStorage userStorage,
+            OperationalInteractionStorage interactionStorage,
+            OperationalCommunicationStorage communicationStorage,
             AnalyticsStorage analyticsStorage,
             TrustSafetyStorage trustSafetyStorage,
             AccountCleanupStorage accountCleanupStorage,

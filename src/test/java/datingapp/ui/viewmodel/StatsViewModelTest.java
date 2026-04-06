@@ -8,6 +8,8 @@ import datingapp.app.testutil.TestEventBus;
 import datingapp.app.usecase.common.UseCaseError;
 import datingapp.app.usecase.common.UseCaseResult;
 import datingapp.app.usecase.profile.ProfileInsightsUseCases;
+import datingapp.app.usecase.profile.ProfileMutationUseCases;
+import datingapp.app.usecase.profile.ProfileNotesUseCases;
 import datingapp.app.usecase.profile.ProfileUseCases;
 import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
@@ -18,6 +20,8 @@ import datingapp.core.metrics.ActivityMetricsService;
 import datingapp.core.metrics.EngagementDomain.Achievement;
 import datingapp.core.metrics.EngagementDomain.Achievement.UserAchievement;
 import datingapp.core.model.User;
+import datingapp.core.profile.ProfileService;
+import datingapp.core.profile.ValidationService;
 import datingapp.core.testutil.TestStorages;
 import datingapp.core.testutil.TestUserFactory;
 import datingapp.ui.JavaFxTestSupport;
@@ -114,13 +118,19 @@ class StatsViewModelTest {
         ProfileUseCases failingProfileUseCases =
                 new ProfileUseCases(
                         users,
-                        null,
-                        null,
-                        new ActivityMetricsService(interactions, trustSafety, analytics, config),
-                        new SingleAchievementService(currentUser.getId()),
-                        config,
-                        new datingapp.core.workflow.ProfileActivationPolicy(),
-                        new TestEventBus()) {
+                        new ProfileService(users),
+                        new ValidationService(config),
+                        new ProfileMutationUseCases(
+                                users,
+                                new ValidationService(config),
+                                new SingleAchievementService(currentUser.getId()),
+                                config,
+                                new datingapp.core.workflow.ProfileActivationPolicy(),
+                                new TestEventBus()),
+                        new ProfileNotesUseCases(users, new ValidationService(config), config, new TestEventBus()),
+                        new ProfileInsightsUseCases(
+                                new SingleAchievementService(currentUser.getId()),
+                                new ActivityMetricsService(interactions, trustSafety, analytics, config))) {
                     @Override
                     public UseCaseResult<ProfileInsightsUseCases.AchievementSnapshot> getAchievements(
                             ProfileInsightsUseCases.AchievementsQuery query) {

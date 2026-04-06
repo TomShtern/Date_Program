@@ -18,6 +18,7 @@ import datingapp.core.testutil.TestClock;
 import datingapp.core.testutil.TestStorages;
 import datingapp.core.testutil.TestUserFactory;
 import java.time.Instant;
+import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -96,6 +97,15 @@ class ConnectionServiceTest {
     }
 
     @Test
+    @DisplayName("getConversationPreview(UUID, String) returns Optional.empty when the conversation is missing")
+    void getConversationPreviewReturnsEmptyWhenConversationIsMissing() {
+        Optional<ConnectionService.ConversationPreview> preview =
+                service.getConversationPreview(sender.getId(), "missing-conversation");
+
+        assertTrue(preview.isEmpty());
+    }
+
+    @Test
     @DisplayName("markAsRead clears unread messages and only counts messages from the other user")
     void markAsReadClearsUnreadMessagesAndTracksUnreadSemantics() {
         service.sendMessage(sender.getId(), recipient.getId(), "One");
@@ -131,23 +141,26 @@ class ConnectionServiceTest {
     }
 
     @Test
-    @DisplayName("gracefulExit fails when atomic relationship transitions are unsupported")
-    void gracefulExitFailsWhenAtomicRelationshipTransitionsAreUnsupported() {
-        TestStorages.Interactions nonAtomicInteractions = new TestStorages.Interactions(communicationStorage) {
+    @DisplayName("gracefulExit fails when transition persistence returns false")
+    void gracefulExitFailsWhenTransitionPersistenceReturnsFalse() {
+        TestStorages.Interactions failingInteractions = new TestStorages.Interactions(communicationStorage) {
             @Override
-            public boolean supportsAtomicRelationshipTransitions() {
+            public boolean gracefulExitTransition(
+                    Match updatedMatch,
+                    Optional<Conversation> archivedConversation,
+                    ConnectionModels.Notification notification) {
                 return false;
             }
         };
-        nonAtomicInteractions.save(Match.create(sender.getId(), recipient.getId()));
+        failingInteractions.save(Match.create(sender.getId(), recipient.getId()));
 
-        ConnectionService nonAtomicService =
-                new ConnectionService(AppConfig.defaults(), communicationStorage, nonAtomicInteractions, userStorage);
+        ConnectionService failingService =
+                new ConnectionService(AppConfig.defaults(), communicationStorage, failingInteractions, userStorage);
 
-        TransitionResult result = nonAtomicService.gracefulExit(sender.getId(), recipient.getId());
+        TransitionResult result = failingService.gracefulExit(sender.getId(), recipient.getId());
 
         assertFalse(result.success());
-        assertEquals("Relationship transition requires atomic storage support", result.errorMessage());
+        assertEquals("Failed to persist graceful exit transition.", result.errorMessage());
         assertNull(result.friendRequest());
     }
 

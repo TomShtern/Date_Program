@@ -7,13 +7,18 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.app.cli.CliTextAndInput.InputReader;
 import datingapp.app.testutil.TestEventBus;
+import datingapp.app.usecase.profile.ProfileInsightsUseCases;
+import datingapp.app.usecase.profile.ProfileMutationUseCases;
+import datingapp.app.usecase.profile.ProfileNotesUseCases;
 import datingapp.app.usecase.profile.ProfileUseCases;
 import datingapp.core.AppConfig;
 import datingapp.core.AppSession;
 import datingapp.core.model.ProfileNote;
 import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
+import datingapp.core.profile.LocationService;
 import datingapp.core.profile.MatchPreferences.PacePreferences;
+import datingapp.core.profile.ProfileService;
 import datingapp.core.profile.ValidationService;
 import datingapp.core.testutil.TestAchievementService;
 import datingapp.core.testutil.TestStorages;
@@ -55,20 +60,26 @@ class ProfileNotesHandlerTest {
 
     private ProfileHandler createHandler(String input) {
         InputReader inputReader = new InputReader(new Scanner(new StringReader(input)));
+        ValidationService validationService = new ValidationService(AppConfig.defaults());
+        AppConfig config = AppConfig.defaults();
         ProfileUseCases profileUseCases = new ProfileUseCases(
                 userStorage,
-                null,
-                null,
-                null,
-                TestAchievementService.empty(),
-                AppConfig.defaults(),
-                new ProfileActivationPolicy(),
-                new TestEventBus());
+                new ProfileService(userStorage),
+                validationService,
+                new ProfileMutationUseCases(
+                        userStorage,
+                        validationService,
+                        TestAchievementService.empty(),
+                        config,
+                        new ProfileActivationPolicy(),
+                        new TestEventBus()),
+                new ProfileNotesUseCases(userStorage, validationService, config, new TestEventBus()),
+                new ProfileInsightsUseCases(TestAchievementService.empty(), null));
         return new ProfileHandler(
-                userStorage,
-                new ValidationService(AppConfig.defaults()),
+                validationService,
+                new LocationService(validationService),
                 profileUseCases,
-                AppConfig.defaults(),
+                config,
                 session,
                 inputReader);
     }
