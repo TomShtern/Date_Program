@@ -317,7 +317,8 @@ public final class ApplicationStartup {
     }
 
     private static boolean isDevDataSeedingEnabled() {
-        return "true".equalsIgnoreCase(System.getenv(SEED_DATA_ENV_VAR));
+        String value = environmentLookup().apply(SEED_DATA_ENV_VAR);
+        return value != null && "true".equalsIgnoreCase(value);
     }
 
     private static void applyEnvInt(

@@ -121,7 +121,6 @@ public class StatsHandler implements LoggingSupport {
                             "  ✅ {} - {}",
                             ua.achievement().getDisplayName(),
                             ua.achievement().getDescription());
-                    // Date formatting?
                     String dateStr = ua.unlockedAt() == null ? "N/A" : dateFormatter.format(ua.unlockedAt());
                     logInfo("     (Unlocked: {})", dateStr);
                 }

@@ -4,6 +4,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import datingapp.app.testutil.TestEventBus;
+import datingapp.app.usecase.profile.ProfileInsightsUseCases;
+import datingapp.app.usecase.profile.ProfileMutationUseCases;
+import datingapp.app.usecase.profile.ProfileNotesUseCases;
 import datingapp.app.usecase.profile.ProfileUseCases;
 import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
@@ -16,7 +20,10 @@ import datingapp.core.metrics.EngagementDomain.Achievement.UserAchievement;
 import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
 import datingapp.core.profile.MatchPreferences.PacePreferences;
+import datingapp.core.profile.ProfileService;
+import datingapp.core.profile.ValidationService;
 import datingapp.core.testutil.TestStorages;
+import datingapp.core.workflow.ProfileActivationPolicy;
 import datingapp.ui.JavaFxTestSupport;
 import datingapp.ui.NavigationService;
 import datingapp.ui.viewmodel.StatsViewModel;
@@ -67,11 +74,12 @@ class StatsControllerTest {
         ActivityMetricsService activityMetricsService =
                 new ActivityMetricsService(interactions, trustSafety, analytics, config);
         ConnectionService connectionService = new ConnectionService(config, communications, interactions, users);
+        ProfileUseCases profileUseCases =
+                createProfileUseCases(users, config, achievementService, activityMetricsService);
         StatsViewModel viewModel = new StatsViewModel(
-                achievementService,
                 activityMetricsService,
                 connectionService,
-                (ProfileUseCases) null,
+                profileUseCases,
                 AppSession.getInstance(),
                 AppClock.clock(),
                 JavaFxTestSupport.blockingUiDispatcher());
@@ -118,6 +126,27 @@ class StatsControllerTest {
                 PacePreferences.DepthPreference.DEEP_CHAT));
         user.activate();
         return user;
+    }
+
+    private static ProfileUseCases createProfileUseCases(
+            TestStorages.Users users,
+            AppConfig config,
+            AchievementService achievementService,
+            ActivityMetricsService activityMetricsService) {
+        ValidationService validationService = new ValidationService(config);
+        return new ProfileUseCases(
+                users,
+                new ProfileService(users),
+                validationService,
+                new ProfileMutationUseCases(
+                        users,
+                        validationService,
+                        achievementService,
+                        config,
+                        new ProfileActivationPolicy(),
+                        new TestEventBus()),
+                new ProfileNotesUseCases(users, validationService, config, new TestEventBus()),
+                new ProfileInsightsUseCases(achievementService, activityMetricsService));
     }
 
     private static final class SingleAchievementService implements AchievementService {

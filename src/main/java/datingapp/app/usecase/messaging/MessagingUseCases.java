@@ -69,7 +69,7 @@ public class MessagingUseCases {
             return connectionService
                     .getConversationPreview(command.context().userId(), conversation.getId())
                     .map(preview -> UseCaseResult.success(new OpenConversationResult(conversation, preview)))
-                    .orElseGet(() -> UseCaseResult.failure(UseCaseError.notFound("Conversation not found")));
+                    .orElseGet(() -> UseCaseResult.failure(UseCaseError.notFound("Conversation preview not found")));
         } catch (Exception e) {
             return internalFailure("open conversation", e);
         }

@@ -719,13 +719,25 @@ class ProfileUseCasesTest {
         ProfileMutationUseCases mutationUseCases = new ProfileMutationUseCases(
                 userStorage, validationService, achievementService, config, new ProfileActivationPolicy(), eventBus);
         ProfileNotesUseCases notesUseCases = new ProfileNotesUseCases(userStorage, validationService, config, eventBus);
+        ProfileInsightsUseCases insightsUseCases = new ProfileInsightsUseCases(achievementService, metricsService);
 
-        NullPointerException error = assertThrows(
+        NullPointerException mutationError = assertThrows(
+                NullPointerException.class,
+                () -> new ProfileUseCases(
+                        userStorage, profileService, validationService, null, notesUseCases, insightsUseCases));
+        assertEquals("profileMutationUseCases cannot be null", mutationError.getMessage());
+
+        NullPointerException notesError = assertThrows(
+                NullPointerException.class,
+                () -> new ProfileUseCases(
+                        userStorage, profileService, validationService, mutationUseCases, null, insightsUseCases));
+        assertEquals("profileNotesUseCases cannot be null", notesError.getMessage());
+
+        NullPointerException insightsError = assertThrows(
                 NullPointerException.class,
                 () -> new ProfileUseCases(
                         userStorage, profileService, validationService, mutationUseCases, notesUseCases, null));
-
-        assertEquals("profileInsightsUseCases cannot be null", error.getMessage());
+        assertEquals("profileInsightsUseCases cannot be null", insightsError.getMessage());
     }
 
     @Test

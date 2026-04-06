@@ -23,6 +23,7 @@ import datingapp.core.profile.MatchPreferences.PacePreferences;
 import datingapp.core.profile.ProfileService;
 import datingapp.core.profile.ValidationService;
 import datingapp.core.testutil.TestAchievementService;
+import datingapp.core.testutil.TestActivityMetricsService;
 import datingapp.core.testutil.TestStorages;
 import datingapp.core.workflow.ProfileActivationPolicy;
 import datingapp.ui.JavaFxTestSupport;
@@ -527,6 +528,6 @@ class ChatControllerTest {
                         new ProfileActivationPolicy(),
                         eventBus),
                 new ProfileNotesUseCases(users, validationService, config, eventBus),
-                new ProfileInsightsUseCases(TestAchievementService.empty(), null));
+                new ProfileInsightsUseCases(TestAchievementService.empty(), TestActivityMetricsService.empty()));
     }
 }

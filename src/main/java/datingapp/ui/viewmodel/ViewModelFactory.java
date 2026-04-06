@@ -21,7 +21,6 @@ import datingapp.ui.screen.SafetyController;
 import datingapp.ui.screen.SocialController;
 import datingapp.ui.screen.StandoutsController;
 import datingapp.ui.screen.StatsController;
-import datingapp.ui.viewmodel.UiDataAdapters.StorageUiSocialDataAccess;
 import datingapp.ui.viewmodel.UiDataAdapters.UiProfileNoteDataAccess;
 import datingapp.ui.viewmodel.UiDataAdapters.UiUserStore;
 import java.util.Collections;
@@ -160,11 +159,7 @@ public class ViewModelFactory {
         return getViewModel(
                 LoginViewModel.class,
                 () -> new LoginViewModel(
-                        createUiUserStore(),
-                        services.getConfig(),
-                        session,
-                        uiDispatcher,
-                        services.getActivationPolicy()));
+                        getUiUserStore(), services.getConfig(), session, uiDispatcher, services.getActivationPolicy()));
     }
 
     public DashboardViewModel getDashboardViewModel() {
@@ -181,7 +176,7 @@ public class ViewModelFactory {
         return getViewModel(
                 ProfileViewModel.class,
                 () -> new ProfileViewModel(new ProfileViewModel.Dependencies(
-                        createUiUserStore(),
+                        getUiUserStore(),
                         services.getProfileService(),
                         services.getProfileMutationUseCases(),
                         services.getProfileUseCases(),
@@ -196,7 +191,7 @@ public class ViewModelFactory {
     public ProfileReadOnlyViewModel getProfileReadOnlyViewModel() {
         return getViewModel(
                 ProfileReadOnlyViewModel.class,
-                () -> new ProfileReadOnlyViewModel(createUiUserStore(), services.getConfig(), uiDispatcher));
+                () -> new ProfileReadOnlyViewModel(getUiUserStore(), services.getConfig(), uiDispatcher));
     }
 
     public MatchingViewModel getMatchingViewModel() {
@@ -210,7 +205,7 @@ public class ViewModelFactory {
                                 services.getTrustSafetyService(),
                                 services.getMatchingUseCases(),
                                 services.getSocialUseCases(),
-                                createUiProfileNoteDataAccess()),
+                                getUiProfileNoteDataAccess()),
                         session,
                         uiDispatcher));
     }
@@ -241,18 +236,16 @@ public class ViewModelFactory {
                                 services.getConfig().validation().chatBackgroundPollSeconds()),
                         java.time.Duration.ofSeconds(
                                 services.getConfig().validation().chatActivePollSeconds()),
-                        new ChatViewModel.ChatUiDependencies(
-                                createUiProfileNoteDataAccess(), createUiPresenceDataAccess())));
+                        new ChatViewModel.ChatUiDependencies(getUiProfileNoteDataAccess(), getUiPresenceDataAccess())));
     }
 
     public StatsViewModel getStatsViewModel() {
         return getViewModel(
                 StatsViewModel.class,
                 () -> new StatsViewModel(
-                        services.getAchievementService(),
                         services.getActivityMetricsService(),
                         services.getConnectionService(),
-                        services.getProfileInsightsUseCases(),
+                        services.getProfileUseCases(),
                         session,
                         datingapp.core.AppClock.clock(),
                         uiDispatcher));
@@ -281,8 +274,8 @@ public class ViewModelFactory {
                 SocialViewModel.class,
                 () -> new SocialViewModel(
                         services.getConnectionService(),
-                        new StorageUiSocialDataAccess(services.getCommunicationStorage()),
-                        createUiUserStore(),
+                        uiAdapterCache.socialDataAccess(services),
+                        getUiUserStore(),
                         services.getSocialUseCases(),
                         session,
                         uiDispatcher));
@@ -304,7 +297,7 @@ public class ViewModelFactory {
                 NotesViewModel.class,
                 () -> new NotesViewModel(
                         services.getProfileNotesUseCases(),
-                        createUiUserStore(),
+                        getUiUserStore(),
                         session,
                         services.getConfig().safety().userTimeZone(),
                         uiDispatcher));
@@ -356,15 +349,15 @@ public class ViewModelFactory {
         uiAdapterCache.reset();
     }
 
-    private UiUserStore createUiUserStore() {
+    private UiUserStore getUiUserStore() {
         return uiAdapterCache.userStore(services);
     }
 
-    private UiProfileNoteDataAccess createUiProfileNoteDataAccess() {
+    private UiProfileNoteDataAccess getUiProfileNoteDataAccess() {
         return uiAdapterCache.profileNotes(services);
     }
 
-    private UiDataAdapters.UiPresenceDataAccess createUiPresenceDataAccess() {
+    private UiDataAdapters.UiPresenceDataAccess getUiPresenceDataAccess() {
         return uiAdapterCache.presence(services);
     }
 

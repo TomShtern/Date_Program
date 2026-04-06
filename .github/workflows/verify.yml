@@ -35,7 +35,7 @@ jobs:
           cache: maven
 
       - name: Maven quality gate
-        run: mvn spotless:apply verify
+        run: mvn spotless:check verify
 
       - name: PostgreSQL smoke
         run: >-

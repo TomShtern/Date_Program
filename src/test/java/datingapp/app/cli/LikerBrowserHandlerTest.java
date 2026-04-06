@@ -114,7 +114,7 @@ class LikerBrowserHandlerTest {
                 inputReader,
                 () -> {},
                 matchingUseCases,
-                socialUseCases); // profileCompleteCallback is optional (nullable) — not needed in tests
+                socialUseCases); // profileCompleteCallback: no-op lambda supplied to avoid nullable handling in tests
         return new MatchingHandler(deps);
     }
 

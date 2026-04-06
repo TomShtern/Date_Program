@@ -3,11 +3,16 @@ param(
     [string]$BaseDir = (Join-Path $PSScriptRoot 'data\local-postgresql'),
     [string]$Superuser = 'datingapp',
     [PSCredential]$Credential = $null,
-    [string]$Database = 'datingapp'
+    [string]$Database = 'datingapp',
+    [int]$StartupTimeoutSeconds = 10
 )
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
+
+if ($StartupTimeoutSeconds -lt 1) {
+    throw 'StartupTimeoutSeconds must be at least 1 second.'
+}
 
 # If no credential provided, create one with default dev credentials
 if ($null -eq $Credential) {
@@ -83,7 +88,7 @@ if (-not (Test-PostgresReady -ProbePort $Port)) {
     $pgCtlArguments = "-D `"$dataDir`" -l `"$logFile`" -o `"-p $Port -h localhost`" start"
     $pgCtlProcess = Start-Process -FilePath 'pg_ctl' -ArgumentList $pgCtlArguments -PassThru -WindowStyle Hidden -RedirectStandardOutput $pgCtlStdOutFile -RedirectStandardError $pgCtlStdErrFile
     # Treat readiness as the success condition; waiting on pg_ctl itself can hang on Windows.
-    $postgresReady = Wait-ForPostgresReady -ProbePort $Port
+    $postgresReady = Wait-ForPostgresReady -ProbePort $Port -Attempts ($StartupTimeoutSeconds * 1000 / 250) -DelayMilliseconds 250
     $pgCtlExited = $pgCtlProcess.WaitForExit(1000)
     $startExitCode = if ($pgCtlExited) { $pgCtlProcess.ExitCode } else { $null }
 

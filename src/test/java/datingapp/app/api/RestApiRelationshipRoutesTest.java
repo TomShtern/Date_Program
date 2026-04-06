@@ -13,9 +13,9 @@ import datingapp.core.connection.ConnectionModels;
 import datingapp.core.model.Match;
 import datingapp.core.model.User;
 import datingapp.core.model.User.UserState;
-import datingapp.core.storage.CommunicationStorage;
-import datingapp.core.storage.InteractionStorage;
-import datingapp.core.storage.UserStorage;
+import datingapp.core.storage.OperationalCommunicationStorage;
+import datingapp.core.storage.OperationalInteractionStorage;
+import datingapp.core.storage.OperationalUserStorage;
 import datingapp.core.testutil.TestStorages;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -590,15 +590,17 @@ class RestApiRelationshipRoutesTest {
     }
 
     private static ServiceRegistry createServices(
-            UserStorage userStorage, InteractionStorage interactionStorage, CommunicationStorage communicationStorage) {
+            OperationalUserStorage userStorage,
+            OperationalInteractionStorage interactionStorage,
+            OperationalCommunicationStorage communicationStorage) {
         return RestApiTestFixture.builder(userStorage, interactionStorage, communicationStorage)
                 .build();
     }
 
     private static ServiceRegistry createServices(
-            UserStorage userStorage,
-            InteractionStorage interactionStorage,
-            CommunicationStorage communicationStorage,
+            OperationalUserStorage userStorage,
+            OperationalInteractionStorage interactionStorage,
+            OperationalCommunicationStorage communicationStorage,
             TestStorages.TrustSafety trustSafetyStorage) {
         return RestApiTestFixture.builder(userStorage, interactionStorage, communicationStorage)
                 .trustSafetyStorage(trustSafetyStorage)

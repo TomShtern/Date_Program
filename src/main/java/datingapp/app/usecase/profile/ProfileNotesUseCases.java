@@ -34,7 +34,7 @@ public class ProfileNotesUseCases {
 
     public ProfileNotesUseCases(
             UserStorage userStorage, ValidationService validationService, AppConfig config, AppEventBus eventBus) {
-        this.userStorage = userStorage;
+        this.userStorage = Objects.requireNonNull(userStorage, USER_STORAGE_REQUIRED);
         this.validationService = validationService;
         this.config = Objects.requireNonNull(config, "config cannot be null");
         this.eventBus = Objects.requireNonNull(eventBus, "eventBus cannot be null");
@@ -141,9 +141,6 @@ public class ProfileNotesUseCases {
     }
 
     private Optional<UseCaseError> validateAuthor(UUID authorId) {
-        if (userStorage == null) {
-            return Optional.of(UseCaseError.dependency(USER_STORAGE_REQUIRED));
-        }
         if (userStorage.get(authorId).isEmpty()) {
             return Optional.of(UseCaseError.notFound(AUTHOR_NOT_FOUND));
         }

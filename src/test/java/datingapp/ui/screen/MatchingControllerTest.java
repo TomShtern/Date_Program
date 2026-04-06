@@ -299,7 +299,7 @@ class MatchingControllerTest {
             TrustSafetyService trustSafetyService = TrustSafetyService.builder(
                             trustSafetyStorage, interactions, users, config, communications)
                     .build();
-            var noteUseCases = createProfileUseCases(users, config, eventBus);
+            var noteUseCases = createProfileUseCases(users, profileService, config, eventBus);
 
             return new MatchingViewModel(
                     new MatchingViewModel.Dependencies(
@@ -380,11 +380,14 @@ class MatchingControllerTest {
         }
 
         private datingapp.app.usecase.profile.ProfileUseCases createProfileUseCases(
-                TestStorages.Users users, AppConfig config, InProcessAppEventBus eventBus) {
+                TestStorages.Users users,
+                ProfileService profileService,
+                AppConfig config,
+                InProcessAppEventBus eventBus) {
             ValidationService validationService = new ValidationService(config);
             return new datingapp.app.usecase.profile.ProfileUseCases(
                     users,
-                    new ProfileService(users),
+                    profileService,
                     validationService,
                     new datingapp.app.usecase.profile.ProfileMutationUseCases(
                             users,

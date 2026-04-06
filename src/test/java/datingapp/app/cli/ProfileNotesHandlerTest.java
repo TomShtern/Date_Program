@@ -13,6 +13,7 @@ import datingapp.app.usecase.profile.ProfileNotesUseCases;
 import datingapp.app.usecase.profile.ProfileUseCases;
 import datingapp.core.AppConfig;
 import datingapp.core.AppSession;
+import datingapp.core.metrics.ActivityMetricsService;
 import datingapp.core.model.ProfileNote;
 import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
@@ -60,8 +61,13 @@ class ProfileNotesHandlerTest {
 
     private ProfileHandler createHandler(String input) {
         InputReader inputReader = new InputReader(new Scanner(new StringReader(input)));
-        ValidationService validationService = new ValidationService(AppConfig.defaults());
         AppConfig config = AppConfig.defaults();
+        ValidationService validationService = new ValidationService(config);
+        TestStorages.Interactions interactions = new TestStorages.Interactions();
+        TestStorages.Analytics analytics = new TestStorages.Analytics();
+        TestStorages.TrustSafety trustSafety = new TestStorages.TrustSafety();
+        ActivityMetricsService activityMetricsService =
+                new ActivityMetricsService(interactions, trustSafety, analytics, config);
         ProfileUseCases profileUseCases = new ProfileUseCases(
                 userStorage,
                 new ProfileService(userStorage),
@@ -74,7 +80,7 @@ class ProfileNotesHandlerTest {
                         new ProfileActivationPolicy(),
                         new TestEventBus()),
                 new ProfileNotesUseCases(userStorage, validationService, config, new TestEventBus()),
-                new ProfileInsightsUseCases(TestAchievementService.empty(), null));
+                new ProfileInsightsUseCases(TestAchievementService.empty(), activityMetricsService));
         return new ProfileHandler(
                 validationService,
                 new LocationService(validationService),

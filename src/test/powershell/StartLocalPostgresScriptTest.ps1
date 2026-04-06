@@ -347,7 +347,7 @@ exit /b 0
             'datingapp'
         ) -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath -PassThru -WindowStyle Hidden
 
-        if (-not $process.WaitForExit(2500)) {
+        if (-not $process.WaitForExit(5000)) {
             $stdout = if (Test-Path $stdoutPath) { Get-Content -Path $stdoutPath -Raw } else { '' }
             $stderr = if (Test-Path $stderrPath) { Get-Content -Path $stderrPath -Raw } else { '' }
             & cmd.exe /c "taskkill /T /F /PID $($process.Id)" >$null 2>&1

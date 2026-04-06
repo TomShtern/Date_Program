@@ -74,7 +74,7 @@ public class MatchingHandler implements LoggingSupport {
     private final AppConfig config;
     private final AppSession session;
     private final InputReader inputReader;
-    private final Runnable profileCompleteCallback; // nullable; invoked when location is missing
+    private final Runnable profileCompleteCallback; // defaulted to NO_OP; invoked when location is missing
     private final MatchingUseCases matchingUseCases;
     private final SocialUseCases socialUseCases;
     private final MatchingCliPresenter presenter;
@@ -189,11 +189,9 @@ public class MatchingHandler implements LoggingSupport {
         if (!currentUser.hasLocationSet()) {
             logInfo("\n⚠️  Your profile location is not set.");
             logInfo("   Distance-based candidate matching requires your location to find nearby people.\n");
-            if (profileCompleteCallback != null) {
-                String response = inputReader.readLine("   Would you like to complete your profile now? (y/N): ");
-                if ("y".equalsIgnoreCase(response.trim())) {
-                    profileCompleteCallback.run();
-                }
+            String response = inputReader.readLine("   Would you like to complete your profile now? (y/N): ");
+            if ("y".equalsIgnoreCase(response.trim())) {
+                profileCompleteCallback.run();
             }
             logInfo("   → Go to 'Complete my profile' from the main menu to add your location.\n");
             return false;

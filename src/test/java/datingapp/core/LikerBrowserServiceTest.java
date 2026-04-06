@@ -30,6 +30,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -523,8 +524,8 @@ class LikerBrowserServiceTest {
 
         @Override
         public void executeWithUserLock(UUID userId, Runnable operation) {
-            java.util.Objects.requireNonNull(userId, "userId cannot be null");
-            java.util.Objects.requireNonNull(operation, "operation cannot be null");
+            Objects.requireNonNull(userId, "userId cannot be null");
+            Objects.requireNonNull(operation, "operation cannot be null");
             operation.run();
         }
     }

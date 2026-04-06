@@ -17,8 +17,6 @@ import java.util.UUID;
 
 /** Profile and user-progress application use-cases shared across adapters. */
 public class ProfileUseCases {
-    private static final String USER_STORAGE_REQUIRED = "UserStorage is required";
-    private static final String PROFILE_SERVICE_REQUIRED = "ProfileService is required";
     private static final String USER_NOT_FOUND = "User not found";
 
     private final UserStorage userStorage;
@@ -61,9 +59,6 @@ public class ProfileUseCases {
     }
 
     public UseCaseResult<List<User>> listUsers() {
-        if (userStorage == null) {
-            return UseCaseResult.failure(UseCaseError.dependency(USER_STORAGE_REQUIRED));
-        }
         try {
             return UseCaseResult.success(userStorage.findAll());
         } catch (Exception e) {
@@ -74,9 +69,6 @@ public class ProfileUseCases {
     public UseCaseResult<User> getUserById(UUID userId) {
         if (userId == null) {
             return UseCaseResult.failure(UseCaseError.validation("User ID is required"));
-        }
-        if (userStorage == null) {
-            return UseCaseResult.failure(UseCaseError.dependency(USER_STORAGE_REQUIRED));
         }
         try {
             return userStorage
@@ -91,9 +83,6 @@ public class ProfileUseCases {
     public UseCaseResult<Map<UUID, User>> getUsersByIds(GetUsersByIdsQuery query) {
         if (query == null || query.userIds() == null) {
             return UseCaseResult.failure(UseCaseError.validation("User IDs are required"));
-        }
-        if (userStorage == null) {
-            return UseCaseResult.failure(UseCaseError.dependency(USER_STORAGE_REQUIRED));
         }
 
         try {
@@ -140,9 +129,6 @@ public class ProfileUseCases {
         if (user == null) {
             return UseCaseResult.failure(UseCaseError.validation("User is required"));
         }
-        if (profileService == null) {
-            return UseCaseResult.failure(UseCaseError.dependency(PROFILE_SERVICE_REQUIRED));
-        }
         try {
             return UseCaseResult.success(profileService.calculate(user));
         } catch (Exception e) {
@@ -154,9 +140,6 @@ public class ProfileUseCases {
     public UseCaseResult<ProfileService.ProfilePreview> generatePreview(User user) {
         if (user == null) {
             return UseCaseResult.failure(UseCaseError.validation("User is required"));
-        }
-        if (profileService == null) {
-            return UseCaseResult.failure(UseCaseError.dependency(PROFILE_SERVICE_REQUIRED));
         }
         try {
             return UseCaseResult.success(profileService.generatePreview(user));

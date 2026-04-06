@@ -1,6 +1,7 @@
 package datingapp.core;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -132,9 +133,9 @@ class ServiceRegistryTest {
         @Test
         @DisplayName("runtime storage graph exposes operational storage capabilities")
         void runtimeStorageGraphExposesOperationalStorageCapabilities() {
-            assertTrue(registry.getUserStorage() instanceof OperationalUserStorage);
-            assertTrue(registry.getInteractionStorage() instanceof OperationalInteractionStorage);
-            assertTrue(registry.getCommunicationStorage() instanceof OperationalCommunicationStorage);
+            assertInstanceOf(OperationalUserStorage.class, registry.getUserStorage());
+            assertInstanceOf(OperationalInteractionStorage.class, registry.getInteractionStorage());
+            assertInstanceOf(OperationalCommunicationStorage.class, registry.getCommunicationStorage());
         }
     }
 

@@ -60,11 +60,11 @@ function New-SmokeScriptSandbox {
     )
 
     return [pscustomobject]@{
-        TempRoot = $tempRoot
-        CopiedScript = $copiedScript
+        TempRoot       = $tempRoot
+        CopiedScript   = $copiedScript
         StartCountFile = $startCountFile
         MavenCountFile = $mavenCountFile
-        OriginalPath = $originalPath
+        OriginalPath   = $originalPath
     }
 }
 
@@ -84,7 +84,8 @@ function Use-Sandbox {
         $env:DATING_APP_DB_USERNAME = 'sa'
         Remove-Item Env:DATING_APP_DB_PASSWORD -ErrorAction SilentlyContinue
         & $Body
-    } finally {
+    }
+    finally {
         $env:PATH = $Sandbox.OriginalPath
         Remove-Item Env:DATING_APP_DB_DIALECT -ErrorAction SilentlyContinue
         Remove-Item Env:DATING_APP_DB_URL -ErrorAction SilentlyContinue
@@ -96,7 +97,7 @@ function Use-Sandbox {
 
 $successSandbox = New-SmokeScriptSandbox -MavenExitCode 0
 Use-Sandbox $successSandbox {
-    & $successSandbox.CopiedScript
+    & pwsh -NoProfile -ExecutionPolicy Bypass -File $successSandbox.CopiedScript | Out-Null
 
     if ((Get-CountValue -Path $successSandbox.MavenCountFile) -ne 1) {
         throw 'Expected one Maven invocation on happy path.'
@@ -138,8 +139,3 @@ Use-Sandbox $mavenFailureSandbox {
 }
 
 Write-Output 'RunPostgresqlSmokeScriptTest passed.'
-
-
-
-
-

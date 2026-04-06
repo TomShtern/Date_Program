@@ -19,6 +19,7 @@ import datingapp.core.profile.MatchPreferences.PacePreferences;
 import datingapp.core.profile.ProfileService;
 import datingapp.core.profile.ValidationService;
 import datingapp.core.testutil.TestAchievementService;
+import datingapp.core.testutil.TestActivityMetricsService;
 import datingapp.core.testutil.TestStorages;
 import datingapp.core.workflow.ProfileActivationPolicy;
 import datingapp.ui.JavaFxTestSupport;
@@ -262,9 +263,11 @@ class NotesViewModelTest {
         return users.getProfileNote(authorId, subjectId).map(ProfileNote::content);
     }
 
+    /** Shares a single event bus across mutation and notes use cases so events propagate correctly. */
     private static ProfileUseCases createProfileUseCases(TestStorages.Users users, AppConfig config) {
         ValidationService validationService = new ValidationService(config);
         ProfileService profileService = new ProfileService(users);
+        InProcessAppEventBus sharedEventBus = new InProcessAppEventBus();
         return new ProfileUseCases(
                 users,
                 profileService,
@@ -275,8 +278,8 @@ class NotesViewModelTest {
                         TestAchievementService.empty(),
                         config,
                         new ProfileActivationPolicy(),
-                        new InProcessAppEventBus()),
-                new ProfileNotesUseCases(users, validationService, config, new InProcessAppEventBus()),
-                new ProfileInsightsUseCases(TestAchievementService.empty(), null));
+                        sharedEventBus),
+                new ProfileNotesUseCases(users, validationService, config, sharedEventBus),
+                new ProfileInsightsUseCases(TestAchievementService.empty(), TestActivityMetricsService.empty()));
     }
 }

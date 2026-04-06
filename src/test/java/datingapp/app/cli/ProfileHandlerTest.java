@@ -140,15 +140,7 @@ class ProfileHandlerTest {
 
         ProfileUseCases failingUseCases = createProfileUseCases(
                 userStorage,
-                new ProfileService(userStorage),
-                validationService,
-                new ActivityMetricsService(interactions, trustSafety, analytics, AppConfig.defaults()),
-                TestAchievementService.empty(),
-                AppConfig.defaults(),
-                new datingapp.core.workflow.ProfileActivationPolicy(),
-                new TestEventBus(),
                 failingMutation,
-                null,
                 new ProfileNotesUseCases(userStorage, validationService, AppConfig.defaults(), new TestEventBus()),
                 new ProfileInsightsUseCases(
                         TestAchievementService.empty(),
@@ -174,16 +166,8 @@ class ProfileHandlerTest {
         AppConfig config =
                 AppConfig.builder().userTimeZone(ZoneId.of("Pacific/Honolulu")).build();
         TestStorages.Users previewUsers = new TestStorages.Users();
-        ProfileService profileService = new ProfileService(previewUsers);
         ProfileUseCases previewUseCases = createProfileUseCases(
                 previewUsers,
-                profileService,
-                validationService,
-                new ActivityMetricsService(interactions, trustSafety, analytics, config),
-                TestAchievementService.empty(),
-                config,
-                new datingapp.core.workflow.ProfileActivationPolicy(),
-                new TestEventBus(),
                 new ProfileMutationUseCases(
                         previewUsers,
                         validationService,
@@ -191,7 +175,6 @@ class ProfileHandlerTest {
                         config,
                         new datingapp.core.workflow.ProfileActivationPolicy(),
                         new TestEventBus()),
-                null,
                 new ProfileNotesUseCases(previewUsers, validationService, config, new TestEventBus()),
                 new ProfileInsightsUseCases(
                         TestAchievementService.empty(),
@@ -302,15 +285,7 @@ class ProfileHandlerTest {
                 new TestEventBus());
         ProfileUseCases routedUseCases = createProfileUseCases(
                 routedStorage,
-                new ProfileService(routedStorage),
-                validationService,
-                new ActivityMetricsService(interactions, trustSafety, analytics, AppConfig.defaults()),
-                TestAchievementService.empty(),
-                AppConfig.defaults(),
-                new datingapp.core.workflow.ProfileActivationPolicy(),
-                new TestEventBus(),
                 mutationUseCases,
-                null,
                 new ProfileNotesUseCases(routedStorage, validationService, AppConfig.defaults(), new TestEventBus()),
                 new ProfileInsightsUseCases(
                         TestAchievementService.empty(),
@@ -421,16 +396,7 @@ class ProfileHandlerTest {
         TestStorages.Analytics dealbreakAnalytics = new TestStorages.Analytics();
         ProfileUseCases routedUseCases = createProfileUseCases(
                 routedStorage,
-                new ProfileService(routedStorage),
-                validationService,
-                new ActivityMetricsService(
-                        dealbreakInteractions, dealbreakTrustSafety, dealbreakAnalytics, AppConfig.defaults()),
-                TestAchievementService.empty(),
-                AppConfig.defaults(),
-                new datingapp.core.workflow.ProfileActivationPolicy(),
-                new TestEventBus(),
                 mutationUseCases,
-                null,
                 new ProfileNotesUseCases(routedStorage, validationService, AppConfig.defaults(), new TestEventBus()),
                 new ProfileInsightsUseCases(
                         TestAchievementService.empty(),
@@ -448,39 +414,12 @@ class ProfileHandlerTest {
 
     private ProfileUseCases createProfileUseCases(
             datingapp.core.storage.UserStorage userStorage,
-            ProfileService profileService,
-            ValidationService validationService,
-            ActivityMetricsService metricsService,
-            datingapp.core.metrics.AchievementService achievementService,
-            AppConfig config,
-            datingapp.core.workflow.ProfileActivationPolicy activationPolicy,
-            TestEventBus eventBus) {
-        return new ProfileUseCases(
-                userStorage,
-                profileService,
-                validationService,
-                new ProfileMutationUseCases(
-                        userStorage, validationService, achievementService, config, activationPolicy, eventBus),
-                new ProfileNotesUseCases(userStorage, validationService, config, eventBus),
-                new ProfileInsightsUseCases(achievementService, metricsService));
-    }
-
-    private ProfileUseCases createProfileUseCases(
-            datingapp.core.storage.UserStorage userStorage,
-            ProfileService profileService,
-            ValidationService validationService,
-            ActivityMetricsService metricsService,
-            datingapp.core.metrics.AchievementService achievementService,
-            AppConfig config,
-            datingapp.core.workflow.ProfileActivationPolicy activationPolicy,
-            TestEventBus eventBus,
             ProfileMutationUseCases profileMutationUseCases,
-            ProfileNotesUseCases ignoredProfileNotesUseCases,
             ProfileNotesUseCases profileNotesUseCases,
             ProfileInsightsUseCases profileInsightsUseCases) {
         return new ProfileUseCases(
                 userStorage,
-                profileService,
+                new ProfileService(userStorage),
                 validationService,
                 profileMutationUseCases,
                 profileNotesUseCases,

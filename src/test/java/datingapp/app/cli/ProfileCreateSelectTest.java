@@ -63,8 +63,8 @@ class ProfileCreateSelectTest {
 
     private ProfileHandler createHandler(String input) {
         InputReader inputReader = new InputReader(new Scanner(new StringReader(input)));
-        ValidationService validationService = new ValidationService(AppConfig.defaults());
         AppConfig config = AppConfig.defaults();
+        ValidationService validationService = new ValidationService(config);
         ProfileUseCases profileUseCases = new ProfileUseCases(
                 userStorage,
                 new ProfileService(userStorage),

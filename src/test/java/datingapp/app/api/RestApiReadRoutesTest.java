@@ -1,6 +1,8 @@
 package datingapp.app.api;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -16,11 +18,12 @@ import datingapp.core.model.Match;
 import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
 import datingapp.core.model.User.UserState;
-import datingapp.core.storage.CommunicationStorage;
-import datingapp.core.storage.InteractionStorage;
-import datingapp.core.storage.UserStorage;
+import datingapp.core.storage.OperationalCommunicationStorage;
+import datingapp.core.storage.OperationalInteractionStorage;
+import datingapp.core.storage.OperationalUserStorage;
 import datingapp.core.testutil.TestStorages;
 import io.javalin.http.Context;
+import io.javalin.http.NotFoundResponse;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
@@ -109,7 +112,7 @@ class RestApiReadRoutesTest {
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
         assertEquals(404, missingUserResponse.statusCode());
-        assertTrue(!missingUserResponse.body().isBlank());
+        assertFalse(missingUserResponse.body().isBlank());
 
         HttpResponse<String> forbiddenUserResponse = client.send(
                 HttpRequest.newBuilder(URI.create(BASE_URL + port + USERS_PATH + aliceId))
@@ -158,7 +161,7 @@ class RestApiReadRoutesTest {
 
         InvocationTargetException thrown =
                 assertThrows(InvocationTargetException.class, () -> method.invoke(server, ctx.context));
-        assertEquals("NotFoundResponse", thrown.getCause().getClass().getSimpleName());
+        assertInstanceOf(NotFoundResponse.class, thrown.getCause());
         assertEquals("User not found", thrown.getCause().getMessage());
     }
 
@@ -624,7 +627,9 @@ class RestApiReadRoutesTest {
     }
 
     private static ServiceRegistry createServices(
-            UserStorage userStorage, InteractionStorage interactionStorage, CommunicationStorage communicationStorage) {
+            OperationalUserStorage userStorage,
+            OperationalInteractionStorage interactionStorage,
+            OperationalCommunicationStorage communicationStorage) {
         return RestApiTestFixture.builder(userStorage, interactionStorage, communicationStorage)
                 .build();
     }

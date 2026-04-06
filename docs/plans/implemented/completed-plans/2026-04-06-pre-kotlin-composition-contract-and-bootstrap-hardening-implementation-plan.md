@@ -20,6 +20,8 @@
 - ✅ Task 6 completed — `ApplicationStartup` bootstrap recovery tests now rely on narrow package-private test hooks and public lifecycle behavior rather than reflection into private static fields.
 - ✅ Task 7 completed — focused packs, `mvn spotless:apply verify`, `./run_postgresql_smoke.ps1`, and the repo-level `./run_verify.ps1` verification path all passed in the implementation session.
 
+> Note: The unchecked detailed task boxes below are intentional template remnants from the original implementation plan body. For this archived completed-plan document, the summary above is the source of truth for execution status.
+
 ---
 
 ## Source of truth used for this plan

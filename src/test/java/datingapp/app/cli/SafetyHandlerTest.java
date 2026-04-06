@@ -7,7 +7,6 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.app.cli.CliTextAndInput.InputReader;
-import datingapp.app.event.InProcessAppEventBus;
 import datingapp.app.testutil.TestEventBus;
 import datingapp.app.usecase.common.UseCaseResult;
 import datingapp.app.usecase.profile.ProfileInsightsUseCases;
@@ -30,6 +29,7 @@ import datingapp.core.profile.MatchPreferences.PacePreferences;
 import datingapp.core.profile.ProfileService;
 import datingapp.core.profile.ValidationService;
 import datingapp.core.testutil.TestAchievementService;
+import datingapp.core.testutil.TestActivityMetricsService;
 import datingapp.core.testutil.TestStorages;
 import java.io.StringReader;
 import java.security.SecureRandom;
@@ -84,27 +84,31 @@ class SafetyHandlerTest {
     private SafetyHandler createHandler(String input, AppConfig config, SecureRandom random) {
         InputReader inputReader = new InputReader(new Scanner(new StringReader(input)));
         TrustSafetyService trustSafetyService = createTrustSafetyService(config, random);
-        ProfileUseCases profileUseCases = new ProfileUseCases(
-                userStorage,
-                new ProfileService(userStorage),
-                new ValidationService(config),
-                new ProfileMutationUseCases(
-                        userStorage,
-                        new ValidationService(config),
-                        TestAchievementService.empty(),
-                        config,
-                        new datingapp.core.workflow.ProfileActivationPolicy(),
-                        new InProcessAppEventBus()),
-                new ProfileNotesUseCases(
-                        userStorage, new ValidationService(config), config, new InProcessAppEventBus()),
-                new ProfileInsightsUseCases(TestAchievementService.empty(), null));
         return new SafetyHandler(
                 new SocialUseCases(trustSafetyService),
-                profileUseCases,
+                buildProfileUseCases(userStorage, config),
                 new VerificationUseCases(userStorage, trustSafetyService),
                 session,
                 inputReader,
                 config);
+    }
+
+    /** Constructs ProfileUseCases with a shared TestEventBus and safe test stubs. */
+    private static ProfileUseCases buildProfileUseCases(TestStorages.Users users, AppConfig config) {
+        TestEventBus eventBus = new TestEventBus();
+        return new ProfileUseCases(
+                users,
+                new ProfileService(users),
+                new ValidationService(config),
+                new ProfileMutationUseCases(
+                        users,
+                        new ValidationService(config),
+                        TestAchievementService.empty(),
+                        config,
+                        new datingapp.core.workflow.ProfileActivationPolicy(),
+                        eventBus),
+                new ProfileNotesUseCases(users, new ValidationService(config), config, eventBus),
+                new ProfileInsightsUseCases(TestAchievementService.empty(), TestActivityMetricsService.empty()));
     }
 
     private TrustSafetyService createTrustSafetyService(AppConfig config, SecureRandom random) {
@@ -215,24 +219,15 @@ class SafetyHandlerTest {
             userStorage.save(otherUser);
 
             TrustSafetyService trustSafetyService = createTrustSafetyService(AppConfig.defaults(), new SecureRandom());
+            ProfileUseCases base = buildProfileUseCases(userStorage, AppConfig.defaults());
             ProfileUseCases profileUseCases =
                     new ProfileUseCases(
                             userStorage,
                             new ProfileService(userStorage),
                             new ValidationService(AppConfig.defaults()),
-                            new ProfileMutationUseCases(
-                                    userStorage,
-                                    new ValidationService(AppConfig.defaults()),
-                                    TestAchievementService.empty(),
-                                    AppConfig.defaults(),
-                                    new datingapp.core.workflow.ProfileActivationPolicy(),
-                                    new InProcessAppEventBus()),
-                            new ProfileNotesUseCases(
-                                    userStorage,
-                                    new ValidationService(AppConfig.defaults()),
-                                    AppConfig.defaults(),
-                                    new InProcessAppEventBus()),
-                            new ProfileInsightsUseCases(TestAchievementService.empty(), null)) {
+                            base.getProfileMutationUseCases(),
+                            base.getProfileNotesUseCases(),
+                            base.getProfileInsightsUseCases()) {
                         @Override
                         public UseCaseResult<List<User>> listUsers() {
                             return UseCaseResult.success(List.of(testUser, otherUser));
@@ -441,23 +436,7 @@ class SafetyHandlerTest {
 
             TrustSafetyService trustSafetyService = createTrustSafetyService(AppConfig.defaults(), new SecureRandom());
             RecordingSocialUseCases socialUseCases = new RecordingSocialUseCases(trustSafetyService, blocked);
-            ProfileUseCases profileUseCases = new ProfileUseCases(
-                    userStorage,
-                    new ProfileService(userStorage),
-                    new ValidationService(AppConfig.defaults()),
-                    new ProfileMutationUseCases(
-                            userStorage,
-                            new ValidationService(AppConfig.defaults()),
-                            TestAchievementService.empty(),
-                            AppConfig.defaults(),
-                            new datingapp.core.workflow.ProfileActivationPolicy(),
-                            new TestEventBus()),
-                    new ProfileNotesUseCases(
-                            userStorage,
-                            new ValidationService(AppConfig.defaults()),
-                            AppConfig.defaults(),
-                            new TestEventBus()),
-                    new ProfileInsightsUseCases(TestAchievementService.empty(), null));
+            ProfileUseCases profileUseCases = buildProfileUseCases(userStorage, AppConfig.defaults());
 
             SafetyHandler handler = new SafetyHandler(
                     socialUseCases,
@@ -497,19 +476,7 @@ class SafetyHandlerTest {
             AppConfig config = AppConfig.defaults();
             TrustSafetyService trustSafetyService = createTrustSafetyService(config, fixedVerificationRandom());
             assertEquals("123456", trustSafetyService.generateVerificationCode());
-            ProfileUseCases profileUseCases = new ProfileUseCases(
-                    userStorage,
-                    new ProfileService(userStorage),
-                    new ValidationService(config),
-                    new ProfileMutationUseCases(
-                            userStorage,
-                            new ValidationService(config),
-                            TestAchievementService.empty(),
-                            config,
-                            new datingapp.core.workflow.ProfileActivationPolicy(),
-                            new TestEventBus()),
-                    new ProfileNotesUseCases(userStorage, new ValidationService(config), config, new TestEventBus()),
-                    new ProfileInsightsUseCases(TestAchievementService.empty(), null));
+            ProfileUseCases profileUseCases = buildProfileUseCases(userStorage, config);
             SafetyHandler handler = new SafetyHandler(
                     new SocialUseCases(trustSafetyService),
                     profileUseCases,
@@ -581,23 +548,7 @@ class SafetyHandlerTest {
         void verifyProfileDelegatesStartAndConfirmToVerificationUseCases() {
             TrustSafetyService trustSafetyService =
                     createTrustSafetyService(AppConfig.defaults(), fixedVerificationRandom());
-            ProfileUseCases profileUseCases = new ProfileUseCases(
-                    userStorage,
-                    new ProfileService(userStorage),
-                    new ValidationService(AppConfig.defaults()),
-                    new ProfileMutationUseCases(
-                            userStorage,
-                            new ValidationService(AppConfig.defaults()),
-                            TestAchievementService.empty(),
-                            AppConfig.defaults(),
-                            new datingapp.core.workflow.ProfileActivationPolicy(),
-                            new TestEventBus()),
-                    new ProfileNotesUseCases(
-                            userStorage,
-                            new ValidationService(AppConfig.defaults()),
-                            AppConfig.defaults(),
-                            new TestEventBus()),
-                    new ProfileInsightsUseCases(TestAchievementService.empty(), null));
+            ProfileUseCases profileUseCases = buildProfileUseCases(userStorage, AppConfig.defaults());
             RecordingVerificationUseCases verificationUseCases =
                     new RecordingVerificationUseCases(userStorage, trustSafetyService);
 

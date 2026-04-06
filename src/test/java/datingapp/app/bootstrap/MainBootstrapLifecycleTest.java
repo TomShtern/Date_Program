@@ -11,6 +11,7 @@ import datingapp.Main;
 import datingapp.storage.DatabaseManager;
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.UUID;
@@ -82,7 +83,7 @@ class MainBootstrapLifecycleTest {
     @Test
     @DisplayName("main renders logged-out menu and exits on explicit zero selection")
     void mainRendersLoggedOutMenuAndExitsOnExplicitZeroSelection() {
-        System.setIn(new ByteArrayInputStream("0\n".getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+        System.setIn(new ByteArrayInputStream("0\n".getBytes(StandardCharsets.UTF_8)));
 
         Logger mainLogger = (Logger) LoggerFactory.getLogger(Main.class);
         Level previousLevel = mainLogger.getLevel();

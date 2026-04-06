@@ -2,9 +2,11 @@ package datingapp.ui.viewmodel;
 
 import datingapp.core.ServiceRegistry;
 import datingapp.ui.viewmodel.UiDataAdapters.MetricsUiPresenceDataAccess;
+import datingapp.ui.viewmodel.UiDataAdapters.StorageUiSocialDataAccess;
 import datingapp.ui.viewmodel.UiDataAdapters.StorageUiUserStore;
 import datingapp.ui.viewmodel.UiDataAdapters.UiPresenceDataAccess;
 import datingapp.ui.viewmodel.UiDataAdapters.UiProfileNoteDataAccess;
+import datingapp.ui.viewmodel.UiDataAdapters.UiSocialDataAccess;
 import datingapp.ui.viewmodel.UiDataAdapters.UiUserStore;
 import datingapp.ui.viewmodel.UiDataAdapters.UseCaseUiProfileNoteDataAccess;
 import java.util.Objects;
@@ -33,6 +35,7 @@ final class UiAdapterCache {
     private UiUserStore userStore;
     private UiProfileNoteDataAccess profileNotes;
     private UiPresenceDataAccess presence;
+    private UiSocialDataAccess socialDataAccess;
 
     /**
      * Returns the cached user-store adapter, creating it if needed.
@@ -41,7 +44,7 @@ final class UiAdapterCache {
      * @return the cached adapter instance
      * @throws NullPointerException if services is null
      */
-    UiUserStore userStore(ServiceRegistry services) {
+    synchronized UiUserStore userStore(ServiceRegistry services) {
         Objects.requireNonNull(services, SERVICES_CANNOT_BE_NULL);
         if (userStore == null) {
             userStore = new StorageUiUserStore(services.getUserStorage());
@@ -56,7 +59,7 @@ final class UiAdapterCache {
      * @return the cached adapter instance
      * @throws NullPointerException if services is null
      */
-    UiProfileNoteDataAccess profileNotes(ServiceRegistry services) {
+    synchronized UiProfileNoteDataAccess profileNotes(ServiceRegistry services) {
         Objects.requireNonNull(services, SERVICES_CANNOT_BE_NULL);
         if (profileNotes == null) {
             profileNotes = new UseCaseUiProfileNoteDataAccess(services.getProfileNotesUseCases());
@@ -71,12 +74,27 @@ final class UiAdapterCache {
      * @return the cached adapter instance
      * @throws NullPointerException if services is null
      */
-    UiPresenceDataAccess presence(ServiceRegistry services) {
+    synchronized UiPresenceDataAccess presence(ServiceRegistry services) {
         Objects.requireNonNull(services, SERVICES_CANNOT_BE_NULL);
         if (presence == null) {
             presence = new MetricsUiPresenceDataAccess(services.getActivityMetricsService(), services.getConfig());
         }
         return presence;
+    }
+
+    /**
+     * Returns the cached social data-access adapter, creating it if needed.
+     *
+     * @param services the service registry providing CommunicationStorage
+     * @return the cached adapter instance
+     * @throws NullPointerException if services is null
+     */
+    synchronized UiSocialDataAccess socialDataAccess(ServiceRegistry services) {
+        Objects.requireNonNull(services, SERVICES_CANNOT_BE_NULL);
+        if (socialDataAccess == null) {
+            socialDataAccess = new StorageUiSocialDataAccess(services.getCommunicationStorage());
+        }
+        return socialDataAccess;
     }
 
     /**
@@ -86,9 +104,10 @@ final class UiAdapterCache {
      * Called during reset/dispose cycles to free references and ensure fresh
      * adapters are created on the next access.
      */
-    void reset() {
+    synchronized void reset() {
         userStore = null;
         profileNotes = null;
         presence = null;
+        socialDataAccess = null;
     }
 }

@@ -127,6 +127,11 @@ class ProfileUseCasesNotesTest {
                         new ProfileActivationPolicy(),
                         new InProcessAppEventBus()),
                 new ProfileNotesUseCases(users, validationService, config, new InProcessAppEventBus()),
-                new ProfileInsightsUseCases(TestAchievementService.empty(), (ActivityMetricsService) null));
+                new ProfileInsightsUseCases(
+                        TestAchievementService.empty(),
+                        // Null is safe: this test only exercises note CRUD, never stats or session-summary.
+                        // ProfileInsightsUseCases guards activityMetricsService at runtime with a
+                        // dependency-error return if a stats method is called.
+                        (ActivityMetricsService) null));
     }
 }

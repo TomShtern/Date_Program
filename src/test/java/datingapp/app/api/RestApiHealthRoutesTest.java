@@ -7,9 +7,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import datingapp.core.ServiceRegistry;
-import datingapp.core.storage.CommunicationStorage;
-import datingapp.core.storage.InteractionStorage;
-import datingapp.core.storage.UserStorage;
+import datingapp.core.storage.OperationalCommunicationStorage;
+import datingapp.core.storage.OperationalInteractionStorage;
+import datingapp.core.storage.OperationalUserStorage;
 import datingapp.core.testutil.TestStorages;
 import io.javalin.http.Context;
 import java.lang.reflect.InvocationTargetException;
@@ -142,7 +142,9 @@ class RestApiHealthRoutesTest {
     }
 
     private static ServiceRegistry createServices(
-            UserStorage userStorage, InteractionStorage interactionStorage, CommunicationStorage communicationStorage) {
+            OperationalUserStorage userStorage,
+            OperationalInteractionStorage interactionStorage,
+            OperationalCommunicationStorage communicationStorage) {
         return RestApiTestFixture.builder(userStorage, interactionStorage, communicationStorage)
                 .build();
     }

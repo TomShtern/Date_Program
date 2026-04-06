@@ -30,12 +30,9 @@ import datingapp.core.metrics.SwipeState.Undo;
 import datingapp.core.profile.LocationService;
 import datingapp.core.profile.ProfileService;
 import datingapp.core.profile.ValidationService;
-import datingapp.core.storage.CommunicationStorage;
-import datingapp.core.storage.InteractionStorage;
 import datingapp.core.storage.OperationalCommunicationStorage;
 import datingapp.core.storage.OperationalInteractionStorage;
 import datingapp.core.storage.OperationalUserStorage;
-import datingapp.core.storage.UserStorage;
 import datingapp.core.testutil.TestStorages;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -53,7 +50,9 @@ final class RestApiTestFixture {
     private RestApiTestFixture() {}
 
     static Builder builder(
-            UserStorage userStorage, InteractionStorage interactionStorage, CommunicationStorage communicationStorage) {
+            OperationalUserStorage userStorage,
+            OperationalInteractionStorage interactionStorage,
+            OperationalCommunicationStorage communicationStorage) {
         return new Builder(userStorage, interactionStorage, communicationStorage);
     }
 
@@ -68,12 +67,13 @@ final class RestApiTestFixture {
         private Undo.Storage undoStorage = new InMemoryUndoStorage();
 
         private Builder(
-                UserStorage userStorage,
-                InteractionStorage interactionStorage,
-                CommunicationStorage communicationStorage) {
-            this.userStorage = requireOperationalUserStorage(userStorage);
-            this.interactionStorage = requireOperationalInteractionStorage(interactionStorage);
-            this.communicationStorage = requireOperationalCommunicationStorage(communicationStorage);
+                OperationalUserStorage userStorage,
+                OperationalInteractionStorage interactionStorage,
+                OperationalCommunicationStorage communicationStorage) {
+            this.userStorage = Objects.requireNonNull(userStorage, "userStorage cannot be null");
+            this.interactionStorage = Objects.requireNonNull(interactionStorage, "interactionStorage cannot be null");
+            this.communicationStorage =
+                    Objects.requireNonNull(communicationStorage, "communicationStorage cannot be null");
         }
 
         Builder config(AppConfig config) {
@@ -171,31 +171,6 @@ final class RestApiTestFixture {
                     .locationService(locationService)
                     .eventBus(eventBus)
                     .build();
-        }
-
-        private static OperationalUserStorage requireOperationalUserStorage(UserStorage storage) {
-            Objects.requireNonNull(storage, "userStorage cannot be null");
-            if (storage instanceof OperationalUserStorage operationalStorage) {
-                return operationalStorage;
-            }
-            throw new IllegalArgumentException("userStorage must implement OperationalUserStorage");
-        }
-
-        private static OperationalInteractionStorage requireOperationalInteractionStorage(InteractionStorage storage) {
-            Objects.requireNonNull(storage, "interactionStorage cannot be null");
-            if (storage instanceof OperationalInteractionStorage operationalStorage) {
-                return operationalStorage;
-            }
-            throw new IllegalArgumentException("interactionStorage must implement OperationalInteractionStorage");
-        }
-
-        private static OperationalCommunicationStorage requireOperationalCommunicationStorage(
-                CommunicationStorage storage) {
-            Objects.requireNonNull(storage, "communicationStorage cannot be null");
-            if (storage instanceof OperationalCommunicationStorage operationalStorage) {
-                return operationalStorage;
-            }
-            throw new IllegalArgumentException("communicationStorage must implement OperationalCommunicationStorage");
         }
     }
 

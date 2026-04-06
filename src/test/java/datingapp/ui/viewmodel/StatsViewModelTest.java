@@ -22,6 +22,8 @@ import datingapp.core.metrics.EngagementDomain.Achievement.UserAchievement;
 import datingapp.core.model.User;
 import datingapp.core.profile.ProfileService;
 import datingapp.core.profile.ValidationService;
+import datingapp.core.testutil.TestAchievementService;
+import datingapp.core.testutil.TestActivityMetricsService;
 import datingapp.core.testutil.TestStorages;
 import datingapp.core.testutil.TestUserFactory;
 import datingapp.ui.JavaFxTestSupport;
@@ -79,11 +81,13 @@ class StatsViewModelTest {
         users.save(currentUser);
         AppSession.getInstance().setCurrentUser(currentUser);
 
+        ProfileUseCases profileUseCases =
+                createProfileUseCases(users, config, new SingleAchievementService(currentUser.getId()));
+
         StatsViewModel viewModel = new StatsViewModel(
-                new SingleAchievementService(currentUser.getId()),
                 new ActivityMetricsService(interactions, trustSafety, analytics, config),
                 new ConnectionService(config, communications, interactions, users),
-                (ProfileUseCases) null,
+                profileUseCases,
                 AppSession.getInstance(),
                 AppClock.clock(),
                 new UiAsyncTestSupport.TestUiThreadDispatcher());
@@ -115,22 +119,25 @@ class StatsViewModelTest {
         users.save(currentUser);
         AppSession.getInstance().setCurrentUser(currentUser);
 
+        ValidationService validationSvc = new ValidationService(config);
+        SingleAchievementService achievementSvc = new SingleAchievementService(currentUser.getId());
+        ActivityMetricsService activityMetricsService =
+                new ActivityMetricsService(interactions, trustSafety, analytics, config);
+
         ProfileUseCases failingProfileUseCases =
                 new ProfileUseCases(
                         users,
                         new ProfileService(users),
-                        new ValidationService(config),
+                        validationSvc,
                         new ProfileMutationUseCases(
                                 users,
-                                new ValidationService(config),
-                                new SingleAchievementService(currentUser.getId()),
+                                validationSvc,
+                                achievementSvc,
                                 config,
                                 new datingapp.core.workflow.ProfileActivationPolicy(),
                                 new TestEventBus()),
-                        new ProfileNotesUseCases(users, new ValidationService(config), config, new TestEventBus()),
-                        new ProfileInsightsUseCases(
-                                new SingleAchievementService(currentUser.getId()),
-                                new ActivityMetricsService(interactions, trustSafety, analytics, config))) {
+                        new ProfileNotesUseCases(users, validationSvc, config, new TestEventBus()),
+                        new ProfileInsightsUseCases(achievementSvc, activityMetricsService)) {
                     @Override
                     public UseCaseResult<ProfileInsightsUseCases.AchievementSnapshot> getAchievements(
                             ProfileInsightsUseCases.AchievementsQuery query) {
@@ -139,8 +146,7 @@ class StatsViewModelTest {
                 };
 
         StatsViewModel viewModel = new StatsViewModel(
-                new SingleAchievementService(currentUser.getId()),
-                new ActivityMetricsService(interactions, trustSafety, analytics, config),
+                activityMetricsService,
                 new ConnectionService(config, communications, interactions, users),
                 failingProfileUseCases,
                 AppSession.getInstance(),
@@ -171,11 +177,12 @@ class StatsViewModelTest {
         users.save(currentUser);
         AppSession.getInstance().setCurrentUser(currentUser);
 
+        ProfileUseCases profileUseCases = createProfileUseCases(users, config);
+
         StatsViewModel viewModel = new StatsViewModel(
-                new SingleAchievementService(currentUser.getId()),
                 new ActivityMetricsService(interactions, trustSafety, analytics, config),
                 new ConnectionService(config, communications, interactions, users),
-                (ProfileUseCases) null,
+                profileUseCases,
                 AppSession.getInstance(),
                 AppClock.clock(),
                 new UiAsyncTestSupport.TestUiThreadDispatcher());
@@ -226,11 +233,12 @@ class StatsViewModelTest {
                 0,
                 0));
 
+        ProfileUseCases profileUseCases = createProfileUseCases(users, config);
+
         StatsViewModel viewModel = new StatsViewModel(
-                new SingleAchievementService(currentUser.getId()),
                 new ActivityMetricsService(interactions, trustSafety, analytics, config),
                 new ConnectionService(config, communications, interactions, users),
-                (ProfileUseCases) null,
+                profileUseCases,
                 AppSession.getInstance(),
                 AppClock.clock(),
                 new UiAsyncTestSupport.TestUiThreadDispatcher());
@@ -245,6 +253,34 @@ class StatsViewModelTest {
 
     private static User createActiveUser(String name) {
         return TestUserFactory.createActiveUser(name);
+    }
+
+    private static ProfileUseCases createProfileUseCases(TestStorages.Users users, AppConfig config) {
+        return createProfileUseCases(users, config, TestAchievementService.empty());
+    }
+
+    private static ProfileUseCases createProfileUseCases(
+            TestStorages.Users users, AppConfig config, AchievementService achievementService) {
+        ValidationService validationService = new ValidationService(config);
+        return new ProfileUseCases(
+                users,
+                new ProfileService(users),
+                validationService,
+                new ProfileMutationUseCases(
+                        users,
+                        validationService,
+                        achievementService,
+                        config,
+                        new datingapp.core.workflow.ProfileActivationPolicy(),
+                        new TestEventBus()),
+                new ProfileNotesUseCases(users, validationService, config, new TestEventBus()),
+                new ProfileInsightsUseCases(
+                        achievementService,
+                        TestActivityMetricsService.withStorages(
+                                new TestStorages.Interactions(),
+                                new TestStorages.TrustSafety(),
+                                new TestStorages.Analytics(),
+                                config)));
     }
 
     private static final class SingleAchievementService implements AchievementService {

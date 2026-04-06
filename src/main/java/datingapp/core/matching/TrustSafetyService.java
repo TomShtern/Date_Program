@@ -14,7 +14,6 @@ import datingapp.core.storage.OperationalInteractionStorage;
 import datingapp.core.storage.TrustSafetyStorage;
 import datingapp.core.storage.UserStorage;
 import datingapp.core.workflow.RelationshipWorkflowPolicy;
-import datingapp.storage.DatabaseManager.StorageException;
 import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.Instant;
@@ -510,14 +509,13 @@ public final class TrustSafetyService {
         return new BlockTransitionData(updatedMatch, archivedConversation);
     }
 
-    private void applyBlockTransition(UUID blockerId, UUID blockedId, BlockTransitionData transitionData) {
+    private boolean applyBlockTransition(UUID blockerId, UUID blockedId, BlockTransitionData transitionData) {
         boolean persisted = interactionStorage.blockTransition(
                 blockerId, blockedId, transitionData.updatedMatch(), transitionData.archivedConversation());
-        if (!persisted) {
-            throw new StorageException("Atomic block transition could not be persisted");
+        if (persisted) {
+            invalidateCandidateCaches(blockerId, blockedId);
         }
-
-        invalidateCandidateCaches(blockerId, blockedId);
+        return persisted;
     }
 
     private void rollbackBlockSave(UUID blockerId, UUID blockedId) {
@@ -582,7 +580,17 @@ public final class TrustSafetyService {
 
         try {
             trustSafetyStorage.save(block);
-            applyBlockTransition(blockerId, blockedId, transitionData);
+            boolean transitionApplied = applyBlockTransition(blockerId, blockedId, transitionData);
+            if (!transitionApplied) {
+                rollbackBlockSave(blockerId, blockedId);
+                auditModeration(
+                        ModerationAuditEvent.Action.BLOCK,
+                        ModerationAuditEvent.Outcome.FAILURE,
+                        blockerId,
+                        blockedId,
+                        contextOf(AUDIT_KEY_ERROR_CODE, "block_transition_failed"));
+                return new BlockResult(false, "Failed to apply block transition");
+            }
 
             auditModeration(
                     ModerationAuditEvent.Action.BLOCK,

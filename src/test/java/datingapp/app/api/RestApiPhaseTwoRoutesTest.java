@@ -23,9 +23,9 @@ import datingapp.core.model.User;
 import datingapp.core.model.User.UserState;
 import datingapp.core.profile.MatchPreferences.Interest;
 import datingapp.core.profile.MatchPreferences.Lifestyle;
-import datingapp.core.storage.CommunicationStorage;
-import datingapp.core.storage.InteractionStorage;
-import datingapp.core.storage.UserStorage;
+import datingapp.core.storage.OperationalCommunicationStorage;
+import datingapp.core.storage.OperationalInteractionStorage;
+import datingapp.core.storage.OperationalUserStorage;
 import datingapp.core.testutil.TestStorages;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -795,9 +795,9 @@ class RestApiPhaseTwoRoutesTest {
     }
 
     private static ServiceRegistry createServices(
-            UserStorage userStorage,
-            InteractionStorage interactionStorage,
-            CommunicationStorage communicationStorage,
+            OperationalUserStorage userStorage,
+            OperationalInteractionStorage interactionStorage,
+            OperationalCommunicationStorage communicationStorage,
             Standout.Storage standoutStorage) {
         return RestApiTestFixture.builder(userStorage, interactionStorage, communicationStorage)
                 .standoutStorage(standoutStorage)

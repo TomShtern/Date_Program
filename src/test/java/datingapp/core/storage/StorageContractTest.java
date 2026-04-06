@@ -2,6 +2,7 @@ package datingapp.core.storage;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -133,19 +134,19 @@ class StorageContractTest {
     @Test
     @DisplayName("In-memory user storage implements the operational user contract")
     void inMemoryUserStorageImplementsOperationalUserStorage() {
-        assertTrue(new TestStorages.Users() instanceof OperationalUserStorage);
+        assertInstanceOf(OperationalUserStorage.class, new TestStorages.Users());
     }
 
     @Test
     @DisplayName("In-memory interaction storage implements the operational interaction contract")
     void inMemoryInteractionStorageImplementsOperationalInteractionStorage() {
-        assertTrue(new TestStorages.Interactions() instanceof OperationalInteractionStorage);
+        assertInstanceOf(OperationalInteractionStorage.class, new TestStorages.Interactions());
     }
 
     @Test
     @DisplayName("In-memory communication storage implements the operational communication contract")
     void inMemoryCommunicationStorageImplementsOperationalCommunicationStorage() {
-        assertTrue(new TestStorages.Communications() instanceof OperationalCommunicationStorage);
+        assertInstanceOf(OperationalCommunicationStorage.class, new TestStorages.Communications());
     }
 
     @Test

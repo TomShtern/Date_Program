@@ -36,18 +36,15 @@ if ($startExitCode -ne 0) {
 }
 
 $plainPassword = $Credential.GetNetworkCredential().Password
-try {
-    $mavenArgs = @(
-        '-Dcheckstyle.skip=true'
-        '-Dtest=PostgresqlRuntimeSmokeTest'
-        "-Ddatingapp.pgtest.url=jdbc:postgresql://localhost:$Port/$Database"
-        "-Ddatingapp.pgtest.username=$($Credential.UserName)"
-        "-Ddatingapp.pgtest.password=$plainPassword"
-        'test'
-    )
-} catch {
-    throw "Failed to extract credentials: $_"
-}
+
+$mavenArgs = @(
+    '-Dcheckstyle.skip=true'
+    '-Dtest=PostgresqlRuntimeSmokeTest'
+    "-Ddatingapp.pgtest.url=jdbc:postgresql://localhost:$Port/$Database"
+    "-Ddatingapp.pgtest.username=$($Credential.UserName)"
+    "-Ddatingapp.pgtest.password=$plainPassword"
+    'test'
+)
 
 $previousDialect = $env:DATING_APP_DB_DIALECT
 $previousUrl = $env:DATING_APP_DB_URL
@@ -65,7 +62,8 @@ try {
     # Mirror the live PostgreSQL runtime env while the smoke test Maven fork is running.
     & mvn @mavenArgs
     $mavenExitCode = $LASTEXITCODE
-} finally {
+}
+finally {
     $env:DATING_APP_DB_DIALECT = $previousDialect
     $env:DATING_APP_DB_URL = $previousUrl
     $env:DATING_APP_DB_USERNAME = $previousUsername

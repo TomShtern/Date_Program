@@ -21,6 +21,7 @@ import datingapp.core.metrics.EngagementDomain.UserStats;
 import datingapp.core.model.Match;
 import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
+import datingapp.core.profile.ProfileService;
 import datingapp.core.testutil.TestStorages;
 import java.io.StringReader;
 import java.util.EnumSet;
@@ -73,7 +74,7 @@ class StatsHandlerTest {
                         interactionStorage,
                         trustSafetyStorage,
                         userStorage,
-                        new datingapp.core.profile.ProfileService(userStorage)),
+                        new ProfileService(userStorage)),
                 statsService);
         return new StatsHandler(
                 profileInsightsUseCases,

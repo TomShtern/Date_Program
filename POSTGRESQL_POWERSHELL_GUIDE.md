@@ -4,7 +4,7 @@ This file records the practical rules for PostgreSQL runtime work in this reposi
 
 ## What Is Canonical
 
-- Runtime storage is PostgreSQL by default through [`config/app-config.json`](/c:/Users/tom7s/Desktopp/Claude_Folder_2/Date_Program/config/app-config.json).
+- Runtime storage is PostgreSQL by default through [`config/app-config.json`](./config/app-config.json).
 - The production/runtime composition path is `StorageFactory.buildSqlDatabase(...)`.
 - `buildH2(...)` and `buildInMemory(...)` are still valid compatibility and test paths. They are not the main runtime path.
 - The canonical full local verification command is `.\run_verify.ps1`.
@@ -50,9 +50,9 @@ This file records the practical rules for PostgreSQL runtime work in this reposi
   - OS env var `DATING_APP_DB_PASSWORD`
   - JVM property `-Ddatingapp.db.password=...`
 - Local PostgreSQL defaults are already represented in:
-  - [`config/app-config.json`](/c:/Users/tom7s/Desktopp/Claude_Folder_2/Date_Program/config/app-config.json)
-  - [`config/app-config.postgresql.local.json`](/c:/Users/tom7s/Desktopp/Claude_Folder_2/Date_Program/config/app-config.postgresql.local.json)
-  - [`.env.example`](/c:/Users/tom7s/Desktopp/Claude_Folder_2/Date_Program/.env.example)
+  - [`config/app-config.json`](./config/app-config.json)
+  - [`config/app-config.postgresql.local.json`](./config/app-config.postgresql.local.json)
+  - [`.env.example`](./.env.example)
 
 ## Important Nuance
 

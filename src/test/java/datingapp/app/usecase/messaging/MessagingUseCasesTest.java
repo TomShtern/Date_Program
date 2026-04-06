@@ -160,7 +160,7 @@ class MessagingUseCasesTest {
 
         assertFalse(result.success());
         assertEquals(UseCaseError.Code.NOT_FOUND, result.error().code());
-        assertEquals("Conversation not found", result.error().message());
+        assertEquals("Conversation preview not found", result.error().message());
     }
 
     void openConversationReturnsPreviewForNewlyCreatedEmptyConversation() {
