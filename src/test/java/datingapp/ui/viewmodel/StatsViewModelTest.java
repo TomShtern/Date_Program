@@ -2,6 +2,7 @@ package datingapp.ui.viewmodel;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.app.testutil.TestEventBus;
@@ -14,11 +15,14 @@ import datingapp.app.usecase.profile.ProfileUseCases;
 import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
 import datingapp.core.AppSession;
+import datingapp.core.connection.ConnectionModels.Like;
 import datingapp.core.connection.ConnectionService;
 import datingapp.core.metrics.AchievementService;
 import datingapp.core.metrics.ActivityMetricsService;
 import datingapp.core.metrics.EngagementDomain.Achievement;
 import datingapp.core.metrics.EngagementDomain.Achievement.UserAchievement;
+import datingapp.core.metrics.EngagementDomain.UserStats;
+import datingapp.core.metrics.SwipeState;
 import datingapp.core.model.User;
 import datingapp.core.profile.ProfileService;
 import datingapp.core.profile.ValidationService;
@@ -26,6 +30,7 @@ import datingapp.core.testutil.TestAchievementService;
 import datingapp.core.testutil.TestActivityMetricsService;
 import datingapp.core.testutil.TestStorages;
 import datingapp.core.testutil.TestUserFactory;
+import datingapp.core.workflow.ProfileActivationPolicy;
 import datingapp.ui.JavaFxTestSupport;
 import datingapp.ui.async.UiAsyncTestSupport;
 import java.time.Clock;
@@ -72,8 +77,6 @@ class StatsViewModelTest {
     void refreshLoadsAchievementsAndZeroStateMetrics() throws InterruptedException {
         TestStorages.Users users = new TestStorages.Users();
         TestStorages.Interactions interactions = new TestStorages.Interactions();
-        TestStorages.TrustSafety trustSafety = new TestStorages.TrustSafety();
-        TestStorages.Analytics analytics = new TestStorages.Analytics();
         TestStorages.Communications communications = new TestStorages.Communications();
         AppConfig config = AppConfig.defaults();
 
@@ -85,7 +88,6 @@ class StatsViewModelTest {
                 createProfileUseCases(users, config, new SingleAchievementService(currentUser.getId()));
 
         StatsViewModel viewModel = new StatsViewModel(
-                new ActivityMetricsService(interactions, trustSafety, analytics, config),
                 new ConnectionService(config, communications, interactions, users),
                 profileUseCases,
                 AppSession.getInstance(),
@@ -101,6 +103,40 @@ class StatsViewModelTest {
         assertEquals(0, viewModel.totalMatchesProperty().get());
         assertEquals("--", viewModel.responseRateProperty().get());
         assertFalse(viewModel.loadFailedProperty().get());
+
+        viewModel.dispose();
+    }
+
+    @Test
+    @DisplayName("achievements accessor exposes an unmodifiable observable view")
+    void achievementsAccessorExposesAnUnmodifiableObservableView() throws InterruptedException {
+        TestStorages.Users users = new TestStorages.Users();
+        TestStorages.Interactions interactions = new TestStorages.Interactions();
+        TestStorages.Communications communications = new TestStorages.Communications();
+        AppConfig config = AppConfig.defaults();
+
+        User currentUser = createActiveUser("Stats User");
+        users.save(currentUser);
+        AppSession.getInstance().setCurrentUser(currentUser);
+
+        ProfileUseCases profileUseCases =
+                createProfileUseCases(users, config, new SingleAchievementService(currentUser.getId()));
+
+        StatsViewModel viewModel = new StatsViewModel(
+                new ConnectionService(config, communications, interactions, users),
+                profileUseCases,
+                AppSession.getInstance(),
+                AppClock.clock(),
+                new UiAsyncTestSupport.TestUiThreadDispatcher());
+
+        viewModel.initialize();
+
+        assertTrue(JavaFxTestSupport.waitUntil(() -> viewModel.getAchievements().size() == 1, 5000));
+        var achievements = viewModel.getAchievements();
+
+        assertThrows(UnsupportedOperationException.class, () -> achievements.add(Achievement.FIRST_SPARK));
+        assertEquals(1, achievements.size());
+        assertEquals(Achievement.FIRST_SPARK, achievements.get(0));
 
         viewModel.dispose();
     }
@@ -134,7 +170,7 @@ class StatsViewModelTest {
                                 validationSvc,
                                 achievementSvc,
                                 config,
-                                new datingapp.core.workflow.ProfileActivationPolicy(),
+                                new ProfileActivationPolicy(),
                                 new TestEventBus()),
                         new ProfileNotesUseCases(users, validationSvc, config, new TestEventBus()),
                         new ProfileInsightsUseCases(achievementSvc, activityMetricsService)) {
@@ -146,7 +182,6 @@ class StatsViewModelTest {
                 };
 
         StatsViewModel viewModel = new StatsViewModel(
-                activityMetricsService,
                 new ConnectionService(config, communications, interactions, users),
                 failingProfileUseCases,
                 AppSession.getInstance(),
@@ -164,12 +199,59 @@ class StatsViewModelTest {
     }
 
     @Test
+    @DisplayName("refresh uses ProfileUseCases fallback before touching the view-model metrics service")
+    void refreshUsesProfileUseCasesFallbackBeforeTouchingViewModelMetricsService() throws InterruptedException {
+        TestStorages.Users users = new TestStorages.Users();
+        TestStorages.Interactions fallbackInteractions = new TestStorages.Interactions();
+        TestStorages.TrustSafety fallbackTrustSafety = new TestStorages.TrustSafety();
+        TestStorages.Analytics fallbackAnalytics = new TestStorages.Analytics();
+        TestStorages.Communications communications = new TestStorages.Communications();
+        AppConfig config = AppConfig.defaults();
+
+        User currentUser = createActiveUser("Stats User");
+        User likedUser = createActiveUser("Fallback Target");
+        users.save(currentUser);
+        users.save(likedUser);
+        fallbackInteractions.save(Like.create(currentUser.getId(), likedUser.getId(), Like.Direction.LIKE));
+        AppSession.getInstance().setCurrentUser(currentUser);
+
+        ActivityMetricsService fallbackMetricsService =
+                new ActivityMetricsService(fallbackInteractions, fallbackTrustSafety, fallbackAnalytics, config);
+        ProfileInsightsUseCases fallbackFailingInsights =
+                new ProfileInsightsUseCases(TestAchievementService.empty(), fallbackMetricsService) {
+                    @Override
+                    public UseCaseResult<UserStats> getOrComputeStats(StatsQuery query) {
+                        return UseCaseResult.failure(UseCaseError.internal("primary stats load failed"));
+                    }
+                };
+
+        ProfileUseCases profileUseCases =
+                createProfileUseCases(users, config, TestAchievementService.empty(), fallbackFailingInsights);
+
+        StatsViewModel viewModel = new StatsViewModel(
+                new ConnectionService(config, communications, fallbackInteractions, users),
+                profileUseCases,
+                AppSession.getInstance(),
+                AppClock.clock(),
+                new UiAsyncTestSupport.TestUiThreadDispatcher());
+
+        viewModel.initialize();
+
+        assertTrue(JavaFxTestSupport.waitUntil(
+                () -> viewModel.totalLikesGivenProperty().get() == 1
+                        || viewModel.loadFailedProperty().get(),
+                5000));
+        assertFalse(viewModel.loadFailedProperty().get());
+        assertEquals(1, viewModel.totalLikesGivenProperty().get());
+
+        viewModel.dispose();
+    }
+
+    @Test
     @DisplayName("total achievement count matches enum length")
     void totalAchievementCountMatchesEnumLength() {
         TestStorages.Users users = new TestStorages.Users();
         TestStorages.Interactions interactions = new TestStorages.Interactions();
-        TestStorages.TrustSafety trustSafety = new TestStorages.TrustSafety();
-        TestStorages.Analytics analytics = new TestStorages.Analytics();
         TestStorages.Communications communications = new TestStorages.Communications();
         AppConfig config = AppConfig.defaults();
 
@@ -180,7 +262,6 @@ class StatsViewModelTest {
         ProfileUseCases profileUseCases = createProfileUseCases(users, config);
 
         StatsViewModel viewModel = new StatsViewModel(
-                new ActivityMetricsService(interactions, trustSafety, analytics, config),
                 new ConnectionService(config, communications, interactions, users),
                 profileUseCases,
                 AppSession.getInstance(),
@@ -198,8 +279,6 @@ class StatsViewModelTest {
     void loginStreakUsesUtcClockSemantics() throws InterruptedException {
         TestStorages.Users users = new TestStorages.Users();
         TestStorages.Interactions interactions = new TestStorages.Interactions();
-        TestStorages.TrustSafety trustSafety = new TestStorages.TrustSafety();
-        TestStorages.Analytics analytics = new TestStorages.Analytics();
         TestStorages.Communications communications = new TestStorages.Communications();
         AppConfig config = AppConfig.defaults();
 
@@ -210,33 +289,43 @@ class StatsViewModelTest {
         users.save(currentUser);
         AppSession.getInstance().setCurrentUser(currentUser);
 
-        analytics.saveSession(new datingapp.core.metrics.SwipeState.Session(
-                UUID.randomUUID(),
-                currentUser.getId(),
-                Instant.parse("2026-03-24T23:30:00Z"),
-                Instant.parse("2026-03-24T23:30:00Z"),
-                null,
-                datingapp.core.metrics.SwipeState.Session.MatchState.ACTIVE,
-                0,
-                0,
-                0,
-                0));
-        analytics.saveSession(new datingapp.core.metrics.SwipeState.Session(
-                UUID.randomUUID(),
-                currentUser.getId(),
-                Instant.parse("2026-03-25T00:30:00Z"),
-                Instant.parse("2026-03-25T00:30:00Z"),
-                null,
-                datingapp.core.metrics.SwipeState.Session.MatchState.ACTIVE,
-                0,
-                0,
-                0,
-                0));
+        List<SwipeState.Session> sessions = List.of(
+                new SwipeState.Session(
+                        UUID.randomUUID(),
+                        currentUser.getId(),
+                        Instant.parse("2026-03-24T23:30:00Z"),
+                        Instant.parse("2026-03-24T23:30:00Z"),
+                        null,
+                        SwipeState.Session.MatchState.ACTIVE,
+                        0,
+                        0,
+                        0,
+                        0),
+                new SwipeState.Session(
+                        UUID.randomUUID(),
+                        currentUser.getId(),
+                        Instant.parse("2026-03-25T00:30:00Z"),
+                        Instant.parse("2026-03-25T00:30:00Z"),
+                        null,
+                        SwipeState.Session.MatchState.ACTIVE,
+                        0,
+                        0,
+                        0,
+                        0));
 
-        ProfileUseCases profileUseCases = createProfileUseCases(users, config);
+        ProfileInsightsUseCases profileInsightsUseCases =
+                new ProfileInsightsUseCases(TestAchievementService.empty(), TestActivityMetricsService.empty()) {
+                    @Override
+                    public UseCaseResult<List<SwipeState.Session>> getSessionHistory(
+                            ProfileInsightsUseCases.SessionHistoryQuery query) {
+                        return UseCaseResult.success(sessions);
+                    }
+                };
+
+        ProfileUseCases profileUseCases =
+                createProfileUseCases(users, config, TestAchievementService.empty(), profileInsightsUseCases);
 
         StatsViewModel viewModel = new StatsViewModel(
-                new ActivityMetricsService(interactions, trustSafety, analytics, config),
                 new ConnectionService(config, communications, interactions, users),
                 profileUseCases,
                 AppSession.getInstance(),
@@ -271,7 +360,7 @@ class StatsViewModelTest {
                         validationService,
                         achievementService,
                         config,
-                        new datingapp.core.workflow.ProfileActivationPolicy(),
+                        new ProfileActivationPolicy(),
                         new TestEventBus()),
                 new ProfileNotesUseCases(users, validationService, config, new TestEventBus()),
                 new ProfileInsightsUseCases(
@@ -281,6 +370,27 @@ class StatsViewModelTest {
                                 new TestStorages.TrustSafety(),
                                 new TestStorages.Analytics(),
                                 config)));
+    }
+
+    private static ProfileUseCases createProfileUseCases(
+            TestStorages.Users users,
+            AppConfig config,
+            AchievementService achievementService,
+            ProfileInsightsUseCases profileInsightsUseCases) {
+        ValidationService validationService = new ValidationService(config);
+        return new ProfileUseCases(
+                users,
+                new ProfileService(users),
+                validationService,
+                new ProfileMutationUseCases(
+                        users,
+                        validationService,
+                        achievementService,
+                        config,
+                        new ProfileActivationPolicy(),
+                        new TestEventBus()),
+                new ProfileNotesUseCases(users, validationService, config, new TestEventBus()),
+                profileInsightsUseCases);
     }
 
     private static final class SingleAchievementService implements AchievementService {

@@ -77,7 +77,6 @@ class StatsControllerTest {
         ProfileUseCases profileUseCases =
                 createProfileUseCases(users, config, achievementService, activityMetricsService);
         StatsViewModel viewModel = new StatsViewModel(
-                activityMetricsService,
                 connectionService,
                 profileUseCases,
                 AppSession.getInstance(),
@@ -134,6 +133,7 @@ class StatsControllerTest {
             AchievementService achievementService,
             ActivityMetricsService activityMetricsService) {
         ValidationService validationService = new ValidationService(config);
+        TestEventBus testEventBus = new TestEventBus();
         return new ProfileUseCases(
                 users,
                 new ProfileService(users),
@@ -144,8 +144,8 @@ class StatsControllerTest {
                         achievementService,
                         config,
                         new ProfileActivationPolicy(),
-                        new TestEventBus()),
-                new ProfileNotesUseCases(users, validationService, config, new TestEventBus()),
+                        testEventBus),
+                new ProfileNotesUseCases(users, validationService, config, testEventBus),
                 new ProfileInsightsUseCases(achievementService, activityMetricsService));
     }
 

@@ -15,12 +15,13 @@ import java.util.Objects;
  * Focused package-private helper that owns the cached UI adapter singletons.
  *
  * <p>
- * This cache manages the lifecycle of three shared adapters used by multiple
+ * This cache manages the lifecycle of four shared adapters used by multiple
  * ViewModels:
  * <ul>
  *   <li>{@link StorageUiUserStore} - for user data access</li>
  *   <li>{@link UseCaseUiProfileNoteDataAccess} - for private profile-note access</li>
  *   <li>{@link MetricsUiPresenceDataAccess} - for chat presence/activity state</li>
+ *   <li>{@link StorageUiSocialDataAccess} - for social data access</li>
  * </ul>
  *
  * <p>

@@ -31,6 +31,7 @@ import datingapp.core.profile.ValidationService;
 import datingapp.core.testutil.TestAchievementService;
 import datingapp.core.testutil.TestActivityMetricsService;
 import datingapp.core.testutil.TestStorages;
+import datingapp.core.workflow.ProfileActivationPolicy;
 import java.io.StringReader;
 import java.security.SecureRandom;
 import java.time.LocalDate;
@@ -105,7 +106,7 @@ class SafetyHandlerTest {
                         new ValidationService(config),
                         TestAchievementService.empty(),
                         config,
-                        new datingapp.core.workflow.ProfileActivationPolicy(),
+                        new ProfileActivationPolicy(),
                         eventBus),
                 new ProfileNotesUseCases(users, new ValidationService(config), config, eventBus),
                 new ProfileInsightsUseCases(TestAchievementService.empty(), TestActivityMetricsService.empty()));

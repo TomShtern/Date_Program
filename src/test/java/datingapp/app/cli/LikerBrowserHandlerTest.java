@@ -112,9 +112,9 @@ class LikerBrowserHandlerTest {
                 config,
                 session,
                 inputReader,
-                () -> {},
+                () -> {}, // profileCompleteCallback: no-op lambda supplied to avoid nullable handling in tests
                 matchingUseCases,
-                socialUseCases); // profileCompleteCallback: no-op lambda supplied to avoid nullable handling in tests
+                socialUseCases);
         return new MatchingHandler(deps);
     }
 

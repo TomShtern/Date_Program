@@ -227,7 +227,7 @@ class RestApiReadRoutesTest {
                 candidateId.toString(),
                 browseJson.get(CANDIDATES_KEY).get(0).get("id").asText());
         assertTrue(browseJson.get(LOCATION_MISSING_KEY).isBoolean());
-        assertTrue(!browseJson.get(LOCATION_MISSING_KEY).asBoolean());
+        assertFalse(browseJson.get(LOCATION_MISSING_KEY).asBoolean());
 
         HttpResponse<String> inactiveCandidatesResponse = client.send(
                 HttpRequest.newBuilder(URI.create(BASE_URL + port + USERS_PATH + inactiveId + CANDIDATES_SEGMENT))
@@ -527,11 +527,11 @@ class RestApiReadRoutesTest {
         for (JsonNode candidate : candidatesJson) {
             candidateIds.add(candidate.get("id").asText());
         }
-        assertTrue(!candidateIds.isEmpty(), "Eligible candidate should remain visible");
+        assertFalse(candidateIds.isEmpty(), "Eligible candidate should remain visible");
         assertTrue(candidateIds.contains(eligibleId.toString()), "Eligible candidate should remain visible");
-        assertTrue(!candidateIds.contains(blockedId.toString()), "Blocked user should not appear in /candidates");
-        assertTrue(
-                !candidateIds.contains(unmatchedId.toString()),
+        assertFalse(candidateIds.contains(blockedId.toString()), "Blocked user should not appear in /candidates");
+        assertFalse(
+                candidateIds.contains(unmatchedId.toString()),
                 "Recently unmatched user should not appear in /candidates");
     }
 

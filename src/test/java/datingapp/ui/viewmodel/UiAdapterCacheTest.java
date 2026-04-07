@@ -75,17 +75,25 @@ class UiAdapterCacheTest {
     @Test
     @DisplayName("adapter accessors and reset are synchronized")
     void accessorsAndResetAreSynchronized() throws NoSuchMethodException {
-        assertTrue(Modifier.isSynchronized(UiAdapterCache.class
-                .getDeclaredMethod("userStore", ServiceRegistry.class)
-                .getModifiers()));
-        assertTrue(Modifier.isSynchronized(UiAdapterCache.class
-                .getDeclaredMethod("profileNotes", ServiceRegistry.class)
-                .getModifiers()));
-        assertTrue(Modifier.isSynchronized(UiAdapterCache.class
-                .getDeclaredMethod("presence", ServiceRegistry.class)
-                .getModifiers()));
-        assertTrue(Modifier.isSynchronized(
-                UiAdapterCache.class.getDeclaredMethod("reset").getModifiers()));
+        assertTrue(
+                Modifier.isSynchronized(UiAdapterCache.class
+                        .getDeclaredMethod("userStore", ServiceRegistry.class)
+                        .getModifiers()),
+                "UiAdapterCache.userStore must be synchronized");
+        assertTrue(
+                Modifier.isSynchronized(UiAdapterCache.class
+                        .getDeclaredMethod("profileNotes", ServiceRegistry.class)
+                        .getModifiers()),
+                "UiAdapterCache.profileNotes must be synchronized");
+        assertTrue(
+                Modifier.isSynchronized(UiAdapterCache.class
+                        .getDeclaredMethod("presence", ServiceRegistry.class)
+                        .getModifiers()),
+                "UiAdapterCache.presence must be synchronized");
+        assertTrue(
+                Modifier.isSynchronized(
+                        UiAdapterCache.class.getDeclaredMethod("reset").getModifiers()),
+                "UiAdapterCache.reset must be synchronized");
     }
 
     private static ServiceRegistry buildTestServiceRegistry() {

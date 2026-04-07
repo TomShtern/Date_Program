@@ -243,7 +243,6 @@ public class ViewModelFactory {
         return getViewModel(
                 StatsViewModel.class,
                 () -> new StatsViewModel(
-                        services.getActivityMetricsService(),
                         services.getConnectionService(),
                         services.getProfileUseCases(),
                         session,

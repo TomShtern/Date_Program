@@ -88,7 +88,8 @@ if (-not (Test-PostgresReady -ProbePort $Port)) {
     $pgCtlArguments = "-D `"$dataDir`" -l `"$logFile`" -o `"-p $Port -h localhost`" start"
     $pgCtlProcess = Start-Process -FilePath 'pg_ctl' -ArgumentList $pgCtlArguments -PassThru -WindowStyle Hidden -RedirectStandardOutput $pgCtlStdOutFile -RedirectStandardError $pgCtlStdErrFile
     # Treat readiness as the success condition; waiting on pg_ctl itself can hang on Windows.
-    $postgresReady = Wait-ForPostgresReady -ProbePort $Port -Attempts ($StartupTimeoutSeconds * 1000 / 250) -DelayMilliseconds 250
+    $probeDelayMs = 250
+    $postgresReady = Wait-ForPostgresReady -ProbePort $Port -Attempts ($StartupTimeoutSeconds * 1000 / $probeDelayMs) -DelayMilliseconds $probeDelayMs
     $pgCtlExited = $pgCtlProcess.WaitForExit(1000)
     $startExitCode = if ($pgCtlExited) { $pgCtlProcess.ExitCode } else { $null }
 

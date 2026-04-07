@@ -99,6 +99,10 @@ $successSandbox = New-SmokeScriptSandbox -MavenExitCode 0
 Use-Sandbox $successSandbox {
     & pwsh -NoProfile -ExecutionPolicy Bypass -File $successSandbox.CopiedScript | Out-Null
 
+    if ($LASTEXITCODE -ne 0) {
+        throw "Expected exit 0 on happy path, observed $LASTEXITCODE."
+    }
+
     if ((Get-CountValue -Path $successSandbox.MavenCountFile) -ne 1) {
         throw 'Expected one Maven invocation on happy path.'
     }

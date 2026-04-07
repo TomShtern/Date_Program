@@ -7,9 +7,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import datingapp.core.ServiceRegistry;
-import datingapp.core.storage.OperationalCommunicationStorage;
-import datingapp.core.storage.OperationalInteractionStorage;
-import datingapp.core.storage.OperationalUserStorage;
 import datingapp.core.testutil.TestStorages;
 import io.javalin.http.Context;
 import java.lang.reflect.InvocationTargetException;
@@ -21,6 +18,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -30,6 +28,19 @@ class RestApiHealthRoutesTest {
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private RestApiServer server;
+    private TestStorages.Users userStorage;
+    private TestStorages.Communications communicationStorage;
+    private TestStorages.Interactions interactionStorage;
+    private ServiceRegistry services;
+
+    @BeforeEach
+    void setUp() {
+        userStorage = new TestStorages.Users();
+        communicationStorage = new TestStorages.Communications();
+        interactionStorage = new TestStorages.Interactions(communicationStorage);
+        services = RestApiTestFixture.builder(userStorage, interactionStorage, communicationStorage)
+                .build();
+    }
 
     @AfterEach
     void tearDown() {
@@ -42,11 +53,6 @@ class RestApiHealthRoutesTest {
     @Test
     @DisplayName("health route responds from localhost-only server")
     void healthRouteRespondsFromLocalhostOnlyServer() throws Exception {
-        TestStorages.Users userStorage = new TestStorages.Users();
-        TestStorages.Communications communicationStorage = new TestStorages.Communications();
-        TestStorages.Interactions interactionStorage = new TestStorages.Interactions(communicationStorage);
-        ServiceRegistry services = createServices(userStorage, interactionStorage, communicationStorage);
-
         server = new RestApiServer(services, 0);
         server.start();
 
@@ -67,11 +73,6 @@ class RestApiHealthRoutesTest {
     @Test
     @DisplayName("invalid UUID route returns bad request")
     void invalidUuidRouteReturnsBadRequest() throws Exception {
-        TestStorages.Users userStorage = new TestStorages.Users();
-        TestStorages.Communications communicationStorage = new TestStorages.Communications();
-        TestStorages.Interactions interactionStorage = new TestStorages.Interactions(communicationStorage);
-        ServiceRegistry services = createServices(userStorage, interactionStorage, communicationStorage);
-
         server = new RestApiServer(services, 0);
         server.start();
 
@@ -92,10 +93,7 @@ class RestApiHealthRoutesTest {
     @Test
     @DisplayName("non-loopback requests are rejected by the localhost guard")
     void nonLoopbackRequestsAreRejectedByTheLocalhostGuard() throws Exception {
-        TestStorages.Users userStorage = new TestStorages.Users();
-        TestStorages.Communications communicationStorage = new TestStorages.Communications();
-        TestStorages.Interactions interactionStorage = new TestStorages.Interactions(communicationStorage);
-        server = new RestApiServer(createServices(userStorage, interactionStorage, communicationStorage), 0);
+        server = new RestApiServer(services, 0);
 
         Method method = RestApiServer.class.getDeclaredMethod("enforceLocalhostOnly", Context.class);
         method.setAccessible(true);
@@ -139,13 +137,5 @@ class RestApiHealthRoutesTest {
         assertEquals(
                 "REST API is restricted to localhost requests",
                 thrown.getCause().getMessage());
-    }
-
-    private static ServiceRegistry createServices(
-            OperationalUserStorage userStorage,
-            OperationalInteractionStorage interactionStorage,
-            OperationalCommunicationStorage communicationStorage) {
-        return RestApiTestFixture.builder(userStorage, interactionStorage, communicationStorage)
-                .build();
     }
 }

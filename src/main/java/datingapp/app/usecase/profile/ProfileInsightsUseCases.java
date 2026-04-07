@@ -7,12 +7,15 @@ import datingapp.core.metrics.AchievementService;
 import datingapp.core.metrics.ActivityMetricsService;
 import datingapp.core.metrics.EngagementDomain.Achievement.UserAchievement;
 import datingapp.core.metrics.EngagementDomain.UserStats;
+import datingapp.core.metrics.SwipeState.Session;
 import java.util.List;
+import java.util.UUID;
 
 /** Read-only profile insight use-cases for achievements, stats, and session summary. */
 public class ProfileInsightsUseCases {
 
     private static final String CONTEXT_REQUIRED = "Context is required";
+    private static final String ACTIVITY_METRICS_REQUIRED = "ActivityMetricsService is required";
 
     private final AchievementService achievementService;
     private final ActivityMetricsService activityMetricsService;
@@ -48,14 +51,17 @@ public class ProfileInsightsUseCases {
             return UseCaseResult.failure(UseCaseError.validation(CONTEXT_REQUIRED));
         }
         if (activityMetricsService == null) {
-            return UseCaseResult.failure(UseCaseError.dependency("ActivityMetricsService is required"));
+            return UseCaseResult.failure(UseCaseError.dependency(ACTIVITY_METRICS_REQUIRED));
         }
         try {
-            return UseCaseResult.success(
-                    activityMetricsService.getOrComputeStats(query.context().userId()));
+            return UseCaseResult.success(getOrComputeStats(query.context().userId()));
         } catch (Exception e) {
             return UseCaseResult.failure(UseCaseError.internal("Failed to load user statistics: " + e.getMessage()));
         }
+    }
+
+    UserStats getOrComputeStats(UUID userId) {
+        return activityMetricsService.getOrComputeStats(userId);
     }
 
     public UseCaseResult<SessionSummaryResult> getSessionSummary(SessionSummaryQuery query) {
@@ -63,7 +69,7 @@ public class ProfileInsightsUseCases {
             return UseCaseResult.failure(UseCaseError.validation(CONTEXT_REQUIRED));
         }
         if (activityMetricsService == null) {
-            return UseCaseResult.failure(UseCaseError.dependency("ActivityMetricsService is required"));
+            return UseCaseResult.failure(UseCaseError.dependency(ACTIVITY_METRICS_REQUIRED));
         }
         try {
             return UseCaseResult.success(new SessionSummaryResult(activityMetricsService
@@ -71,6 +77,22 @@ public class ProfileInsightsUseCases {
                     .map(ProfileInsightsUseCases::toCurrentSessionSnapshot)));
         } catch (Exception e) {
             return UseCaseResult.failure(UseCaseError.internal("Failed to load session summary: " + e.getMessage()));
+        }
+    }
+
+    public UseCaseResult<List<Session>> getSessionHistory(SessionHistoryQuery query) {
+        if (query == null || query.context() == null) {
+            return UseCaseResult.failure(UseCaseError.validation(CONTEXT_REQUIRED));
+        }
+        if (activityMetricsService == null) {
+            return UseCaseResult.failure(UseCaseError.dependency(ACTIVITY_METRICS_REQUIRED));
+        }
+
+        try {
+            return UseCaseResult.success(List.copyOf(
+                    activityMetricsService.getSessionHistory(query.context().userId(), query.limit())));
+        } catch (Exception e) {
+            return UseCaseResult.failure(UseCaseError.internal("Failed to load session history: " + e.getMessage()));
         }
     }
 
@@ -84,6 +106,14 @@ public class ProfileInsightsUseCases {
     }
 
     public static record StatsQuery(UserContext context) {}
+
+    public static record SessionHistoryQuery(UserContext context, int limit) {
+        public SessionHistoryQuery {
+            if (limit <= 0) {
+                throw new IllegalArgumentException("limit must be positive");
+            }
+        }
+    }
 
     public static record SessionSummaryQuery(UserContext context) {}
 

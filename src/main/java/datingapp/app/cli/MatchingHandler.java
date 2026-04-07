@@ -190,7 +190,7 @@ public class MatchingHandler implements LoggingSupport {
             logInfo("\n⚠️  Your profile location is not set.");
             logInfo("   Distance-based candidate matching requires your location to find nearby people.\n");
             String response = inputReader.readLine("   Would you like to complete your profile now? (y/N): ");
-            if ("y".equalsIgnoreCase(response.trim())) {
+            if (response != null && "y".equalsIgnoreCase(response.trim())) {
                 profileCompleteCallback.run();
             }
             logInfo("   → Go to 'Complete my profile' from the main menu to add your location.\n");

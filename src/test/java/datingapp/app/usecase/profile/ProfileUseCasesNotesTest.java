@@ -8,7 +8,6 @@ import datingapp.app.event.InProcessAppEventBus;
 import datingapp.app.usecase.common.UseCaseError;
 import datingapp.app.usecase.common.UserContext;
 import datingapp.core.AppConfig;
-import datingapp.core.metrics.ActivityMetricsService;
 import datingapp.core.model.User;
 import datingapp.core.profile.ProfileService;
 import datingapp.core.profile.ValidationService;
@@ -128,10 +127,6 @@ class ProfileUseCasesNotesTest {
                         new InProcessAppEventBus()),
                 new ProfileNotesUseCases(users, validationService, config, new InProcessAppEventBus()),
                 new ProfileInsightsUseCases(
-                        TestAchievementService.empty(),
-                        // Null is safe: this test only exercises note CRUD, never stats or session-summary.
-                        // ProfileInsightsUseCases guards activityMetricsService at runtime with a
-                        // dependency-error return if a stats method is called.
-                        (ActivityMetricsService) null));
+                        TestAchievementService.empty(), null)); // stats/service not used in this test
     }
 }

@@ -2,11 +2,11 @@ package datingapp.ui.viewmodel;
 
 import datingapp.app.usecase.common.UserContext;
 import datingapp.app.usecase.profile.ProfileInsightsUseCases.AchievementsQuery;
+import datingapp.app.usecase.profile.ProfileInsightsUseCases.SessionHistoryQuery;
 import datingapp.app.usecase.profile.ProfileInsightsUseCases.StatsQuery;
 import datingapp.app.usecase.profile.ProfileUseCases;
 import datingapp.core.AppSession;
 import datingapp.core.connection.ConnectionService;
-import datingapp.core.metrics.ActivityMetricsService;
 import datingapp.core.metrics.EngagementDomain.Achievement;
 import datingapp.core.metrics.EngagementDomain.Achievement.UserAchievement;
 import datingapp.core.metrics.EngagementDomain.UserStats;
@@ -35,13 +35,13 @@ import javafx.collections.ObservableList;
  */
 public class StatsViewModel extends BaseViewModel {
 
-    private final ActivityMetricsService activityMetricsService;
     private final ConnectionService connectionService;
     private final ProfileUseCases profileUseCases;
     private final AppSession session;
     private final Clock clock;
 
     private final ObservableList<Achievement> achievements = FXCollections.observableArrayList();
+    private final ObservableList<Achievement> achievementsView = FXCollections.unmodifiableObservableList(achievements);
 
     // Stats properties
     private final IntegerProperty totalLikesGiven = new SimpleIntegerProperty(0);
@@ -64,15 +64,12 @@ public class StatsViewModel extends BaseViewModel {
 
     /** Canonical constructor. */
     public StatsViewModel(
-            ActivityMetricsService activityMetricsService,
             ConnectionService connectionService,
             ProfileUseCases profileUseCases,
             AppSession session,
             Clock clock,
             UiThreadDispatcher uiDispatcher) {
         super("stats", uiDispatcher);
-        this.activityMetricsService =
-                Objects.requireNonNull(activityMetricsService, "activityMetricsService cannot be null");
         this.connectionService = Objects.requireNonNull(connectionService, "connectionService cannot be null");
         this.profileUseCases = Objects.requireNonNull(profileUseCases, "profileUseCases cannot be null");
         this.session = Objects.requireNonNull(session, "session cannot be null");
@@ -180,16 +177,27 @@ public class StatsViewModel extends BaseViewModel {
         }
         logWarn(
                 "profileUseCases.getOrComputeStats failed: {}",
-                result.error() != null ? result.error().message() : "unknown");
-        return activityMetricsService.getOrComputeStats(userId);
+                result.error() != null ? result.error().message() : UNKNOWN);
+        throw new IllegalStateException(result.error() != null ? result.error().message() : UNKNOWN);
     }
 
     private int fetchMessagesExchanged(java.util.UUID userId) {
         return connectionService.getTotalMessagesExchanged(userId);
     }
 
+    private List<Session> fetchSessionHistory(java.util.UUID userId) {
+        var result = profileUseCases.getSessionHistory(new SessionHistoryQuery(UserContext.ui(userId), 60));
+        if (result.success()) {
+            return result.data();
+        }
+        logWarn(
+                "profileUseCases.getSessionHistory failed: {}",
+                result.error() != null ? result.error().message() : UNKNOWN);
+        throw new IllegalStateException(result.error() != null ? result.error().message() : UNKNOWN);
+    }
+
     private int computeLoginStreak(java.util.UUID userId) {
-        List<Session> sessions = activityMetricsService.getSessionHistory(userId, 60);
+        List<Session> sessions = fetchSessionHistory(userId);
         if (sessions.isEmpty()) {
             return 0;
         }
@@ -220,7 +228,7 @@ public class StatsViewModel extends BaseViewModel {
 
     // --- Properties ---
     public ObservableList<Achievement> getAchievements() {
-        return achievements;
+        return achievementsView;
     }
 
     /** Returns the total number of achievements defined in the system. */
