@@ -123,8 +123,31 @@ public interface JdbiTrustSafetyStorage extends TrustSafetyStorage {
             INSERT INTO reports (id, reporter_id, reported_user_id, reason, description, created_at)
             VALUES (:id, :reporterId, :reportedUserId, :reason, :description, :createdAt)
             """)
+    void insertReportRow(@BindMethods Report report);
+
+    @SqlUpdate("""
+            UPDATE reports
+            SET id = :id,
+                reason = :reason,
+                description = :description,
+                created_at = :createdAt,
+                deleted_at = NULL
+            WHERE reporter_id = :reporterId
+              AND reported_user_id = :reportedUserId
+              AND deleted_at IS NOT NULL
+            """)
+    int reviveDeletedReport(@BindMethods Report report);
+
     @Override
-    void save(@BindMethods Report report);
+    default void save(Report report) {
+        if (reviveDeletedReport(report) > 0) {
+            return;
+        }
+        if (hasReported(report.reporterId(), report.reportedUserId())) {
+            return;
+        }
+        insertReportRow(report);
+    }
 
     @SqlQuery("SELECT COUNT(*) FROM reports WHERE reported_user_id = :userId AND deleted_at IS NULL")
     @Override

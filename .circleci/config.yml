@@ -1,0 +1,152 @@
+# CircleCI configuration for the Dating App
+# Mirrors the GitHub Actions verify.yml workflow:
+#   1. Maven quality gate (spotless:check + verify)
+#   2. PostgreSQL runtime smoke test (Postgres 17)
+
+version: 2.1
+
+# ---------------------------------------------------------------------------
+# Orbs - reusable config packages
+# ---------------------------------------------------------------------------
+orbs:
+  maven: circleci/maven@2.1.1
+
+# ---------------------------------------------------------------------------
+# Executor - Java 25 (Eclipse Temurin) on Ubuntu Jammy
+# NOTE: Java 25 images may lag behind on Docker Hub. If the exact tag is
+#       unavailable, fall back to the latest available 25.x tag from
+#       https://hub.docker.com/r/eclipse-temurin/tags?page=1&name=25
+# ---------------------------------------------------------------------------
+executors:
+  java-25:
+    docker:
+      - image: eclipse-temurin:25-jdk-jammy
+    working_directory: ~/project
+    environment:
+      MAVEN_OPTS: >-
+        -Xmx512m
+        -Dhttps.protocols=TLSv1.2
+
+# ---------------------------------------------------------------------------
+# Jobs
+# ---------------------------------------------------------------------------
+jobs:
+  # ---- Maven quality gate: spotless check, checkstyle, PMD, SpotBugs, JaCoCo ----
+  verify:
+    executor: java-25
+    steps:
+      - checkout
+
+      - restore_cache:
+          name: Restore Maven local repository
+          keys:
+            - v1-maven-deps-{{ checksum "pom.xml" }}
+            - v1-maven-deps-
+
+      - run:
+          name: Maven quality gate (spotless:check + verify)
+          command: |
+            mvn spotless:check verify \
+              -B \
+              -Dorg.slf4j.simpleLogger.defaultLogLevel=warn
+
+      - save_cache:
+          name: Persist Maven local repository
+          paths:
+            - ~/.m2/repository
+          key: v1-maven-deps-{{ checksum "pom.xml" }}
+
+      # Store test results for CircleCI's Insights and test summary UI
+      - store_test_results:
+          path: target/surefire-reports
+
+      # Attach JUnit XML and JaCoCo exec as build artifacts
+      - store_artifacts:
+          path: target/surefire-reports
+          destination: surefire-reports
+      - store_artifacts:
+          path: target/site/jacoco
+          destination: jacoco-report
+
+  # ---- PostgreSQL runtime smoke test ----
+  pg-smoke:
+    docker:
+      # Primary container: Java 25
+      - image: eclipse-temurin:25-jdk-jammy
+        environment:
+          # Connection details for the PostgreSQL service container
+          DATINGAPP_PGTEST_URL: jdbc:postgresql://localhost:5432/datingapp
+          DATINGAPP_PGTEST_USERNAME: datingapp
+          DATINGAPP_PGTEST_PASSWORD: datingapp
+      # Service container: PostgreSQL 17
+      - image: postgres:17
+        environment:
+          POSTGRES_USER: datingapp
+          POSTGRES_PASSWORD: datingapp
+          POSTGRES_DB: datingapp
+
+    working_directory: ~/project
+    steps:
+      - checkout
+
+      - restore_cache:
+          name: Restore Maven local repository
+          keys:
+            - v1-maven-deps-{{ checksum "pom.xml" }}
+            - v1-maven-deps-
+
+      # Wait for PostgreSQL to be ready before running tests
+      - run:
+          name: Wait for PostgreSQL
+          command: |
+            apt-get update -qq && apt-get install -qq -y postgresql-client > /dev/null 2>&1
+            for i in $(seq 1 30); do
+              if pg_isready -h localhost -U datingapp -d datingapp > /dev/null 2>&1; then
+                echo "PostgreSQL is ready."
+                exit 0
+              fi
+              echo "Waiting for PostgreSQL... ($i/30)"
+              sleep 2
+            done
+            echo "PostgreSQL did not become ready in time."
+            exit 1
+
+      - run:
+          name: PostgreSQL smoke test
+          command: |
+            mvn -Dcheckstyle.skip=true \
+              -Dtest=PostgresqlRuntimeSmokeTest \
+              test \
+              -B \
+              -Dorg.slf4j.simpleLogger.defaultLogLevel=warn
+
+      - store_test_results:
+          path: target/surefire-reports
+
+      - store_artifacts:
+          path: target/surefire-reports
+          destination: pg-smoke-reports
+
+# ---------------------------------------------------------------------------
+# Workflows
+# ---------------------------------------------------------------------------
+workflows:
+  ci-pipeline:
+    jobs:
+      - verify:
+          filters:
+            branches:
+              only:
+                - main
+                - /pull\/\d+/
+                - /circleci.*/
+
+      - pg-smoke:
+          requires:
+            - verify
+          filters:
+            branches:
+              only:
+                - main
+                - /pull\/\d+/
+                - /circleci.*/

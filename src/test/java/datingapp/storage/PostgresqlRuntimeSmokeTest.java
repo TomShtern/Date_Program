@@ -68,14 +68,16 @@ class PostgresqlRuntimeSmokeTest {
     }
 
     @Test
-    @DisplayName("ApplicationStartup.load should use the default PostgreSQL runtime path")
-    void applicationStartupLoadUsesDefaultPostgresqlRuntimePath() {
+    @DisplayName("ApplicationStartup.load should use the configured PostgreSQL runtime path")
+    void applicationStartupLoadUsesConfiguredPostgresqlRuntimePath() {
         ServiceRegistry services = ApplicationStartup.initialize(ApplicationStartup.load());
 
         assertEquals("POSTGRESQL", services.getConfig().storage().databaseDialect());
         assertEquals(
-                "jdbc:postgresql://localhost:55432/datingapp",
-                services.getConfig().storage().databaseUrl());
+                System.getProperty(URL_PROPERTY), services.getConfig().storage().databaseUrl());
+        assertEquals(
+                System.getProperty(USERNAME_PROPERTY),
+                services.getConfig().storage().databaseUsername());
 
         verifyRoundTripStorageFlows(services);
     }

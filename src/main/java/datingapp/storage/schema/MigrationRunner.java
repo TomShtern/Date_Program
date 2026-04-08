@@ -11,12 +11,10 @@ import java.util.Locale;
  * Versioned migration runner: applies schema migrations in version order, each
  * exactly once.
  *
- * <p>
- * Fresh databases execute every migration in sequence. Upgraded databases skip
- * already-applied
- * versions (tracked in {@code schema_version}) and execute only what remains.
- * Both paths converge
- * on an identical final schema.
+ * <p>Fresh databases bootstrap the current baseline directly, then record every historical version as
+ * covered in {@code schema_version}. Upgraded databases skip already-applied versions (tracked in
+ * {@code schema_version}) and execute only what remains. Both paths should converge on an identical
+ * final schema.
  *
  * <p>
  * <strong>Adding a future migration (V2+):</strong>
@@ -31,6 +29,7 @@ import java.util.Locale;
 public final class MigrationRunner {
 
     private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger(MigrationRunner.class);
+    private static final String FRESH_BASELINE_DESCRIPTION_PREFIX = "Included in fresh baseline: ";
     private static final String WHERE_NOT_DELETED = " WHERE deleted_at IS NULL";
     private static final String TABLE_MATCHES = "MATCHES";
     private static final String SQL_TABLE_MATCHES = "matches";
@@ -67,8 +66,9 @@ public final class MigrationRunner {
     }
 
     /**
-     * Ordered registry of all schema migrations. Fresh databases execute all
-     * entries; upgraded databases skip already-applied versions.
+     * Ordered registry of all schema migrations. Fresh databases bootstrap the latest baseline and
+     * record these versions as covered; upgraded databases execute only the versions that are still
+     * pending.
      *
      * <p>
      * <strong>APPEND-ONLY:</strong> never reorder or remove entries. New migrations
@@ -122,21 +122,36 @@ public final class MigrationRunner {
             new VersionedMigration(
                     13,
                     "Enforce matches.ended_by integrity against users and match participants",
-                    MigrationRunner::applyV13));
+                    MigrationRunner::applyV13),
+            new VersionedMigration(
+                    14,
+                    "Converge legacy databases on fresh-baseline structural checks and nonblank text constraints",
+                    MigrationRunner::applyV14));
 
     // ═══════════════════════════════════════════════════════════════
     // Public entry point
     // ═══════════════════════════════════════════════════════════════
 
     /**
-     * Runs all pending migrations in version order. Each migration is applied
-     * exactly once. Fresh and upgraded databases take the same code path.
+     * Runs all pending migrations in version order. Each migration is applied exactly once.
+     * Fresh-database bootstraps use the direct baseline path; existing databases execute pending
+     * migrations incrementally.
      *
      * @param stmt a JDBC statement connected to the target database
      * @throws SQLException if any migration statement fails
      */
     public static void runAllPending(Statement stmt) throws SQLException {
+        boolean freshDatabase = isFreshApplicationSchema(stmt);
         createSchemaVersionTable(stmt);
+
+        if (freshDatabase) {
+            if (LOG.isInfoEnabled()) {
+                LOG.info("Applying current fresh baseline schema without replaying historical migrations");
+            }
+            applyV1(stmt);
+            recordFreshBaselineCoverage(stmt);
+            return;
+        }
 
         for (VersionedMigration migration : MIGRATIONS) {
             if (!isVersionApplied(stmt.getConnection(), migration.version())) {
@@ -415,12 +430,41 @@ public final class MigrationRunner {
                 "ended_by IS NULL OR ended_by = user_a OR ended_by = user_b");
     }
 
+    /**
+     * V14 migration: adds remaining fresh-baseline structural checks to upgraded databases and
+     * enforces nonblank user-facing text where the domain already requires it.
+     */
+    private static void applyV14(Statement stmt) throws SQLException {
+        applyFreshBaselineStructuralConstraints(stmt);
+        applyNonBlankTextConstraints(stmt);
+    }
+
     private static void repairMatchesUpdatedAtColumn(Statement stmt) throws SQLException {
         if (!hasTable(stmt, TABLE_MATCHES)) {
             return;
         }
         stmt.execute("ALTER TABLE matches ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP");
         stmt.execute("UPDATE matches SET updated_at = COALESCE(updated_at, created_at)");
+    }
+
+    private static boolean isFreshApplicationSchema(Statement stmt) throws SQLException {
+        String currentSchema = stmt.getConnection().getSchema();
+        String metadataTableName = metadataIdentifier(stmt.getConnection(), "users");
+        String metadataSchema = currentSchema == null ? null : metadataIdentifier(stmt.getConnection(), currentSchema);
+        try (ResultSet rs = stmt.getConnection()
+                .getMetaData()
+                .getTables(null, metadataSchema, metadataTableName, new String[] {"TABLE"})) {
+            return !rs.next();
+        }
+    }
+
+    private static void recordFreshBaselineCoverage(Statement stmt) throws SQLException {
+        for (VersionedMigration migration : MIGRATIONS) {
+            String description = migration.version() == 1
+                    ? migration.description()
+                    : FRESH_BASELINE_DESCRIPTION_PREFIX + migration.description();
+            recordSchemaVersion(stmt, migration.version(), description);
+        }
     }
 
     private static boolean hasTable(Statement stmt, String tableName) throws SQLException {
@@ -763,6 +807,67 @@ public final class MigrationRunner {
                         "match_id IS NULL OR CHAR_LENGTH(match_id) = 73");
             }
         }
+    }
+
+    private static void applyFreshBaselineStructuralConstraints(Statement stmt) throws SQLException {
+        if (hasTable(stmt, TABLE_USERS)) {
+            if (hasColumn(stmt, TABLE_USERS, "MIN_AGE") && hasColumn(stmt, TABLE_USERS, "MAX_AGE")) {
+                addCheckConstraintIfMissing(stmt, "users", "ck_users_age_bounds", "min_age <= max_age");
+            }
+            if (hasColumn(stmt, TABLE_USERS, "DB_MIN_HEIGHT_CM") && hasColumn(stmt, TABLE_USERS, "DB_MAX_HEIGHT_CM")) {
+                addCheckConstraintIfMissing(
+                        stmt,
+                        "users",
+                        "ck_users_height_bounds",
+                        "db_min_height_cm IS NULL OR db_max_height_cm IS NULL OR db_min_height_cm <= db_max_height_cm");
+            }
+            if (hasColumn(stmt, TABLE_USERS, "DB_MAX_AGE_DIFF")) {
+                addCheckConstraintIfMissing(
+                        stmt,
+                        "users",
+                        "ck_users_max_age_diff_nonnegative",
+                        "db_max_age_diff IS NULL OR db_max_age_diff >= 0");
+            }
+        }
+        addDistinctUsersConstraintIfPresent(stmt, "likes", "who_likes", "who_got_liked", "ck_likes_distinct_users");
+        addDistinctUsersConstraintIfPresent(stmt, "matches", "user_a", "user_b", "ck_matches_distinct_users");
+        addDistinctUsersConstraintIfPresent(
+                stmt, "conversations", "user_a", "user_b", "ck_conversations_distinct_users");
+        addDistinctUsersConstraintIfPresent(
+                stmt, "friend_requests", "from_user_id", "to_user_id", "ck_friend_requests_distinct_users");
+        addDistinctUsersConstraintIfPresent(stmt, "blocks", "blocker_id", "blocked_id", "ck_blocks_distinct_users");
+        addDistinctUsersConstraintIfPresent(
+                stmt, "reports", "reporter_id", "reported_user_id", "ck_reports_distinct_users");
+        addDistinctUsersConstraintIfPresent(
+                stmt, "profile_notes", "author_id", "subject_id", "ck_profile_notes_distinct_users");
+        addDistinctUsersConstraintIfPresent(
+                stmt, "profile_views", "viewer_id", "viewed_id", "ck_profile_views_distinct_users");
+    }
+
+    private static void applyNonBlankTextConstraints(Statement stmt) throws SQLException {
+        addTrimmedTextNotBlankConstraint(stmt, "messages", "content", "ck_messages_content_nonblank");
+        addTrimmedTextNotBlankConstraint(stmt, "profile_notes", "content", "ck_profile_notes_content_nonblank");
+        addTrimmedTextNotBlankConstraint(stmt, "notifications", "title", "ck_notifications_title_nonblank");
+        addTrimmedTextNotBlankConstraint(stmt, "notifications", "message", "ck_notifications_message_nonblank");
+    }
+
+    private static void addDistinctUsersConstraintIfPresent(
+            Statement stmt, String tableName, String leftColumn, String rightColumn, String constraintName)
+            throws SQLException {
+        if (!hasTable(stmt, tableName)
+                || !hasColumn(stmt, tableName, leftColumn)
+                || !hasColumn(stmt, tableName, rightColumn)) {
+            return;
+        }
+        addCheckConstraintIfMissing(stmt, tableName, constraintName, leftColumn + " <> " + rightColumn);
+    }
+
+    private static void addTrimmedTextNotBlankConstraint(
+            Statement stmt, String tableName, String columnName, String constraintName) throws SQLException {
+        if (!hasTable(stmt, tableName) || !hasColumn(stmt, tableName, columnName)) {
+            return;
+        }
+        addCheckConstraintIfMissing(stmt, tableName, constraintName, "CHAR_LENGTH(TRIM(" + columnName + ")) > 0");
     }
 
     private static void addAllowedValuesConstraint(

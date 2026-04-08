@@ -9,6 +9,9 @@
 *log*.txt
 *_output.txt
 *_run.txt
+*_stdout.txt
+*_stderr.txt
+.cache/oh-my-posh/
 
 # Package files
 *.jar

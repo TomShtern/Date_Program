@@ -12,6 +12,7 @@ This file records the practical rules for PostgreSQL runtime work in this reposi
   - `.\start_local_postgres.ps1`
   - `.\run_postgresql_smoke.ps1`
   - `.\stop_local_postgres.ps1`
+  - `.\reset_local_postgres.ps1` — rebuilds the local database from a preserved backup schema
 
 ## Daily Commands
 
@@ -21,6 +22,9 @@ This file records the practical rules for PostgreSQL runtime work in this reposi
 
 # Run only the PostgreSQL runtime smoke path
 .\run_postgresql_smoke.ps1
+
+# Reset the local PostgreSQL database with a preserved backup schema
+.\reset_local_postgres.ps1
 
 # Run the full local gate: Maven quality gate + PostgreSQL smoke + cleanup
 .\run_verify.ps1

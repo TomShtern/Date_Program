@@ -28,6 +28,7 @@
         <javalin.version>6.7.0</javalin.version>
         <hikaricp.version>6.3.0</hikaricp.version>
         <jetbrains.annotations.version>24.1.0</jetbrains.annotations.version>
+        <spotbugs.maven.plugin.version>4.9.8.3</spotbugs.maven.plugin.version>
     </properties>
 
     <dependencies>
@@ -366,6 +367,30 @@
                 </executions>
             </plugin>
 
+            <!-- SpotBugs: bytecode-level bug detection (report by default; strict gate via profile) -->
+            <plugin>
+                <groupId>com.github.spotbugs</groupId>
+                <artifactId>spotbugs-maven-plugin</artifactId>
+                <version>${spotbugs.maven.plugin.version}</version>
+                <configuration>
+                    <effort>more</effort>
+                    <threshold>Medium</threshold>
+                    <maxHeap>1024</maxHeap>
+                    <xmlOutput>true</xmlOutput>
+                    <htmlOutput>true</htmlOutput>
+                    <excludeFilterFile>${project.basedir}/spotbugs-exclude.xml</excludeFilterFile>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>spotbugs-report</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>spotbugs</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+
             <!-- Code Coverage with JaCoCo -->
             <plugin>
                 <groupId>org.jacoco</groupId>
@@ -428,6 +453,20 @@
                             <pluginExecutions>
                                 <pluginExecution>
                                     <pluginExecutionFilter>
+                                        <groupId>com.github.spotbugs</groupId>
+                                        <artifactId>spotbugs-maven-plugin</artifactId>
+                                        <versionRange>[4.0,)</versionRange>
+                                        <goals>
+                                            <goal>spotbugs</goal>
+                                            <goal>check</goal>
+                                        </goals>
+                                    </pluginExecutionFilter>
+                                    <action>
+                                        <ignore />
+                                    </action>
+                                </pluginExecution>
+                                <pluginExecution>
+                                    <pluginExecutionFilter>
                                         <groupId>org.apache.maven.plugins</groupId>
                                         <artifactId>maven-checkstyle-plugin</artifactId>
                                         <versionRange>[3.0,)</versionRange>
@@ -470,6 +509,31 @@
                                     ${project.basedir}/src/test/resources/logback-test-verbose.xml</logback.configurationFile>
                             </systemPropertyVariables>
                         </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+        <profile>
+            <id>spotbugs-strict</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>com.github.spotbugs</groupId>
+                        <artifactId>spotbugs-maven-plugin</artifactId>
+                        <version>${spotbugs.maven.plugin.version}</version>
+                        <executions>
+                            <execution>
+                                <id>spotbugs-check</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>check</goal>
+                                </goals>
+                                <configuration>
+                                    <maxAllowedViolations>0</maxAllowedViolations>
+                                    <failThreshold>Medium</failThreshold>
+                                </configuration>
+                            </execution>
+                        </executions>
                     </plugin>
                 </plugins>
             </build>

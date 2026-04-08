@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<FindBugsFilter>
+    <!--
+        Intentionally empty baseline filter.
+
+        Add suppressions only after verifying that a finding is either:
+        1. a false positive, or
+        2. an explicitly accepted trade-off.
+
+        Prefer narrow suppressions (specific class + bug pattern) over broad global exclusions.
+    -->
+</FindBugsFilter>

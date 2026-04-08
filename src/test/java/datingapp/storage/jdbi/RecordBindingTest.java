@@ -176,4 +176,42 @@ class RecordBindingTest {
         boolean hasReported = trustSafetyStorage.hasReported(user1, user2);
         assertTrue(hasReported, "Report should be persisted");
     }
+
+    @Test
+    @DisplayName("Report can be recreated after delete without duplicating the pair")
+    void deletedReportCanBeRecreated() {
+        UUID user1 = UUID.fromString("00000000-0000-0000-0000-000000000001");
+        UUID user2 = UUID.fromString("00000000-0000-0000-0000-000000000002");
+
+        Report original =
+                new Report(UUID.randomUUID(), user1, user2, Report.Reason.SPAM, "First report", Instant.now());
+        trustSafetyStorage.save(original);
+
+        jdbi.useHandle(handle -> handle.createUpdate("""
+                        UPDATE reports
+                        SET deleted_at = CURRENT_TIMESTAMP
+                        WHERE reporter_id = :reporterId AND reported_user_id = :reportedUserId
+                        """)
+                .bind("reporterId", user1)
+                .bind("reportedUserId", user2)
+                .execute());
+
+        assertFalse(trustSafetyStorage.hasReported(user1, user2), "Report should be hidden after soft delete");
+
+        Report recreated = new Report(
+                UUID.randomUUID(), user1, user2, Report.Reason.HARASSMENT, "Replacement report", Instant.now());
+        trustSafetyStorage.save(recreated);
+
+        assertTrue(trustSafetyStorage.hasReported(user1, user2), "Report should be active after recreation");
+        long pairRowCount = jdbi.withHandle(handle -> handle.createQuery(
+                        "SELECT COUNT(*) FROM reports WHERE reporter_id = :reporterId AND reported_user_id = :reportedUserId")
+                .bind("reporterId", user1)
+                .bind("reportedUserId", user2)
+                .mapTo(Long.class)
+                .one());
+        assertEquals(
+                1L,
+                pairRowCount,
+                "Recreating a report should revive the existing pair row rather than creating duplicates");
+    }
 }

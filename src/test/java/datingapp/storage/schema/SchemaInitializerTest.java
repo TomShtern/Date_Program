@@ -65,6 +65,7 @@ class SchemaInitializerTest {
                     "SWIPE_SESSIONS",
                     "USER_STATS",
                     "PLATFORM_STATS",
+                    "DAILY_PICKS",
                     "DAILY_PICK_VIEWS",
                     "USER_ACHIEVEMENTS",
                     "CONVERSATIONS",
@@ -125,13 +126,183 @@ class SchemaInitializerTest {
 
             // Additional indexes
             assertTrue(indexes.contains("IDX_ACHIEVEMENTS_USER_ID"), "Missing index: idx_achievements_user_id");
+            assertTrue(indexes.contains("IDX_DAILY_PICKS_PICK_DATE"), "Missing index: idx_daily_picks_pick_date");
+            assertTrue(indexes.contains("IDX_DAILY_PICK_VIEWS_USER"), "Missing index: idx_daily_pick_views_user");
             assertTrue(indexes.contains("IDX_MESSAGES_SENDER_ID"), "Missing index: idx_messages_sender_id");
             assertTrue(indexes.contains("IDX_MESSAGES_CONVERSATION_ID"), "Missing index: idx_messages_conversation_id");
+            assertTrue(indexes.contains("IDX_LIKES_DIRECTION_CREATED"), "Missing index: idx_likes_direction_created");
+            assertTrue(indexes.contains("IDX_LIKES_RECEIVED_CREATED"), "Missing index: idx_likes_received_created");
+            assertTrue(
+                    indexes.contains("IDX_CONVERSATIONS_USER_A_LAST_MSG"),
+                    "Missing index: idx_conversations_user_a_last_msg");
+            assertTrue(
+                    indexes.contains("IDX_CONVERSATIONS_USER_B_LAST_MSG"),
+                    "Missing index: idx_conversations_user_b_last_msg");
+            assertTrue(indexes.contains("IDX_MESSAGES_SENDER_CREATED"), "Missing index: idx_messages_sender_created");
+            assertTrue(indexes.contains("IDX_SESSIONS_STARTED_AT_DESC"), "Missing index: idx_sessions_started_at_desc");
+            assertTrue(indexes.contains("IDX_USER_STATS_COMPUTED_DESC"), "Missing index: idx_user_stats_computed_desc");
+            assertTrue(indexes.contains("IDX_STANDOUTS_INTERACTED_AT"), "Missing index: idx_standouts_interacted_at");
 
             // Normalized profile table indexes (V3)
             assertTrue(indexes.contains("IDX_USER_INTERESTS_INTEREST"), "Missing index: idx_user_interests_interest");
             assertTrue(
                     indexes.contains("IDX_USER_INTERESTED_IN_GENDER"), "Missing index: idx_user_interested_in_gender");
+        }
+
+        @Test
+        @DisplayName("should create the final fresh-schema columns directly")
+        void createsFinalFreshSchemaColumnsDirectly() throws SQLException {
+            try (Statement stmt = connection.createStatement()) {
+                SchemaInitializer.createAllTables(stmt);
+            }
+
+            Set<String> userColumns = getColumnNames("USERS");
+            assertFalse(userColumns.contains("PHOTO_URLS"), "Fresh schema should not recreate users.photo_urls");
+            assertFalse(userColumns.contains("INTERESTS"), "Fresh schema should not recreate users.interests");
+            assertFalse(userColumns.contains("INTERESTED_IN"), "Fresh schema should not recreate users.interested_in");
+
+            Set<String> matchColumns = getColumnNames("MATCHES");
+            assertTrue(matchColumns.contains("UPDATED_AT"), "Fresh schema should create matches.updated_at");
+            assertTrue(matchColumns.contains("ENDED_BY"), "Fresh schema should create matches.ended_by");
+
+            Set<String> friendRequestColumns = getColumnNames("FRIEND_REQUESTS");
+            assertTrue(
+                    friendRequestColumns.contains("PAIR_KEY"), "Fresh schema should create friend_requests.pair_key");
+            assertTrue(
+                    friendRequestColumns.contains("PENDING_MARKER"),
+                    "Fresh schema should create friend_requests.pending_marker");
+        }
+
+        @Test
+        @DisplayName("should create the final fresh-schema foreign keys and invariant checks directly")
+        void createsFinalFreshSchemaForeignKeysAndInvariantChecksDirectly() throws SQLException {
+            try (Statement stmt = connection.createStatement()) {
+                SchemaInitializer.createAllTables(stmt);
+            }
+
+            Set<String> dailyPickViewsForeignKeys = getForeignKeyNames("DAILY_PICK_VIEWS");
+            assertTrue(
+                    dailyPickViewsForeignKeys.contains("FK_DAILY_PICK_VIEWS_USER"),
+                    "Fresh schema should create fk_daily_pick_views_user directly");
+
+            Set<String> userAchievementsForeignKeys = getForeignKeyNames("USER_ACHIEVEMENTS");
+            assertTrue(
+                    userAchievementsForeignKeys.contains("FK_USER_ACHIEVEMENTS_USER"),
+                    "Fresh schema should create fk_user_achievements_user directly");
+
+            Set<String> matchesForeignKeys = getForeignKeyNames("MATCHES");
+            assertTrue(
+                    matchesForeignKeys.contains("FK_MATCHES_ENDED_BY"),
+                    "Fresh schema should create fk_matches_ended_by directly");
+
+            Set<String> indexes = getIndexNames();
+            assertTrue(
+                    indexes.contains("UK_FRIEND_REQUESTS_PENDING_PAIR"),
+                    "Fresh schema should create uk_friend_requests_pending_pair directly");
+
+            Set<String> userChecks = getCheckConstraintNames("USERS");
+            assertTrue(userChecks.contains("CK_USERS_STATE_VALUES"), "Missing check: ck_users_state_values");
+            assertTrue(userChecks.contains("CK_USERS_GENDER_VALUES"), "Missing check: ck_users_gender_values");
+
+            Set<String> matchChecks = getCheckConstraintNames("MATCHES");
+            assertTrue(matchChecks.contains("CK_MATCHES_STATE_VALUES"), "Missing check: ck_matches_state_values");
+            assertTrue(
+                    matchChecks.contains("CK_MATCHES_END_REASON_VALUES"),
+                    "Missing check: ck_matches_end_reason_values");
+            assertTrue(matchChecks.contains("CK_MATCHES_ID_LENGTH"), "Missing check: ck_matches_id_length");
+            assertTrue(
+                    matchChecks.contains("CK_MATCHES_ENDED_BY_PARTICIPANT"),
+                    "Missing check: ck_matches_ended_by_participant");
+            assertTrue(matchChecks.contains("CK_MATCHES_DISTINCT_USERS"), "Missing check: ck_matches_distinct_users");
+
+            Set<String> likeChecks = getCheckConstraintNames("LIKES");
+            assertTrue(likeChecks.contains("CK_LIKES_DISTINCT_USERS"), "Missing check: ck_likes_distinct_users");
+
+            Set<String> friendRequestChecks = getCheckConstraintNames("FRIEND_REQUESTS");
+            assertTrue(
+                    friendRequestChecks.contains("CK_FRIEND_REQUESTS_DISTINCT_USERS"),
+                    "Missing check: ck_friend_requests_distinct_users");
+
+            Set<String> profileViewChecks = getCheckConstraintNames("PROFILE_VIEWS");
+            assertTrue(
+                    profileViewChecks.contains("CK_PROFILE_VIEWS_DISTINCT_USERS"),
+                    "Missing check: ck_profile_views_distinct_users");
+
+            Set<String> messageChecks = getCheckConstraintNames("MESSAGES");
+            assertTrue(
+                    messageChecks.contains("CK_MESSAGES_CONTENT_NONBLANK"),
+                    "Missing check: ck_messages_content_nonblank");
+
+            Set<String> profileNoteChecks = getCheckConstraintNames("PROFILE_NOTES");
+            assertTrue(
+                    profileNoteChecks.contains("CK_PROFILE_NOTES_CONTENT_NONBLANK"),
+                    "Missing check: ck_profile_notes_content_nonblank");
+
+            Set<String> notificationChecks = getCheckConstraintNames("NOTIFICATIONS");
+            assertTrue(
+                    notificationChecks.contains("CK_NOTIFICATIONS_TITLE_NONBLANK"),
+                    "Missing check: ck_notifications_title_nonblank");
+            assertTrue(
+                    notificationChecks.contains("CK_NOTIFICATIONS_MESSAGE_NONBLANK"),
+                    "Missing check: ck_notifications_message_nonblank");
+        }
+
+        @Test
+        @DisplayName("should reject blank user-facing text in the fresh schema")
+        void rejectsBlankUserFacingTextInFreshSchema() throws SQLException {
+            String userA = "00000000-0000-0000-0000-000000000001";
+            String userB = "00000000-0000-0000-0000-000000000002";
+            String conversationId = userA + "_" + userB;
+
+            try (Statement stmt = connection.createStatement()) {
+                SchemaInitializer.createAllTables(stmt);
+                stmt.execute("INSERT INTO users (id, name, created_at, updated_at, state) VALUES ('"
+                        + userA
+                        + "', 'User A', CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP(), 'ACTIVE')");
+                stmt.execute("INSERT INTO users (id, name, created_at, updated_at, state) VALUES ('"
+                        + userB
+                        + "', 'User B', CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP(), 'ACTIVE')");
+                stmt.execute("INSERT INTO conversations (id, user_a, user_b, created_at) VALUES ('"
+                        + conversationId
+                        + "', '"
+                        + userA
+                        + "', '"
+                        + userB
+                        + "', CURRENT_TIMESTAMP())");
+
+                assertThrows(
+                        SQLException.class,
+                        () -> stmt.execute("INSERT INTO messages "
+                                + "(id, conversation_id, sender_id, content, created_at) VALUES "
+                                + "('11111111-1111-1111-1111-111111111111', '"
+                                + conversationId
+                                + "', '"
+                                + userA
+                                + "', '   ', CURRENT_TIMESTAMP())"));
+                assertThrows(
+                        SQLException.class,
+                        () -> stmt.execute("INSERT INTO profile_notes "
+                                + "(author_id, subject_id, content, created_at, updated_at) VALUES "
+                                + "('"
+                                + userA
+                                + "', '"
+                                + userB
+                                + "', '   ', CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP())"));
+                assertThrows(
+                        SQLException.class,
+                        () -> stmt.execute("INSERT INTO notifications "
+                                + "(id, user_id, type, title, message, created_at) VALUES "
+                                + "('22222222-2222-2222-2222-222222222222', '"
+                                + userA
+                                + "', 'NEW_MESSAGE', '   ', 'hello', CURRENT_TIMESTAMP())"));
+                assertThrows(
+                        SQLException.class,
+                        () -> stmt.execute("INSERT INTO notifications "
+                                + "(id, user_id, type, title, message, created_at) VALUES "
+                                + "('33333333-3333-3333-3333-333333333333', '"
+                                + userA
+                                + "', 'NEW_MESSAGE', 'Hello', '   ', CURRENT_TIMESTAMP())"));
+            }
         }
 
         @Test
@@ -189,9 +360,25 @@ class SchemaInitializerTest {
                     "Missing foreign key: fk_user_achievements_user");
 
             try (Statement stmt = connection.createStatement();
-                    ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM schema_version WHERE version = 13")) {
+                    ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM schema_version WHERE version = 14")) {
                 assertTrue(rs.next());
-                assertEquals(1, rs.getInt(1), "Schema version 13 should be recorded");
+                assertEquals(1, rs.getInt(1), "Schema version 14 should be recorded");
+            }
+        }
+
+        @Test
+        @DisplayName("should record historical versions as covered by the fresh baseline")
+        void freshDatabaseMigrationRecordsHistoricalVersionsAsCoveredByBaseline() throws SQLException {
+            try (Statement stmt = connection.createStatement()) {
+                MigrationRunner.runAllPending(stmt);
+            }
+
+            try (Statement stmt = connection.createStatement();
+                    ResultSet rs = stmt.executeQuery("SELECT description FROM schema_version WHERE version = 2")) {
+                assertTrue(rs.next());
+                assertTrue(
+                        rs.getString(1).contains("fresh baseline"),
+                        "Fresh bootstrap should mark legacy versions as covered by the fresh baseline");
             }
         }
 
@@ -219,9 +406,9 @@ class SchemaInitializerTest {
                     "Migration should keep fk_user_achievements_user on rerun");
 
             try (Statement stmt = connection.createStatement();
-                    ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM schema_version WHERE version = 13")) {
+                    ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM schema_version WHERE version = 14")) {
                 assertTrue(rs.next());
-                assertEquals(1, rs.getInt(1), "Schema version 13 should still be recorded once");
+                assertEquals(1, rs.getInt(1), "Schema version 14 should still be recorded once");
             }
         }
 
@@ -626,6 +813,172 @@ class SchemaInitializerTest {
                 assertEquals(1, rs.getInt(1), "Schema version 8 should be recorded");
             }
         }
+
+        @Test
+        @DisplayName("should add fresh-baseline structural and nonblank text checks in V14")
+        void v14MigrationAddsFreshBaselineStructuralAndTextChecks() throws SQLException {
+            String userA = "00000000-0000-0000-0000-000000000001";
+            String userB = "00000000-0000-0000-0000-000000000002";
+            String conversationId = userA + "_" + userB;
+
+            try (Statement stmt = connection.createStatement()) {
+                stmt.execute("CREATE TABLE users ("
+                        + "id UUID PRIMARY KEY, "
+                        + "name VARCHAR(100) NOT NULL, "
+                        + "min_age INT DEFAULT 18, "
+                        + "max_age INT DEFAULT 99, "
+                        + "db_min_height_cm INT, "
+                        + "db_max_height_cm INT, "
+                        + "db_max_age_diff INT, "
+                        + "created_at TIMESTAMP NOT NULL, "
+                        + "updated_at TIMESTAMP NOT NULL, "
+                        + "state VARCHAR(20) NOT NULL"
+                        + ")");
+                stmt.execute("CREATE TABLE likes ("
+                        + "id UUID PRIMARY KEY, "
+                        + "who_likes UUID NOT NULL, "
+                        + "who_got_liked UUID NOT NULL, "
+                        + "direction VARCHAR(10) NOT NULL, "
+                        + "created_at TIMESTAMP NOT NULL, "
+                        + "deleted_at TIMESTAMP"
+                        + ")");
+                stmt.execute("CREATE TABLE friend_requests ("
+                        + "id UUID PRIMARY KEY, "
+                        + "from_user_id UUID NOT NULL, "
+                        + "to_user_id UUID NOT NULL, "
+                        + "created_at TIMESTAMP NOT NULL, "
+                        + "status VARCHAR(20) NOT NULL, "
+                        + "responded_at TIMESTAMP, "
+                        + "pair_key VARCHAR(73), "
+                        + "pending_marker VARCHAR(10)"
+                        + ")");
+                stmt.execute("CREATE TABLE profile_views ("
+                        + "viewer_id UUID NOT NULL, "
+                        + "viewed_id UUID NOT NULL, "
+                        + "viewed_at TIMESTAMP NOT NULL"
+                        + ")");
+                stmt.execute("CREATE TABLE messages ("
+                        + "id UUID PRIMARY KEY, "
+                        + "conversation_id VARCHAR(100) NOT NULL, "
+                        + "sender_id UUID NOT NULL, "
+                        + "content VARCHAR(1000) NOT NULL, "
+                        + "created_at TIMESTAMP NOT NULL, "
+                        + "deleted_at TIMESTAMP"
+                        + ")");
+                stmt.execute("CREATE TABLE profile_notes ("
+                        + "author_id UUID NOT NULL, "
+                        + "subject_id UUID NOT NULL, "
+                        + "content VARCHAR(500) NOT NULL, "
+                        + "created_at TIMESTAMP NOT NULL, "
+                        + "updated_at TIMESTAMP NOT NULL, "
+                        + "deleted_at TIMESTAMP"
+                        + ")");
+                stmt.execute("CREATE TABLE notifications ("
+                        + "id UUID PRIMARY KEY, "
+                        + "user_id UUID NOT NULL, "
+                        + "type VARCHAR(30) NOT NULL, "
+                        + "title VARCHAR(200) NOT NULL, "
+                        + "message TEXT NOT NULL, "
+                        + "created_at TIMESTAMP NOT NULL, "
+                        + "is_read BOOLEAN DEFAULT FALSE, "
+                        + "data_json TEXT"
+                        + ")");
+                stmt.execute("CREATE TABLE schema_version ("
+                        + "version INT PRIMARY KEY, "
+                        + "applied_at TIMESTAMP NOT NULL, "
+                        + "description VARCHAR(255)"
+                        + ")");
+                stmt.execute("INSERT INTO schema_version(version, applied_at, description) VALUES "
+                        + "(1, CURRENT_TIMESTAMP(), 'V1 baseline schema'), "
+                        + "(2, CURRENT_TIMESTAMP(), 'V2 daily picks cache table'), "
+                        + "(3, CURRENT_TIMESTAMP(), 'V3 normalized profile cleanup'), "
+                        + "(4, CURRENT_TIMESTAMP(), 'V4 soft-delete columns'), "
+                        + "(5, CURRENT_TIMESTAMP(), 'V5 profile view primary key'), "
+                        + "(6, CURRENT_TIMESTAMP(), 'V6 matches updated_at backfill'), "
+                        + "(7, CURRENT_TIMESTAMP(), 'V7 messages conversation index'), "
+                        + "(8, CURRENT_TIMESTAMP(), 'V8 query optimization indexes'), "
+                        + "(9, CURRENT_TIMESTAMP(), 'V9 matches updated_at repair'), "
+                        + "(10, CURRENT_TIMESTAMP(), 'V10 named foreign keys'), "
+                        + "(11, CURRENT_TIMESTAMP(), 'V11 friend request uniqueness helpers'), "
+                        + "(12, CURRENT_TIMESTAMP(), 'V12 enum and length checks'), "
+                        + "(13, CURRENT_TIMESTAMP(), 'V13 matches ended_by integrity')");
+
+                MigrationRunner.runAllPending(stmt);
+
+                stmt.execute("INSERT INTO users (id, name, min_age, max_age, created_at, updated_at, state) VALUES ('"
+                        + userA
+                        + "', 'User A', 18, 99, CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP(), 'ACTIVE')");
+                stmt.execute("INSERT INTO users (id, name, min_age, max_age, created_at, updated_at, state) VALUES ('"
+                        + userB
+                        + "', 'User B', 18, 99, CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP(), 'ACTIVE')");
+
+                assertThrows(
+                        SQLException.class,
+                        () -> stmt.execute("INSERT INTO likes "
+                                + "(id, who_likes, who_got_liked, direction, created_at) VALUES "
+                                + "('44444444-4444-4444-4444-444444444444', '"
+                                + userA
+                                + "', '"
+                                + userA
+                                + "', 'LIKE', CURRENT_TIMESTAMP())"));
+                assertThrows(
+                        SQLException.class,
+                        () -> stmt.execute("INSERT INTO friend_requests "
+                                + "(id, from_user_id, to_user_id, created_at, status) VALUES "
+                                + "('55555555-5555-5555-5555-555555555555', '"
+                                + userA
+                                + "', '"
+                                + userA
+                                + "', CURRENT_TIMESTAMP(), 'PENDING')"));
+                assertThrows(
+                        SQLException.class,
+                        () -> stmt.execute("INSERT INTO profile_views "
+                                + "(viewer_id, viewed_id, viewed_at) VALUES "
+                                + "('"
+                                + userA
+                                + "', '"
+                                + userA
+                                + "', CURRENT_TIMESTAMP())"));
+                assertThrows(
+                        SQLException.class,
+                        () -> stmt.execute("INSERT INTO messages "
+                                + "(id, conversation_id, sender_id, content, created_at) VALUES "
+                                + "('66666666-6666-6666-6666-666666666666', '"
+                                + conversationId
+                                + "', '"
+                                + userA
+                                + "', '   ', CURRENT_TIMESTAMP())"));
+                assertThrows(
+                        SQLException.class,
+                        () -> stmt.execute("INSERT INTO profile_notes "
+                                + "(author_id, subject_id, content, created_at, updated_at) VALUES "
+                                + "('"
+                                + userA
+                                + "', '"
+                                + userB
+                                + "', '   ', CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP())"));
+                assertThrows(
+                        SQLException.class,
+                        () -> stmt.execute("INSERT INTO notifications "
+                                + "(id, user_id, type, title, message, created_at) VALUES "
+                                + "('77777777-7777-7777-7777-777777777777', '"
+                                + userA
+                                + "', 'NEW_MESSAGE', '   ', 'hello', CURRENT_TIMESTAMP())"));
+
+                Set<String> userChecks = getCheckConstraintNames("USERS");
+                assertTrue(userChecks.contains("CK_USERS_AGE_BOUNDS"), "Missing check: ck_users_age_bounds");
+                assertTrue(userChecks.contains("CK_USERS_HEIGHT_BOUNDS"), "Missing check: ck_users_height_bounds");
+                assertTrue(
+                        userChecks.contains("CK_USERS_MAX_AGE_DIFF_NONNEGATIVE"),
+                        "Missing check: ck_users_max_age_diff_nonnegative");
+            }
+
+            try (Statement stmt = connection.createStatement();
+                    ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM schema_version WHERE version = 14")) {
+                assertTrue(rs.next());
+                assertEquals(1, rs.getInt(1), "Schema version 14 should be recorded");
+            }
+        }
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -676,6 +1029,18 @@ class SchemaInitializerTest {
         try (Statement stmt = connection.createStatement();
                 ResultSet rs = stmt.executeQuery("SELECT constraint_name FROM information_schema.table_constraints "
                         + "WHERE table_name = '" + tableName + "' AND constraint_type = 'UNIQUE'")) {
+            while (rs.next()) {
+                constraints.add(rs.getString("CONSTRAINT_NAME"));
+            }
+        }
+        return constraints;
+    }
+
+    private Set<String> getCheckConstraintNames(String tableName) throws SQLException {
+        Set<String> constraints = new HashSet<>();
+        try (Statement stmt = connection.createStatement();
+                ResultSet rs = stmt.executeQuery("SELECT constraint_name FROM information_schema.table_constraints "
+                        + "WHERE table_name = '" + tableName + "' AND constraint_type = 'CHECK'")) {
             while (rs.next()) {
                 constraints.add(rs.getString("CONSTRAINT_NAME"));
             }
