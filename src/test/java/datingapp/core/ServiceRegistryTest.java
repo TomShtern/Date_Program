@@ -22,8 +22,8 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -43,21 +43,20 @@ class ServiceRegistryTest {
 
     private static final String PROFILE_PROPERTY = "datingapp.db.profile";
 
-    private static DatabaseManager dbManager;
-    private static ServiceRegistry registry;
+    private DatabaseManager dbManager;
+    private ServiceRegistry registry;
 
-    @BeforeAll
-    static void setUpOnce() {
+    @BeforeEach
+    void setUpEach() {
         System.setProperty(PROFILE_PROPERTY, "test");
-        // Use in-memory H2 database for testing
         DatabaseManager.resetInstance();
         DatabaseManager.setJdbcUrl("jdbc:h2:mem:test_service_registry_" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1");
         dbManager = DatabaseManager.getInstance();
         registry = StorageFactory.buildSqlDatabase(dbManager, AppConfig.defaults());
     }
 
-    @AfterAll
-    static void tearDownOnce() {
+    @AfterEach
+    void tearDownEach() {
         System.clearProperty(PROFILE_PROPERTY);
         DatabaseManager.resetInstance();
     }

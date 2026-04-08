@@ -25,9 +25,11 @@ import java.sql.SQLXML;
 import java.sql.Statement;
 import java.sql.Time;
 import java.sql.Timestamp;
+import java.time.Instant;
 import java.util.Calendar;
 import java.util.List;
 import java.util.Map;
+import java.util.TimeZone;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -43,9 +45,19 @@ class SqlRowReadersTest {
     /** A very simple manual mock for ResultSet to avoid Mockito dependency. */
     static class MockResultSet implements ResultSet {
         private String value;
+        private Timestamp timestampValue;
+        private Calendar lastTimestampCalendar;
 
         public void setValue(String value) {
             this.value = value;
+        }
+
+        public void setTimestampValue(Timestamp timestampValue) {
+            this.timestampValue = timestampValue;
+        }
+
+        public Calendar getLastTimestampCalendar() {
+            return lastTimestampCalendar;
         }
 
         @Override
@@ -206,7 +218,7 @@ class SqlRowReadersTest {
 
         @Override
         public Timestamp getTimestamp(String columnLabel) throws SQLException {
-            return null;
+            return timestampValue;
         }
 
         @Override
@@ -691,7 +703,8 @@ class SqlRowReadersTest {
 
         @Override
         public Timestamp getTimestamp(String columnLabel, Calendar cal) throws SQLException {
-            return null;
+            lastTimestampCalendar = cal;
+            return timestampValue;
         }
 
         @Override
@@ -1089,6 +1102,19 @@ class SqlRowReadersTest {
         List<String> result = SqlRowReaders.readCsvAsList(rs, "col");
         assertTrue(result.isEmpty());
         assertThrows(UnsupportedOperationException.class, () -> result.add("A"));
+    }
+
+    @Test
+    @DisplayName("readInstant uses UTC calendar semantics")
+    void testReadInstantUsesUtcCalendar() throws SQLException {
+        MockResultSet rs = new MockResultSet();
+        Timestamp timestamp = Timestamp.from(Instant.parse("2026-04-08T00:00:00Z"));
+        rs.setTimestampValue(timestamp);
+
+        Instant result = SqlRowReaders.readInstant(rs, "created_at");
+
+        assertEquals(timestamp.toInstant(), result);
+        assertEquals(TimeZone.getTimeZone("UTC"), rs.getLastTimestampCalendar().getTimeZone());
     }
 
     @Nested

@@ -15,7 +15,6 @@ import datingapp.core.model.User;
 import datingapp.core.storage.CommunicationStorage;
 import datingapp.core.storage.UserStorage;
 import datingapp.storage.DatabaseManager;
-import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -62,10 +61,7 @@ class JdbiCommunicationStorageSocialTest {
 
         jdbi.registerArgument(new JdbiTypeCodecs.EnumSetSqlCodec.EnumSetArgumentFactory());
         jdbi.registerColumnMapper(new JdbiTypeCodecs.EnumSetSqlCodec.InterestColumnMapper());
-        jdbi.registerColumnMapper(Instant.class, (rs, col, ctx) -> {
-            Timestamp ts = rs.getTimestamp(col);
-            return ts != null ? ts.toInstant() : null;
-        });
+        JdbiTypeCodecs.registerInstantCodec(jdbi);
         communicationStorage = new JdbiConnectionStorage(jdbi);
         userStorage = new JdbiUserStorage(jdbi);
 

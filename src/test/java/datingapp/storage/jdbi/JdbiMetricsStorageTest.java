@@ -13,7 +13,6 @@ import datingapp.core.metrics.SwipeState.Session;
 import datingapp.core.model.User;
 import datingapp.core.storage.AnalyticsStorage;
 import datingapp.storage.DatabaseManager;
-import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
@@ -54,10 +53,7 @@ class JdbiMetricsStorageTest {
 
         jdbi.registerArgument(new JdbiTypeCodecs.EnumSetSqlCodec.EnumSetArgumentFactory());
         jdbi.registerColumnMapper(new JdbiTypeCodecs.EnumSetSqlCodec.InterestColumnMapper());
-        jdbi.registerColumnMapper(Instant.class, (rs, col, ctx) -> {
-            Timestamp ts = rs.getTimestamp(col);
-            return ts != null ? ts.toInstant() : null;
-        });
+        JdbiTypeCodecs.registerInstantCodec(jdbi);
 
         storage = new JdbiMetricsStorage(jdbi);
         userStorage = new JdbiUserStorage(jdbi);

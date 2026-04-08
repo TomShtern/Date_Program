@@ -6,7 +6,13 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import datingapp.core.AppConfig;
+import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
 import java.sql.Connection;
+import java.sql.Statement;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -153,6 +159,49 @@ class DatabaseManagerConfigurationTest {
     }
 
     @Test
+    @DisplayName("PostgreSQL session setup should pin timezone to UTC before applying timeout")
+    void postgresqlSessionSetupPinsTimezoneToUtc() throws Exception {
+        DatabaseManager manager = DatabaseManager.getInstance();
+        manager.configureStorage(AppConfig.builder()
+                .databaseDialect("POSTGRESQL")
+                .databaseUrl("jdbc:postgresql://localhost:55432/datingapp")
+                .databaseUsername("datingapp")
+                .queryTimeoutSeconds(42)
+                .build()
+                .storage());
+
+        List<String> executedSql = new ArrayList<>();
+        Statement statement = (Statement) Proxy.newProxyInstance(
+                Statement.class.getClassLoader(),
+                new Class<?>[] {Statement.class},
+                (proxy, method, args) -> switch (method.getName()) {
+                    case "execute" -> {
+                        executedSql.add((String) args[0]);
+                        yield true;
+                    }
+                    case "close" -> null;
+                    case "isClosed" -> false;
+                    default -> defaultValue(method.getReturnType());
+                });
+        Connection connection = (Connection) Proxy.newProxyInstance(
+                Connection.class.getClassLoader(),
+                new Class<?>[] {Connection.class},
+                (proxy, method, args) -> switch (method.getName()) {
+                    case "createStatement" -> statement;
+                    case "close" -> null;
+                    case "isClosed" -> false;
+                    default -> defaultValue(method.getReturnType());
+                });
+
+        Method applySessionQueryTimeout =
+                DatabaseManager.class.getDeclaredMethod("applySessionQueryTimeout", Connection.class);
+        applySessionQueryTimeout.setAccessible(true);
+        applySessionQueryTimeout.invoke(manager, connection);
+
+        assertEquals(List.of("SET TIME ZONE 'UTC'", "SET statement_timeout TO 42000"), executedSql);
+    }
+
+    @Test
     @DisplayName("resetInstance restores the default singleton JDBC URL")
     void resetInstanceRestoresDefaultSingletonJdbcUrl() throws Exception {
         DatabaseManager.setJdbcUrl("jdbc:h2:./target/dbmanager-config-reset-" + UUID.randomUUID());
@@ -174,6 +223,37 @@ class DatabaseManagerConfigurationTest {
         var field = DatabaseManager.class.getDeclaredField("jdbcUrl");
         field.setAccessible(true);
         return (String) field.get(null);
+    }
+
+    private static Object defaultValue(Class<?> returnType) {
+        if (returnType == Void.TYPE) {
+            return null;
+        }
+        if (returnType == Boolean.TYPE) {
+            return false;
+        }
+        if (returnType == Integer.TYPE) {
+            return 0;
+        }
+        if (returnType == Long.TYPE) {
+            return 0L;
+        }
+        if (returnType == Double.TYPE) {
+            return 0.0d;
+        }
+        if (returnType == Float.TYPE) {
+            return 0.0f;
+        }
+        if (returnType == Short.TYPE) {
+            return (short) 0;
+        }
+        if (returnType == Byte.TYPE) {
+            return (byte) 0;
+        }
+        if (returnType == Character.TYPE) {
+            return '\0';
+        }
+        return null;
     }
 
     private static void clearRuntimeConfig() {

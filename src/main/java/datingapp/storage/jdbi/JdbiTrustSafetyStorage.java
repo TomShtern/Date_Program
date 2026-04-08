@@ -30,11 +30,42 @@ public interface JdbiTrustSafetyStorage extends TrustSafetyStorage {
     // ═══════════════════════════════════════════════════════════════
 
     @SqlUpdate("""
-            INSERT INTO blocks (id, blocker_id, blocked_id, created_at)
-            VALUES (:id, :blockerId, :blockedId, :createdAt)
-            """)
+                        INSERT INTO blocks (id, blocker_id, blocked_id, created_at)
+                        VALUES (:id, :blockerId, :blockedId, :createdAt)
+                        """)
+    void insertBlockRow(@BindMethods Block block);
+
+    @SqlUpdate("""
+                        UPDATE blocks
+                        SET id = :id,
+                                created_at = :createdAt,
+                                deleted_at = NULL
+                        WHERE blocker_id = :blockerId
+                          AND blocked_id = :blockedId
+                          AND deleted_at IS NOT NULL
+                        """)
+    int reviveDeletedBlock(@BindMethods Block block);
+
+    @SqlQuery("""
+                        SELECT EXISTS (
+                                SELECT 1 FROM blocks
+                                WHERE blocker_id = :blockerId
+                                  AND blocked_id = :blockedId
+                                  AND deleted_at IS NULL
+                        )
+                        """)
+    boolean activeBlockExists(@Bind("blockerId") UUID blockerId, @Bind("blockedId") UUID blockedId);
+
     @Override
-    void save(@BindMethods Block block);
+    default void save(Block block) {
+        if (reviveDeletedBlock(block) > 0) {
+            return;
+        }
+        if (activeBlockExists(block.blockerId(), block.blockedId())) {
+            return;
+        }
+        insertBlockRow(block);
+    }
 
     @SqlQuery("""
             SELECT EXISTS (

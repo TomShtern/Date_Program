@@ -1,5 +1,6 @@
 package datingapp.storage.jdbi;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -7,7 +8,6 @@ import datingapp.core.connection.ConnectionModels.Block;
 import datingapp.core.connection.ConnectionModels.Like;
 import datingapp.core.connection.ConnectionModels.Report;
 import datingapp.storage.DatabaseManager;
-import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.UUID;
 import org.jdbi.v3.core.Jdbi;
@@ -52,10 +52,7 @@ class RecordBindingTest {
 
         jdbi.registerArgument(new JdbiTypeCodecs.EnumSetSqlCodec.EnumSetArgumentFactory());
         jdbi.registerColumnMapper(new JdbiTypeCodecs.EnumSetSqlCodec.InterestColumnMapper());
-        jdbi.registerColumnMapper(Instant.class, (rs, col, ctx) -> {
-            Timestamp ts = rs.getTimestamp(col);
-            return ts != null ? ts.toInstant() : null;
-        });
+        JdbiTypeCodecs.registerInstantCodec(jdbi);
 
         matchmakingStorage = new JdbiMatchmakingStorage(jdbi);
         trustSafetyStorage = jdbi.onDemand(JdbiTrustSafetyStorage.class);
@@ -137,6 +134,31 @@ class RecordBindingTest {
         // Verify the block was persisted
         boolean isBlocked = trustSafetyStorage.isBlocked(user1, user2);
         assertTrue(isBlocked, "Block should be persisted");
+    }
+
+    @Test
+    @DisplayName("Block can be recreated after delete without duplicating the pair")
+    void deletedBlockCanBeRecreated() {
+        UUID user1 = UUID.fromString("00000000-0000-0000-0000-000000000001");
+        UUID user2 = UUID.fromString("00000000-0000-0000-0000-000000000002");
+
+        trustSafetyStorage.save(Block.create(user1, user2));
+        assertTrue(trustSafetyStorage.deleteBlock(user1, user2));
+        assertFalse(trustSafetyStorage.isBlocked(user1, user2), "Block should be hidden after delete");
+
+        trustSafetyStorage.save(Block.create(user1, user2));
+
+        assertTrue(trustSafetyStorage.isBlocked(user1, user2), "Block should be active after recreation");
+        long pairRowCount = jdbi.withHandle(handle -> handle.createQuery(
+                        "SELECT COUNT(*) FROM blocks WHERE blocker_id = :blockerId AND blocked_id = :blockedId")
+                .bind("blockerId", user1)
+                .bind("blockedId", user2)
+                .mapTo(Long.class)
+                .one());
+        assertEquals(
+                1L,
+                pairRowCount,
+                "Recreating a block should revive the existing pair row rather than creating duplicates");
     }
 
     @Test

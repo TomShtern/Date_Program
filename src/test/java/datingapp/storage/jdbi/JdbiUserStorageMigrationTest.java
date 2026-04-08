@@ -10,7 +10,6 @@ import datingapp.core.profile.MatchPreferences.Dealbreakers;
 import datingapp.core.profile.MatchPreferences.Interest;
 import datingapp.core.profile.MatchPreferences.Lifestyle;
 import datingapp.storage.DatabaseManager;
-import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.EnumSet;
@@ -52,10 +51,7 @@ class JdbiUserStorageMigrationTest {
 
         jdbi.registerArgument(new JdbiTypeCodecs.EnumSetSqlCodec.EnumSetArgumentFactory());
         jdbi.registerColumnMapper(new JdbiTypeCodecs.EnumSetSqlCodec.InterestColumnMapper());
-        jdbi.registerColumnMapper(Instant.class, (rs, col, ctx) -> {
-            Timestamp ts = rs.getTimestamp(col);
-            return ts != null ? ts.toInstant() : null;
-        });
+        JdbiTypeCodecs.registerInstantCodec(jdbi);
 
         storage = new JdbiUserStorage(jdbi);
         userId = UUID.randomUUID();

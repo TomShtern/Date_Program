@@ -13,8 +13,6 @@ import datingapp.storage.schema.MigrationRunner;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.sql.Timestamp;
-import java.time.Instant;
 import java.util.UUID;
 import org.h2.api.Trigger;
 import org.jdbi.v3.core.Jdbi;
@@ -58,10 +56,7 @@ class JdbiConnectionStorageAtomicityTest {
 
         jdbi.registerArgument(new JdbiTypeCodecs.EnumSetSqlCodec.EnumSetArgumentFactory());
         jdbi.registerColumnMapper(new JdbiTypeCodecs.EnumSetSqlCodec.InterestColumnMapper());
-        jdbi.registerColumnMapper(Instant.class, (rs, col, ctx) -> {
-            Timestamp ts = rs.getTimestamp(col);
-            return ts != null ? ts.toInstant() : null;
-        });
+        JdbiTypeCodecs.registerInstantCodec(jdbi);
 
         jdbi.useHandle(handle -> {
             try (Statement stmt = handle.getConnection().createStatement()) {

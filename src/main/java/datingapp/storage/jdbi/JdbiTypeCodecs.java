@@ -2,6 +2,7 @@ package datingapp.storage.jdbi;
 
 import datingapp.core.profile.MatchPreferences;
 import java.lang.reflect.Type;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
@@ -9,13 +10,16 @@ import java.sql.Types;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Arrays;
+import java.util.Calendar;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.TimeZone;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import org.jdbi.v3.core.Jdbi;
 import org.jdbi.v3.core.argument.Argument;
 import org.jdbi.v3.core.argument.ArgumentFactory;
 import org.jdbi.v3.core.config.ConfigRegistry;
@@ -29,7 +33,19 @@ import org.slf4j.LoggerFactory;
 @SuppressWarnings("PMD.MissingStaticMethodInNonInstantiatableClass")
 public final class JdbiTypeCodecs {
 
+    private static final TimeZone UTC_TIME_ZONE = TimeZone.getTimeZone("UTC");
+
     private JdbiTypeCodecs() {}
+
+    public static void registerInstantCodec(Jdbi jdbi) {
+        Objects.requireNonNull(jdbi, "jdbi cannot be null");
+        jdbi.registerColumnMapper(Instant.class, (rs, col, ctx) -> SqlRowReaders.readInstant(rs, col));
+        jdbi.registerArgument(new InstantArgumentFactory());
+    }
+
+    private static Calendar utcCalendar() {
+        return Calendar.getInstance(UTC_TIME_ZONE);
+    }
 
     /** Null-safe SQL row readers shared across storage row mappers. */
     public static final class SqlRowReaders {
@@ -62,7 +78,13 @@ public final class JdbiTypeCodecs {
 
         @Nullable
         public static Instant readInstant(ResultSet rs, String column) throws SQLException {
-            Timestamp ts = rs.getTimestamp(column);
+            Timestamp ts = rs.getTimestamp(column, utcCalendar());
+            return ts == null ? null : ts.toInstant();
+        }
+
+        @Nullable
+        public static Instant readInstant(ResultSet rs, int column) throws SQLException {
+            Timestamp ts = rs.getTimestamp(column, utcCalendar());
             return ts == null ? null : ts.toInstant();
         }
 
@@ -163,6 +185,21 @@ public final class JdbiTypeCodecs {
                 }
                 return Optional.empty();
             }
+        }
+    }
+
+    public static final class InstantArgumentFactory implements ArgumentFactory {
+        @Override
+        public Optional<Argument> build(Type type, Object value, ConfigRegistry config) {
+            if (!(value instanceof Instant instant)) {
+                return Optional.empty();
+            }
+            return Optional.of((position, statement, context) -> bindInstant(statement, position, instant));
+        }
+
+        private static void bindInstant(PreparedStatement statement, int position, Instant instant)
+                throws SQLException {
+            statement.setTimestamp(position, Timestamp.from(instant), utcCalendar());
         }
     }
 }

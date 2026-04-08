@@ -33,6 +33,16 @@ public final class MigrationRunner {
     private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger(MigrationRunner.class);
     private static final String WHERE_NOT_DELETED = " WHERE deleted_at IS NULL";
     private static final String TABLE_MATCHES = "MATCHES";
+    private static final String SQL_TABLE_MATCHES = "matches";
+    private static final String TABLE_USERS = "USERS";
+    private static final String TABLE_CONVERSATIONS = "CONVERSATIONS";
+    private static final String TABLE_MESSAGES = "MESSAGES";
+    private static final String TABLE_UNDO_STATES = "UNDO_STATES";
+    private static final String VALUE_OTHER = "OTHER";
+    private static final String VALUE_GRACEFUL_EXIT = "GRACEFUL_EXIT";
+    private static final String VALUE_FRIEND_ZONE = "FRIEND_ZONE";
+    private static final String VALUE_UNMATCH = "UNMATCH";
+    private static final String VALUE_BLOCK = "BLOCK";
 
     private MigrationRunner() {
         // Utility class — static methods only
@@ -104,7 +114,15 @@ public final class MigrationRunner {
             new VersionedMigration(
                     11,
                     "Add pending friend-request uniqueness helpers and deterministic pair lookup columns",
-                    MigrationRunner::applyV11));
+                    MigrationRunner::applyV11),
+            new VersionedMigration(
+                    12,
+                    "Add safe enum-backed checks and deterministic pair-ID length constraints",
+                    MigrationRunner::applyV12),
+            new VersionedMigration(
+                    13,
+                    "Enforce matches.ended_by integrity against users and match participants",
+                    MigrationRunner::applyV13));
 
     // ═══════════════════════════════════════════════════════════════
     // Public entry point
@@ -224,7 +242,7 @@ public final class MigrationRunner {
      * conversation/created_at index.
      */
     private static void applyV7(Statement stmt) throws SQLException {
-        if (!hasTable(stmt, "MESSAGES")) {
+        if (!hasTable(stmt, TABLE_MESSAGES)) {
             return;
         }
         stmt.execute("CREATE INDEX IF NOT EXISTS idx_messages_conversation_id ON messages(conversation_id)");
@@ -250,8 +268,8 @@ public final class MigrationRunner {
                     "CREATE INDEX IF NOT EXISTS idx_likes_received_created ON likes(who_got_liked, created_at DESC)");
         }
 
-        if (hasTable(stmt, "CONVERSATIONS")) {
-            if (hasColumn(stmt, "CONVERSATIONS", "LAST_MESSAGE_AT")) {
+        if (hasTable(stmt, TABLE_CONVERSATIONS)) {
+            if (hasColumn(stmt, TABLE_CONVERSATIONS, "LAST_MESSAGE_AT")) {
                 createIndexWithFallback(
                         stmt,
                         "CREATE INDEX IF NOT EXISTS idx_conversations_user_a_last_msg ON conversations(user_a, last_message_at DESC)"
@@ -268,7 +286,7 @@ public final class MigrationRunner {
             }
         }
 
-        if (hasTable(stmt, "MESSAGES")) {
+        if (hasTable(stmt, TABLE_MESSAGES)) {
             createIndexWithFallback(
                     stmt,
                     "CREATE INDEX IF NOT EXISTS idx_messages_sender_created ON messages(sender_id, created_at DESC)"
@@ -364,6 +382,39 @@ public final class MigrationRunner {
                 "CREATE UNIQUE INDEX IF NOT EXISTS uk_friend_requests_pending_pair ON friend_requests(pair_key, pending_marker)");
     }
 
+    /**
+     * V12 migration: adds safe enum-backed checks plus deterministic ID length
+     * constraints that preserve current behavior while tightening database invariants.
+     */
+    private static void applyV12(Statement stmt) throws SQLException {
+        applyUserValueConstraints(stmt);
+        applyInteractionValueConstraints(stmt);
+    }
+
+    /**
+     * V13 migration: ensures {@code matches.ended_by} references a real user and,
+     * when present, one of the match participants.
+     */
+    private static void applyV13(Statement stmt) throws SQLException {
+        if (!hasTable(stmt, TABLE_MATCHES) || !hasColumn(stmt, TABLE_MATCHES, "ENDED_BY")) {
+            return;
+        }
+
+        long invalidParticipants = countInvalidMatchEnders(stmt);
+        if (invalidParticipants > 0) {
+            throw new SQLException("Cannot enforce matches ended_by participant integrity: "
+                    + invalidParticipants
+                    + " row(s) have ended_by outside the matched pair");
+        }
+
+        addForeignKeyIfMissing(stmt, SQL_TABLE_MATCHES, "fk_matches_ended_by", "ended_by", "users", "id");
+        addCheckConstraintIfMissing(
+                stmt,
+                SQL_TABLE_MATCHES,
+                "ck_matches_ended_by_participant",
+                "ended_by IS NULL OR ended_by = user_a OR ended_by = user_b");
+    }
+
     private static void repairMatchesUpdatedAtColumn(Statement stmt) throws SQLException {
         if (!hasTable(stmt, TABLE_MATCHES)) {
             return;
@@ -404,6 +455,20 @@ public final class MigrationRunner {
                 }
             }
             return false;
+        }
+    }
+
+    private static boolean hasConstraint(Statement stmt, String tableName, String constraintName) throws SQLException {
+        String metadataTableName = metadataIdentifier(stmt.getConnection(), tableName);
+        String metadataConstraintName = metadataIdentifier(stmt.getConnection(), constraintName);
+        try (var pstmt = stmt.getConnection()
+                .prepareStatement(
+                        "SELECT COUNT(*) FROM information_schema.table_constraints WHERE table_name = ? AND constraint_name = ?")) {
+            pstmt.setString(1, metadataTableName);
+            pstmt.setString(2, metadataConstraintName);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                return rs.next() && rs.getInt(1) > 0;
+            }
         }
     }
 
@@ -481,6 +546,257 @@ public final class MigrationRunner {
         try (ResultSet rs = stmt.executeQuery(sql)) {
             return rs.next() ? rs.getLong(1) : 0L;
         }
+    }
+
+    private static long countInvalidMatchEnders(Statement stmt) throws SQLException {
+        String sql = """
+                SELECT COUNT(*)
+                FROM matches
+                WHERE ended_by IS NOT NULL
+                  AND ended_by <> user_a
+                  AND ended_by <> user_b
+                """;
+        try (ResultSet rs = stmt.executeQuery(sql)) {
+            return rs.next() ? rs.getLong(1) : 0L;
+        }
+    }
+
+    private static void applyUserValueConstraints(Statement stmt) throws SQLException {
+        if (!hasTable(stmt, TABLE_USERS)) {
+            return;
+        }
+        addAllowedValuesConstraint(
+                stmt, "users", "state", "ck_users_state_values", false, "INCOMPLETE", "ACTIVE", "PAUSED", "BANNED");
+        addAllowedValuesConstraint(
+                stmt, "users", "gender", "ck_users_gender_values", true, "MALE", "FEMALE", VALUE_OTHER);
+        addAllowedValuesConstraint(
+                stmt, "users", "smoking", "ck_users_smoking_values", true, "NEVER", "SOMETIMES", "REGULARLY");
+        addAllowedValuesConstraint(
+                stmt, "users", "drinking", "ck_users_drinking_values", true, "NEVER", "SOCIALLY", "REGULARLY");
+        addAllowedValuesConstraint(
+                stmt, "users", "wants_kids", "ck_users_wants_kids_values", true, "NO", "OPEN", "SOMEDAY", "HAS_KIDS");
+        addAllowedValuesConstraint(
+                stmt,
+                "users",
+                "looking_for",
+                "ck_users_looking_for_values",
+                true,
+                "CASUAL",
+                "SHORT_TERM",
+                "LONG_TERM",
+                "MARRIAGE",
+                "UNSURE");
+        addAllowedValuesConstraint(
+                stmt,
+                "users",
+                "education",
+                "ck_users_education_values",
+                true,
+                "HIGH_SCHOOL",
+                "SOME_COLLEGE",
+                "BACHELORS",
+                "MASTERS",
+                "PHD",
+                "TRADE_SCHOOL",
+                VALUE_OTHER);
+        addAllowedValuesConstraint(
+                stmt, "users", "verification_method", "ck_users_verification_method_values", true, "EMAIL", "PHONE");
+        addAllowedValuesConstraint(
+                stmt,
+                "users",
+                "pace_messaging_frequency",
+                "ck_users_pace_msg_freq_values",
+                true,
+                "RARELY",
+                "OFTEN",
+                "CONSTANTLY",
+                "WILDCARD");
+        addAllowedValuesConstraint(
+                stmt,
+                "users",
+                "pace_time_to_first_date",
+                "ck_users_pace_first_date_values",
+                true,
+                "QUICKLY",
+                "FEW_DAYS",
+                "WEEKS",
+                "MONTHS",
+                "WILDCARD");
+        addAllowedValuesConstraint(
+                stmt,
+                "users",
+                "pace_communication_style",
+                "ck_users_pace_comm_style_values",
+                true,
+                "TEXT_ONLY",
+                "VOICE_NOTES",
+                "VIDEO_CALLS",
+                "IN_PERSON_ONLY",
+                "MIX_OF_EVERYTHING");
+        addAllowedValuesConstraint(
+                stmt,
+                "users",
+                "pace_depth_preference",
+                "ck_users_pace_depth_values",
+                true,
+                "SMALL_TALK",
+                "DEEP_CHAT",
+                "EXISTENTIAL",
+                "DEPENDS_ON_VIBE");
+    }
+
+    private static void applyInteractionValueConstraints(Statement stmt) throws SQLException {
+        if (hasTable(stmt, "LIKES")) {
+            addAllowedValuesConstraint(
+                    stmt, "likes", "direction", "ck_likes_direction_values", false, "LIKE", "SUPER_LIKE", "PASS");
+        }
+        if (hasTable(stmt, TABLE_MATCHES)) {
+            addAllowedValuesConstraint(
+                    stmt,
+                    SQL_TABLE_MATCHES,
+                    "state",
+                    "ck_matches_state_values",
+                    false,
+                    "ACTIVE",
+                    "FRIENDS",
+                    "UNMATCHED",
+                    VALUE_GRACEFUL_EXIT,
+                    "BLOCKED");
+            addAllowedValuesConstraint(
+                    stmt,
+                    SQL_TABLE_MATCHES,
+                    "end_reason",
+                    "ck_matches_end_reason_values",
+                    true,
+                    VALUE_FRIEND_ZONE,
+                    VALUE_GRACEFUL_EXIT,
+                    VALUE_UNMATCH,
+                    VALUE_BLOCK);
+            if (hasColumn(stmt, TABLE_MATCHES, "ID")) {
+                addCheckConstraintIfMissing(stmt, SQL_TABLE_MATCHES, "ck_matches_id_length", "CHAR_LENGTH(id) = 73");
+            }
+        }
+        if (hasTable(stmt, TABLE_CONVERSATIONS)) {
+            addAllowedValuesConstraint(
+                    stmt,
+                    "conversations",
+                    "archive_reason_a",
+                    "ck_conversations_archive_reason_a_values",
+                    true,
+                    VALUE_FRIEND_ZONE,
+                    VALUE_GRACEFUL_EXIT,
+                    VALUE_UNMATCH,
+                    VALUE_BLOCK);
+            addAllowedValuesConstraint(
+                    stmt,
+                    "conversations",
+                    "archive_reason_b",
+                    "ck_conversations_archive_reason_b_values",
+                    true,
+                    VALUE_FRIEND_ZONE,
+                    VALUE_GRACEFUL_EXIT,
+                    VALUE_UNMATCH,
+                    VALUE_BLOCK);
+            if (hasColumn(stmt, TABLE_CONVERSATIONS, "ID")) {
+                addCheckConstraintIfMissing(
+                        stmt, "conversations", "ck_conversations_id_length", "CHAR_LENGTH(id) = 73");
+            }
+        }
+        if (hasTable(stmt, TABLE_MESSAGES) && hasColumn(stmt, TABLE_MESSAGES, "CONVERSATION_ID")) {
+            addCheckConstraintIfMissing(
+                    stmt, "messages", "ck_messages_conversation_id_length", "CHAR_LENGTH(conversation_id) = 73");
+        }
+        if (hasTable(stmt, "FRIEND_REQUESTS")) {
+            addAllowedValuesConstraint(
+                    stmt,
+                    "friend_requests",
+                    "status",
+                    "ck_friend_requests_status_values",
+                    false,
+                    "PENDING",
+                    "ACCEPTED",
+                    "DECLINED",
+                    "EXPIRED");
+        }
+        if (hasTable(stmt, "NOTIFICATIONS")) {
+            addAllowedValuesConstraint(
+                    stmt,
+                    "notifications",
+                    "type",
+                    "ck_notifications_type_values",
+                    false,
+                    "MATCH_FOUND",
+                    "NEW_MESSAGE",
+                    "FRIEND_REQUEST",
+                    "FRIEND_REQUEST_ACCEPTED",
+                    VALUE_GRACEFUL_EXIT);
+        }
+        if (hasTable(stmt, "REPORTS")) {
+            addAllowedValuesConstraint(
+                    stmt,
+                    "reports",
+                    "reason",
+                    "ck_reports_reason_values",
+                    false,
+                    "SPAM",
+                    "INAPPROPRIATE_CONTENT",
+                    "HARASSMENT",
+                    "FAKE_PROFILE",
+                    "UNDERAGE",
+                    VALUE_OTHER);
+        }
+        if (hasTable(stmt, TABLE_UNDO_STATES)) {
+            addAllowedValuesConstraint(
+                    stmt,
+                    "undo_states",
+                    "direction",
+                    "ck_undo_states_direction_values",
+                    false,
+                    "LIKE",
+                    "SUPER_LIKE",
+                    "PASS");
+            if (hasColumn(stmt, TABLE_UNDO_STATES, "MATCH_ID")) {
+                addCheckConstraintIfMissing(
+                        stmt,
+                        "undo_states",
+                        "ck_undo_states_match_id_length",
+                        "match_id IS NULL OR CHAR_LENGTH(match_id) = 73");
+            }
+        }
+    }
+
+    private static void addAllowedValuesConstraint(
+            Statement stmt,
+            String tableName,
+            String columnName,
+            String constraintName,
+            boolean nullable,
+            String... allowedValues)
+            throws SQLException {
+        if (!hasColumn(stmt, tableName, columnName)) {
+            return;
+        }
+        String inClause = String.join(
+                ", ",
+                java.util.Arrays.stream(allowedValues)
+                        .map(MigrationRunner::quoteSqlLiteral)
+                        .toList());
+        String condition = nullable
+                ? columnName + " IS NULL OR " + columnName + " IN (" + inClause + ")"
+                : columnName + " IN (" + inClause + ")";
+        addCheckConstraintIfMissing(stmt, tableName, constraintName, condition);
+    }
+
+    private static void addCheckConstraintIfMissing(
+            Statement stmt, String tableName, String constraintName, String condition) throws SQLException {
+        if (hasConstraint(stmt, tableName, constraintName)) {
+            return;
+        }
+        stmt.execute("ALTER TABLE " + tableName + " ADD CONSTRAINT " + constraintName + " CHECK (" + condition + ")");
+    }
+
+    private static String quoteSqlLiteral(String value) {
+        return "'" + value.replace("'", "''") + "'";
     }
 
     private static void createIndexWithFallback(Statement stmt, String partialSql, String fallbackSql)

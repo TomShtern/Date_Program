@@ -358,11 +358,13 @@ public final class DatabaseManager {
         RuntimeStorageState storageState = runtimeStorageState.get();
         DatabaseDialect dialect =
                 storageState != null ? storageState.dialect() : DatabaseDialect.fromJdbcUrl(effectiveJdbcUrl());
-        String sql = dialect == DatabaseDialect.POSTGRESQL
-                ? "SET statement_timeout TO " + safeTimeoutMillis
-                : "SET QUERY_TIMEOUT " + safeTimeoutMillis;
         try (Statement statement = connection.createStatement()) {
-            statement.execute(sql);
+            statement.execute("SET TIME ZONE 'UTC'");
+            if (dialect == DatabaseDialect.POSTGRESQL) {
+                statement.execute("SET statement_timeout TO " + safeTimeoutMillis);
+            } else {
+                statement.execute("SET QUERY_TIMEOUT " + safeTimeoutMillis);
+            }
         } catch (SQLException e) {
             try {
                 connection.close();

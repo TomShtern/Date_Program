@@ -46,9 +46,7 @@ import datingapp.storage.jdbi.JdbiMetricsStorage;
 import datingapp.storage.jdbi.JdbiTrustSafetyStorage;
 import datingapp.storage.jdbi.JdbiTypeCodecs;
 import datingapp.storage.jdbi.JdbiUserStorage;
-import java.sql.Timestamp;
 import java.time.Duration;
-import java.time.Instant;
 import java.util.Objects;
 import java.util.UUID;
 import org.jdbi.v3.core.Jdbi;
@@ -101,12 +99,9 @@ public final class StorageFactory {
     }
 
     private static void registerTypeCodecs(Jdbi jdbi) {
+        JdbiTypeCodecs.registerInstantCodec(jdbi);
         jdbi.registerArgument(new JdbiTypeCodecs.EnumSetSqlCodec.EnumSetArgumentFactory());
         jdbi.registerColumnMapper(new JdbiTypeCodecs.EnumSetSqlCodec.InterestColumnMapper());
-        jdbi.registerColumnMapper(Instant.class, (rs, col, ctx) -> {
-            Timestamp ts = rs.getTimestamp(col);
-            return ts != null ? ts.toInstant() : null;
-        });
     }
 
     private static PersistenceComponents createPersistenceComponents(Jdbi jdbi) {

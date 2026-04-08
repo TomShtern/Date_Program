@@ -14,7 +14,6 @@ import datingapp.core.model.Match.MatchArchiveReason;
 import datingapp.core.model.Match.MatchState;
 import datingapp.core.model.User;
 import datingapp.storage.DatabaseManager;
-import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
@@ -57,10 +56,7 @@ class JdbiMatchmakingStorageTransitionAtomicityTest {
 
         jdbi.registerArgument(new JdbiTypeCodecs.EnumSetSqlCodec.EnumSetArgumentFactory());
         jdbi.registerColumnMapper(new JdbiTypeCodecs.EnumSetSqlCodec.InterestColumnMapper());
-        jdbi.registerColumnMapper(Instant.class, (rs, col, ctx) -> {
-            Timestamp ts = rs.getTimestamp(col);
-            return ts != null ? ts.toInstant() : null;
-        });
+        JdbiTypeCodecs.registerInstantCodec(jdbi);
 
         interactionStorage = new JdbiMatchmakingStorage(jdbi);
         userStorage = new JdbiUserStorage(jdbi);

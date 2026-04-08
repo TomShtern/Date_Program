@@ -189,9 +189,9 @@ class SchemaInitializerTest {
                     "Missing foreign key: fk_user_achievements_user");
 
             try (Statement stmt = connection.createStatement();
-                    ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM schema_version WHERE version = 10")) {
+                    ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM schema_version WHERE version = 13")) {
                 assertTrue(rs.next());
-                assertEquals(1, rs.getInt(1), "Schema version 10 should be recorded");
+                assertEquals(1, rs.getInt(1), "Schema version 13 should be recorded");
             }
         }
 
@@ -219,9 +219,63 @@ class SchemaInitializerTest {
                     "Migration should keep fk_user_achievements_user on rerun");
 
             try (Statement stmt = connection.createStatement();
-                    ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM schema_version WHERE version = 10")) {
+                    ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM schema_version WHERE version = 13")) {
                 assertTrue(rs.next());
-                assertEquals(1, rs.getInt(1), "Schema version 10 should still be recorded once");
+                assertEquals(1, rs.getInt(1), "Schema version 13 should still be recorded once");
+            }
+        }
+
+        @Test
+        @DisplayName("should enforce latest invariant checks and match ended_by integrity")
+        void latestMigrationEnforcesInvariantChecksAndEndedByIntegrity() throws SQLException {
+            String userA = "00000000-0000-0000-0000-000000000001";
+            String userB = "00000000-0000-0000-0000-000000000002";
+            String outsider = "00000000-0000-0000-0000-000000000003";
+            String canonicalMatchId = userA + "_" + userB;
+
+            try (Statement stmt = connection.createStatement()) {
+                MigrationRunner.runAllPending(stmt);
+
+                stmt.execute("INSERT INTO users (id, name, created_at, updated_at, state, gender) VALUES " + "('"
+                        + userA + "', 'User A', CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP(), 'ACTIVE', 'MALE')");
+                stmt.execute("INSERT INTO users (id, name, created_at, updated_at, state, gender) VALUES " + "('"
+                        + userB + "', 'User B', CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP(), 'ACTIVE', 'FEMALE')");
+                stmt.execute("INSERT INTO users (id, name, created_at, updated_at, state, gender) VALUES " + "('"
+                        + outsider + "', 'Outsider', CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP(), 'ACTIVE', 'OTHER')");
+
+                assertThrows(
+                        SQLException.class,
+                        () -> stmt.execute(
+                                "INSERT INTO likes (id, who_likes, who_got_liked, direction, created_at) VALUES "
+                                        + "('11111111-1111-1111-1111-111111111111', '"
+                                        + userA
+                                        + "', '"
+                                        + userB
+                                        + "', 'MAYBE', CURRENT_TIMESTAMP())"));
+
+                assertThrows(
+                        SQLException.class,
+                        () -> stmt.execute(
+                                "INSERT INTO matches (id, user_a, user_b, created_at, updated_at, state) VALUES "
+                                        + "('short-id', '"
+                                        + userA
+                                        + "', '"
+                                        + userB
+                                        + "', CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP(), 'ACTIVE')"));
+
+                assertThrows(
+                        SQLException.class,
+                        () -> stmt.execute(
+                                "INSERT INTO matches (id, user_a, user_b, created_at, updated_at, state, ended_at, ended_by, end_reason) VALUES "
+                                        + "('"
+                                        + canonicalMatchId
+                                        + "', '"
+                                        + userA
+                                        + "', '"
+                                        + userB
+                                        + "', CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP(), 'UNMATCHED', CURRENT_TIMESTAMP(), '"
+                                        + outsider
+                                        + "', 'UNMATCH')"));
             }
         }
 
