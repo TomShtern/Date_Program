@@ -1,107 +1,62 @@
-# CircleCI configuration for the Dating App
-# Mirrors the GitHub Actions verify.yml workflow:
+# CircleCI configuration for the Dating App.
+# Mirrors the repository's verification contract:
 #   1. Maven quality gate (spotless:check + verify)
-#   2. PostgreSQL runtime smoke test (Postgres 17)
+#   2. PostgreSQL runtime smoke test (PostgreSQL 17)
+#
+# The repository does not currently check in Maven Wrapper scripts, so both
+# jobs use an official Maven + Eclipse Temurin 25 image instead of a JDK-only
+# image. That avoids the previous "/bin/bash: mvn: command not found" failure.
 
 version: 2.1
 
-# ---------------------------------------------------------------------------
-# Orbs - reusable config packages
-# ---------------------------------------------------------------------------
-orbs:
-  maven: circleci/maven@2.1.1
-
-# ---------------------------------------------------------------------------
-# Executor - Java 25 (Eclipse Temurin) on Ubuntu Jammy
-# NOTE: Java 25 images may lag behind on Docker Hub. If the exact tag is
-#       unavailable, fall back to the latest available 25.x tag from
-#       https://hub.docker.com/r/eclipse-temurin/tags?page=1&name=25
-# ---------------------------------------------------------------------------
 executors:
-  java-25:
+  java-25-maven-postgres:
     docker:
-      - image: eclipse-temurin:25-jdk-jammy
-    working_directory: ~/project
-    environment:
-      MAVEN_OPTS: >-
-        -Xmx512m
-        -Dhttps.protocols=TLSv1.2
-
-# ---------------------------------------------------------------------------
-# Jobs
-# ---------------------------------------------------------------------------
-jobs:
-  # ---- Maven quality gate: spotless check, checkstyle, PMD, SpotBugs, JaCoCo ----
-  verify:
-    executor: java-25
-    steps:
-      - checkout
-
-      - restore_cache:
-          name: Restore Maven local repository
-          keys:
-            - v1-maven-deps-{{ checksum "pom.xml" }}
-            - v1-maven-deps-
-
-      - run:
-          name: Maven quality gate (spotless:check + verify)
-          command: |
-            mvn spotless:check verify \
-              -B \
-              -Dorg.slf4j.simpleLogger.defaultLogLevel=warn
-
-      - save_cache:
-          name: Persist Maven local repository
-          paths:
-            - ~/.m2/repository
-          key: v1-maven-deps-{{ checksum "pom.xml" }}
-
-      # Store test results for CircleCI's Insights and test summary UI
-      - store_test_results:
-          path: target/surefire-reports
-
-      # Attach JUnit XML and JaCoCo exec as build artifacts
-      - store_artifacts:
-          path: target/surefire-reports
-          destination: surefire-reports
-      - store_artifacts:
-          path: target/site/jacoco
-          destination: jacoco-report
-
-  # ---- PostgreSQL runtime smoke test ----
-  pg-smoke:
-    docker:
-      # Primary container: Java 25
-      - image: eclipse-temurin:25-jdk-jammy
-        environment:
-          # Connection details for the PostgreSQL service container
-          DATINGAPP_PGTEST_URL: jdbc:postgresql://localhost:5432/datingapp
-          DATINGAPP_PGTEST_USERNAME: datingapp
-          DATINGAPP_PGTEST_PASSWORD: datingapp
-      # Service container: PostgreSQL 17
+      - image: maven:3.9.14-eclipse-temurin-25
       - image: postgres:17
         environment:
           POSTGRES_USER: datingapp
           POSTGRES_PASSWORD: datingapp
           POSTGRES_DB: datingapp
-
     working_directory: ~/project
-    steps:
-      - checkout
+    environment:
+      MAVEN_OPTS: >-
+        -Xmx1024m
+        -Dhttps.protocols=TLSv1.2
+      MAVEN_CLI_OPTS: >-
+        -B
+        -Dorg.slf4j.simpleLogger.defaultLogLevel=warn
+      DATING_APP_DB_DIALECT: POSTGRESQL
+      DATING_APP_DB_URL: jdbc:postgresql://127.0.0.1:5432/datingapp
+      DATING_APP_DB_USERNAME: datingapp
+      DATING_APP_DB_PASSWORD: datingapp
 
+commands:
+  restore-maven-cache:
+    steps:
       - restore_cache:
           name: Restore Maven local repository
           keys:
-            - v1-maven-deps-{{ checksum "pom.xml" }}
-            - v1-maven-deps-
+            - v2-maven-deps-{{ checksum "pom.xml" }}
+            - v2-maven-deps-
 
-      # Wait for PostgreSQL to be ready before running tests
+  save-maven-cache:
+    steps:
+      - save_cache:
+          name: Persist Maven local repository
+          key: v2-maven-deps-{{ checksum "pom.xml" }}
+          paths:
+            - ~/.m2/repository
+
+  wait-for-postgresql:
+    steps:
       - run:
           name: Wait for PostgreSQL
           command: |
-            apt-get update -qq && apt-get install -qq -y postgresql-client > /dev/null 2>&1
+            apt-get update -qq
+            DEBIAN_FRONTEND=noninteractive apt-get install -qq -y postgresql-client > /dev/null
             for i in $(seq 1 30); do
-              if pg_isready -h localhost -U datingapp -d datingapp > /dev/null 2>&1; then
+              if pg_isready -h 127.0.0.1 -p 5432 -U datingapp -d datingapp > /dev/null 2>&1; then
                 echo "PostgreSQL is ready."
                 exit 0
               fi
@@ -111,14 +66,52 @@ jobs:
             echo "PostgreSQL did not become ready in time."
             exit 1
 
+jobs:
+  verify:
+    executor: java-25-maven-postgres
+    steps:
+      - checkout
+      - restore-maven-cache
+      - wait-for-postgresql
+
+      - run:
+          name: Maven quality gate (spotless:check + verify)
+          command: mvn ${MAVEN_CLI_OPTS} spotless:check verify
+
+      - save-maven-cache
+
+      - store_test_results:
+          path: target/surefire-reports
+
+      - store_artifacts:
+          path: target/surefire-reports
+          destination: surefire-reports
+      - store_artifacts:
+          path: target/site/jacoco
+          destination: jacoco-report
+      - store_artifacts:
+          path: target/spotbugsXml.xml
+          destination: spotbugs-report.xml
+
+  pg-smoke:
+    executor: java-25-maven-postgres
+    steps:
+      - checkout
+      - restore-maven-cache
+      - wait-for-postgresql
+
       - run:
           name: PostgreSQL smoke test
           command: |
-            mvn -Dcheckstyle.skip=true \
+            mvn ${MAVEN_CLI_OPTS} \
+              -Dcheckstyle.skip=true \
               -Dtest=PostgresqlRuntimeSmokeTest \
-              test \
-              -B \
-              -Dorg.slf4j.simpleLogger.defaultLogLevel=warn
+              -Ddatingapp.pgtest.url=jdbc:postgresql://127.0.0.1:5432/datingapp \
+              -Ddatingapp.pgtest.username=datingapp \
+              -Ddatingapp.pgtest.password=datingapp \
+              test
+
+      - save-maven-cache
 
       - store_test_results:
           path: target/surefire-reports
@@ -127,26 +120,10 @@ jobs:
           path: target/surefire-reports
           destination: pg-smoke-reports
 
-# ---------------------------------------------------------------------------
-# Workflows
-# ---------------------------------------------------------------------------
 workflows:
   ci-pipeline:
     jobs:
-      - verify:
-          filters:
-            branches:
-              only:
-                - main
-                - /pull\/\d+/
-                - /circleci.*/
-
+      - verify
       - pg-smoke:
           requires:
             - verify
-          filters:
-            branches:
-              only:
-                - main
-                - /pull\/\d+/
-                - /circleci.*/
