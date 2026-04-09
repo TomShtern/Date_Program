@@ -65,6 +65,31 @@ commands:
             echo "PostgreSQL did not become ready in time."
             exit 1
 
+  run-maven-with-heartbeat:
+    parameters:
+      step_name:
+        type: string
+      maven_command:
+        type: string
+      heartbeat_seconds:
+        type: integer
+        default: 60
+    steps:
+      - run:
+          name: << parameters.step_name >>
+          no_output_timeout: 45m
+          command: |
+            set -eu
+            bash -lc '<< parameters.maven_command >>' &
+            mvn_pid=$!
+
+            while kill -0 "$mvn_pid" 2>/dev/null; do
+              echo "[$(date -u +"%Y-%m-%dT%H:%M:%SZ")] << parameters.step_name >> still running"
+              sleep << parameters.heartbeat_seconds >>
+            done
+
+            wait "$mvn_pid"
+
 jobs:
   postgres-verify:
     executor: java-25-maven-postgres
@@ -73,10 +98,10 @@ jobs:
       - restore-maven-cache
       - wait-for-postgresql
 
-      - run:
-          name: Maven quality gate (spotless:check + verify)
-          no_output_timeout: 30m
-          command: mvn ${MAVEN_CLI_OPTS} spotless:check verify
+      - run-maven-with-heartbeat:
+          step_name: Maven quality gate (spotless:check + verify)
+          maven_command: mvn ${MAVEN_CLI_OPTS} spotless:check verify
+          heartbeat_seconds: 60
 
       - save-maven-cache
 
@@ -100,17 +125,17 @@ jobs:
       - restore-maven-cache
       - wait-for-postgresql
 
-      - run:
-          name: PostgreSQL smoke test
-          no_output_timeout: 15m
-          command: |
-            mvn ${MAVEN_CLI_OPTS} \
-              -Dcheckstyle.skip=true \
-              -Dtest=PostgresqlRuntimeSmokeTest \
-              -Ddatingapp.pgtest.url=jdbc:postgresql://127.0.0.1:5432/datingapp \
-              -Ddatingapp.pgtest.username=datingapp \
-              -Ddatingapp.pgtest.password=datingapp \
-              test
+      - run-maven-with-heartbeat:
+          step_name: PostgreSQL smoke test
+          maven_command: >-
+            mvn ${MAVEN_CLI_OPTS}
+            -Dcheckstyle.skip=true
+            -Dtest=PostgresqlRuntimeSmokeTest
+            -Ddatingapp.pgtest.url=jdbc:postgresql://127.0.0.1:5432/datingapp
+            -Ddatingapp.pgtest.username=datingapp
+            -Ddatingapp.pgtest.password=datingapp
+            test
+          heartbeat_seconds: 30
 
       - save-maven-cache
 

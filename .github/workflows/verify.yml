@@ -21,11 +21,11 @@ jobs:
           cache: maven
 
       # GitHub Actions owns the fast repository-native guardrail:
-      # format, compile, unit/integration tests that do not require explicit
-      # PostgreSQL runtime wiring. The full PostgreSQL-backed verification path
-      # lives in CircleCI.
+      # format, compile, and test feedback that runs quickly on GitHub-hosted
+      # runners. CircleCI remains the authoritative full-verification lane with
+      # the full verify phase and explicit PostgreSQL-backed integration checks.
       - name: Fast Maven feedback
         run: >-
-          mvn spotless:check verify
+          mvn spotless:check test
           -B
           -Dorg.slf4j.simpleLogger.defaultLogLevel=warn
