@@ -10,7 +10,7 @@ version: 2.1
 
 executors:
   java-25-maven-postgres:
-    resource_class: xlarge
+    resource_class: medium
     docker:
       - image: maven:3.9.14-eclipse-temurin-25
       - image: postgres:17
@@ -21,7 +21,7 @@ executors:
     working_directory: ~/project
     environment:
       MAVEN_OPTS: >-
-        -Xmx3072m
+        -Xmx1536m
         -XX:+UseG1GC
         -Dhttps.protocols=TLSv1.2
       MAVEN_CLI_OPTS: >-
