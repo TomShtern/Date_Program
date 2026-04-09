@@ -1,4 +1,4 @@
-name: verify
+name: github-fast-feedback
 
 on:
   push:
@@ -7,22 +7,8 @@ on:
   pull_request:
 
 jobs:
-  verify:
+  fast-feedback:
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:17
-        env:
-          POSTGRES_USER: datingapp
-          POSTGRES_PASSWORD: datingapp
-          POSTGRES_DB: datingapp
-        ports:
-          - 55432:5432
-        options: >-
-          --health-cmd "pg_isready -U datingapp -d datingapp"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -34,14 +20,12 @@ jobs:
           java-version: "25"
           cache: maven
 
-      - name: Maven quality gate
-        run: mvn spotless:check verify
-
-      - name: PostgreSQL smoke
+      # GitHub Actions owns the fast repository-native guardrail:
+      # format, compile, unit/integration tests that do not require explicit
+      # PostgreSQL runtime wiring. The full PostgreSQL-backed verification path
+      # lives in CircleCI.
+      - name: Fast Maven feedback
         run: >-
-          mvn -Dcheckstyle.skip=true
-          -Dtest=PostgresqlRuntimeSmokeTest
-          -Ddatingapp.pgtest.url=jdbc:postgresql://localhost:55432/datingapp
-          -Ddatingapp.pgtest.username=datingapp
-          -Ddatingapp.pgtest.password=datingapp
-          test
+          mvn spotless:check verify
+          -B
+          -Dorg.slf4j.simpleLogger.defaultLogLevel=warn

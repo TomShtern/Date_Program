@@ -1,7 +1,6 @@
-# CircleCI configuration for the Dating App.
-# Mirrors the repository's verification contract:
-#   1. Maven quality gate (spotless:check + verify)
-#   2. PostgreSQL runtime smoke test (PostgreSQL 17)
+# CircleCI owns the PostgreSQL-backed integration contract for this repository.
+# GitHub Actions handles the fast Maven feedback loop, while this pipeline runs
+# the heavier verification that explicitly wires a live PostgreSQL instance.
 #
 # The repository does not currently check in Maven Wrapper scripts, so both
 # jobs use an official Maven + Eclipse Temurin 25 image instead of a JDK-only
@@ -67,7 +66,7 @@ commands:
             exit 1
 
 jobs:
-  verify:
+  postgres-verify:
     executor: java-25-maven-postgres
     steps:
       - checkout
@@ -93,7 +92,7 @@ jobs:
           path: target/spotbugsXml.xml
           destination: spotbugs-report.xml
 
-  pg-smoke:
+  postgres-runtime-smoke:
     executor: java-25-maven-postgres
     steps:
       - checkout
@@ -121,9 +120,9 @@ jobs:
           destination: pg-smoke-reports
 
 workflows:
-  ci-pipeline:
+  postgresql-integration:
     jobs:
-      - verify
-      - pg-smoke:
+      - postgres-verify
+      - postgres-runtime-smoke:
           requires:
-            - verify
+            - postgres-verify
