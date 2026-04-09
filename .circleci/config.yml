@@ -40,29 +40,10 @@ commands:
           name: Install CI helper packages
           command: |
             apt-get update -qq
-            audio_pkg=libasound2
-            if ! apt-cache show libasound2 > /dev/null 2>&1; then
-              audio_pkg=libasound2t64
+            base_packages='postgresql-client xvfb xauth libgl1 libgtk-3-0 libxcomposite1 libxcursor1 libxdamage1 libxext6 libxfixes3 libxi6 libxinerama1 libxrandr2 libxrender1 libxt6 libxtst6 libxxf86vm1'
+            if ! DEBIAN_FRONTEND=noninteractive apt-get install -qq -y $base_packages libasound2 > /dev/null; then
+              DEBIAN_FRONTEND=noninteractive apt-get install -qq -y $base_packages libasound2t64 > /dev/null
             fi
-            DEBIAN_FRONTEND=noninteractive apt-get install -qq -y \
-              postgresql-client \
-              xvfb \
-              xauth \
-              libgl1 \
-              libgtk-3-0 \
-              libxcomposite1 \
-              libxcursor1 \
-              libxdamage1 \
-              libxext6 \
-              libxfixes3 \
-              libxi6 \
-              libxinerama1 \
-              libxrandr2 \
-              libxrender1 \
-              libxt6 \
-              libxtst6 \
-              libxxf86vm1 \
-              "$audio_pkg" > /dev/null
 
   restore-maven-cache:
     steps:

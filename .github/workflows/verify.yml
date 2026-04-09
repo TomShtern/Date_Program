@@ -23,14 +23,10 @@ jobs:
       - name: Install Linux UI dependencies
         run: |
           sudo apt-get update
-          audio_pkg=libasound2
-          if ! apt-cache show libasound2 > /dev/null 2>&1; then
-            audio_pkg=libasound2t64
+          base_packages='xvfb xauth libgl1 libgtk-3-0 libxcomposite1 libxcursor1 libxdamage1 libxext6 libxfixes3 libxi6 libxinerama1 libxrandr2 libxrender1 libxt6 libxtst6 libxxf86vm1'
+          if ! sudo DEBIAN_FRONTEND=noninteractive apt-get install -y $base_packages libasound2; then
+            sudo DEBIAN_FRONTEND=noninteractive apt-get install -y $base_packages libasound2t64
           fi
-          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
-            xvfb xauth libgl1 libgtk-3-0 libxcomposite1 libxcursor1 \
-            libxdamage1 libxext6 libxfixes3 libxi6 libxinerama1 libxrandr2 \
-            libxrender1 libxt6 libxtst6 libxxf86vm1 "$audio_pkg"
 
       # GitHub Actions owns the fast repository-native guardrail:
       # format, compile, and test feedback that runs quickly on GitHub-hosted
