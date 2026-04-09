@@ -3,6 +3,7 @@ param(
     [string]$Username = 'datingapp',
     [PSCredential]$Credential = $null,
     [string]$Database = 'datingapp',
+    [int]$StartupTimeoutSeconds = 10,
     [switch]$ThrowOnFailure
 )
 
@@ -22,13 +23,31 @@ function Exit-OrThrow {
     exit $ExitCode
 }
 
+function Set-Or-ClearEnvironmentVariable {
+    param(
+        [string]$Name,
+        [AllowNull()][string]$Value
+    )
+
+    if ($null -eq $Value -or $Value -eq '') {
+        Remove-Item "Env:$Name" -ErrorAction SilentlyContinue
+        return
+    }
+
+    Set-Item "Env:$Name" -Value $Value
+}
+
+if ($StartupTimeoutSeconds -lt 1) {
+    throw 'StartupTimeoutSeconds must be at least 1 second.'
+}
+
 # If no credential provided, create one with default dev credentials
 if ($null -eq $Credential) {
     $securePassword = ConvertTo-SecureString -String 'datingapp' -AsPlainText -Force
     $Credential = New-Object PSCredential($Username, $securePassword)
 }
 
-& (Join-Path $PSScriptRoot 'start_local_postgres.ps1') -Port $Port -Superuser $Credential.UserName -Credential $Credential -Database $Database
+& (Join-Path $PSScriptRoot 'start_local_postgres.ps1') -Port $Port -Superuser $Credential.UserName -Credential $Credential -Database $Database -StartupTimeoutSeconds $StartupTimeoutSeconds
 $startExitCode = $LASTEXITCODE
 
 if ($startExitCode -ne 0) {
@@ -38,6 +57,8 @@ if ($startExitCode -ne 0) {
 $plainPassword = $Credential.GetNetworkCredential().Password
 
 $mavenArgs = @(
+    '-B'
+    '-Dstyle.color=never'
     '-Dcheckstyle.skip=true'
     '-Dtest=PostgresqlRuntimeSmokeTest'
     "-Ddatingapp.pgtest.url=jdbc:postgresql://localhost:$Port/$Database"
@@ -51,10 +72,10 @@ $previousUrl = $env:DATING_APP_DB_URL
 $previousUsername = $env:DATING_APP_DB_USERNAME
 $previousPassword = $env:DATING_APP_DB_PASSWORD
 
-$env:DATING_APP_DB_DIALECT = 'POSTGRESQL'
-$env:DATING_APP_DB_URL = "jdbc:postgresql://localhost:$Port/$Database"
-$env:DATING_APP_DB_USERNAME = $Credential.UserName
-$env:DATING_APP_DB_PASSWORD = $plainPassword
+Set-Or-ClearEnvironmentVariable -Name 'DATING_APP_DB_DIALECT' -Value 'POSTGRESQL'
+Set-Or-ClearEnvironmentVariable -Name 'DATING_APP_DB_URL' -Value "jdbc:postgresql://localhost:$Port/$Database"
+Set-Or-ClearEnvironmentVariable -Name 'DATING_APP_DB_USERNAME' -Value $Credential.UserName
+Set-Or-ClearEnvironmentVariable -Name 'DATING_APP_DB_PASSWORD' -Value $plainPassword
 
 $mavenExitCode = 0
 
@@ -64,10 +85,10 @@ try {
     $mavenExitCode = $LASTEXITCODE
 }
 finally {
-    $env:DATING_APP_DB_DIALECT = $previousDialect
-    $env:DATING_APP_DB_URL = $previousUrl
-    $env:DATING_APP_DB_USERNAME = $previousUsername
-    $env:DATING_APP_DB_PASSWORD = $previousPassword
+    Set-Or-ClearEnvironmentVariable -Name 'DATING_APP_DB_DIALECT' -Value $previousDialect
+    Set-Or-ClearEnvironmentVariable -Name 'DATING_APP_DB_URL' -Value $previousUrl
+    Set-Or-ClearEnvironmentVariable -Name 'DATING_APP_DB_USERNAME' -Value $previousUsername
+    Set-Or-ClearEnvironmentVariable -Name 'DATING_APP_DB_PASSWORD' -Value $previousPassword
     # Clear plaintext password from memory
     if ($plainPassword) {
         $plainPassword = $null

@@ -9,9 +9,14 @@ on:
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   fast-feedback:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     permissions:
       contents: read
     steps:
@@ -27,10 +32,18 @@ jobs:
 
       - name: Install Linux UI dependencies
         run: |
-          sudo apt-get update
-          base_packages='xvfb xauth libgl1 libgtk-3-0 libxcomposite1 libxcursor1 libxdamage1 libxext6 libxfixes3 libxi6 libxinerama1 libxrandr2 libxrender1 libxt6 libxtst6 libxxf86vm1'
-          if ! sudo DEBIAN_FRONTEND=noninteractive apt-get install -y $base_packages libasound2; then
-            sudo DEBIAN_FRONTEND=noninteractive apt-get install -y $base_packages libasound2t64
+          install_ui_packages() {
+            local base_packages='xvfb xauth libgl1 libgtk-3-0 libxcomposite1 libxcursor1 libxdamage1 libxext6 libxfixes3 libxi6 libxinerama1 libxrandr2 libxrender1 libxt6 libxtst6 libxxf86vm1'
+
+            if ! sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends $base_packages libasound2; then
+              sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends $base_packages libasound2t64
+            fi
+          }
+
+          sudo apt-get update -qq
+          if ! install_ui_packages; then
+            sudo apt-get update -qq
+            install_ui_packages
           fi
 
       # GitHub Actions owns the fast repository-native guardrail:
@@ -39,7 +52,7 @@ jobs:
       # the full verify phase and explicit PostgreSQL-backed integration checks.
       - name: Fast Maven feedback
         run: >-
-          xvfb-run -a mvn spotless:check test
+          xvfb-run -a -s "-screen 0 1920x1080x24" mvn spotless:check test
           -B
           -Dstyle.color=never
           -Djava.awt.headless=true
