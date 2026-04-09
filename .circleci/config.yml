@@ -75,6 +75,7 @@ jobs:
 
       - run:
           name: Maven quality gate (spotless:check + verify)
+          no_output_timeout: 30m
           command: mvn ${MAVEN_CLI_OPTS} spotless:check verify
 
       - save-maven-cache
@@ -101,6 +102,7 @@ jobs:
 
       - run:
           name: PostgreSQL smoke test
+          no_output_timeout: 15m
           command: |
             mvn ${MAVEN_CLI_OPTS} \
               -Dcheckstyle.skip=true \
