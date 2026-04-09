@@ -20,6 +20,14 @@ jobs:
           java-version: "25"
           cache: maven
 
+      - name: Install Linux UI dependencies
+        run: >-
+          sudo apt-get update &&
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y
+          xvfb xauth libasound2 libgl1 libgtk-3-0 libxcomposite1 libxcursor1
+          libxdamage1 libxext6 libxfixes3 libxi6 libxinerama1 libxrandr2
+          libxrender1 libxt6 libxtst6 libxxf86vm1
+
       # GitHub Actions owns the fast repository-native guardrail:
       # format, compile, and test feedback that runs quickly on GitHub-hosted
       # runners. CircleCI remains the authoritative full-verification lane with
@@ -29,4 +37,5 @@ jobs:
           xvfb-run -a mvn spotless:check test
           -B
           -Dstyle.color=never
+          -Djava.awt.headless=true
           -Dorg.slf4j.simpleLogger.defaultLogLevel=warn
