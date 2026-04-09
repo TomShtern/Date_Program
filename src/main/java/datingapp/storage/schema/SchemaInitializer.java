@@ -307,7 +307,8 @@ public final class SchemaInitializer {
                     CONSTRAINT fk_daily_picks_user FOREIGN KEY (user_id)
                         REFERENCES users(id) ON DELETE CASCADE,
                     CONSTRAINT fk_daily_picks_picked_user FOREIGN KEY (picked_user_id)
-                        REFERENCES users(id) ON DELETE CASCADE
+                        REFERENCES users(id) ON DELETE CASCADE,
+                    CONSTRAINT ck_daily_picks_distinct_users CHECK (user_id <> picked_user_id)
                 )
                 """);
         stmt.execute("CREATE INDEX IF NOT EXISTS idx_daily_picks_pick_date ON daily_picks(pick_date)");
@@ -566,7 +567,8 @@ public final class SchemaInitializer {
                     interacted_at TIMESTAMP,
                     FOREIGN KEY (seeker_id) REFERENCES users(id) ON DELETE CASCADE,
                     FOREIGN KEY (standout_user_id) REFERENCES users(id) ON DELETE CASCADE,
-                    CONSTRAINT uk_standouts_daily UNIQUE (seeker_id, standout_user_id, featured_date)
+                    CONSTRAINT uk_standouts_daily UNIQUE (seeker_id, standout_user_id, featured_date),
+                    CONSTRAINT chk_standouts_distinct_users CHECK (seeker_id <> standout_user_id)
                 )
                 """);
 

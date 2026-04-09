@@ -440,7 +440,7 @@ function Assert-ResetScriptStopsAfterMavenFailure {
 
 function Assert-ResetScriptGeneratedImportSqlIncludesNormalizationAndTextFilters {
     $sandbox = New-ResetScriptSandbox -MavenExitCode 23
-    $keptTempDirectory = $null
+    $script:keptTempDirectoryToClean = $null
     try {
         Use-Sandbox $sandbox {
             $result = Invoke-ResetScript -Sandbox $sandbox
@@ -449,8 +449,8 @@ function Assert-ResetScriptGeneratedImportSqlIncludesNormalizationAndTextFilters
                 throw 'Expected the reset script to throw when Maven bootstrap fails so the generated SQL files are preserved.'
             }
 
-            $keptTempDirectory = Get-KeptTempDirectory -Message $result.Message
-            $importSqlPath = Join-Path $keptTempDirectory 'import.sql'
+            $script:keptTempDirectoryToClean = Get-KeptTempDirectory -Message $result.Message
+            $importSqlPath = Join-Path $script:keptTempDirectoryToClean 'import.sql'
 
             if (-not (Test-Path $importSqlPath)) {
                 throw "Expected import.sql to be preserved at $importSqlPath."
@@ -476,9 +476,10 @@ function Assert-ResetScriptGeneratedImportSqlIncludesNormalizationAndTextFilters
         }
     }
     finally {
-        if ($keptTempDirectory -and (Test-Path $keptTempDirectory)) {
-            Remove-Item -Path $keptTempDirectory -Recurse -Force -ErrorAction SilentlyContinue
+        if ($script:keptTempDirectoryToClean -and (Test-Path $script:keptTempDirectoryToClean)) {
+            Remove-Item -Path $script:keptTempDirectoryToClean -Recurse -Force -ErrorAction SilentlyContinue
         }
+        $script:keptTempDirectoryToClean = $null
         Remove-Item -Path $sandbox.TempRoot -Recurse -Force -ErrorAction SilentlyContinue
     }
 }

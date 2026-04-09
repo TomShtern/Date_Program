@@ -859,7 +859,23 @@ public final class MigrationRunner {
                 || !hasColumn(stmt, tableName, rightColumn)) {
             return;
         }
+        long violations = countDistinctUserViolations(stmt, tableName, leftColumn, rightColumn);
+        if (violations > 0) {
+            throw new SQLException("Cannot enforce " + constraintName + ": " + violations + " row(s) have " + leftColumn
+                    + " = " + rightColumn);
+        }
         addCheckConstraintIfMissing(stmt, tableName, constraintName, leftColumn + " <> " + rightColumn);
+    }
+
+    private static long countDistinctUserViolations(
+            Statement stmt, String tableName, String leftColumn, String rightColumn) throws SQLException {
+        String sql = "SELECT COUNT(*) FROM " + tableName + " WHERE " + leftColumn + " = " + rightColumn;
+        try (ResultSet rs = stmt.executeQuery(sql)) {
+            if (rs.next()) {
+                return rs.getLong(1);
+            }
+            return 0;
+        }
     }
 
     private static void addTrimmedTextNotBlankConstraint(
@@ -867,7 +883,23 @@ public final class MigrationRunner {
         if (!hasTable(stmt, tableName) || !hasColumn(stmt, tableName, columnName)) {
             return;
         }
+        long violations = countBlankTrimmedText(stmt, tableName, columnName);
+        if (violations > 0) {
+            throw new SQLException("Cannot enforce " + constraintName + ": " + violations + " row(s) have blank "
+                    + tableName + "." + columnName);
+        }
         addCheckConstraintIfMissing(stmt, tableName, constraintName, "CHAR_LENGTH(TRIM(" + columnName + ")) > 0");
+    }
+
+    private static long countBlankTrimmedText(Statement stmt, String tableName, String columnName) throws SQLException {
+        String sql = "SELECT COUNT(*) FROM " + tableName + " WHERE " + columnName + " IS NOT NULL AND CHAR_LENGTH(TRIM("
+                + columnName + ")) = 0";
+        try (ResultSet rs = stmt.executeQuery(sql)) {
+            if (rs.next()) {
+                return rs.getLong(1);
+            }
+            return 0;
+        }
     }
 
     private static void addAllowedValuesConstraint(
