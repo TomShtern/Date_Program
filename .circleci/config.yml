@@ -10,6 +10,7 @@ version: 2.1
 
 executors:
   java-25-maven-postgres:
+    resource_class: xlarge
     docker:
       - image: maven:3.9.14-eclipse-temurin-25
       - image: postgres:17
@@ -20,10 +21,12 @@ executors:
     working_directory: ~/project
     environment:
       MAVEN_OPTS: >-
-        -Xmx1024m
+        -Xmx3072m
+        -XX:+UseG1GC
         -Dhttps.protocols=TLSv1.2
       MAVEN_CLI_OPTS: >-
         -B
+        -Dstyle.color=never
         -Dorg.slf4j.simpleLogger.defaultLogLevel=warn
       DATING_APP_DB_DIALECT: POSTGRESQL
       DATING_APP_DB_URL: jdbc:postgresql://127.0.0.1:5432/datingapp
@@ -31,6 +34,14 @@ executors:
       DATING_APP_DB_PASSWORD: datingapp
 
 commands:
+  install-ci-packages:
+    steps:
+      - run:
+          name: Install CI helper packages
+          command: |
+            apt-get update -qq
+            DEBIAN_FRONTEND=noninteractive apt-get install -qq -y postgresql-client xvfb > /dev/null
+
   restore-maven-cache:
     steps:
       - restore_cache:
@@ -52,8 +63,6 @@ commands:
       - run:
           name: Wait for PostgreSQL
           command: |
-            apt-get update -qq
-            DEBIAN_FRONTEND=noninteractive apt-get install -qq -y postgresql-client > /dev/null
             for i in $(seq 1 30); do
               if pg_isready -h 127.0.0.1 -p 5432 -U datingapp -d datingapp > /dev/null 2>&1; then
                 echo "PostgreSQL is ready."
@@ -65,11 +74,11 @@ commands:
             echo "PostgreSQL did not become ready in time."
             exit 1
 
-  run-maven-with-heartbeat:
+  run-with-heartbeat:
     parameters:
       step_name:
         type: string
-      maven_command:
+      command:
         type: string
       heartbeat_seconds:
         type: integer
@@ -80,15 +89,23 @@ commands:
           no_output_timeout: 45m
           command: |
             set -eu
-            bash -lc '<< parameters.maven_command >>' &
-            mvn_pid=$!
+            heartbeat() {
+              while true; do
+                echo "[$(date -u +"%Y-%m-%dT%H:%M:%SZ")] << parameters.step_name >> still running"
+                sleep << parameters.heartbeat_seconds >>
+              done
+            }
 
-            while kill -0 "$mvn_pid" 2>/dev/null; do
-              echo "[$(date -u +"%Y-%m-%dT%H:%M:%SZ")] << parameters.step_name >> still running"
-              sleep << parameters.heartbeat_seconds >>
-            done
+            heartbeat &
+            heartbeat_pid=$!
 
-            wait "$mvn_pid"
+            cleanup() {
+              kill "$heartbeat_pid" 2>/dev/null || true
+              wait "$heartbeat_pid" 2>/dev/null || true
+            }
+
+            trap cleanup EXIT
+            stdbuf -oL -eL bash -lc '<< parameters.command >>'
 
 jobs:
   postgres-verify:
@@ -96,11 +113,17 @@ jobs:
     steps:
       - checkout
       - restore-maven-cache
+      - install-ci-packages
       - wait-for-postgresql
 
-      - run-maven-with-heartbeat:
-          step_name: Maven quality gate (spotless:check + verify)
-          maven_command: mvn ${MAVEN_CLI_OPTS} spotless:check verify
+      - run-with-heartbeat:
+          step_name: Maven test suite (headless JavaFX)
+          command: xvfb-run -a mvn ${MAVEN_CLI_OPTS} -Ptest-output-verbose test
+          heartbeat_seconds: 30
+
+      - run-with-heartbeat:
+          step_name: Maven verify plugins (skip tests)
+          command: mvn ${MAVEN_CLI_OPTS} -DskipTests verify
           heartbeat_seconds: 60
 
       - save-maven-cache
@@ -123,11 +146,12 @@ jobs:
     steps:
       - checkout
       - restore-maven-cache
+      - install-ci-packages
       - wait-for-postgresql
 
-      - run-maven-with-heartbeat:
+      - run-with-heartbeat:
           step_name: PostgreSQL smoke test
-          maven_command: >-
+          command: >-
             mvn ${MAVEN_CLI_OPTS}
             -Dcheckstyle.skip=true
             -Dtest=PostgresqlRuntimeSmokeTest

@@ -26,6 +26,7 @@ jobs:
       # the full verify phase and explicit PostgreSQL-backed integration checks.
       - name: Fast Maven feedback
         run: >-
-          mvn spotless:check test
+          xvfb-run -a mvn spotless:check test
           -B
+          -Dstyle.color=never
           -Dorg.slf4j.simpleLogger.defaultLogLevel=warn
