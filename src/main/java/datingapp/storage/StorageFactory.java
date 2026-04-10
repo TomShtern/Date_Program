@@ -75,6 +75,7 @@ public final class StorageFactory {
 
     private static ServiceRegistry buildRegistry(DatabaseManager dbManager, AppConfig config) {
         dbManager.configureQueryTimeoutSeconds(config.storage().queryTimeoutSeconds());
+        dbManager.configurePoolSettings(config.storage());
 
         Jdbi jdbi = createJdbi(dbManager);
         registerTypeCodecs(jdbi);

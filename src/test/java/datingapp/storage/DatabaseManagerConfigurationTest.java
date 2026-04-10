@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import com.zaxxer.hikari.HikariDataSource;
 import datingapp.core.AppConfig;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
@@ -198,7 +199,56 @@ class DatabaseManagerConfigurationTest {
         applySessionQueryTimeout.setAccessible(true);
         applySessionQueryTimeout.invoke(manager, connection);
 
-        assertEquals(List.of("SET TIME ZONE 'UTC'", "SET statement_timeout TO 42000"), executedSql);
+        assertEquals(
+                List.of("SET search_path TO public", "SET TIME ZONE 'UTC'", "SET statement_timeout TO 42000"),
+                executedSql);
+    }
+
+    @Test
+    @DisplayName("configurePoolSettings should externalize Hikari pool sizing and timeouts")
+    void configurePoolSettingsExternalizesHikariSettings() throws Exception {
+        System.setProperty(PROFILE_PROPERTY, "test");
+        DatabaseManager manager = DatabaseManager.createIsolated(
+                "jdbc:h2:mem:dbmanager-pool-" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1");
+        AppConfig.StorageConfig storageConfig = AppConfig.builder()
+                .databaseDialect("H2")
+                .databaseUrl("jdbc:h2:mem:dbmanager-pool-" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1")
+                .databaseUsername("sa")
+                .queryTimeoutSeconds(30)
+                .maxPoolSize(14)
+                .minIdle(4)
+                .connectionTimeoutSeconds(7)
+                .validationTimeoutSeconds(5)
+                .idleTimeoutSeconds(900)
+                .maxLifetimeSeconds(2400)
+                .keepaliveTimeSeconds(120)
+                .build()
+                .storage();
+
+        manager.configurePoolSettings(storageConfig);
+
+        Connection connection = manager.getConnection();
+        try {
+            assertNotNull(connection);
+            var dataSourceField = DatabaseManager.class.getDeclaredField("dataSource");
+            dataSourceField.setAccessible(true);
+            @SuppressWarnings("unchecked")
+            var dataSourceRef =
+                    (java.util.concurrent.atomic.AtomicReference<HikariDataSource>) dataSourceField.get(manager);
+            HikariDataSource dataSource = dataSourceRef.get();
+            assertNotNull(dataSource);
+            assertEquals(14, dataSource.getMaximumPoolSize());
+            assertEquals(4, dataSource.getMinimumIdle());
+            assertEquals(7000L, dataSource.getConnectionTimeout());
+            assertEquals(5000L, dataSource.getValidationTimeout());
+            assertEquals(900000L, dataSource.getIdleTimeout());
+            assertEquals(2400000L, dataSource.getMaxLifetime());
+            assertEquals(120000L, dataSource.getKeepaliveTime());
+        } finally {
+            connection.close();
+            manager.shutdown();
+            System.clearProperty(PROFILE_PROPERTY);
+        }
     }
 
     @Test

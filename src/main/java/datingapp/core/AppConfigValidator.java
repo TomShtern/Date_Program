@@ -201,6 +201,27 @@ final class AppConfigValidator {
         requireInRange(queryTimeoutSeconds, 1, 600, "queryTimeoutSeconds");
     }
 
+    static void validatePoolSizing(int maxPoolSize, int minIdle) {
+        requireInRange(maxPoolSize, 1, 200, "maxPoolSize");
+        requireInRange(minIdle, 0, 200, "minIdle");
+        if (minIdle > maxPoolSize) {
+            throw new IllegalArgumentException("minIdle must be <= maxPoolSize");
+        }
+    }
+
+    static void validatePoolTimeouts(
+            int connectionTimeoutSeconds,
+            int validationTimeoutSeconds,
+            int idleTimeoutSeconds,
+            int maxLifetimeSeconds,
+            int keepaliveTimeSeconds) {
+        requireInRange(connectionTimeoutSeconds, 1, 300, "connectionTimeoutSeconds");
+        requireInRange(validationTimeoutSeconds, 1, 300, "validationTimeoutSeconds");
+        requireInRange(idleTimeoutSeconds, 0, 86400, "idleTimeoutSeconds");
+        requireInRange(maxLifetimeSeconds, 0, 86400, "maxLifetimeSeconds");
+        requireInRange(keepaliveTimeSeconds, 0, 86400, "keepaliveTimeSeconds");
+    }
+
     static void validateSafetySession(
             int autoBanThreshold, ZoneId userTimeZone, int sessionTimeoutMinutes, int undoWindowSeconds) {
         Objects.requireNonNull(userTimeZone, "userTimeZone cannot be null");

@@ -37,6 +37,38 @@ public final class MigrationRunner {
     private static final String TABLE_CONVERSATIONS = "CONVERSATIONS";
     private static final String TABLE_MESSAGES = "MESSAGES";
     private static final String TABLE_UNDO_STATES = "UNDO_STATES";
+    private static final String TABLE_LIKES = "LIKES";
+    private static final String TABLE_FRIEND_REQUESTS = "FRIEND_REQUESTS";
+    private static final String TABLE_REPORTS = "REPORTS";
+    private static final String TABLE_PROFILE_NOTES = "PROFILE_NOTES";
+    private static final String TABLE_PROFILE_VIEWS = "PROFILE_VIEWS";
+    private static final String TABLE_BLOCKS = "BLOCKS";
+    private static final String TABLE_STANDOUTS = "STANDOUTS";
+    private static final String TABLE_SWIPE_SESSIONS = "SWIPE_SESSIONS";
+    private static final String TABLE_USER_STATS = "USER_STATS";
+    private static final String TABLE_PLATFORM_STATS = "PLATFORM_STATS";
+    private static final String TABLE_DAILY_PICKS = "DAILY_PICKS";
+    private static final String TABLE_DAILY_PICK_VIEWS = "DAILY_PICK_VIEWS";
+    private static final String TABLE_USER_ACHIEVEMENTS = "USER_ACHIEVEMENTS";
+    private static final String TABLE_USER_PHOTOS = "USER_PHOTOS";
+    private static final String TABLE_SCHEMA_VERSION = "SCHEMA_VERSION";
+    private static final String TABLE_NOTIFICATIONS = "notifications";
+    private static final String SQL_SELECT_COUNT_FROM = "SELECT COUNT(*) FROM ";
+    private static final String SQL_WHERE_FRAGMENT = " WHERE ";
+    private static final String SQL_CREATE_IDX_CONVERSATIONS_USER_A_LAST_MSG =
+            "CREATE INDEX IF NOT EXISTS idx_conversations_user_a_last_msg ON conversations(user_a, last_message_at DESC)";
+    private static final String SQL_CREATE_IDX_CONVERSATIONS_USER_B_LAST_MSG =
+            "CREATE INDEX IF NOT EXISTS idx_conversations_user_b_last_msg ON conversations(user_b, last_message_at DESC)";
+    private static final String SQL_ALTER_TABLE_PREFIX = "ALTER TABLE ";
+    private static final String SQL_ALTER_COLUMN_FRAGMENT = " ALTER COLUMN ";
+    private static final String SQL_ADD_CONSTRAINT_FRAGMENT = " ADD CONSTRAINT ";
+    private static final String COLUMN_STATE = "state";
+    private static final String COLUMN_CREATED_AT = "created_at";
+    private static final String COLUMN_UPDATED_AT = "updated_at";
+    private static final String COLUMN_DELETED_AT = "deleted_at";
+    private static final String VALUE_ACTIVE = "ACTIVE";
+    private static final String VALUE_NEVER = "NEVER";
+    private static final String VALUE_REGULARLY = "REGULARLY";
     private static final String VALUE_OTHER = "OTHER";
     private static final String VALUE_GRACEFUL_EXIT = "GRACEFUL_EXIT";
     private static final String VALUE_FRIEND_ZONE = "FRIEND_ZONE";
@@ -126,7 +158,23 @@ public final class MigrationRunner {
             new VersionedMigration(
                     14,
                     "Converge legacy databases on fresh-baseline structural checks and nonblank text constraints",
-                    MigrationRunner::applyV14));
+                    MigrationRunner::applyV14),
+            new VersionedMigration(
+                    15,
+                    "Add remaining enum-backed checks for swipe sessions and normalized profile preference tables",
+                    MigrationRunner::applyV15),
+            new VersionedMigration(
+                    16,
+                    "Realign conversation activity indexes with current query shapes and drop redundant message conversation index",
+                    MigrationRunner::applyV16),
+            new VersionedMigration(
+                    17,
+                    "Convert event and audit timestamps to TIMESTAMP WITH TIME ZONE using UTC semantics for legacy data",
+                    MigrationRunner::applyV17),
+            new VersionedMigration(
+                    18,
+                    "Normalize and enforce unique email/phone verification contacts in users",
+                    MigrationRunner::applyV18));
 
     // ═══════════════════════════════════════════════════════════════
     // Public entry point
@@ -234,7 +282,7 @@ public final class MigrationRunner {
      */
     private static void applyV5(Statement stmt) throws SQLException {
         stmt.execute("ALTER TABLE profile_views DROP COLUMN IF EXISTS id");
-        if (!hasPrimaryKey(stmt, "PROFILE_VIEWS")) {
+        if (!hasPrimaryKey(stmt, TABLE_PROFILE_VIEWS)) {
             stmt.execute(
                     "ALTER TABLE profile_views ADD CONSTRAINT pk_profile_views PRIMARY KEY (viewer_id, viewed_id, viewed_at)");
         }
@@ -270,7 +318,7 @@ public final class MigrationRunner {
      * clause syntax, so each index falls back to a non-partial equivalent.
      */
     private static void applyV8(Statement stmt) throws SQLException {
-        if (hasTable(stmt, "LIKES")) {
+        if (hasTable(stmt, TABLE_LIKES)) {
             createIndexWithFallback(
                     stmt,
                     "CREATE INDEX IF NOT EXISTS idx_likes_direction_created ON likes(direction, created_at DESC)"
@@ -287,14 +335,12 @@ public final class MigrationRunner {
             if (hasColumn(stmt, TABLE_CONVERSATIONS, "LAST_MESSAGE_AT")) {
                 createIndexWithFallback(
                         stmt,
-                        "CREATE INDEX IF NOT EXISTS idx_conversations_user_a_last_msg ON conversations(user_a, last_message_at DESC)"
-                                + WHERE_NOT_DELETED,
-                        "CREATE INDEX IF NOT EXISTS idx_conversations_user_a_last_msg ON conversations(user_a, last_message_at DESC)");
+                        SQL_CREATE_IDX_CONVERSATIONS_USER_A_LAST_MSG + WHERE_NOT_DELETED,
+                        SQL_CREATE_IDX_CONVERSATIONS_USER_A_LAST_MSG);
                 createIndexWithFallback(
                         stmt,
-                        "CREATE INDEX IF NOT EXISTS idx_conversations_user_b_last_msg ON conversations(user_b, last_message_at DESC)"
-                                + WHERE_NOT_DELETED,
-                        "CREATE INDEX IF NOT EXISTS idx_conversations_user_b_last_msg ON conversations(user_b, last_message_at DESC)");
+                        SQL_CREATE_IDX_CONVERSATIONS_USER_B_LAST_MSG + WHERE_NOT_DELETED,
+                        SQL_CREATE_IDX_CONVERSATIONS_USER_B_LAST_MSG);
             } else {
                 stmt.execute("CREATE INDEX IF NOT EXISTS idx_conversations_user_a_last_msg ON conversations(user_a)");
                 stmt.execute("CREATE INDEX IF NOT EXISTS idx_conversations_user_b_last_msg ON conversations(user_b)");
@@ -309,7 +355,7 @@ public final class MigrationRunner {
                     "CREATE INDEX IF NOT EXISTS idx_messages_sender_created ON messages(sender_id, created_at DESC)");
         }
 
-        if (hasTable(stmt, "SWIPE_SESSIONS")) {
+        if (hasTable(stmt, TABLE_SWIPE_SESSIONS)) {
             createIndexWithFallback(
                     stmt,
                     "CREATE INDEX IF NOT EXISTS idx_sessions_started_at_desc ON swipe_sessions(started_at DESC)"
@@ -317,11 +363,11 @@ public final class MigrationRunner {
                     "CREATE INDEX IF NOT EXISTS idx_sessions_started_at_desc ON swipe_sessions(started_at DESC)");
         }
 
-        if (hasTable(stmt, "USER_STATS")) {
+        if (hasTable(stmt, TABLE_USER_STATS)) {
             stmt.execute("CREATE INDEX IF NOT EXISTS idx_user_stats_computed_desc ON user_stats(computed_at DESC)");
         }
 
-        if (hasTable(stmt, "STANDOUTS")) {
+        if (hasTable(stmt, TABLE_STANDOUTS)) {
             createIndexWithFallback(
                     stmt,
                     "CREATE INDEX IF NOT EXISTS idx_standouts_interacted_at ON standouts(seeker_id, interacted_at DESC)"
@@ -349,10 +395,10 @@ public final class MigrationRunner {
      * user_achievements with orphan preflight checks.
      */
     private static void applyV10(Statement stmt) throws SQLException {
-        if (hasTable(stmt, "DAILY_PICK_VIEWS")) {
+        if (hasTable(stmt, TABLE_DAILY_PICK_VIEWS)) {
             addForeignKeyIfMissing(stmt, "daily_pick_views", "fk_daily_pick_views_user", "user_id", "users", "id");
         }
-        if (hasTable(stmt, "USER_ACHIEVEMENTS")) {
+        if (hasTable(stmt, TABLE_USER_ACHIEVEMENTS)) {
             addForeignKeyIfMissing(stmt, "user_achievements", "fk_user_achievements_user", "user_id", "users", "id");
         }
     }
@@ -363,7 +409,7 @@ public final class MigrationRunner {
      * history rows.
      */
     private static void applyV11(Statement stmt) throws SQLException {
-        if (!hasTable(stmt, "FRIEND_REQUESTS")) {
+        if (!hasTable(stmt, TABLE_FRIEND_REQUESTS)) {
             return;
         }
 
@@ -437,6 +483,201 @@ public final class MigrationRunner {
     private static void applyV14(Statement stmt) throws SQLException {
         applyFreshBaselineStructuralConstraints(stmt);
         applyNonBlankTextConstraints(stmt);
+    }
+
+    /**
+     * V15 migration: adds remaining enum-backed checks that fresh installs already
+     * expect on swipe sessions and normalized profile preference tables.
+     */
+    private static void applyV15(Statement stmt) throws SQLException {
+        applySwipeSessionValueConstraints(stmt);
+        applyNormalizedProfileValueConstraints(stmt);
+    }
+
+    /**
+     * V16 migration: drop the redundant standalone messages(conversation_id) index and rebuild
+     * conversation list indexes so they match the visible-conversation query path more closely.
+     */
+    private static void applyV16(Statement stmt) throws SQLException {
+        if (hasTable(stmt, TABLE_MESSAGES)) {
+            stmt.execute("DROP INDEX IF EXISTS idx_messages_conversation_id");
+        }
+
+        if (!hasTable(stmt, TABLE_CONVERSATIONS)) {
+            return;
+        }
+
+        rebuildConversationActivityIndexes(stmt);
+    }
+
+    private static void applyV17(Statement stmt) throws SQLException {
+        alterTimestampColumnsToTimeZone(
+                stmt,
+                "users",
+                COLUMN_CREATED_AT,
+                COLUMN_UPDATED_AT,
+                "verification_sent_at",
+                "verified_at",
+                COLUMN_DELETED_AT);
+        alterTimestampColumnsToTimeZone(stmt, TABLE_LIKES, COLUMN_CREATED_AT, COLUMN_DELETED_AT);
+        alterTimestampColumnsToTimeZone(
+                stmt, SQL_TABLE_MATCHES, COLUMN_CREATED_AT, COLUMN_UPDATED_AT, "ended_at", COLUMN_DELETED_AT);
+        alterTimestampColumnsToTimeZone(stmt, TABLE_SWIPE_SESSIONS, "started_at", "last_activity_at", "ended_at");
+        alterTimestampColumnsToTimeZone(stmt, TABLE_USER_STATS, "computed_at");
+        alterTimestampColumnsToTimeZone(stmt, TABLE_PLATFORM_STATS, "computed_at");
+        alterTimestampColumnsToTimeZone(stmt, TABLE_DAILY_PICKS, COLUMN_CREATED_AT);
+        alterTimestampColumnsToTimeZone(stmt, TABLE_DAILY_PICK_VIEWS, "viewed_at");
+        alterTimestampColumnsToTimeZone(stmt, TABLE_USER_ACHIEVEMENTS, "unlocked_at");
+        alterTimestampColumnsToTimeZone(
+                stmt,
+                "conversations",
+                COLUMN_CREATED_AT,
+                "last_message_at",
+                "user_a_last_read_at",
+                "user_b_last_read_at",
+                "archived_at_a",
+                "archived_at_b",
+                COLUMN_DELETED_AT);
+        alterTimestampColumnsToTimeZone(stmt, TABLE_MESSAGES, COLUMN_CREATED_AT, COLUMN_DELETED_AT);
+        alterTimestampColumnsToTimeZone(stmt, TABLE_FRIEND_REQUESTS, COLUMN_CREATED_AT, "responded_at");
+        alterTimestampColumnsToTimeZone(stmt, TABLE_NOTIFICATIONS, COLUMN_CREATED_AT);
+        alterTimestampColumnsToTimeZone(stmt, TABLE_BLOCKS, COLUMN_CREATED_AT, COLUMN_DELETED_AT);
+        alterTimestampColumnsToTimeZone(stmt, TABLE_REPORTS, COLUMN_CREATED_AT, COLUMN_DELETED_AT);
+        alterTimestampColumnsToTimeZone(
+                stmt, TABLE_PROFILE_NOTES, COLUMN_CREATED_AT, COLUMN_UPDATED_AT, COLUMN_DELETED_AT);
+        alterTimestampColumnsToTimeZone(stmt, TABLE_PROFILE_VIEWS, "viewed_at");
+        alterTimestampColumnsToTimeZone(stmt, TABLE_STANDOUTS, COLUMN_CREATED_AT, "interacted_at");
+        alterTimestampColumnsToTimeZone(stmt, TABLE_USER_PHOTOS, COLUMN_CREATED_AT);
+        alterTimestampColumnsToTimeZone(stmt, TABLE_UNDO_STATES, "like_created_at", "expires_at");
+        alterTimestampColumnsToTimeZone(stmt, TABLE_SCHEMA_VERSION, "applied_at");
+    }
+
+    private static void applyV18(Statement stmt) throws SQLException {
+        if (!hasTable(stmt, TABLE_USERS)) {
+            return;
+        }
+
+        if (hasColumn(stmt, TABLE_USERS, "EMAIL")) {
+            stmt.execute("UPDATE users SET email = NULL WHERE email IS NOT NULL AND TRIM(email) = ''");
+            stmt.execute("UPDATE users SET email = TRIM(email) WHERE email IS NOT NULL");
+            long duplicateEmails = countDuplicateTrimmedValues(stmt, "users", "email");
+            if (duplicateEmails > 0) {
+                throw new SQLException("Cannot enforce unique users.email values: " + duplicateEmails
+                        + " duplicate trimmed value(s) exist");
+            }
+            addCheckConstraintIfMissing(
+                    stmt, "users", "ck_users_email_trimmed", "email IS NULL OR email = TRIM(email)");
+            addUniqueConstraintIfMissing(stmt, "users", "uk_users_email", "email");
+        }
+
+        if (hasColumn(stmt, TABLE_USERS, "PHONE")) {
+            stmt.execute("UPDATE users SET phone = NULL WHERE phone IS NOT NULL AND TRIM(phone) = ''");
+            stmt.execute("UPDATE users SET phone = TRIM(phone) WHERE phone IS NOT NULL");
+            long duplicatePhones = countDuplicateTrimmedValues(stmt, "users", "phone");
+            if (duplicatePhones > 0) {
+                throw new SQLException("Cannot enforce unique users.phone values: " + duplicatePhones
+                        + " duplicate trimmed value(s) exist");
+            }
+            addCheckConstraintIfMissing(
+                    stmt, "users", "ck_users_phone_trimmed", "phone IS NULL OR phone = TRIM(phone)");
+            addUniqueConstraintIfMissing(stmt, "users", "uk_users_phone", "phone");
+        }
+    }
+
+    private static void rebuildConversationActivityIndexes(Statement stmt) throws SQLException {
+        stmt.execute("DROP INDEX IF EXISTS idx_conversations_user_a_last_msg");
+        stmt.execute("DROP INDEX IF EXISTS idx_conversations_user_b_last_msg");
+
+        boolean hasLastMessageAt = hasColumn(stmt, TABLE_CONVERSATIONS, "LAST_MESSAGE_AT");
+        boolean hasCreatedAt = hasColumn(stmt, TABLE_CONVERSATIONS, "CREATED_AT");
+        boolean hasDeletedAt = hasColumn(stmt, TABLE_CONVERSATIONS, "DELETED_AT");
+        boolean hasVisibleToUserA = hasColumn(stmt, TABLE_CONVERSATIONS, "VISIBLE_TO_USER_A");
+        boolean hasVisibleToUserB = hasColumn(stmt, TABLE_CONVERSATIONS, "VISIBLE_TO_USER_B");
+
+        if (hasLastMessageAt && hasCreatedAt && hasVisibleToUserA && hasVisibleToUserB && hasDeletedAt) {
+            createIndexWithFallback(
+                    stmt,
+                    "CREATE INDEX IF NOT EXISTS idx_conversations_user_a_last_msg "
+                            + "ON conversations(user_a, last_message_at DESC, created_at DESC, id DESC) "
+                            + "WHERE deleted_at IS NULL AND visible_to_user_a = TRUE",
+                    "CREATE INDEX IF NOT EXISTS idx_conversations_user_a_last_msg "
+                            + "ON conversations(user_a, visible_to_user_a, deleted_at, last_message_at DESC, created_at DESC, id DESC)");
+            createIndexWithFallback(
+                    stmt,
+                    "CREATE INDEX IF NOT EXISTS idx_conversations_user_b_last_msg "
+                            + "ON conversations(user_b, last_message_at DESC, created_at DESC, id DESC) "
+                            + "WHERE deleted_at IS NULL AND visible_to_user_b = TRUE",
+                    "CREATE INDEX IF NOT EXISTS idx_conversations_user_b_last_msg "
+                            + "ON conversations(user_b, visible_to_user_b, deleted_at, last_message_at DESC, created_at DESC, id DESC)");
+            return;
+        }
+
+        if (hasLastMessageAt && hasCreatedAt && hasDeletedAt) {
+            createIndexWithFallback(
+                    stmt,
+                    "CREATE INDEX IF NOT EXISTS idx_conversations_user_a_last_msg "
+                            + "ON conversations(user_a, last_message_at DESC, created_at DESC, id DESC) WHERE deleted_at IS NULL",
+                    "CREATE INDEX IF NOT EXISTS idx_conversations_user_a_last_msg "
+                            + "ON conversations(user_a, deleted_at, last_message_at DESC, created_at DESC, id DESC)");
+            createIndexWithFallback(
+                    stmt,
+                    "CREATE INDEX IF NOT EXISTS idx_conversations_user_b_last_msg "
+                            + "ON conversations(user_b, last_message_at DESC, created_at DESC, id DESC) WHERE deleted_at IS NULL",
+                    "CREATE INDEX IF NOT EXISTS idx_conversations_user_b_last_msg "
+                            + "ON conversations(user_b, deleted_at, last_message_at DESC, created_at DESC, id DESC)");
+            return;
+        }
+
+        if (hasLastMessageAt) {
+            createIndexWithFallback(
+                    stmt,
+                    SQL_CREATE_IDX_CONVERSATIONS_USER_A_LAST_MSG + (hasDeletedAt ? WHERE_NOT_DELETED : ""),
+                    SQL_CREATE_IDX_CONVERSATIONS_USER_A_LAST_MSG);
+            createIndexWithFallback(
+                    stmt,
+                    SQL_CREATE_IDX_CONVERSATIONS_USER_B_LAST_MSG + (hasDeletedAt ? WHERE_NOT_DELETED : ""),
+                    SQL_CREATE_IDX_CONVERSATIONS_USER_B_LAST_MSG);
+            return;
+        }
+
+        stmt.execute("CREATE INDEX IF NOT EXISTS idx_conversations_user_a_last_msg ON conversations(user_a)");
+        stmt.execute("CREATE INDEX IF NOT EXISTS idx_conversations_user_b_last_msg ON conversations(user_b)");
+    }
+
+    private static void alterTimestampColumnsToTimeZone(Statement stmt, String tableName, String... columnNames)
+            throws SQLException {
+        if (!hasTable(stmt, tableName)) {
+            return;
+        }
+
+        for (String columnName : columnNames) {
+            if (hasColumn(stmt, tableName, columnName)) {
+                alterTimestampColumnToTimeZone(stmt, tableName, columnName);
+            }
+        }
+    }
+
+    private static void alterTimestampColumnToTimeZone(Statement stmt, String tableName, String columnName)
+            throws SQLException {
+        String postgresSql = SQL_ALTER_TABLE_PREFIX + tableName + SQL_ALTER_COLUMN_FRAGMENT + columnName
+                + " TYPE TIMESTAMP WITH TIME ZONE USING " + columnName + " AT TIME ZONE 'UTC'";
+        try {
+            stmt.execute(postgresSql);
+        } catch (SQLException postgresFailure) {
+            try {
+                stmt.execute(SQL_ALTER_TABLE_PREFIX + tableName + SQL_ALTER_COLUMN_FRAGMENT + columnName
+                        + " TIMESTAMP WITH TIME ZONE");
+            } catch (SQLException firstFallbackFailure) {
+                try {
+                    stmt.execute(SQL_ALTER_TABLE_PREFIX + tableName + SQL_ALTER_COLUMN_FRAGMENT + columnName
+                            + " SET DATA TYPE TIMESTAMP WITH TIME ZONE");
+                } catch (SQLException secondFallbackFailure) {
+                    secondFallbackFailure.addSuppressed(firstFallbackFailure);
+                    secondFallbackFailure.addSuppressed(postgresFailure);
+                    throw secondFallbackFailure;
+                }
+            }
+        }
     }
 
     private static void repairMatchesUpdatedAtColumn(Statement stmt) throws SQLException {
@@ -516,6 +757,20 @@ public final class MigrationRunner {
         }
     }
 
+    private static boolean hasColumnIgnoreCase(Statement stmt, String tableName, String columnName)
+            throws SQLException {
+        String metadataTableName = metadataIdentifier(stmt.getConnection(), tableName);
+        try (var pstmt = stmt.getConnection()
+                .prepareStatement(
+                        "SELECT COUNT(*) FROM information_schema.columns WHERE table_name = ? AND UPPER(column_name) = UPPER(?)")) {
+            pstmt.setString(1, metadataTableName);
+            pstmt.setString(2, columnName);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                return rs.next() && rs.getInt(1) > 0;
+            }
+        }
+    }
+
     private static void addForeignKeyIfMissing(
             Statement stmt,
             String tableName,
@@ -544,9 +799,9 @@ public final class MigrationRunner {
                     + referencedColumn);
         }
 
-        stmt.execute("ALTER TABLE "
+        stmt.execute(SQL_ALTER_TABLE_PREFIX
                 + tableName
-                + " ADD CONSTRAINT "
+                + SQL_ADD_CONSTRAINT_FRAGMENT
                 + foreignKeyName
                 + " FOREIGN KEY ("
                 + columnName
@@ -560,7 +815,7 @@ public final class MigrationRunner {
     private static long countOrphanRows(
             Statement stmt, String tableName, String columnName, String referencedTable, String referencedColumn)
             throws SQLException {
-        String sql = "SELECT COUNT(*) FROM "
+        String sql = SQL_SELECT_COUNT_FROM
                 + tableName
                 + " t WHERE t."
                 + columnName
@@ -610,13 +865,21 @@ public final class MigrationRunner {
             return;
         }
         addAllowedValuesConstraint(
-                stmt, "users", "state", "ck_users_state_values", false, "INCOMPLETE", "ACTIVE", "PAUSED", "BANNED");
+                stmt,
+                "users",
+                COLUMN_STATE,
+                "ck_users_state_values",
+                false,
+                "INCOMPLETE",
+                VALUE_ACTIVE,
+                "PAUSED",
+                "BANNED");
         addAllowedValuesConstraint(
                 stmt, "users", "gender", "ck_users_gender_values", true, "MALE", "FEMALE", VALUE_OTHER);
         addAllowedValuesConstraint(
-                stmt, "users", "smoking", "ck_users_smoking_values", true, "NEVER", "SOMETIMES", "REGULARLY");
+                stmt, "users", "smoking", "ck_users_smoking_values", true, VALUE_NEVER, "SOMETIMES", VALUE_REGULARLY);
         addAllowedValuesConstraint(
-                stmt, "users", "drinking", "ck_users_drinking_values", true, "NEVER", "SOCIALLY", "REGULARLY");
+                stmt, "users", "drinking", "ck_users_drinking_values", true, VALUE_NEVER, "SOCIALLY", VALUE_REGULARLY);
         addAllowedValuesConstraint(
                 stmt, "users", "wants_kids", "ck_users_wants_kids_values", true, "NO", "OPEN", "SOMEDAY", "HAS_KIDS");
         addAllowedValuesConstraint(
@@ -690,7 +953,7 @@ public final class MigrationRunner {
     }
 
     private static void applyInteractionValueConstraints(Statement stmt) throws SQLException {
-        if (hasTable(stmt, "LIKES")) {
+        if (hasTable(stmt, TABLE_LIKES)) {
             addAllowedValuesConstraint(
                     stmt, "likes", "direction", "ck_likes_direction_values", false, "LIKE", "SUPER_LIKE", "PASS");
         }
@@ -698,10 +961,10 @@ public final class MigrationRunner {
             addAllowedValuesConstraint(
                     stmt,
                     SQL_TABLE_MATCHES,
-                    "state",
+                    COLUMN_STATE,
                     "ck_matches_state_values",
                     false,
-                    "ACTIVE",
+                    VALUE_ACTIVE,
                     "FRIENDS",
                     "UNMATCHED",
                     VALUE_GRACEFUL_EXIT,
@@ -750,7 +1013,7 @@ public final class MigrationRunner {
             addCheckConstraintIfMissing(
                     stmt, "messages", "ck_messages_conversation_id_length", "CHAR_LENGTH(conversation_id) = 73");
         }
-        if (hasTable(stmt, "FRIEND_REQUESTS")) {
+        if (hasTable(stmt, TABLE_FRIEND_REQUESTS)) {
             addAllowedValuesConstraint(
                     stmt,
                     "friend_requests",
@@ -765,7 +1028,7 @@ public final class MigrationRunner {
         if (hasTable(stmt, "NOTIFICATIONS")) {
             addAllowedValuesConstraint(
                     stmt,
-                    "notifications",
+                    TABLE_NOTIFICATIONS,
                     "type",
                     "ck_notifications_type_values",
                     false,
@@ -775,7 +1038,7 @@ public final class MigrationRunner {
                     "FRIEND_REQUEST_ACCEPTED",
                     VALUE_GRACEFUL_EXIT);
         }
-        if (hasTable(stmt, "REPORTS")) {
+        if (hasTable(stmt, TABLE_REPORTS)) {
             addAllowedValuesConstraint(
                     stmt,
                     "reports",
@@ -809,6 +1072,62 @@ public final class MigrationRunner {
         }
     }
 
+    private static void applySwipeSessionValueConstraints(Statement stmt) throws SQLException {
+        if (!hasTable(stmt, TABLE_SWIPE_SESSIONS)) {
+            return;
+        }
+
+        addAllowedValuesConstraint(
+                stmt,
+                "swipe_sessions",
+                COLUMN_STATE,
+                "ck_swipe_sessions_state_values",
+                false,
+                VALUE_ACTIVE,
+                "COMPLETED");
+    }
+
+    private static void applyNormalizedProfileValueConstraints(Statement stmt) throws SQLException {
+        if (hasTable(stmt, "USER_INTERESTED_IN")) {
+            addAllowedValuesConstraint(
+                    stmt,
+                    "user_interested_in",
+                    "gender",
+                    "ck_user_interested_in_gender_values",
+                    false,
+                    "MALE",
+                    "FEMALE",
+                    VALUE_OTHER);
+        }
+
+        addAllowedValuesConstraintForQuotedValueColumn(
+                stmt, "user_db_smoking", "ck_user_db_smoking_value_values", VALUE_NEVER, "SOMETIMES", VALUE_REGULARLY);
+        addAllowedValuesConstraintForQuotedValueColumn(
+                stmt, "user_db_drinking", "ck_user_db_drinking_value_values", VALUE_NEVER, "SOCIALLY", VALUE_REGULARLY);
+        addAllowedValuesConstraintForQuotedValueColumn(
+                stmt, "user_db_wants_kids", "ck_user_db_wants_kids_value_values", "NO", "OPEN", "SOMEDAY", "HAS_KIDS");
+        addAllowedValuesConstraintForQuotedValueColumn(
+                stmt,
+                "user_db_looking_for",
+                "ck_user_db_looking_for_value_values",
+                "CASUAL",
+                "SHORT_TERM",
+                "LONG_TERM",
+                "MARRIAGE",
+                "UNSURE");
+        addAllowedValuesConstraintForQuotedValueColumn(
+                stmt,
+                "user_db_education",
+                "ck_user_db_education_value_values",
+                "HIGH_SCHOOL",
+                "SOME_COLLEGE",
+                "BACHELORS",
+                "MASTERS",
+                "PHD",
+                "TRADE_SCHOOL",
+                VALUE_OTHER);
+    }
+
     private static void applyFreshBaselineStructuralConstraints(Statement stmt) throws SQLException {
         if (hasTable(stmt, TABLE_USERS)) {
             if (hasColumn(stmt, TABLE_USERS, "MIN_AGE") && hasColumn(stmt, TABLE_USERS, "MAX_AGE")) {
@@ -830,7 +1149,7 @@ public final class MigrationRunner {
             }
         }
         addDistinctUsersConstraintIfPresent(stmt, "likes", "who_likes", "who_got_liked", "ck_likes_distinct_users");
-        addDistinctUsersConstraintIfPresent(stmt, "matches", "user_a", "user_b", "ck_matches_distinct_users");
+        addDistinctUsersConstraintIfPresent(stmt, SQL_TABLE_MATCHES, "user_a", "user_b", "ck_matches_distinct_users");
         addDistinctUsersConstraintIfPresent(
                 stmt, "conversations", "user_a", "user_b", "ck_conversations_distinct_users");
         addDistinctUsersConstraintIfPresent(
@@ -847,8 +1166,8 @@ public final class MigrationRunner {
     private static void applyNonBlankTextConstraints(Statement stmt) throws SQLException {
         addTrimmedTextNotBlankConstraint(stmt, "messages", "content", "ck_messages_content_nonblank");
         addTrimmedTextNotBlankConstraint(stmt, "profile_notes", "content", "ck_profile_notes_content_nonblank");
-        addTrimmedTextNotBlankConstraint(stmt, "notifications", "title", "ck_notifications_title_nonblank");
-        addTrimmedTextNotBlankConstraint(stmt, "notifications", "message", "ck_notifications_message_nonblank");
+        addTrimmedTextNotBlankConstraint(stmt, TABLE_NOTIFICATIONS, "title", "ck_notifications_title_nonblank");
+        addTrimmedTextNotBlankConstraint(stmt, TABLE_NOTIFICATIONS, "message", "ck_notifications_message_nonblank");
     }
 
     private static void addDistinctUsersConstraintIfPresent(
@@ -869,7 +1188,7 @@ public final class MigrationRunner {
 
     private static long countDistinctUserViolations(
             Statement stmt, String tableName, String leftColumn, String rightColumn) throws SQLException {
-        String sql = "SELECT COUNT(*) FROM " + tableName + " WHERE " + leftColumn + " = " + rightColumn;
+        String sql = SQL_SELECT_COUNT_FROM + tableName + SQL_WHERE_FRAGMENT + leftColumn + " = " + rightColumn;
         try (ResultSet rs = stmt.executeQuery(sql)) {
             if (rs.next()) {
                 return rs.getLong(1);
@@ -892,8 +1211,21 @@ public final class MigrationRunner {
     }
 
     private static long countBlankTrimmedText(Statement stmt, String tableName, String columnName) throws SQLException {
-        String sql = "SELECT COUNT(*) FROM " + tableName + " WHERE " + columnName + " IS NOT NULL AND CHAR_LENGTH(TRIM("
-                + columnName + ")) = 0";
+        String sql = SQL_SELECT_COUNT_FROM + tableName + SQL_WHERE_FRAGMENT + columnName
+                + " IS NOT NULL AND CHAR_LENGTH(TRIM(" + columnName + ")) = 0";
+        try (ResultSet rs = stmt.executeQuery(sql)) {
+            if (rs.next()) {
+                return rs.getLong(1);
+            }
+            return 0;
+        }
+    }
+
+    private static long countDuplicateTrimmedValues(Statement stmt, String tableName, String columnName)
+            throws SQLException {
+        String sql = "SELECT COUNT(*) FROM (SELECT TRIM(" + columnName + ") AS normalized_value FROM " + tableName
+                + SQL_WHERE_FRAGMENT + columnName + " IS NOT NULL GROUP BY TRIM(" + columnName
+                + ") HAVING COUNT(*) > 1) duplicates";
         try (ResultSet rs = stmt.executeQuery(sql)) {
             if (rs.next()) {
                 return rs.getLong(1);
@@ -924,12 +1256,36 @@ public final class MigrationRunner {
         addCheckConstraintIfMissing(stmt, tableName, constraintName, condition);
     }
 
+    private static void addAllowedValuesConstraintForQuotedValueColumn(
+            Statement stmt, String tableName, String constraintName, String... allowedValues) throws SQLException {
+        if (!hasTable(stmt, tableName) || !hasColumnIgnoreCase(stmt, tableName, "value")) {
+            return;
+        }
+
+        String inClause = String.join(
+                ", ",
+                java.util.Arrays.stream(allowedValues)
+                        .map(MigrationRunner::quoteSqlLiteral)
+                        .toList());
+        addCheckConstraintIfMissing(stmt, tableName, constraintName, "\"value\" IN (" + inClause + ")");
+    }
+
     private static void addCheckConstraintIfMissing(
             Statement stmt, String tableName, String constraintName, String condition) throws SQLException {
         if (hasConstraint(stmt, tableName, constraintName)) {
             return;
         }
-        stmt.execute("ALTER TABLE " + tableName + " ADD CONSTRAINT " + constraintName + " CHECK (" + condition + ")");
+        stmt.execute(SQL_ALTER_TABLE_PREFIX + tableName + SQL_ADD_CONSTRAINT_FRAGMENT + constraintName + " CHECK ("
+                + condition + ")");
+    }
+
+    private static void addUniqueConstraintIfMissing(
+            Statement stmt, String tableName, String constraintName, String columnName) throws SQLException {
+        if (hasConstraint(stmt, tableName, constraintName)) {
+            return;
+        }
+        stmt.execute(SQL_ALTER_TABLE_PREFIX + tableName + SQL_ADD_CONSTRAINT_FRAGMENT + constraintName + " UNIQUE ("
+                + columnName + ")");
     }
 
     private static String quoteSqlLiteral(String value) {
@@ -979,7 +1335,7 @@ public final class MigrationRunner {
         stmt.execute("""
                 CREATE TABLE IF NOT EXISTS schema_version (
                     version INT PRIMARY KEY,
-                    applied_at TIMESTAMP NOT NULL,
+                    applied_at TIMESTAMP WITH TIME ZONE NOT NULL,
                     description VARCHAR(255)
                 )
                 """);

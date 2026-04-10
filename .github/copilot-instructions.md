@@ -138,6 +138,7 @@ Use PowerShell-friendly commands. When Maven test selection uses a comma-separat
 - Only make simple harmless assumptions when they are directly stated by the user or are explicitly labeled as low-risk assumptions.
 - Use a full targeted context pass first: exact seam confirmation, symbol existence, test surfaces, composition-root paths, targeted searching, and selective reads.
 - Read full files only for a small number of especially important relevant files when doing so is clearly beneficial.
+- Do not add append-only "Second Pass", "Corrections", or "Additions" sections to review, audit, or analysis documents. When new findings or corrections appear, revise the relevant existing section in place so the file remains a single coherent canonical document.
 - Before opening another review loop, first aggregate what else can be checked in that same pass: related blockers, related improvements, adjacent risks, and useful notes that can save time later.
 - Distinguish clearly between fixes and improvements. Fixes are critical blockers and should not be postponed. Improvements are optional. If only optional improvements remain, gather them all and present them together at the end instead of opening another review cycle for each one separately.
 - Before starting a third independent review pass for a planning, documentation, or meta-workflow deliverable, summarize the reasons and expected value, then ask the user via `vscode_askQuestions` whether to proceed.

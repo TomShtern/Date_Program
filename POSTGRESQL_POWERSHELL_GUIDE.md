@@ -7,16 +7,28 @@ This file records the practical rules for PostgreSQL runtime work in this reposi
 - Runtime storage is PostgreSQL by default through [`config/app-config.json`](./config/app-config.json).
 - The production/runtime composition path is `StorageFactory.buildSqlDatabase(...)`.
 - `buildH2(...)` and `buildInMemory(...)` are still valid compatibility and test paths. They are not the main runtime path.
-- The canonical full local verification command is `.\run_verify.ps1`.
+- The canonical full local verification command is `./run_verify.ps1`.
+- `./start_local_postgres.ps1` now ensures the local cluster enables `pg_stat_statements` and `compute_query_id`, then installs the `pg_stat_statements` extension in the target database.
+- `./start_local_postgres.ps1` also applies local role defaults for the `datingapp` role in the `datingapp` database:
+  - `search_path = public`
+  - `statement_timeout = 30s`
+  - `lock_timeout = 5s`
+  - `idle_in_transaction_session_timeout = 5min`
+- `./reset_local_postgres.ps1` now keeps the newest auto-generated backup schema by default and best-effort removes older `reset_backup_*` schemas after a successful reset. Use `-RetainedAutoBackupSchemas <n>` to retain more than one auto backup.
 - The canonical local PostgreSQL helper scripts are:
-  - `.\start_local_postgres.ps1`
-  - `.\run_postgresql_smoke.ps1`
-  - `.\stop_local_postgres.ps1`
-  - `.\reset_local_postgres.ps1` — rebuilds the local database from a preserved backup schema
+  - `./start_local_postgres.ps1`
+  - `./run_postgresql_smoke.ps1`
+  - `./stop_local_postgres.ps1`
+  - `./reset_local_postgres.ps1` — rebuilds the local database from a preserved backup schema
+
+Production/runtime PostgreSQL sessions also set `search_path` explicitly in `DatabaseManager`, so the application does not rely only on ambient server defaults.
 
 ## Daily Commands
 
 ```powershell
+# Check whether the local PostgreSQL runtime is ready for VS Code or Maven
+.\check_postgresql_runtime_env.ps1
+
 # Start or reuse the local PostgreSQL instance
 .\start_local_postgres.ps1
 
@@ -97,6 +109,9 @@ This file records the practical rules for PostgreSQL runtime work in this reposi
 
 ## Troubleshooting
 
+- If the VS Code PostgreSQL extension times out, run `./check_postgresql_runtime_env.ps1` first.
+- If the preflight says PostgreSQL is unreachable, start it with `./start_local_postgres.ps1` and retry the connection.
+
 - If `start_local_postgres.ps1` hangs, inspect:
   - `data/local-postgresql/postgres.log`
   - `data/local-postgresql/pg_ctl-start.stderr.log`
@@ -104,6 +119,7 @@ This file records the practical rules for PostgreSQL runtime work in this reposi
 - If smoke fails but direct startup works, check the Maven properties passed by `run_postgresql_smoke.ps1`.
 - If the full verify path fails after Maven succeeds, the failure is usually in the PostgreSQL smoke path or cleanup path, not the quality gate itself.
 - If a PowerShell test opens a blank extra window again, inspect any new `Start-Process` usage first.
+- If you intentionally want to keep multiple historical `reset_backup_*` schemas for manual inspection, run `./reset_local_postgres.ps1 -RetainedAutoBackupSchemas <n>`.
 
 ## Recommended Mental Model
 

@@ -25,6 +25,7 @@ function New-StartScriptSandbox {
     $pgCtlCountFile = Join-Path $tempRoot 'pg-ctl-count.txt'
     $pgCtlArgsFile = Join-Path $tempRoot 'pg-ctl-args.txt'
     $psqlCountFile = Join-Path $tempRoot 'psql-count.txt'
+    $postgresAutoConfFile = Join-Path $dataDir 'postgresql.auto.conf'
     $createdbCountFile = Join-Path $tempRoot 'createdb-count.txt'
     $originalPath = $env:PATH
 
@@ -35,9 +36,14 @@ function New-StartScriptSandbox {
     Set-Content -Path $pgCtlArgsFile -Value ''
     Set-Content -Path $psqlCountFile -Value '0'
     Set-Content -Path $createdbCountFile -Value '0'
+    Set-Content -Path $postgresAutoConfFile -Value ''
 
-    $firstProbeExitCode = $PgIsReadyExitCodes[0]
-    $secondProbeExitCode = if ($PgIsReadyExitCodes.Count -gt 1) { $PgIsReadyExitCodes[1] } else { $firstProbeExitCode }
+    $sequenceConditions = New-Object System.Collections.Generic.List[string]
+    for ($index = 0; $index -lt $PgIsReadyExitCodes.Count; $index++) {
+        $probeNumber = $index + 1
+        $sequenceConditions.Add("if %COUNT%==${probeNumber} exit /b $($PgIsReadyExitCodes[$index])")
+    }
+    $defaultProbeExitCode = $PgIsReadyExitCodes[-1]
 
     Set-Content -Path (Join-Path $tempRoot 'pg_isready.cmd') -Value @"
 @echo off
@@ -46,8 +52,8 @@ set /p COUNT=<"%COUNT_FILE%"
 if "%COUNT%"=="" set COUNT=0
 set /a COUNT=%COUNT%+1
 >"%COUNT_FILE%" echo %COUNT%
-if %COUNT%==1 exit /b $firstProbeExitCode
-exit /b $secondProbeExitCode
+$($sequenceConditions -join [Environment]::NewLine)
+exit /b $defaultProbeExitCode
 "@
 
     Set-Content -Path (Join-Path $tempRoot 'pg_ctl.cmd') -Value @"
@@ -93,14 +99,15 @@ exit /b $CreatedbExitCode
 "@
 
     return [pscustomobject]@{
-        TempRoot           = $tempRoot
-        BaseDir            = $baseDir
-        PgIsReadyCountFile = $pgIsReadyCountFile
-        PgCtlCountFile     = $pgCtlCountFile
-        PgCtlArgsFile      = $pgCtlArgsFile
-        PsqlCountFile      = $psqlCountFile
-        CreatedbCountFile  = $createdbCountFile
-        OriginalPath       = $originalPath
+        TempRoot             = $tempRoot
+        BaseDir              = $baseDir
+        PgIsReadyCountFile   = $pgIsReadyCountFile
+        PgCtlCountFile       = $pgCtlCountFile
+        PgCtlArgsFile        = $pgCtlArgsFile
+        PsqlCountFile        = $psqlCountFile
+        PostgresAutoConfFile = $postgresAutoConfFile
+        CreatedbCountFile    = $createdbCountFile
+        OriginalPath         = $originalPath
     }
 }
 
@@ -169,10 +176,14 @@ function Assert-StartScriptRejectsUnsafeDatabaseName {
 }
 
 function Assert-StartScriptAcceptsAlreadyRunningDatabase {
-    $sandbox = New-StartScriptSandbox -PgIsReadyExitCodes @(1, 0) -PgCtlStartExitCode 1 -PsqlOutput '1'
+    $sandbox = New-StartScriptSandbox -PgIsReadyExitCodes @(0) -PgCtlStartExitCode 1 -PsqlOutput '1'
 
     try {
         Initialize-StartScriptEnvironment -Sandbox $sandbox
+        Set-Content -Path $sandbox.PostgresAutoConfFile -Value @(
+            "shared_preload_libraries = 'pg_stat_statements'"
+            'compute_query_id = on'
+        )
 
         & $scriptUnderTest -BaseDir $sandbox.BaseDir -Database 'datingapp' | Out-Null
 
@@ -180,8 +191,12 @@ function Assert-StartScriptAcceptsAlreadyRunningDatabase {
             throw "Expected start_local_postgres.ps1 to exit with code 0 when the server is already running, but observed $LASTEXITCODE."
         }
 
-        if ((Get-CountValue -Path $sandbox.PgCtlCountFile) -ne 1) {
-            throw 'Expected start_local_postgres.ps1 to invoke pg_ctl exactly once when the server is already running.'
+        if ((Get-CountValue -Path $sandbox.PgCtlCountFile) -ne 0) {
+            throw 'Expected start_local_postgres.ps1 to skip pg_ctl when the server is already running and observability config is already in place.'
+        }
+
+        if ((Get-CountValue -Path $sandbox.PsqlCountFile) -ne 3) {
+            throw 'Expected start_local_postgres.ps1 to invoke psql for the database check, pg_stat_statements enablement, and local role defaults when the database already exists.'
         }
 
         if ((Get-CountValue -Path $sandbox.CreatedbCountFile) -ne 0) {
@@ -194,7 +209,7 @@ function Assert-StartScriptAcceptsAlreadyRunningDatabase {
 }
 
 function Assert-StartScriptAcceptsSuccessfulPgCtlStartWhenDatabaseBecomesReady {
-    $sandbox = New-StartScriptSandbox -PgIsReadyExitCodes @(1, 0) -PgCtlStartExitCode 0 -PsqlOutput '1'
+    $sandbox = New-StartScriptSandbox -PgIsReadyExitCodes @(1, 1, 0) -PgCtlStartExitCode 0 -PsqlOutput '1'
 
     try {
         Initialize-StartScriptEnvironment -Sandbox $sandbox
@@ -209,8 +224,8 @@ function Assert-StartScriptAcceptsSuccessfulPgCtlStartWhenDatabaseBecomesReady {
             throw 'Expected start_local_postgres.ps1 to invoke pg_ctl exactly once when startup is required.'
         }
 
-        if ((Get-CountValue -Path $sandbox.PsqlCountFile) -ne 1) {
-            throw 'Expected start_local_postgres.ps1 to continue to the database-exists check after successful pg_ctl start.'
+        if ((Get-CountValue -Path $sandbox.PsqlCountFile) -ne 3) {
+            throw 'Expected start_local_postgres.ps1 to continue to the database-exists check, pg_stat_statements enablement, and local role-default bootstrap after successful pg_ctl start.'
         }
     }
     finally {
@@ -219,7 +234,7 @@ function Assert-StartScriptAcceptsSuccessfulPgCtlStartWhenDatabaseBecomesReady {
 }
 
 function Assert-StartScriptPassesServerOptionsToPgCtlAsSingleArgument {
-    $sandbox = New-StartScriptSandbox -PgIsReadyExitCodes @(1, 0) -PgCtlStartExitCode 0 -PsqlOutput '1'
+    $sandbox = New-StartScriptSandbox -PgIsReadyExitCodes @(1, 1, 0) -PgCtlStartExitCode 0 -PsqlOutput '1'
 
     try {
         Initialize-StartScriptEnvironment -Sandbox $sandbox
@@ -242,6 +257,28 @@ function Assert-StartScriptPassesServerOptionsToPgCtlAsSingleArgument {
 
         if ($pgCtlArgs[6] -ne '7=start') {
             throw "Expected pg_ctl start argument after the -o payload, but observed '$($pgCtlArgs -join '; ')'."
+        }
+    }
+    finally {
+        Restore-StartScriptEnvironment -Sandbox $sandbox
+    }
+}
+
+function Assert-StartScriptConfiguresPgStatStatementsDefaults {
+    $sandbox = New-StartScriptSandbox -PgIsReadyExitCodes @(1, 1, 0) -PgCtlStartExitCode 0 -PsqlOutput '1'
+
+    try {
+        Initialize-StartScriptEnvironment -Sandbox $sandbox
+
+        & $scriptUnderTest -BaseDir $sandbox.BaseDir -Database 'datingapp' | Out-Null
+
+        $postgresAutoConf = Get-Content -Path $sandbox.PostgresAutoConfFile -Raw
+        if ($postgresAutoConf -notmatch "shared_preload_libraries = 'pg_stat_statements'") {
+            throw 'Expected start_local_postgres.ps1 to enable pg_stat_statements in postgresql.auto.conf.'
+        }
+
+        if ($postgresAutoConf -notmatch 'compute_query_id = on') {
+            throw 'Expected start_local_postgres.ps1 to enable compute_query_id in postgresql.auto.conf.'
         }
     }
     finally {
@@ -314,7 +351,7 @@ function Assert-StartScriptFailsWhenStartupNeverBecomesReady {
 }
 
 function Assert-StartScriptDoesNotHangWhenPgCtlLeavesBackgroundChildAttachedToStdout {
-    $sandbox = New-StartScriptSandbox -PgIsReadyExitCodes @(1, 0) -PgCtlStartExitCode 0 -PsqlOutput '1'
+    $sandbox = New-StartScriptSandbox -PgIsReadyExitCodes @(1, 1, 0) -PgCtlStartExitCode 0 -PsqlOutput '1'
     $process = $null
     $stdoutPath = Join-Path $sandbox.TempRoot 'stdout.txt'
     $stderrPath = Join-Path $sandbox.TempRoot 'stderr.txt'
@@ -373,6 +410,7 @@ Assert-StartScriptRejectsUnsafeDatabaseName
 Assert-StartScriptAcceptsAlreadyRunningDatabase
 Assert-StartScriptAcceptsSuccessfulPgCtlStartWhenDatabaseBecomesReady
 Assert-StartScriptPassesServerOptionsToPgCtlAsSingleArgument
+Assert-StartScriptConfiguresPgStatStatementsDefaults
 Assert-StartScriptFailsWhenPgCtlReturnsSuccessButDatabaseNeverBecomesReady
 Assert-StartScriptFailsWhenStartupNeverBecomesReady
 Assert-StartScriptDoesNotHangWhenPgCtlLeavesBackgroundChildAttachedToStdout

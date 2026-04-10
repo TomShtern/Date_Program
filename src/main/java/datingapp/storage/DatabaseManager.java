@@ -38,6 +38,13 @@ public final class DatabaseManager {
     private final AtomicReference<RuntimeStorageState> runtimeStorageState = new AtomicReference<>();
     private volatile boolean initialized = false;
     private volatile int queryTimeoutSeconds = 30;
+    private volatile int maxPoolSize = 10;
+    private volatile int minIdle = 2;
+    private volatile int connectionTimeoutSeconds = 5;
+    private volatile int validationTimeoutSeconds = 3;
+    private volatile int idleTimeoutSeconds = 600;
+    private volatile int maxLifetimeSeconds = 1800;
+    private volatile int keepaliveTimeSeconds = 0;
 
     public static void setJdbcUrl(String url) {
         jdbcUrl = Objects.requireNonNull(url, "JDBC URL cannot be null");
@@ -69,6 +76,24 @@ public final class DatabaseManager {
             throw new IllegalArgumentException("query timeout must be positive");
         }
         this.queryTimeoutSeconds = timeoutSeconds;
+    }
+
+    public void configurePoolSettings(AppConfig.StorageConfig storageConfig) {
+        Objects.requireNonNull(storageConfig, "storageConfig cannot be null");
+        if (storageConfig.maxPoolSize() <= 0) {
+            throw new IllegalArgumentException("maxPoolSize must be positive");
+        }
+        if (storageConfig.minIdle() < 0 || storageConfig.minIdle() > storageConfig.maxPoolSize()) {
+            throw new IllegalArgumentException("minIdle must be between 0 and maxPoolSize");
+        }
+
+        this.maxPoolSize = storageConfig.maxPoolSize();
+        this.minIdle = storageConfig.minIdle();
+        this.connectionTimeoutSeconds = storageConfig.connectionTimeoutSeconds();
+        this.validationTimeoutSeconds = storageConfig.validationTimeoutSeconds();
+        this.idleTimeoutSeconds = storageConfig.idleTimeoutSeconds();
+        this.maxLifetimeSeconds = storageConfig.maxLifetimeSeconds();
+        this.keepaliveTimeSeconds = storageConfig.keepaliveTimeSeconds();
     }
 
     public synchronized void configureStorage(AppConfig.StorageConfig storageConfig) {
@@ -119,11 +144,16 @@ public final class DatabaseManager {
         config.setJdbcUrl(resolveJdbcUrl(configuredJdbcUrl, configuredProfile, explicitPassword, dialect));
         config.setUsername(resolveUsername());
         config.setPassword(resolvePassword(explicitPassword, configuredProfile, configuredJdbcUrl, dialect));
-        config.setMaximumPoolSize(10);
-        config.setMinimumIdle(2);
-        config.setConnectionTimeout(5000);
+        config.setMaximumPoolSize(maxPoolSize);
+        config.setMinimumIdle(minIdle);
+        config.setConnectionTimeout(connectionTimeoutSeconds * 1000L);
         config.setConnectionTestQuery("SELECT 1");
-        config.setValidationTimeout(3000);
+        config.setValidationTimeout(validationTimeoutSeconds * 1000L);
+        config.setIdleTimeout(idleTimeoutSeconds * 1000L);
+        config.setMaxLifetime(maxLifetimeSeconds * 1000L);
+        if (keepaliveTimeSeconds > 0) {
+            config.setKeepaliveTime(keepaliveTimeSeconds * 1000L);
+        }
         dataSource.set(new HikariDataSource(config));
     }
 
@@ -359,10 +389,12 @@ public final class DatabaseManager {
         DatabaseDialect dialect =
                 storageState != null ? storageState.dialect() : DatabaseDialect.fromJdbcUrl(effectiveJdbcUrl());
         try (Statement statement = connection.createStatement()) {
-            statement.execute("SET TIME ZONE 'UTC'");
             if (dialect == DatabaseDialect.POSTGRESQL) {
+                statement.execute("SET search_path TO public");
+                statement.execute("SET TIME ZONE 'UTC'");
                 statement.execute("SET statement_timeout TO " + safeTimeoutMillis);
             } else {
+                statement.execute("SET TIME ZONE 'UTC'");
                 statement.execute("SET QUERY_TIMEOUT " + safeTimeoutMillis);
             }
         } catch (SQLException e) {

@@ -58,6 +58,7 @@ mvn spotless:apply verify
 ```
 <!--/ARCHIVE-->
 
+<!--ARCHIVE:9:agent:github_copilot:scope:postgres-startup-ux-->
 ```bash
 # CLI
 mvn compile && mvn exec:exec
@@ -75,7 +76,32 @@ mvn -Ptest-output-verbose test
 # Maven quality gate only
 mvn spotless:apply verify
 ```
-<!-- ChangeStamp: 7|2026-04-06 00:45:00|agent:github_copilot|scope:verification-routine|Added full local verification wrapper and clarified the Maven-only quality gate|README.md -->
+<!--/ARCHIVE-->
+
+```bash
+# PostgreSQL preflight (checks tools, listener, login, and shows next step if the server is down)
+.\check_postgresql_runtime_env.ps1
+
+# Start local PostgreSQL before using the VS Code PostgreSQL connection profile
+.\start_local_postgres.ps1
+
+# CLI
+mvn compile && mvn exec:exec
+
+# JavaFX GUI
+mvn javafx:run
+
+# Tests
+mvn test
+mvn -Ptest-output-verbose test
+
+# Full local verification (Maven quality gate + PostgreSQL smoke)
+.\run_verify.ps1
+
+# Maven quality gate only
+mvn spotless:apply verify
+```
+<!-- ChangeStamp: 9|2026-04-09 22:05:00|agent:github_copilot|scope:postgres-startup-ux|Added PostgreSQL preflight/start commands so the local VS Code connection workflow is harder to miss|README.md -->
 
 ## Architecture (code-verified)
 
@@ -177,4 +203,5 @@ example: 1|2026-01-14 16:42:11|agent:claude_code|UI-mig|JavaFX→Swing; examples
 6|2026-03-01 03:20:00|agent:github_copilot|docs-metrics-refresh|Updated README LOC snapshot to current tokei values|README.md
 7|2026-04-06 00:45:00|agent:github_copilot|verification-routine|Added .\run_verify.ps1 as the full local verification path and kept mvn spotless:apply verify as the Maven-only gate|README.md
 8|2026-04-06 19:35:00|agent:codex|postgres-runtime-doc-sync|Clarified the runtime storage stack after the PostgreSQL move|README.md
+9|2026-04-09 22:05:00|agent:github_copilot|postgres-startup-ux|Added PostgreSQL preflight/start commands to the main local run instructions|README.md
 ---AGENT-LOG-END---

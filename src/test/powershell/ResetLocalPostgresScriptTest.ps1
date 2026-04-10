@@ -261,7 +261,7 @@ function Invoke-ResetScript {
 function Assert-ResetScriptHappyPath {
     $sandbox = New-ResetScriptSandbox
     try {
-        Use-Sandbox $sandbox {
+        Use-Sandbox -Sandbox $sandbox -Body {
             $result = Invoke-ResetScript -Sandbox $sandbox
 
             if ($result.Threw) {
@@ -276,8 +276,8 @@ function Assert-ResetScriptHappyPath {
                 throw 'Expected one start-helper invocation on the happy path.'
             }
 
-            if ((Get-CountValue -Path $sandbox.PsqlCountFile) -ne 3) {
-                throw 'Expected three psql invocations on the happy path.'
+            if ((Get-CountValue -Path $sandbox.PsqlCountFile) -ne 4) {
+                throw 'Expected four psql invocations on the happy path, including backup-schema retention cleanup.'
             }
 
             if ((Get-CountValue -Path $sandbox.MavenCountFile) -ne 1) {
@@ -319,8 +319,8 @@ function Assert-ResetScriptHappyPath {
             }
 
             $psqlArgs = Get-LogLines -Path $sandbox.PsqlArgsFile
-            if ($psqlArgs.Count -ne 3) {
-                throw 'Expected three captured psql command lines on the happy path.'
+            if ($psqlArgs.Count -ne 4) {
+                throw 'Expected four captured psql command lines on the happy path.'
             }
 
             foreach ($line in $psqlArgs) {
@@ -335,10 +335,20 @@ function Assert-ResetScriptHappyPath {
                 if ($line -notmatch '-v ON_ERROR_STOP=1') {
                     throw 'Expected psql to use -v ON_ERROR_STOP=1.'
                 }
+            }
 
+            foreach ($line in $psqlArgs[0..2]) {
                 if ($line -notmatch '\s-f\s') {
-                    throw 'Expected psql to use a generated SQL file via -f.'
+                    throw 'Expected backup/reset/import psql calls to use generated SQL files via -f.'
                 }
+            }
+
+            if ($psqlArgs[-1] -notmatch '-tAc') {
+                throw 'Expected the final psql invocation on the happy path to use -tAc for backup-schema retention cleanup.'
+            }
+
+            if ($psqlArgs[-1] -notmatch 'information_schema\.schemata') {
+                throw 'Expected the final psql invocation on the happy path to inspect reset_backup_* schemas for retention cleanup.'
             }
 
             $smokeArgs = Get-LogLines -Path $sandbox.SmokeArgsFile
@@ -362,7 +372,7 @@ function Assert-ResetScriptHappyPath {
 function Assert-ResetScriptShortCircuitsWhenStartFails {
     $sandbox = New-ResetScriptSandbox -StartExitCode 17
     try {
-        Use-Sandbox $sandbox {
+        Use-Sandbox -Sandbox $sandbox -Body {
             $result = Invoke-ResetScript -Sandbox $sandbox
 
             if (-not $result.Threw) {
@@ -398,7 +408,7 @@ function Assert-ResetScriptShortCircuitsWhenStartFails {
 function Assert-ResetScriptStopsAfterMavenFailure {
     $sandbox = New-ResetScriptSandbox -MavenExitCode 23
     try {
-        Use-Sandbox $sandbox {
+        Use-Sandbox -Sandbox $sandbox -Body {
             $result = Invoke-ResetScript -Sandbox $sandbox
 
             if (-not $result.Threw) {
@@ -442,7 +452,7 @@ function Assert-ResetScriptGeneratedImportSqlIncludesNormalizationAndTextFilters
     $sandbox = New-ResetScriptSandbox -MavenExitCode 23
     $script:keptTempDirectoryToClean = $null
     try {
-        Use-Sandbox $sandbox {
+        Use-Sandbox -Sandbox $sandbox -Body {
             $result = Invoke-ResetScript -Sandbox $sandbox
 
             if (-not $result.Threw) {
@@ -487,7 +497,7 @@ function Assert-ResetScriptGeneratedImportSqlIncludesNormalizationAndTextFilters
 function Assert-ResetScriptRejectsUnsafeDatabaseName {
     $sandbox = New-ResetScriptSandbox
     try {
-        Use-Sandbox $sandbox {
+        Use-Sandbox -Sandbox $sandbox -Body {
             $result = Invoke-ResetScript -Sandbox $sandbox -Database "bad-name';DROP DATABASE postgres;--"
 
             if (-not $result.Threw) {

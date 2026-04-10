@@ -155,9 +155,26 @@ public record AppConfig(
     // ========================================================================
 
     public static record StorageConfig(
-            String databaseDialect, String databaseUrl, String databaseUsername, int queryTimeoutSeconds) {
+            String databaseDialect,
+            String databaseUrl,
+            String databaseUsername,
+            int queryTimeoutSeconds,
+            int maxPoolSize,
+            int minIdle,
+            int connectionTimeoutSeconds,
+            int validationTimeoutSeconds,
+            int idleTimeoutSeconds,
+            int maxLifetimeSeconds,
+            int keepaliveTimeSeconds) {
         public StorageConfig {
             AppConfigValidator.validateStorage(databaseDialect, databaseUrl, databaseUsername, queryTimeoutSeconds);
+            AppConfigValidator.validatePoolSizing(maxPoolSize, minIdle);
+            AppConfigValidator.validatePoolTimeouts(
+                    connectionTimeoutSeconds,
+                    validationTimeoutSeconds,
+                    idleTimeoutSeconds,
+                    maxLifetimeSeconds,
+                    keepaliveTimeSeconds);
             databaseDialect = databaseDialect.trim().toUpperCase(Locale.ROOT);
             databaseUrl = databaseUrl.trim();
             databaseUsername = databaseUsername.trim();
@@ -319,6 +336,13 @@ public record AppConfig(
         private String databaseUrl = "jdbc:h2:./data/dating";
         private String databaseUsername = "sa";
         private int queryTimeoutSeconds = 30;
+        private int maxPoolSize = 10;
+        private int minIdle = 2;
+        private int connectionTimeoutSeconds = 5;
+        private int validationTimeoutSeconds = 3;
+        private int idleTimeoutSeconds = 600;
+        private int maxLifetimeSeconds = 1800;
+        private int keepaliveTimeSeconds = 0;
         // SafetyConfig fields
         private int autoBanThreshold = 3;
         private ZoneId userTimeZone = ZoneId.systemDefault();
@@ -389,6 +413,41 @@ public record AppConfig(
 
         public Builder queryTimeoutSeconds(int v) {
             this.queryTimeoutSeconds = v;
+            return this;
+        }
+
+        public Builder maxPoolSize(int v) {
+            this.maxPoolSize = v;
+            return this;
+        }
+
+        public Builder minIdle(int v) {
+            this.minIdle = v;
+            return this;
+        }
+
+        public Builder connectionTimeoutSeconds(int v) {
+            this.connectionTimeoutSeconds = v;
+            return this;
+        }
+
+        public Builder validationTimeoutSeconds(int v) {
+            this.validationTimeoutSeconds = v;
+            return this;
+        }
+
+        public Builder idleTimeoutSeconds(int v) {
+            this.idleTimeoutSeconds = v;
+            return this;
+        }
+
+        public Builder maxLifetimeSeconds(int v) {
+            this.maxLifetimeSeconds = v;
+            return this;
+        }
+
+        public Builder keepaliveTimeSeconds(int v) {
+            this.keepaliveTimeSeconds = v;
             return this;
         }
 
@@ -790,7 +849,18 @@ public record AppConfig(
         }
 
         private StorageConfig buildStorageConfig() {
-            return new StorageConfig(databaseDialect, databaseUrl, databaseUsername, queryTimeoutSeconds);
+            return new StorageConfig(
+                    databaseDialect,
+                    databaseUrl,
+                    databaseUsername,
+                    queryTimeoutSeconds,
+                    maxPoolSize,
+                    minIdle,
+                    connectionTimeoutSeconds,
+                    validationTimeoutSeconds,
+                    idleTimeoutSeconds,
+                    maxLifetimeSeconds,
+                    keepaliveTimeSeconds);
         }
 
         private SafetyConfig buildSafetyConfig() {

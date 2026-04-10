@@ -80,8 +80,8 @@ public final class SchemaInitializer {
                     min_age INT DEFAULT 18,
                     max_age INT DEFAULT 99,
                     state VARCHAR(20) NOT NULL DEFAULT 'INCOMPLETE',
-                    created_at TIMESTAMP NOT NULL,
-                    updated_at TIMESTAMP NOT NULL,
+                    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+                    updated_at TIMESTAMP WITH TIME ZONE NOT NULL,
                     smoking VARCHAR(20),
                     drinking VARCHAR(20),
                     wants_kids VARCHAR(20),
@@ -96,13 +96,13 @@ public final class SchemaInitializer {
                     is_verified BOOLEAN,
                     verification_method VARCHAR(10),
                     verification_code VARCHAR(10),
-                    verification_sent_at TIMESTAMP,
-                    verified_at TIMESTAMP,
+                    verification_sent_at TIMESTAMP WITH TIME ZONE,
+                    verified_at TIMESTAMP WITH TIME ZONE,
                     pace_messaging_frequency VARCHAR(30),
                     pace_time_to_first_date VARCHAR(30),
                     pace_communication_style VARCHAR(30),
                     pace_depth_preference VARCHAR(30),
-                    deleted_at TIMESTAMP,
+                    deleted_at TIMESTAMP WITH TIME ZONE,
                     CONSTRAINT ck_users_state_values CHECK (
                         state IN ('INCOMPLETE', 'ACTIVE', 'PAUSED', 'BANNED')
                     ),
@@ -137,6 +137,12 @@ public final class SchemaInitializer {
                     CONSTRAINT ck_users_verification_method_values CHECK (
                         verification_method IS NULL OR verification_method IN ('EMAIL', 'PHONE')
                     ),
+                    CONSTRAINT ck_users_email_trimmed CHECK (
+                        email IS NULL OR email = TRIM(email)
+                    ),
+                    CONSTRAINT ck_users_phone_trimmed CHECK (
+                        phone IS NULL OR phone = TRIM(phone)
+                    ),
                     CONSTRAINT ck_users_pace_msg_freq_values CHECK (
                         pace_messaging_frequency IS NULL
                             OR pace_messaging_frequency IN ('RARELY', 'OFTEN', 'CONSTANTLY', 'WILDCARD')
@@ -165,7 +171,9 @@ public final class SchemaInitializer {
                             OR db_max_height_cm IS NULL
                             OR db_min_height_cm <= db_max_height_cm
                     ),
-                    CONSTRAINT ck_users_max_age_diff_nonnegative CHECK (db_max_age_diff IS NULL OR db_max_age_diff >= 0)
+                    CONSTRAINT ck_users_max_age_diff_nonnegative CHECK (db_max_age_diff IS NULL OR db_max_age_diff >= 0),
+                    CONSTRAINT uk_users_email UNIQUE (email),
+                    CONSTRAINT uk_users_phone UNIQUE (phone)
                 )
                 """);
     }
@@ -177,8 +185,8 @@ public final class SchemaInitializer {
                             who_likes UUID NOT NULL,
                             who_got_liked UUID NOT NULL,
                             direction VARCHAR(10) NOT NULL,
-                            created_at TIMESTAMP NOT NULL,
-                            deleted_at TIMESTAMP,
+                            created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+                            deleted_at TIMESTAMP WITH TIME ZONE,
                             CONSTRAINT fk_likes_who_likes FOREIGN KEY (who_likes)
                                 REFERENCES users(id) ON DELETE CASCADE,
                             CONSTRAINT fk_likes_who_got_liked FOREIGN KEY (who_got_liked)
@@ -198,13 +206,13 @@ public final class SchemaInitializer {
                     id VARCHAR(100) PRIMARY KEY,
                     user_a UUID NOT NULL,
                     user_b UUID NOT NULL,
-                    created_at TIMESTAMP NOT NULL,
-                    updated_at TIMESTAMP NOT NULL,
+                    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+                    updated_at TIMESTAMP WITH TIME ZONE NOT NULL,
                     state VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
-                    ended_at TIMESTAMP,
+                    ended_at TIMESTAMP WITH TIME ZONE,
                     ended_by UUID,
                     end_reason VARCHAR(30),
-                    deleted_at TIMESTAMP,
+                    deleted_at TIMESTAMP WITH TIME ZONE,
                     CONSTRAINT fk_matches_user_a FOREIGN KEY (user_a)
                         REFERENCES users(id) ON DELETE CASCADE,
                     CONSTRAINT fk_matches_user_b FOREIGN KEY (user_b)
@@ -232,14 +240,15 @@ public final class SchemaInitializer {
                 CREATE TABLE IF NOT EXISTS swipe_sessions (
                     id UUID PRIMARY KEY,
                     user_id UUID NOT NULL,
-                    started_at TIMESTAMP NOT NULL,
-                    last_activity_at TIMESTAMP NOT NULL,
-                    ended_at TIMESTAMP,
+                    started_at TIMESTAMP WITH TIME ZONE NOT NULL,
+                    last_activity_at TIMESTAMP WITH TIME ZONE NOT NULL,
+                    ended_at TIMESTAMP WITH TIME ZONE,
                     state VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
                     swipe_count INT NOT NULL DEFAULT 0,
                     like_count INT NOT NULL DEFAULT 0,
                     pass_count INT NOT NULL DEFAULT 0,
                     match_count INT NOT NULL DEFAULT 0,
+                    CONSTRAINT ck_swipe_sessions_state_values CHECK (state IN ('ACTIVE', 'COMPLETED')),
                     CONSTRAINT fk_sessions_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
                 )
                 """);
@@ -254,7 +263,7 @@ public final class SchemaInitializer {
                 CREATE TABLE IF NOT EXISTS user_stats (
                     id UUID PRIMARY KEY,
                     user_id UUID NOT NULL,
-                    computed_at TIMESTAMP NOT NULL,
+                    computed_at TIMESTAMP WITH TIME ZONE NOT NULL,
                     total_swipes_given INT NOT NULL DEFAULT 0,
                     likes_given INT NOT NULL DEFAULT 0,
                     passes_given INT NOT NULL DEFAULT 0,
@@ -282,7 +291,7 @@ public final class SchemaInitializer {
         stmt.execute("""
                 CREATE TABLE IF NOT EXISTS platform_stats (
                     id UUID PRIMARY KEY,
-                    computed_at TIMESTAMP NOT NULL,
+                    computed_at TIMESTAMP WITH TIME ZONE NOT NULL,
                     total_active_users INT NOT NULL DEFAULT 0,
                     avg_likes_received DOUBLE PRECISION NOT NULL DEFAULT 0.0,
                     avg_likes_given DOUBLE PRECISION NOT NULL DEFAULT 0.0,
@@ -302,7 +311,7 @@ public final class SchemaInitializer {
                     user_id UUID NOT NULL,
                     pick_date DATE NOT NULL,
                     picked_user_id UUID NOT NULL,
-                    created_at TIMESTAMP NOT NULL,
+                    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
                     PRIMARY KEY (user_id, pick_date),
                     CONSTRAINT fk_daily_picks_user FOREIGN KEY (user_id)
                         REFERENCES users(id) ON DELETE CASCADE,
@@ -319,7 +328,7 @@ public final class SchemaInitializer {
                 CREATE TABLE IF NOT EXISTS daily_pick_views (
                     user_id UUID NOT NULL,
                     viewed_date DATE NOT NULL,
-                    viewed_at TIMESTAMP NOT NULL,
+                    viewed_at TIMESTAMP WITH TIME ZONE NOT NULL,
                     PRIMARY KEY (user_id, viewed_date),
                     CONSTRAINT fk_daily_pick_views_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
                 )
@@ -332,7 +341,7 @@ public final class SchemaInitializer {
                     id UUID PRIMARY KEY,
                     user_id UUID NOT NULL,
                     achievement VARCHAR(50) NOT NULL,
-                    unlocked_at TIMESTAMP NOT NULL,
+                    unlocked_at TIMESTAMP WITH TIME ZONE NOT NULL,
                     UNIQUE (user_id, achievement),
                     CONSTRAINT fk_user_achievements_user FOREIGN KEY (user_id)
                         REFERENCES users(id) ON DELETE CASCADE
@@ -355,17 +364,17 @@ public final class SchemaInitializer {
                     id VARCHAR(100) PRIMARY KEY,
                     user_a UUID NOT NULL,
                     user_b UUID NOT NULL,
-                    created_at TIMESTAMP NOT NULL,
-                    last_message_at TIMESTAMP,
-                    user_a_last_read_at TIMESTAMP,
-                    user_b_last_read_at TIMESTAMP,
-                    archived_at_a TIMESTAMP,
+                    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+                    last_message_at TIMESTAMP WITH TIME ZONE,
+                    user_a_last_read_at TIMESTAMP WITH TIME ZONE,
+                    user_b_last_read_at TIMESTAMP WITH TIME ZONE,
+                    archived_at_a TIMESTAMP WITH TIME ZONE,
                     archive_reason_a VARCHAR(20),
-                    archived_at_b TIMESTAMP,
+                    archived_at_b TIMESTAMP WITH TIME ZONE,
                     archive_reason_b VARCHAR(20),
                     visible_to_user_a BOOLEAN DEFAULT TRUE,
                     visible_to_user_b BOOLEAN DEFAULT TRUE,
-                    deleted_at TIMESTAMP,
+                    deleted_at TIMESTAMP WITH TIME ZONE,
                     CONSTRAINT uk_conversation_users UNIQUE (user_a, user_b),
                         CONSTRAINT ck_conversations_archive_reason_a_values CHECK (
                         archive_reason_a IS NULL
@@ -387,15 +396,17 @@ public final class SchemaInitializer {
         createIndexWithFallback(
                 stmt,
                 "CREATE INDEX IF NOT EXISTS idx_conversations_user_a_last_msg "
-                        + "ON conversations(user_a, last_message_at DESC) WHERE deleted_at IS NULL",
+                        + "ON conversations(user_a, last_message_at DESC, created_at DESC, id DESC) "
+                        + "WHERE deleted_at IS NULL AND visible_to_user_a = TRUE",
                 "CREATE INDEX IF NOT EXISTS idx_conversations_user_a_last_msg "
-                        + "ON conversations(user_a, last_message_at DESC)");
+                        + "ON conversations(user_a, visible_to_user_a, deleted_at, last_message_at DESC, created_at DESC, id DESC)");
         createIndexWithFallback(
                 stmt,
                 "CREATE INDEX IF NOT EXISTS idx_conversations_user_b_last_msg "
-                        + "ON conversations(user_b, last_message_at DESC) WHERE deleted_at IS NULL",
+                        + "ON conversations(user_b, last_message_at DESC, created_at DESC, id DESC) "
+                        + "WHERE deleted_at IS NULL AND visible_to_user_b = TRUE",
                 "CREATE INDEX IF NOT EXISTS idx_conversations_user_b_last_msg "
-                        + "ON conversations(user_b, last_message_at DESC)");
+                        + "ON conversations(user_b, visible_to_user_b, deleted_at, last_message_at DESC, created_at DESC, id DESC)");
 
         stmt.execute("""
                 CREATE TABLE IF NOT EXISTS messages (
@@ -403,8 +414,8 @@ public final class SchemaInitializer {
                     conversation_id VARCHAR(100) NOT NULL,
                     sender_id UUID NOT NULL,
                     content VARCHAR(1000) NOT NULL,
-                    created_at TIMESTAMP NOT NULL,
-                    deleted_at TIMESTAMP,
+                    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+                    deleted_at TIMESTAMP WITH TIME ZONE,
                     CONSTRAINT ck_messages_conversation_id_length CHECK (CHAR_LENGTH(conversation_id) = 73),
                     CONSTRAINT ck_messages_content_nonblank CHECK (CHAR_LENGTH(TRIM(content)) > 0),
                     FOREIGN KEY (sender_id) REFERENCES users(id) ON DELETE CASCADE,
@@ -428,9 +439,9 @@ public final class SchemaInitializer {
                     id UUID PRIMARY KEY,
                     from_user_id UUID NOT NULL,
                     to_user_id UUID NOT NULL,
-                    created_at TIMESTAMP NOT NULL,
+                    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
                     status VARCHAR(20) NOT NULL,
-                    responded_at TIMESTAMP,
+                    responded_at TIMESTAMP WITH TIME ZONE,
                     pair_key VARCHAR(73),
                     pending_marker VARCHAR(10),
                     CONSTRAINT ck_friend_requests_status_values CHECK (
@@ -454,7 +465,7 @@ public final class SchemaInitializer {
                     type VARCHAR(30) NOT NULL,
                     title VARCHAR(200) NOT NULL,
                     message TEXT NOT NULL,
-                    created_at TIMESTAMP NOT NULL,
+                    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
                     is_read BOOLEAN DEFAULT FALSE,
                     data_json TEXT,
                     CONSTRAINT ck_notifications_title_nonblank CHECK (CHAR_LENGTH(TRIM(title)) > 0),
@@ -482,8 +493,8 @@ public final class SchemaInitializer {
                     id UUID PRIMARY KEY,
                     blocker_id UUID NOT NULL,
                     blocked_id UUID NOT NULL,
-                    created_at TIMESTAMP NOT NULL,
-                    deleted_at TIMESTAMP,
+                    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+                    deleted_at TIMESTAMP WITH TIME ZONE,
                     UNIQUE (blocker_id, blocked_id),
                     CONSTRAINT ck_blocks_distinct_users CHECK (blocker_id <> blocked_id),
                     FOREIGN KEY (blocker_id) REFERENCES users(id) ON DELETE CASCADE,
@@ -501,8 +512,8 @@ public final class SchemaInitializer {
                     reported_user_id UUID NOT NULL,
                     reason VARCHAR(50) NOT NULL,
                     description VARCHAR(500),
-                    created_at TIMESTAMP NOT NULL,
-                    deleted_at TIMESTAMP,
+                    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+                    deleted_at TIMESTAMP WITH TIME ZONE,
                     UNIQUE (reporter_id, reported_user_id),
                     CONSTRAINT ck_reports_reason_values CHECK (
                         reason IN ('SPAM', 'INAPPROPRIATE_CONTENT', 'HARASSMENT', 'FAKE_PROFILE', 'UNDERAGE', 'OTHER')
@@ -523,9 +534,9 @@ public final class SchemaInitializer {
                     author_id UUID NOT NULL,
                     subject_id UUID NOT NULL,
                     content VARCHAR(500) NOT NULL,
-                    created_at TIMESTAMP NOT NULL,
-                    updated_at TIMESTAMP NOT NULL,
-                    deleted_at TIMESTAMP,
+                    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+                    updated_at TIMESTAMP WITH TIME ZONE NOT NULL,
+                    deleted_at TIMESTAMP WITH TIME ZONE,
                     PRIMARY KEY (author_id, subject_id),
                     CONSTRAINT ck_profile_notes_content_nonblank CHECK (CHAR_LENGTH(TRIM(content)) > 0),
                     CONSTRAINT ck_profile_notes_distinct_users CHECK (author_id <> subject_id),
@@ -540,7 +551,7 @@ public final class SchemaInitializer {
                 CREATE TABLE IF NOT EXISTS profile_views (
                     viewer_id UUID NOT NULL,
                     viewed_id UUID NOT NULL,
-                    viewed_at TIMESTAMP NOT NULL,
+                    viewed_at TIMESTAMP WITH TIME ZONE NOT NULL,
                     PRIMARY KEY (viewer_id, viewed_id, viewed_at),
                     CONSTRAINT ck_profile_views_distinct_users CHECK (viewer_id <> viewed_id),
                     FOREIGN KEY (viewer_id) REFERENCES users(id) ON DELETE CASCADE,
@@ -563,8 +574,8 @@ public final class SchemaInitializer {
                     rank INT NOT NULL,
                     score INT NOT NULL,
                     reason VARCHAR(200) NOT NULL,
-                    created_at TIMESTAMP NOT NULL,
-                    interacted_at TIMESTAMP,
+                    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+                    interacted_at TIMESTAMP WITH TIME ZONE,
                     FOREIGN KEY (seeker_id) REFERENCES users(id) ON DELETE CASCADE,
                     FOREIGN KEY (standout_user_id) REFERENCES users(id) ON DELETE CASCADE,
                     CONSTRAINT uk_standouts_daily UNIQUE (seeker_id, standout_user_id, featured_date),
@@ -587,7 +598,7 @@ public final class SchemaInitializer {
                     user_id UUID NOT NULL,
                     position INT NOT NULL,
                     url VARCHAR(500) NOT NULL,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
                     PRIMARY KEY (user_id, position),
                     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
                 )
@@ -607,6 +618,7 @@ public final class SchemaInitializer {
                     user_id UUID NOT NULL,
                     gender VARCHAR(30) NOT NULL,
                     PRIMARY KEY (user_id, gender),
+                    CONSTRAINT ck_user_interested_in_gender_values CHECK (gender IN ('MALE', 'FEMALE', 'OTHER')),
                     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
                 )
                 """);
@@ -616,6 +628,7 @@ public final class SchemaInitializer {
                     user_id UUID NOT NULL,
                     "value" VARCHAR(50) NOT NULL,
                     PRIMARY KEY (user_id, "value"),
+                    CONSTRAINT ck_user_db_smoking_value_values CHECK ("value" IN ('NEVER', 'SOMETIMES', 'REGULARLY')),
                     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
                 )
                 """);
@@ -625,6 +638,7 @@ public final class SchemaInitializer {
                     user_id UUID NOT NULL,
                     "value" VARCHAR(50) NOT NULL,
                     PRIMARY KEY (user_id, "value"),
+                    CONSTRAINT ck_user_db_drinking_value_values CHECK ("value" IN ('NEVER', 'SOCIALLY', 'REGULARLY')),
                     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
                 )
                 """);
@@ -634,6 +648,7 @@ public final class SchemaInitializer {
                     user_id UUID NOT NULL,
                     "value" VARCHAR(50) NOT NULL,
                     PRIMARY KEY (user_id, "value"),
+                    CONSTRAINT ck_user_db_wants_kids_value_values CHECK ("value" IN ('NO', 'OPEN', 'SOMEDAY', 'HAS_KIDS')),
                     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
                 )
                 """);
@@ -643,6 +658,9 @@ public final class SchemaInitializer {
                     user_id UUID NOT NULL,
                     "value" VARCHAR(50) NOT NULL,
                     PRIMARY KEY (user_id, "value"),
+                    CONSTRAINT ck_user_db_looking_for_value_values CHECK (
+                        "value" IN ('CASUAL', 'SHORT_TERM', 'LONG_TERM', 'MARRIAGE', 'UNSURE')
+                    ),
                     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
                 )
                 """);
@@ -652,6 +670,9 @@ public final class SchemaInitializer {
                     user_id UUID NOT NULL,
                     "value" VARCHAR(50) NOT NULL,
                     PRIMARY KEY (user_id, "value"),
+                    CONSTRAINT ck_user_db_education_value_values CHECK (
+                        "value" IN ('HIGH_SCHOOL', 'SOME_COLLEGE', 'BACHELORS', 'MASTERS', 'PHD', 'TRADE_SCHOOL', 'OTHER')
+                    ),
                     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
                 )
                 """);
@@ -670,9 +691,9 @@ public final class SchemaInitializer {
                     who_likes UUID NOT NULL,
                     who_got_liked UUID NOT NULL,
                     direction VARCHAR(10) NOT NULL,
-                    like_created_at TIMESTAMP NOT NULL,
+                    like_created_at TIMESTAMP WITH TIME ZONE NOT NULL,
                     match_id VARCHAR(100),
-                    expires_at TIMESTAMP NOT NULL,
+                    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
                     CONSTRAINT ck_undo_states_direction_values CHECK (direction IN ('LIKE', 'SUPER_LIKE', 'PASS')),
                     CONSTRAINT ck_undo_states_match_id_length CHECK (match_id IS NULL OR CHAR_LENGTH(match_id) = 73)
                 )
@@ -728,7 +749,6 @@ public final class SchemaInitializer {
         stmt.execute("CREATE INDEX IF NOT EXISTS idx_friend_req_to_user ON friend_requests(to_user_id)");
         stmt.execute("CREATE INDEX IF NOT EXISTS idx_notifications_created ON notifications(created_at DESC)");
         stmt.execute("CREATE INDEX IF NOT EXISTS idx_profile_views_viewer ON profile_views(viewer_id)");
-        stmt.execute("CREATE INDEX IF NOT EXISTS idx_messages_conversation_id ON messages(conversation_id)");
         stmt.execute("CREATE INDEX IF NOT EXISTS idx_messages_sender_id ON messages(sender_id)");
         stmt.execute("CREATE INDEX IF NOT EXISTS idx_friend_req_to_status ON friend_requests(to_user_id, status)");
         createIndexWithFallback(

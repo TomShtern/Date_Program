@@ -281,8 +281,12 @@ class AppConfigValidatorTest {
     @Test
     @DisplayName("validateStorage accepts supported database settings")
     void validateStorageAcceptsSupportedDatabaseSettings() {
-        assertDoesNotThrow(() -> AppConfigValidator.validateStorage(
-                "POSTGRESQL", "jdbc:postgresql://localhost:5432/datingapp", "datingapp", 30));
+        assertDoesNotThrow(() -> {
+            AppConfigValidator.validateStorage(
+                    "POSTGRESQL", "jdbc:postgresql://localhost:5432/datingapp", "datingapp", 30);
+            AppConfigValidator.validatePoolSizing(10, 2);
+            AppConfigValidator.validatePoolTimeouts(5, 3, 600, 1800, 0);
+        });
     }
 
     @Test
@@ -313,6 +317,12 @@ class AppConfigValidatorTest {
         assertThrows(
                 IllegalArgumentException.class,
                 () -> AppConfigValidator.validateStorage("H2", "jdbc:h2:./data/dating", "sa", 0));
+    }
+
+    @Test
+    @DisplayName("validateStorage rejects minIdle greater than maxPoolSize")
+    void validateStorageRejectsMinIdleGreaterThanMaxPoolSize() {
+        assertThrows(IllegalArgumentException.class, () -> AppConfigValidator.validatePoolSizing(4, 5));
     }
 
     @Test

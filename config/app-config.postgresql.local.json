@@ -2,5 +2,12 @@
     "databaseDialect": "POSTGRESQL",
     "databaseUrl": "jdbc:postgresql://localhost:55432/datingapp",
     "databaseUsername": "datingapp",
-    "queryTimeoutSeconds": 30
+    "queryTimeoutSeconds": 30,
+    "maxPoolSize": 10,
+    "minIdle": 2,
+    "connectionTimeoutSeconds": 5,
+    "validationTimeoutSeconds": 3,
+    "idleTimeoutSeconds": 600,
+    "maxLifetimeSeconds": 1800,
+    "keepaliveTimeSeconds": 0
 }

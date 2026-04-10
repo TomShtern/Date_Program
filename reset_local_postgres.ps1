@@ -5,6 +5,7 @@ param(
     [string]$Database = 'datingapp',
     [int]$StartupTimeoutSeconds = 10,
     [string]$BackupSchema = '',
+    [int]$RetainedAutoBackupSchemas = 1,
     [switch]$ProfileDataOnly,
     [switch]$ThrowOnFailure
 )
@@ -638,6 +639,110 @@ if ($StartupTimeoutSeconds -lt 1) {
     throw 'StartupTimeoutSeconds must be at least 1 second.'
 }
 
+if ($RetainedAutoBackupSchemas -lt 1) {
+    throw 'RetainedAutoBackupSchemas must be at least 1.'
+}
+
+function Invoke-PsqlQuery {
+    param(
+        [string]$Sql,
+        [int]$TargetPort,
+        [string]$TargetUsername,
+        [string]$TargetPassword,
+        [string]$TargetDatabase
+    )
+
+    $previousPassword = $env:PGPASSWORD
+    $env:PGPASSWORD = $TargetPassword
+
+    try {
+        $psqlArgs = @(
+            '-h',
+            'localhost',
+            '-p',
+            $TargetPort.ToString(),
+            '-U',
+            $TargetUsername,
+            '-d',
+            $TargetDatabase,
+            '-w',
+            '-X',
+            '-v',
+            'ON_ERROR_STOP=1',
+            '-tAc',
+            $Sql
+        )
+        $output = & psql @psqlArgs | Out-String
+        return [pscustomobject]@{
+            ExitCode = [int]$LASTEXITCODE
+            Output   = $output.Trim()
+        }
+    }
+    catch {
+        $exitCode = if ($LASTEXITCODE -ne 0) { [int]$LASTEXITCODE } else { 1 }
+        return [pscustomobject]@{
+            ExitCode = $exitCode
+            Output   = ''
+        }
+    }
+    finally {
+        if ($null -eq $previousPassword) {
+            Remove-Item Env:PGPASSWORD -ErrorAction SilentlyContinue
+        }
+        else {
+            $env:PGPASSWORD = $previousPassword
+        }
+    }
+}
+
+function Remove-OlderAutoBackupSchemas {
+    param(
+        [int]$TargetPort,
+        [string]$TargetUsername,
+        [string]$TargetPassword,
+        [string]$TargetDatabase,
+        [string]$CurrentBackupSchema,
+        [int]$SchemasToRetain
+    )
+
+    $schemaListResult = Invoke-PsqlQuery -Sql "SELECT schema_name FROM information_schema.schemata WHERE schema_name LIKE 'reset_backup_%' ORDER BY schema_name DESC" -TargetPort $TargetPort -TargetUsername $TargetUsername -TargetPassword $TargetPassword -TargetDatabase $TargetDatabase
+
+    if ($schemaListResult.ExitCode -ne 0) {
+        Write-Warning 'Could not inspect existing reset_backup_* schemas; skipping backup-schema cleanup.'
+        return
+    }
+
+    $allSchemas = @($schemaListResult.Output -split "`r?`n" | ForEach-Object { $_.Trim() } | Where-Object {
+            -not [string]::IsNullOrWhiteSpace($_)
+        })
+    $schemasToKeep = New-Object System.Collections.Generic.List[string]
+    $schemasToKeep.Add($CurrentBackupSchema)
+    foreach ($schemaName in $allSchemas) {
+        if ($schemaName -eq $CurrentBackupSchema) {
+            continue
+        }
+        if ($schemasToKeep.Count -ge $SchemasToRetain) {
+            break
+        }
+        $schemasToKeep.Add($schemaName)
+    }
+
+    foreach ($schemaName in $allSchemas) {
+        if ($schemasToKeep.Contains($schemaName)) {
+            continue
+        }
+
+        $dropResult = Invoke-PsqlQuery -Sql ("DROP SCHEMA IF EXISTS {0} CASCADE" -f (Quote-SqlIdentifier $schemaName)) -TargetPort $TargetPort -TargetUsername $TargetUsername -TargetPassword $TargetPassword -TargetDatabase $TargetDatabase
+
+        if ($dropResult.ExitCode -ne 0) {
+            Write-Warning ("Failed to drop older backup schema {0}; keeping it in place." -f $schemaName)
+            continue
+        }
+
+        Write-Output ("Removed old backup schema: {0}" -f $schemaName)
+    }
+}
+
 if ($null -eq $Credential) {
     $Credential = New-DefaultCredential
 }
@@ -742,6 +847,16 @@ try {
             $failureMessage = "PostgreSQL smoke validation failed with exit code $smokeExitCode."
             $keepTempDirectory = $true
         }
+    }
+
+    if ($failureExitCode -eq 0) {
+        Remove-OlderAutoBackupSchemas `
+            -TargetPort $Port `
+            -TargetUsername $Credential.UserName `
+            -TargetPassword $plainPassword `
+            -TargetDatabase $resolvedDatabase `
+            -CurrentBackupSchema $resolvedBackupSchema `
+            -SchemasToRetain $RetainedAutoBackupSchemas
     }
 }
 finally {

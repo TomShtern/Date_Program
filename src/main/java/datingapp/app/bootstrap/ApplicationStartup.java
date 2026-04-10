@@ -298,6 +298,13 @@ public final class ApplicationStartup {
         applyEnvInt(envLookup, "UNDO_WINDOW_SECONDS", builder::undoWindowSeconds);
         applyEnvInt(envLookup, "SESSION_TIMEOUT_MINUTES", builder::sessionTimeoutMinutes);
         applyEnvInt(envLookup, "QUERY_TIMEOUT_SECONDS", builder::queryTimeoutSeconds);
+        applyEnvInt(envLookup, "DB_MAX_POOL_SIZE", builder::maxPoolSize);
+        applyEnvInt(envLookup, "DB_MIN_IDLE", builder::minIdle);
+        applyEnvInt(envLookup, "DB_CONNECTION_TIMEOUT_SECONDS", builder::connectionTimeoutSeconds);
+        applyEnvInt(envLookup, "DB_VALIDATION_TIMEOUT_SECONDS", builder::validationTimeoutSeconds);
+        applyEnvInt(envLookup, "DB_IDLE_TIMEOUT_SECONDS", builder::idleTimeoutSeconds);
+        applyEnvInt(envLookup, "DB_MAX_LIFETIME_SECONDS", builder::maxLifetimeSeconds);
+        applyEnvInt(envLookup, "DB_KEEPALIVE_TIME_SECONDS", builder::keepaliveTimeSeconds);
         applyEnvInt(envLookup, "CLEANUP_RETENTION_DAYS", builder::cleanupRetentionDays);
         applyEnvInt(envLookup, "MIN_AGE", builder::minAge);
         applyEnvInt(envLookup, "MAX_AGE", builder::maxAge);

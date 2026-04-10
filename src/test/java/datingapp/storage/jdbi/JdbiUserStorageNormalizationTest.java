@@ -176,9 +176,9 @@ class JdbiUserStorageNormalizationTest {
     @Test
     @DisplayName("should save and load dealbreaker dimensions")
     void saveAndLoadDealbreakerDimensionsRoundTrip() {
-        Set<String> smoking = Set.of("NEVER", "SOCIALLY");
+        Set<String> smoking = Set.of("NEVER", "SOMETIMES");
         Set<String> drinking = Set.of("SOCIALLY");
-        Set<String> wantsKids = Set.of("YES", "OPEN_TO_IT");
+        Set<String> wantsKids = Set.of("SOMEDAY", "OPEN");
         Set<String> lookingFor = Set.of("LONG_TERM");
         Set<String> education = Set.of("BACHELORS", "MASTERS");
 
@@ -679,6 +679,8 @@ class JdbiUserStorageNormalizationTest {
     @DisplayName("invalid normalized enum values are ignored during hydration")
     void invalidNormalizedEnumValuesAreIgnoredDuringHydration() {
         jdbi.useHandle(handle -> {
+            handle.execute("ALTER TABLE user_interested_in DROP CONSTRAINT ck_user_interested_in_gender_values");
+            handle.execute("ALTER TABLE user_db_smoking DROP CONSTRAINT ck_user_db_smoking_value_values");
             handle.createUpdate("INSERT INTO user_interested_in (user_id, gender) VALUES (:userId, :gender)")
                     .bind("userId", userId)
                     .bind("gender", "MALE")

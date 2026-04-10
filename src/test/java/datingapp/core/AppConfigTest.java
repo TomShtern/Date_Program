@@ -32,7 +32,14 @@ class AppConfigTest {
         void defaultsHaveExpectedValues() {
             AppConfig defaults = AppConfig.defaults();
 
+            assertDefaultMatchingConfig(defaults);
+            assertDefaultStorageConfig(defaults);
+            assertDefaultValidationConfig(defaults);
+            assertDefaultAlgorithmConfig(defaults);
             assertEquals(3, defaults.safety().autoBanThreshold(), "Default auto-ban threshold should be 3");
+        }
+
+        private void assertDefaultMatchingConfig(AppConfig defaults) {
             assertEquals(100, defaults.matching().dailyLikeLimit(), "Default daily like limit should be 100");
             assertEquals(1, defaults.matching().dailySuperLikeLimit(), "Default super like limit should be 1");
             assertEquals(
@@ -44,6 +51,9 @@ class AppConfigTest {
             assertTrue(
                     defaults.matching().suspiciousSwipeVelocityBlockingEnabled(),
                     "Default suspicious swipe blocking should be enabled");
+        }
+
+        private void assertDefaultStorageConfig(AppConfig defaults) {
             assertEquals("H2", defaults.storage().databaseDialect(), "Default database dialect should be H2");
             assertEquals(
                     "jdbc:h2:./data/dating",
@@ -51,6 +61,18 @@ class AppConfigTest {
                     "Default database URL should keep the existing H2 runtime path");
             assertEquals("sa", defaults.storage().databaseUsername(), "Default database username should be sa");
             assertEquals(30, defaults.storage().queryTimeoutSeconds(), "Default query timeout should be 30");
+            assertEquals(10, defaults.storage().maxPoolSize(), "Default max pool size should be 10");
+            assertEquals(2, defaults.storage().minIdle(), "Default min idle should be 2");
+            assertEquals(
+                    5, defaults.storage().connectionTimeoutSeconds(), "Default connection timeout should be 5 seconds");
+            assertEquals(
+                    3, defaults.storage().validationTimeoutSeconds(), "Default validation timeout should be 3 seconds");
+            assertEquals(600, defaults.storage().idleTimeoutSeconds(), "Default idle timeout should be 600 seconds");
+            assertEquals(1800, defaults.storage().maxLifetimeSeconds(), "Default max lifetime should be 1800 seconds");
+            assertEquals(0, defaults.storage().keepaliveTimeSeconds(), "Default keepalive should be disabled");
+        }
+
+        private void assertDefaultValidationConfig(AppConfig defaults) {
             assertEquals(10, defaults.validation().maxInterests(), "Default max interests should be 10");
             assertEquals(
                     User.MAX_PHOTOS,
@@ -66,6 +88,9 @@ class AppConfigTest {
                     "Default max profile note length should match ProfileNote.MAX_LENGTH");
             assertEquals(500, defaults.validation().maxBioLength(), "Default max bio length should be 500");
             assertEquals(500, defaults.validation().maxReportDescLength(), "Default report desc length should be 500");
+        }
+
+        private void assertDefaultAlgorithmConfig(AppConfig defaults) {
             assertEquals(
                     3, defaults.algorithm().standoutDiversityDays(), "Default standout diversity days should be 3");
             assertEquals(40, defaults.algorithm().standoutMinScore(), "Default standout minimum score should be 40");
@@ -118,7 +143,12 @@ class AppConfigTest {
         void builderIsChainable() {
             AppConfig.Builder builder = AppConfig.builder();
 
-            // Verify all methods return the builder for chaining
+            assertBuilderChainableCoreMethods(builder);
+            assertBuilderChainableStorageMethods(builder);
+            assertBuilderChainableAlgorithmMethods(builder);
+        }
+
+        private void assertBuilderChainableCoreMethods(AppConfig.Builder builder) {
             assertSame(builder, builder.autoBanThreshold(1));
             assertSame(builder, builder.dailyLikeLimit(1));
             assertSame(builder, builder.dailySuperLikeLimit(1));
@@ -131,10 +161,23 @@ class AppConfigTest {
             assertSame(builder, builder.maxReportDescLength(1));
             assertSame(builder, builder.maxMessageLength(1));
             assertSame(builder, builder.maxProfileNoteLength(1));
+        }
+
+        private void assertBuilderChainableStorageMethods(AppConfig.Builder builder) {
             assertSame(builder, builder.databaseDialect("POSTGRESQL"));
             assertSame(builder, builder.databaseUrl("jdbc:postgresql://localhost:5432/datingapp"));
             assertSame(builder, builder.databaseUsername("datingapp"));
             assertSame(builder, builder.queryTimeoutSeconds(1));
+            assertSame(builder, builder.maxPoolSize(1));
+            assertSame(builder, builder.minIdle(0));
+            assertSame(builder, builder.connectionTimeoutSeconds(1));
+            assertSame(builder, builder.validationTimeoutSeconds(1));
+            assertSame(builder, builder.idleTimeoutSeconds(0));
+            assertSame(builder, builder.maxLifetimeSeconds(0));
+            assertSame(builder, builder.keepaliveTimeSeconds(0));
+        }
+
+        private void assertBuilderChainableAlgorithmMethods(AppConfig.Builder builder) {
             assertSame(builder, builder.standoutDiversityDays(1));
             assertSame(builder, builder.standoutMinScore(1));
             assertSame(builder, builder.starExcellentThreshold(1));
@@ -198,6 +241,13 @@ class AppConfigTest {
                     config.storage().databaseUrl());
             assertEquals("datingapp", config.storage().databaseUsername());
             assertEquals(62, config.storage().queryTimeoutSeconds());
+            assertEquals(14, config.storage().maxPoolSize());
+            assertEquals(4, config.storage().minIdle());
+            assertEquals(7, config.storage().connectionTimeoutSeconds());
+            assertEquals(5, config.storage().validationTimeoutSeconds());
+            assertEquals(900, config.storage().idleTimeoutSeconds());
+            assertEquals(2400, config.storage().maxLifetimeSeconds());
+            assertEquals(120, config.storage().keepaliveTimeSeconds());
         }
 
         @Test
@@ -359,6 +409,13 @@ class AppConfigTest {
                     .databaseUrl("jdbc:postgresql://localhost:5432/datingapp")
                     .databaseUsername("datingapp")
                     .queryTimeoutSeconds(62)
+                    .maxPoolSize(14)
+                    .minIdle(4)
+                    .connectionTimeoutSeconds(7)
+                    .validationTimeoutSeconds(5)
+                    .idleTimeoutSeconds(900)
+                    .maxLifetimeSeconds(2400)
+                    .keepaliveTimeSeconds(120)
                     .build();
         }
     }
