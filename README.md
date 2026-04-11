@@ -78,7 +78,7 @@ mvn spotless:apply verify
 ```
 <!--/ARCHIVE-->
 
-```bash
+```powershell
 # PostgreSQL preflight (checks tools, listener, login, and shows next step if the server is down)
 .\check_postgresql_runtime_env.ps1
 

@@ -34,6 +34,7 @@ import java.util.Set;
 import java.util.UUID;
 
 /** Candidate browsing, swiping, undo, and standout/match orchestration use-cases. */
+@SuppressWarnings("java:S6539")
 public class MatchingUseCases {
 
     private static final String CONTEXT_REQUIRED = "Context is required";

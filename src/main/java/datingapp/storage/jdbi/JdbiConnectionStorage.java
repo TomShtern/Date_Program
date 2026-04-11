@@ -91,29 +91,27 @@ public final class JdbiConnectionStorage implements OperationalCommunicationStor
                             user_a_last_read_at, user_b_last_read_at,
                             archived_at_a AS user_a_archived_at, archive_reason_a AS user_a_archive_reason,
                             archived_at_b AS user_b_archived_at, archive_reason_b AS user_b_archive_reason,
-                            visible_to_user_a, visible_to_user_b
-                        FROM (
-                            SELECT id, user_a, user_b, created_at, last_message_at,
-                                user_a_last_read_at, user_b_last_read_at,
-                                archived_at_a, archive_reason_a, archived_at_b, archive_reason_b,
-                                visible_to_user_a, visible_to_user_b
-                            FROM conversations
-                            WHERE user_a = :userId
-                              AND visible_to_user_a = TRUE
-                              AND deleted_at IS NULL
+                            visible_to_user_a, visible_to_user_b,
+                            COALESCE(last_message_at, created_at) AS _sort_time
+                        FROM conversations
+                        WHERE user_a = :userId
+                          AND visible_to_user_a = TRUE
+                          AND deleted_at IS NULL
 
-                            UNION ALL
+                        UNION ALL
 
-                            SELECT id, user_a, user_b, created_at, last_message_at,
-                                user_a_last_read_at, user_b_last_read_at,
-                                archived_at_a, archive_reason_a, archived_at_b, archive_reason_b,
-                                visible_to_user_a, visible_to_user_b
-                            FROM conversations
-                            WHERE user_b = :userId
-                              AND visible_to_user_b = TRUE
-                              AND deleted_at IS NULL
-                        ) visible_conversations
-                        ORDER BY COALESCE(last_message_at, created_at) DESC, id DESC
+                        SELECT id, user_a, user_b, created_at, last_message_at,
+                            user_a_last_read_at, user_b_last_read_at,
+                            archived_at_a AS user_a_archived_at, archive_reason_a AS user_a_archive_reason,
+                            archived_at_b AS user_b_archived_at, archive_reason_b AS user_b_archive_reason,
+                            visible_to_user_a, visible_to_user_b,
+                            COALESCE(last_message_at, created_at) AS _sort_time
+                        FROM conversations
+                        WHERE user_b = :userId
+                          AND visible_to_user_b = TRUE
+                          AND deleted_at IS NULL
+
+                        ORDER BY _sort_time DESC, id DESC
                         """;
 
     private final Jdbi jdbi;

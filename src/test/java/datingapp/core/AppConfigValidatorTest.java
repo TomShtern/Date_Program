@@ -320,7 +320,7 @@ class AppConfigValidatorTest {
     }
 
     @Test
-    @DisplayName("validateStorage rejects minIdle greater than maxPoolSize")
+    @DisplayName("validatePoolSizing rejects minIdle greater than maxPoolSize")
     void validateStorageRejectsMinIdleGreaterThanMaxPoolSize() {
         assertThrows(IllegalArgumentException.class, () -> AppConfigValidator.validatePoolSizing(4, 5));
     }

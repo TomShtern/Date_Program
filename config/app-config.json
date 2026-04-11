@@ -62,7 +62,7 @@
   "queryTimeoutSeconds": 30,
   "maxPoolSize": 10,
   "minIdle": 2,
-  "connectionTimeoutSeconds": 5,
+  "connectionTimeoutSeconds": 20,
   "validationTimeoutSeconds": 3,
   "idleTimeoutSeconds": 600,
   "maxLifetimeSeconds": 1800,

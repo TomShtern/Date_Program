@@ -666,7 +666,7 @@ public final class MigrationRunner {
         } catch (SQLException postgresFailure) {
             try {
                 stmt.execute(SQL_ALTER_TABLE_PREFIX + tableName + SQL_ALTER_COLUMN_FRAGMENT + columnName
-                        + " TIMESTAMP WITH TIME ZONE");
+                        + " TYPE TIMESTAMP WITH TIME ZONE");
             } catch (SQLException firstFallbackFailure) {
                 try {
                     stmt.execute(SQL_ALTER_TABLE_PREFIX + tableName + SQL_ALTER_COLUMN_FRAGMENT + columnName

@@ -220,6 +220,15 @@ final class AppConfigValidator {
         requireInRange(idleTimeoutSeconds, 0, 86400, "idleTimeoutSeconds");
         requireInRange(maxLifetimeSeconds, 0, 86400, "maxLifetimeSeconds");
         requireInRange(keepaliveTimeSeconds, 0, 86400, "keepaliveTimeSeconds");
+
+        if (keepaliveTimeSeconds > 0 && maxLifetimeSeconds > 0 && keepaliveTimeSeconds >= maxLifetimeSeconds) {
+            throw new IllegalArgumentException(
+                    "keepaliveTimeSeconds must be less than maxLifetimeSeconds when both are enabled");
+        }
+        if (idleTimeoutSeconds > 0 && maxLifetimeSeconds > 0 && idleTimeoutSeconds > maxLifetimeSeconds) {
+            throw new IllegalArgumentException(
+                    "idleTimeoutSeconds must not exceed maxLifetimeSeconds when both are enabled");
+        }
     }
 
     static void validateSafetySession(

@@ -272,6 +272,9 @@ CREATE TABLE public.standouts (
     interacted_at timestamp with time zone
 );
 
+ALTER TABLE public.standouts
+    ADD CONSTRAINT chk_standouts_seeker_not_standout CHECK (seeker_id <> standout_user_id);
+
 
 --
 -- Name: swipe_sessions; Type: TABLE; Schema: public; Owner: -
@@ -305,6 +308,7 @@ CREATE TABLE public.undo_states (
     like_created_at timestamp with time zone NOT NULL,
     match_id character varying(100),
     expires_at timestamp with time zone NOT NULL,
+    CONSTRAINT ck_undo_states_distinct_users CHECK (who_likes <> who_got_liked),
     CONSTRAINT ck_undo_states_direction_values CHECK (((direction)::text = ANY ((ARRAY['LIKE'::character varying, 'SUPER_LIKE'::character varying, 'PASS'::character varying])::text[]))),
     CONSTRAINT ck_undo_states_match_id_length CHECK (((match_id IS NULL) OR (char_length((match_id)::text) = 73)))
 );

@@ -208,11 +208,11 @@ class DatabaseManagerConfigurationTest {
     @DisplayName("configurePoolSettings should externalize Hikari pool sizing and timeouts")
     void configurePoolSettingsExternalizesHikariSettings() throws Exception {
         System.setProperty(PROFILE_PROPERTY, "test");
-        DatabaseManager manager = DatabaseManager.createIsolated(
-                "jdbc:h2:mem:dbmanager-pool-" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1");
+        String jdbcUrl = "jdbc:h2:mem:dbmanager-pool-" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1";
+        DatabaseManager manager = DatabaseManager.createIsolated(jdbcUrl);
         AppConfig.StorageConfig storageConfig = AppConfig.builder()
                 .databaseDialect("H2")
-                .databaseUrl("jdbc:h2:mem:dbmanager-pool-" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1")
+                .databaseUrl(jdbcUrl)
                 .databaseUsername("sa")
                 .queryTimeoutSeconds(30)
                 .maxPoolSize(14)

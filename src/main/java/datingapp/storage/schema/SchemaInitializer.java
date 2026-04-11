@@ -598,7 +598,7 @@ public final class SchemaInitializer {
                     user_id UUID NOT NULL,
                     position INT NOT NULL,
                     url VARCHAR(500) NOT NULL,
-                    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
                     PRIMARY KEY (user_id, position),
                     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
                 )
@@ -694,6 +694,7 @@ public final class SchemaInitializer {
                     like_created_at TIMESTAMP WITH TIME ZONE NOT NULL,
                     match_id VARCHAR(100),
                     expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+                    CONSTRAINT ck_undo_states_distinct_users CHECK (who_likes <> who_got_liked),
                     CONSTRAINT ck_undo_states_direction_values CHECK (direction IN ('LIKE', 'SUPER_LIKE', 'PASS')),
                     CONSTRAINT ck_undo_states_match_id_length CHECK (match_id IS NULL OR CHAR_LENGTH(match_id) = 73)
                 )

@@ -116,7 +116,7 @@ try {
         New-Item -ItemType Directory -Force -Path $parentDirectory | Out-Null
     }
 
-    & pg_dump --schema-only --schema public --no-owner --no-privileges --host $DatabaseServer --port $Port --username $Username --dbname $Database --file $OutputPath | Out-Null
+    & pg_dump --schema-only --schema public --no-owner --no-privileges --host $DatabaseServer --port $Port --username $Username --dbname $Database --file $OutputPath
     $exitCode = $LASTEXITCODE
     if ($exitCode -ne 0) {
         Exit-OrThrow -ExitCode $exitCode -Message ("pg_dump failed with exit code {0}." -f $exitCode)
