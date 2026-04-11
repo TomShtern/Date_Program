@@ -40,32 +40,14 @@ public final class DatabaseManager {
     private volatile int queryTimeoutSeconds = 30;
 
     /** Immutable pool configuration swapped atomically to prevent partial reads. */
-    private static final class PoolConfig {
-        final int maxPoolSize;
-        final int minIdle;
-        final int connectionTimeoutSeconds;
-        final int validationTimeoutSeconds;
-        final int idleTimeoutSeconds;
-        final int maxLifetimeSeconds;
-        final int keepaliveTimeSeconds;
-
-        PoolConfig(
-                int maxPoolSize,
-                int minIdle,
-                int connectionTimeoutSeconds,
-                int validationTimeoutSeconds,
-                int idleTimeoutSeconds,
-                int maxLifetimeSeconds,
-                int keepaliveTimeSeconds) {
-            this.maxPoolSize = maxPoolSize;
-            this.minIdle = minIdle;
-            this.connectionTimeoutSeconds = connectionTimeoutSeconds;
-            this.validationTimeoutSeconds = validationTimeoutSeconds;
-            this.idleTimeoutSeconds = idleTimeoutSeconds;
-            this.maxLifetimeSeconds = maxLifetimeSeconds;
-            this.keepaliveTimeSeconds = keepaliveTimeSeconds;
-        }
-    }
+    private static record PoolConfig(
+            int maxPoolSize,
+            int minIdle,
+            int connectionTimeoutSeconds,
+            int validationTimeoutSeconds,
+            int idleTimeoutSeconds,
+            int maxLifetimeSeconds,
+            int keepaliveTimeSeconds) {}
 
     private static final PoolConfig DEFAULT_POOL_CONFIG = new PoolConfig(10, 2, 5, 3, 600, 1800, 0);
     private final AtomicReference<PoolConfig> configRef = new AtomicReference<>(DEFAULT_POOL_CONFIG);
@@ -112,11 +94,6 @@ public final class DatabaseManager {
         }
         if (storageConfig.connectionTimeoutSeconds() <= 0) {
             throw new IllegalArgumentException("connectionTimeoutSeconds must be positive");
-        }
-        long connectionTimeoutMs = storageConfig.connectionTimeoutSeconds() * 1000L;
-        if (connectionTimeoutMs < 250) {
-            throw new IllegalArgumentException(
-                    "connectionTimeoutSeconds must be at least 1 second (250 ms Hikari minimum)");
         }
         if (storageConfig.validationTimeoutSeconds() <= 0) {
             throw new IllegalArgumentException("validationTimeoutSeconds must be positive");
@@ -199,15 +176,15 @@ public final class DatabaseManager {
         config.setJdbcUrl(resolveJdbcUrl(configuredJdbcUrl, configuredProfile, explicitPassword, dialect));
         config.setUsername(resolveUsername());
         config.setPassword(resolvePassword(explicitPassword, configuredProfile, configuredJdbcUrl, dialect));
-        config.setMaximumPoolSize(cfg.maxPoolSize);
-        config.setMinimumIdle(cfg.minIdle);
-        config.setConnectionTimeout(cfg.connectionTimeoutSeconds * 1000L);
+        config.setMaximumPoolSize(cfg.maxPoolSize());
+        config.setMinimumIdle(cfg.minIdle());
+        config.setConnectionTimeout(cfg.connectionTimeoutSeconds() * 1000L);
         config.setConnectionTestQuery("SELECT 1");
-        config.setValidationTimeout(cfg.validationTimeoutSeconds * 1000L);
-        config.setIdleTimeout(cfg.idleTimeoutSeconds * 1000L);
-        config.setMaxLifetime(cfg.maxLifetimeSeconds * 1000L);
-        if (cfg.keepaliveTimeSeconds > 0) {
-            config.setKeepaliveTime(cfg.keepaliveTimeSeconds * 1000L);
+        config.setValidationTimeout(cfg.validationTimeoutSeconds() * 1000L);
+        config.setIdleTimeout(cfg.idleTimeoutSeconds() * 1000L);
+        config.setMaxLifetime(cfg.maxLifetimeSeconds() * 1000L);
+        if (cfg.keepaliveTimeSeconds() > 0) {
+            config.setKeepaliveTime(cfg.keepaliveTimeSeconds() * 1000L);
         }
         dataSource.set(new HikariDataSource(config));
     }

@@ -273,7 +273,7 @@ CREATE TABLE public.standouts (
 );
 
 ALTER TABLE public.standouts
-    ADD CONSTRAINT chk_standouts_seeker_not_standout CHECK (seeker_id <> standout_user_id);
+    ADD CONSTRAINT ck_standouts_distinct_users CHECK (seeker_id <> standout_user_id);
 
 
 --

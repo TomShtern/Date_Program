@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.zaxxer.hikari.HikariDataSource;
 import datingapp.core.AppConfig;
@@ -249,6 +250,24 @@ class DatabaseManagerConfigurationTest {
             manager.shutdown();
             System.clearProperty(PROFILE_PROPERTY);
         }
+    }
+
+    @Test
+    @DisplayName("PoolConfig should be a private record with the expected components")
+    void poolConfigIsARecordWithExpectedComponents() throws Exception {
+        Class<?> poolConfigClass = Class.forName("datingapp.storage.DatabaseManager$PoolConfig");
+
+        assertTrue(poolConfigClass.isRecord());
+
+        var components = poolConfigClass.getRecordComponents();
+        assertEquals(7, components.length);
+        assertEquals("maxPoolSize", components[0].getName());
+        assertEquals("minIdle", components[1].getName());
+        assertEquals("connectionTimeoutSeconds", components[2].getName());
+        assertEquals("validationTimeoutSeconds", components[3].getName());
+        assertEquals("idleTimeoutSeconds", components[4].getName());
+        assertEquals("maxLifetimeSeconds", components[5].getName());
+        assertEquals("keepaliveTimeSeconds", components[6].getName());
     }
 
     @Test
