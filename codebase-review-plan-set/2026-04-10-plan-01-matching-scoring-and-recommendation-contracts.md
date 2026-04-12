@@ -28,6 +28,7 @@ Stabilize the scoring and recommendation surface so browse ranking, standouts, d
 ## Primary source files and seams
 
 - `src/main/java/datingapp/app/usecase/matching/MatchingUseCases.java`
+- `src/main/java/datingapp/core/matching/MatchingService.java`
 - `src/main/java/datingapp/core/matching/MatchQualityService.java`
 - `src/main/java/datingapp/core/matching/RecommendationService.java`
 - `src/main/java/datingapp/core/matching/DefaultBrowseRankingService.java`
@@ -35,6 +36,8 @@ Stabilize the scoring and recommendation surface so browse ranking, standouts, d
 - `src/main/java/datingapp/core/matching/DefaultCompatibilityCalculator.java`
 - `src/main/java/datingapp/core/matching/Standout.java`
 - `src/main/java/datingapp/core/model/Match.java`
+
+`Match.java` and `MatchingService.java` stay in the primary source list because they define the semantic context this plan must verify, but they remain supporting read-only seams unless the plan escalates.
 
 ## Boundary contract
 

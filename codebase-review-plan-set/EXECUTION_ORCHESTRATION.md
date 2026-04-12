@@ -85,6 +85,7 @@ the coordinator should stop and open a follow-on plan rather than silently widen
 | P09  | `DatabaseManager.java`                                                    | `StorageFactory.java`     |
 | P09B | `MigrationRunner.java`, `SchemaInitializer.java`                          | `DatabaseManager.java`    |
 | P10  | `StorageFactory.java` and the `Jdbi*Storage` cluster                      | none                      |
+| P11  | none                                                                      | none                      |
 | P12  | `ServiceRegistry.java`                                                    | none                      |
 
 ### Wave 1 — core behavior and application workflow contracts

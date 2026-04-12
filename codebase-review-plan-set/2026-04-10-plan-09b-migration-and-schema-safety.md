@@ -11,7 +11,7 @@
 
 ## Objective
 
-Reduce the chance of getting stranded in a half-migrated or hard-to-recover schema state by isolating migration-engine cleanup, irreversible schema handling, pair-ID invariants, and bootstrap transaction/timeout behavior into one dedicated plan.
+Reduce the chance of getting stranded in a half-migrated or hard-to-recover schema state by isolating migration-engine cleanup, irreversible schema handling, pair-ID invariants (the shared deterministic match/conversation ID length contract), and bootstrap transaction/timeout behavior into one dedicated plan.
 
 ## Issues addressed
 
@@ -19,7 +19,7 @@ Reduce the chance of getting stranded in a half-migrated or hard-to-recover sche
 |----------|-----------------------------------------------------------------------------|
 | 4.2      | `MigrationRunner` mixes registry, execution, introspection, and DDL helpers |
 | 11.7     | V3 schema cleanup is irreversible                                           |
-| 16.5     | Match/conversation ID length is encoded as a magic number                   |
+| 16.5     | Pair-ID length is encoded as a magic number                                 |
 | 17.10    | Startup migration has weaker timeout and atomicity guarantees               |
 
 ## Primary source files and seams

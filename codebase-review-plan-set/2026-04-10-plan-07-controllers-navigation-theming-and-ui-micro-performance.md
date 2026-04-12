@@ -36,11 +36,12 @@ Improve controller lifecycle ownership, navigation testability, styling consiste
 - `src/main/java/datingapp/ui/NavigationService.java`
 - `src/main/java/datingapp/ui/screen/BaseController.java`
 - `src/main/java/datingapp/ui/screen/MatchesController.java`
+- `src/main/resources/css/theme.css`
+- `src/main/resources/css/light-theme.css`
 
 ### Supporting read-only seams
 
-- `src/main/resources/css/theme.css`
-- `src/main/resources/css/light-theme.css`
+- none
 
 ### Escalate instead of expanding scope if
 
@@ -68,6 +69,7 @@ Improve controller lifecycle ownership, navigation testability, styling consiste
 ### Slice C — move repeatable styling into CSS
 
 - migrate repeated theme constants and control styling into style classes or shared stylesheet rules
+- keep the Slice C migration scoped to the minimal `theme.css` and `light-theme.css` constant/class updates needed for that move, not a broad theming rewrite
 - keep only genuinely data-driven inline styles in code
 
 ### Slice D — remove the hover-allocation hot path

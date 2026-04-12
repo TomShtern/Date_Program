@@ -209,12 +209,13 @@ class StatsViewModelTest {
         users.save(currentUser);
         AppSession.getInstance().setCurrentUser(currentUser);
 
-        ProfileInsightsUseCases failingInsights = new ProfileInsightsUseCases(TestAchievementService.empty(), null) {
-            @Override
-            public UseCaseResult<UserStats> getOrComputeStats(StatsQuery query) {
-                return UseCaseResult.failure(UseCaseError.internal("stats unavailable"));
-            }
-        };
+        ProfileInsightsUseCases failingInsights =
+                new ProfileInsightsUseCases(TestAchievementService.empty(), TestActivityMetricsService.empty()) {
+                    @Override
+                    public UseCaseResult<UserStats> getOrComputeStats(StatsQuery query) {
+                        return UseCaseResult.failure(UseCaseError.internal("stats unavailable"));
+                    }
+                };
 
         ProfileUseCases profileUseCases =
                 createProfileUseCases(users, config, TestAchievementService.empty(), failingInsights);
@@ -230,7 +231,15 @@ class StatsViewModelTest {
 
         assertTrue(
                 JavaFxTestSupport.waitUntil(() -> viewModel.loadFailedProperty().get(), 5000));
-        assertTrue(viewModel.loadFailedProperty().get());
+        assertFalse(viewModel.loadFailureMessageProperty().get().isBlank());
+        // Metrics remain at defaults — no fallback values were set
+        assertEquals(0, viewModel.totalLikesGivenProperty().get());
+        assertEquals(0, viewModel.totalLikesReceivedProperty().get());
+        assertEquals(0, viewModel.totalMatchesProperty().get());
+        assertEquals(0, viewModel.messagesExchangedProperty().get());
+        assertEquals(0, viewModel.loginStreakProperty().get());
+        assertEquals("--", viewModel.responseRateProperty().get());
+        assertEquals(0, viewModel.getAchievements().size());
 
         viewModel.dispose();
     }

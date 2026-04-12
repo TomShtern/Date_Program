@@ -40,6 +40,14 @@ For the **first execution pass**, use a strict serial order even where later saf
 
 After that, pause and review the seam stability before opening Wave 2.
 
+## Wave definitions
+
+- Wave 1 = `P01`, `P02`, `P03`, `P04`, `P04B`
+- Wave 2 = `P09`, `P09B`, `P10`, `P12`
+- Wave 3 = `P05`, `P06`, `P07`
+- Wave 4 = `P08`, `P11`
+- Wave 5 = `P13`
+
 ## Explicit wait list
 
 | Plan   | Wait until                | Gate type   | Why                                                                                  |

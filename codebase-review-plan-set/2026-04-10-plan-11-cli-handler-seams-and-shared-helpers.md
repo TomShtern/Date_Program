@@ -4,7 +4,7 @@
 > **Wave:** 4
 > **Priority:** Medium
 > **Parallel-safe with:** none recommended
-> **Must run after:** P03
+> **Must run after:** P03 and P04B
 > **Status:** Planned
 
 ---
@@ -61,7 +61,7 @@ Extract the repetitive parsing and formatting seams in the CLI layer so handlers
 
 ## Dependencies and orchestration notes
 
-- Execute this plan after P03 and after P04/P04B so handler behavior inherits settled copy and workflow semantics.
+- Execute this plan after P03 and P04B so handler behavior inherits settled copy and workflow semantics.
 - Keep this plan single-layer: if it starts changing use-case or controller semantics, stop and re-scope.
 
 ## Out of scope

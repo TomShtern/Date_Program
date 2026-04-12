@@ -59,7 +59,8 @@ Clarify how selected runtime services and validators communicate supported const
 ### Slice A — narrow or group builder inputs where it reduces accidental complexity
 
 - keep `ServiceRegistry` as the single composition root
-- only group builder inputs into smaller records/helpers if that materially reduces setter-surface sprawl without obscuring construction ownership
+- refactor `ServiceRegistry.Builder` to replace the current one-setter-per-field sprawl with grouped helper inputs such as `storageDependencies(...)`, `matchingDependencies(...)`, `profileDependencies(...)`, and `runtimePolicies(...)`, so the builder still owns composition while reducing the public setter surface materially
+- acceptance criteria: remove the individual builder setters covered by those grouped helpers, keep validation/build ownership inside `ServiceRegistry.Builder`, and make the remaining public builder API small enough that issue 6.2 is no longer an oversized setter surface in practice
 
 ### Slice B — make constructor-mode semantics explicit
 

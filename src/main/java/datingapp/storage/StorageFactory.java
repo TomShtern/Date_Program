@@ -79,7 +79,7 @@ public final class StorageFactory {
 
         Jdbi jdbi = createJdbi(dbManager);
         registerTypeCodecs(jdbi);
-        DatabaseDialect dialect = datingapp.storage.jdbi.SqlDialectSupport.detectDialect(jdbi);
+        DatabaseDialect dialect = detectDialect(jdbi);
 
         PersistenceComponents persistence = createPersistenceComponents(jdbi, dialect);
         DomainServices domain = createDomainServices(config, persistence);
@@ -104,6 +104,23 @@ public final class StorageFactory {
         JdbiTypeCodecs.registerInstantCodec(jdbi);
         jdbi.registerArgument(new JdbiTypeCodecs.EnumSetSqlCodec.EnumSetArgumentFactory());
         jdbi.registerColumnMapper(new JdbiTypeCodecs.EnumSetSqlCodec.InterestColumnMapper());
+    }
+
+    private static DatabaseDialect detectDialect(Jdbi jdbi) {
+        try {
+            DatabaseDialect dialect = datingapp.storage.jdbi.SqlDialectSupport.detectDialect(jdbi);
+            if (dialect == null) {
+                throw new DatabaseManager.StorageException(
+                        "StorageFactory failed to detect database dialect: SqlDialectSupport.detectDialect(jdbi) returned null");
+            }
+            return dialect;
+        } catch (DatabaseManager.StorageException exception) {
+            throw exception;
+        } catch (Exception exception) {
+            throw new DatabaseManager.StorageException(
+                    "StorageFactory failed to detect database dialect via SqlDialectSupport.detectDialect(jdbi)",
+                    exception);
+        }
     }
 
     private static PersistenceComponents createPersistenceComponents(Jdbi jdbi, DatabaseDialect dialect) {

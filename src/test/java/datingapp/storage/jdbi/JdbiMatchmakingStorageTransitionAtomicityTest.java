@@ -1,5 +1,6 @@
 package datingapp.storage.jdbi;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -9,11 +10,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import datingapp.core.connection.ConnectionModels.Conversation;
 import datingapp.core.connection.ConnectionModels.FriendRequest;
 import datingapp.core.connection.ConnectionModels.Like;
+import datingapp.core.metrics.SwipeState.Undo;
 import datingapp.core.model.Match;
 import datingapp.core.model.Match.MatchArchiveReason;
 import datingapp.core.model.Match.MatchState;
 import datingapp.core.model.User;
 import datingapp.storage.DatabaseManager;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
@@ -115,6 +118,26 @@ class JdbiMatchmakingStorageTransitionAtomicityTest {
         assertFalse(duplicateResult.likePersisted());
         assertTrue(duplicateResult.createdMatch().isEmpty());
         assertEquals(1, interactionStorage.countByDirection(userA, Like.Direction.LIKE));
+    }
+
+    @Test
+    @DisplayName("undoStorage saves and reads back an undo state")
+    void undoStorageSavesAndReadsBackUndoState() {
+        Like like = Like.create(userA, userB, Like.Direction.LIKE);
+        Undo undoState = Undo.create(userA, like, null, Instant.now().plusSeconds(60));
+        Undo.Storage undoStorage = interactionStorage.undoStorage();
+
+        assertDoesNotThrow(() -> undoStorage.save(undoState));
+
+        Undo persisted = undoStorage.findByUserId(userA).orElseThrow();
+        assertEquals(undoState.userId(), persisted.userId());
+        assertEquals(undoState.like().id(), persisted.like().id());
+        assertTrue(
+                Duration.between(undoState.expiresAt(), persisted.expiresAt())
+                                .abs()
+                                .compareTo(Duration.ofNanos(1_000))
+                        <= 0,
+                "Persisted undo expiry should stay within database timestamp precision");
     }
 
     @Test

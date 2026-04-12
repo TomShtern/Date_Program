@@ -56,7 +56,7 @@ Clarify the safety and verification boundary so verification work has one canoni
 
 ### Slice A — split the safety surface by responsibility
 
-- keep moderation/blocking/relationship-safety orchestration separate from verification-code ownership
+- keep moderation/blocking/relationship-safety orchestration in `TrustSafetyService` during Slice A while moving verification-code ownership to `VerificationUseCases`; any relationship-control workflow contract changes are deferred to P04B
 - ensure verification logic has one canonical use-case seam for downstream consumers
 
 ### Slice B — remove bypass paths from the UI
@@ -77,7 +77,7 @@ Clarify the safety and verification boundary so verification work has one canoni
 
 ## Out of scope
 
-- relationship and messaging workflow contracts (P04B)
+- relationship and messaging workflow contracts (P04B); P04A may touch only the existing `TrustSafetyService` orchestration hooks needed to separate verification ownership, not the workflow contracts themselves
 - chat-specific ViewModel UX and polling fixes (P05)
 - REST-side error mapping for these workflows (P08)
 - deferred cross-cutting core-import cleanup (P13)

@@ -69,10 +69,10 @@ public final class JdbiMetricsStorage implements AnalyticsStorage, Standout.Stor
 
     public JdbiMetricsStorage(Jdbi jdbi, DatabaseDialect dialect) {
         this.jdbi = Objects.requireNonNull(jdbi, "jdbi cannot be null");
+        Objects.requireNonNull(dialect, "dialect cannot be null");
         this.statsDao = jdbi.onDemand(StatsDao.class);
         this.sessionDao = jdbi.onDemand(SessionDao.class);
         this.standoutDao = jdbi.onDemand(StandoutDao.class);
-        Objects.requireNonNull(dialect, "dialect cannot be null");
         this.profileViewUpsertSql = buildProfileViewUpsertSql(dialect);
         this.userAchievementUpsertSql = buildUserAchievementUpsertSql(dialect);
         this.dailyPickViewUpsertSql = buildDailyPickViewUpsertSql(dialect);
@@ -315,39 +315,40 @@ public final class JdbiMetricsStorage implements AnalyticsStorage, Standout.Stor
         }
 
         jdbi.useTransaction(handle -> {
-            PreparedBatch batch = handle.prepareBatch(standoutUpsertSql);
-            for (Standout standout : standouts) {
-                if (standout == null) {
-                    continue;
+            try (PreparedBatch batch = handle.prepareBatch(standoutUpsertSql)) {
+                for (Standout standout : standouts) {
+                    if (standout == null) {
+                        continue;
+                    }
+
+                    Standout normalized = standout;
+                    if (!seekerId.equals(standout.seekerId()) || !date.equals(standout.featuredDate())) {
+                        normalized = Standout.fromDatabase(
+                                standout.id(),
+                                seekerId,
+                                standout.standoutUserId(),
+                                date,
+                                standout.rank(),
+                                standout.score(),
+                                standout.reason(),
+                                standout.createdAt(),
+                                standout.interactedAt());
+                    }
+
+                    batch.bind("id", normalized.id())
+                            .bind("seekerId", normalized.seekerId())
+                            .bind("standoutUserId", normalized.standoutUserId())
+                            .bind("featuredDate", normalized.featuredDate())
+                            .bind("rank", normalized.rank())
+                            .bind(SCORE_COLUMN, normalized.score())
+                            .bind(REASON_COLUMN, normalized.reason())
+                            .bind(CREATED_AT_BIND, normalized.createdAt());
+                    bindNullableInstant(batch, "interactedAt", normalized.interactedAt());
+                    batch.add();
                 }
 
-                Standout normalized = standout;
-                if (!seekerId.equals(standout.seekerId()) || !date.equals(standout.featuredDate())) {
-                    normalized = Standout.fromDatabase(
-                            standout.id(),
-                            seekerId,
-                            standout.standoutUserId(),
-                            date,
-                            standout.rank(),
-                            standout.score(),
-                            standout.reason(),
-                            standout.createdAt(),
-                            standout.interactedAt());
-                }
-
-                batch.bind("id", normalized.id())
-                        .bind("seekerId", normalized.seekerId())
-                        .bind("standoutUserId", normalized.standoutUserId())
-                        .bind("featuredDate", normalized.featuredDate())
-                        .bind("rank", normalized.rank())
-                        .bind(SCORE_COLUMN, normalized.score())
-                        .bind(REASON_COLUMN, normalized.reason())
-                        .bind(CREATED_AT_BIND, normalized.createdAt());
-                bindNullableInstant(batch, "interactedAt", normalized.interactedAt());
-                batch.add();
+                batch.execute();
             }
-
-            batch.execute();
         });
     }
 
@@ -690,50 +691,6 @@ public final class JdbiMetricsStorage implements AnalyticsStorage, Standout.Stor
                     likeCount,
                     passCount,
                     matchCount);
-        }
-    }
-
-    public static class StandoutBindingHelper {
-        private final Standout standout;
-
-        public StandoutBindingHelper(Standout standout) {
-            this.standout = standout;
-        }
-
-        public UUID getId() {
-            return standout.id();
-        }
-
-        public UUID getSeekerId() {
-            return standout.seekerId();
-        }
-
-        public UUID getStandoutUserId() {
-            return standout.standoutUserId();
-        }
-
-        public LocalDate getFeaturedDate() {
-            return standout.featuredDate();
-        }
-
-        public int getRank() {
-            return standout.rank();
-        }
-
-        public int getScore() {
-            return standout.score();
-        }
-
-        public String getReason() {
-            return standout.reason();
-        }
-
-        public Instant getCreatedAt() {
-            return standout.createdAt();
-        }
-
-        public Instant getInteractedAt() {
-            return standout.interactedAt();
         }
     }
 

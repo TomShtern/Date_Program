@@ -250,14 +250,27 @@ public final class MigrationRunner {
         }
 
         connection.setAutoCommit(false);
+        SQLException primaryFailure = null;
         try {
             work.run();
             connection.commit();
         } catch (SQLException exception) {
+            primaryFailure = exception;
             rollbackMigrationTransaction(connection, exception);
-            throw exception;
         } finally {
-            restoreAutoCommit(connection);
+            try {
+                restoreAutoCommit(connection);
+            } catch (SQLException restoreFailure) {
+                if (primaryFailure != null) {
+                    primaryFailure.addSuppressed(restoreFailure);
+                } else {
+                    primaryFailure = restoreFailure;
+                }
+            }
+        }
+
+        if (primaryFailure != null) {
+            throw primaryFailure;
         }
     }
 
@@ -939,6 +952,13 @@ public final class MigrationRunner {
         if (!hasTable(stmt, TABLE_USERS)) {
             return;
         }
+        applyUserAccountConstraints(stmt);
+        applyUserLifestyleConstraints(stmt);
+        applyUserVerificationConstraints(stmt);
+        applyUserPaceConstraints(stmt);
+    }
+
+    private static void applyUserAccountConstraints(Statement stmt) throws SQLException {
         addAllowedValuesConstraint(
                 stmt,
                 SQL_TABLE_USERS,
@@ -951,6 +971,9 @@ public final class MigrationRunner {
                 "BANNED");
         addAllowedValuesConstraint(
                 stmt, SQL_TABLE_USERS, "gender", "ck_users_gender_values", true, "MALE", "FEMALE", VALUE_OTHER);
+    }
+
+    private static void applyUserLifestyleConstraints(Statement stmt) throws SQLException {
         addAllowedValuesConstraint(
                 stmt,
                 SQL_TABLE_USERS,
@@ -1003,6 +1026,9 @@ public final class MigrationRunner {
                 "PHD",
                 "TRADE_SCHOOL",
                 VALUE_OTHER);
+    }
+
+    private static void applyUserVerificationConstraints(Statement stmt) throws SQLException {
         addAllowedValuesConstraint(
                 stmt,
                 SQL_TABLE_USERS,
@@ -1011,6 +1037,9 @@ public final class MigrationRunner {
                 true,
                 "EMAIL",
                 "PHONE");
+    }
+
+    private static void applyUserPaceConstraints(Statement stmt) throws SQLException {
         addAllowedValuesConstraint(
                 stmt,
                 SQL_TABLE_USERS,

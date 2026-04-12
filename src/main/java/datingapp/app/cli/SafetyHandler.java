@@ -170,6 +170,7 @@ public class SafetyHandler implements LoggingSupport {
             return reasons[selectedIndex.getAsInt()];
         }
         if (!CliTextAndInput.isZeroSelection(reasonInput)) {
+            logger.warn("Invalid report reason input");
             String lengthMeta = reasonInput == null ? EMPTY_INPUT_META : String.valueOf(reasonInput.length());
             logger.debug("Invalid report reason input; length={}", lengthMeta);
         }

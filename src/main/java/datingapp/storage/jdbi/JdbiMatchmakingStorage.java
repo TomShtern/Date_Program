@@ -56,6 +56,7 @@ public final class JdbiMatchmakingStorage implements OperationalInteractionStora
     private static final String PARAM_VISIBLE_TO_USER_B = "visibleToUserB";
     private static final String PARAM_USER_A = "userA";
     private static final String PARAM_USER_B = "userB";
+    private static final String PARAM_USER_ID = "userId";
     private static final String COLUMN_USER_ID = "user_id";
     private static final String COLUMN_WHO_LIKES = "who_likes";
     private static final String COLUMN_WHO_GOT_LIKED = "who_got_liked";
@@ -812,7 +813,7 @@ public final class JdbiMatchmakingStorage implements OperationalInteractionStora
         public void save(Undo state) {
             jdbi.useHandle(handle -> {
                 try (var update = handle.createUpdate(undoUpsertSql)) {
-                    update.bind(COLUMN_USER_ID, state.userId())
+                    update.bind(PARAM_USER_ID, state.userId())
                             .bind("likeId", state.like().id())
                             .bind(PARAM_WHO_LIKES, state.like().whoLikes())
                             .bind(PARAM_WHO_GOT_LIKED, state.like().whoGotLiked())
@@ -1201,7 +1202,7 @@ public final class JdbiMatchmakingStorage implements OperationalInteractionStora
                 dialect,
                 "undo_states",
                 List.of(
-                        new SqlDialectSupport.ColumnBinding(COLUMN_USER_ID, "userId"),
+                        new SqlDialectSupport.ColumnBinding(COLUMN_USER_ID, PARAM_USER_ID),
                         new SqlDialectSupport.ColumnBinding("like_id", "likeId"),
                         new SqlDialectSupport.ColumnBinding(COLUMN_WHO_LIKES, PARAM_WHO_LIKES),
                         new SqlDialectSupport.ColumnBinding(COLUMN_WHO_GOT_LIKED, PARAM_WHO_GOT_LIKED),

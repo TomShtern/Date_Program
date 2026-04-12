@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import datingapp.app.usecase.social.SocialUseCases;
 import datingapp.core.AppConfig;
 import datingapp.core.AppSession;
 import datingapp.core.connection.ConnectionModels.FriendRequest;
@@ -66,8 +67,7 @@ class SocialViewModelTest {
         TrustSafetyService trustSafetyService = TrustSafetyService.builder(
                         trustSafety, interactions, users, config, communications)
                 .build();
-        var socialUseCases = datingapp.app.usecase.social.SocialUseCases.forWorkflowAccess(
-                connectionService, trustSafetyService, communications);
+        var socialUseCases = SocialUseCases.forWorkflowAccess(connectionService, trustSafetyService, communications);
 
         viewModel = new SocialViewModel(
                 connectionService,

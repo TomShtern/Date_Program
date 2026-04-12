@@ -1,5 +1,6 @@
 package datingapp.ui.screen;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -47,13 +48,11 @@ class BaseControllerTest {
     void cleanupAndBackHandlingAreSafeWithoutNavigationService() throws Exception {
         NullNavigationController controller = new NullNavigationController();
 
-        JavaFxTestSupport.runOnFxAndWait(() -> {
+        assertDoesNotThrow(() -> JavaFxTestSupport.runOnFxAndWait(() -> {
             controller.cleanup();
             controller.invokeHandleBack();
             controller.cleanup();
-        });
-
-        assertTrue(true);
+        }));
     }
 
     @Test

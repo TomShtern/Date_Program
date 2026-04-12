@@ -70,8 +70,8 @@ Clarify the workflow contracts that sit between relationship transitions, social
 
 ### Slice C — make messaging success semantics explicit
 
-- document or normalize the persistence-first rule intentionally
-- ensure callers do not mistake event publication as the success boundary unless the use-case layer explicitly changes that rule
+- preserve and document the persistence-first rule intentionally: the message/conversation persistence path in `ConnectionService` and `MessagingUseCases.sendMessage(...)` remains the success boundary, while `AppEvent.MessageSent` or similar event publication stays best-effort afterward
+- ensure callers do not mistake event publication as the success boundary, and do not add rollback or compensation requirements unless a later plan explicitly adopts an atomic publish/outbox contract for a critical workflow with justified consistency-over-latency tradeoffs
 
 ## Dependencies and orchestration notes
 

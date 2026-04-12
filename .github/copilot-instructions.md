@@ -149,32 +149,14 @@ Use PowerShell-friendly commands.
 When Maven test selection uses a comma-separated `-Dtest=...,...` list, prefer:
 
 ```powershell
-mvn --% ...
-
-
-
-
-
-
-
-
-
-
+mvn --% test -Dtest=TestClass1,TestClass2
+```
 
 # Dating App - Copilot Instructions
 
 > **Updated:** 2026-03-30
 > **Role in the instruction stack:** highest-level repo guidance.
 > **Hierarchy:** `.github/copilot-instructions.md` → `CLAUDE.md` → `AGENTS.md`.
-
-## Source of truth
-
-If any instruction file disagrees with the codebase, trust:
-- `src/main/java`
-- `src/test/java`
-- `pom.xml`
-Use the lower-level docs only to explain or operationalize what the code already does.
-
 
 
 ## Patch and direct-edit policy
