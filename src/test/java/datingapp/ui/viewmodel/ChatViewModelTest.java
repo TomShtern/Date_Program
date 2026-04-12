@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.app.event.InProcessAppEventBus;
@@ -100,7 +101,8 @@ class ChatViewModelTest {
                 .build();
         var noteUseCases = createProfileUseCases(users, config, eventBus);
         var messagingUseCases = new datingapp.app.usecase.messaging.MessagingUseCases(connectionService, eventBus);
-        var socialUseCases = new datingapp.app.usecase.social.SocialUseCases(connectionService, trustSafetyService);
+        var socialUseCases = datingapp.app.usecase.social.SocialUseCases.forWorkflowAccess(
+                connectionService, trustSafetyService, communications);
         UiPresenceDataAccess presenceDataAccess = new UiPresenceDataAccess() {
             @Override
             public PresenceStatus getPresence(UUID userId) {
@@ -244,10 +246,11 @@ class ChatViewModelTest {
         var eventBus = new InProcessAppEventBus();
         var isolatedMessagingUseCases =
                 new datingapp.app.usecase.messaging.MessagingUseCases(connectionService, eventBus);
-        var isolatedSocialUseCases = new datingapp.app.usecase.social.SocialUseCases(
+        var isolatedSocialUseCases = datingapp.app.usecase.social.SocialUseCases.forWorkflowAccess(
                 connectionService,
                 TrustSafetyService.builder(trustSafety, interactions, users, AppConfig.defaults())
-                        .build());
+                        .build(),
+                communications);
         var isolatedProfileUseCases = createProfileUseCases(users, AppConfig.defaults(), eventBus);
         UiAsyncTestSupport.QueuedUiThreadDispatcher queuedDispatcher =
                 new UiAsyncTestSupport.QueuedUiThreadDispatcher();
@@ -358,10 +361,11 @@ class ChatViewModelTest {
         CountDownLatch releaseSend = new CountDownLatch(1);
         var eventBus = new InProcessAppEventBus();
         var noteUseCases = createProfileUseCases(users, AppConfig.defaults(), eventBus);
-        var socialUseCases = new datingapp.app.usecase.social.SocialUseCases(
+        var socialUseCases = datingapp.app.usecase.social.SocialUseCases.forWorkflowAccess(
                 connectionService,
                 TrustSafetyService.builder(trustSafety, interactions, users, AppConfig.defaults())
-                        .build());
+                        .build(),
+                communications);
         UiPresenceDataAccess delayedPresenceDataAccess = new UiPresenceDataAccess() {
             @Override
             public PresenceStatus getPresence(UUID userId) {
@@ -450,6 +454,64 @@ class ChatViewModelTest {
     }
 
     @Test
+    @DisplayName("setCurrentUser(null) clears visible chat state")
+    void setCurrentUserNullClearsVisibleChatState() throws InterruptedException {
+        users.saveProfileNote(ProfileNote.create(currentUser.getId(), otherUser.getId(), "Known context"));
+        connectionService.sendMessage(otherUser.getId(), currentUser.getId(), "Hello!");
+        presenceStatus.set(PresenceStatus.ONLINE);
+        remoteTyping.set(true);
+
+        viewModel.refreshConversations();
+        assertTrue(waitUntil(() -> viewModel.getConversations().size() == 1, 5000));
+
+        viewModel
+                .selectedConversationProperty()
+                .set(viewModel.getConversations().get(0));
+        assertTrue(waitUntil(
+                () -> viewModel.getActiveMessages().size() == 1
+                        && "Known context"
+                                .equals(viewModel.profileNoteContentProperty().get())
+                        && viewModel.presenceStatusProperty().get() == PresenceStatus.ONLINE
+                        && viewModel.remoteTypingProperty().get(),
+                5000));
+
+        viewModel.setCurrentUser(null);
+
+        assertTrue(waitUntil(
+                () -> viewModel.selectedConversationProperty().get() == null
+                        && viewModel.getConversations().isEmpty()
+                        && viewModel.getActiveMessages().isEmpty()
+                        && viewModel.totalUnreadCountProperty().get() == 0
+                        && viewModel.profileNoteContentProperty().get().isEmpty()
+                        && viewModel.profileNoteStatusMessageProperty().get() == null
+                        && !viewModel.profileNoteBusyProperty().get()
+                        && viewModel.presenceStatusProperty().get() == PresenceStatus.UNKNOWN
+                        && !viewModel.remoteTypingProperty().get()
+                        && !viewModel.loadingProperty().get(),
+                5000));
+    }
+
+    @Test
+    @DisplayName("conversation and message lists are exposed as read-only views")
+    void conversationAndMessageListsAreExposedAsReadOnlyViews() throws InterruptedException {
+        connectionService.sendMessage(otherUser.getId(), currentUser.getId(), "Hello!");
+
+        viewModel.refreshConversations();
+        assertTrue(waitUntil(() -> viewModel.getConversations().size() == 1, 5000));
+
+        viewModel
+                .selectedConversationProperty()
+                .set(viewModel.getConversations().get(0));
+        assertTrue(waitUntil(() -> viewModel.getActiveMessages().size() == 1, 5000));
+
+        var exposedConversations = viewModel.getConversations();
+        var exposedMessages = viewModel.getActiveMessages();
+
+        assertThrows(UnsupportedOperationException.class, exposedConversations::clear);
+        assertThrows(UnsupportedOperationException.class, exposedMessages::clear);
+    }
+
+    @Test
     @DisplayName("openConversationWithUser reuses openConversation result without reloading conversation list")
     void openConversationWithUserReusesOpenConversationResultWithoutReloadingConversationList()
             throws InterruptedException {
@@ -470,10 +532,11 @@ class ChatViewModelTest {
                         return super.openConversation(command);
                     }
                 };
-        var socialUseCases = new datingapp.app.usecase.social.SocialUseCases(
+        var socialUseCases = datingapp.app.usecase.social.SocialUseCases.forWorkflowAccess(
                 connectionService,
                 TrustSafetyService.builder(trustSafety, interactions, users, AppConfig.defaults())
-                        .build());
+                        .build(),
+                communications);
         var noteUseCases = createProfileUseCases(users, AppConfig.defaults(), eventBus);
         ChatViewModel localViewModel = new ChatViewModel(
                 countingMessagingUseCases,
@@ -691,10 +754,11 @@ class ChatViewModelTest {
                         return super.listConversations(query);
                     }
                 };
-        var socialUseCases = new datingapp.app.usecase.social.SocialUseCases(
+        var socialUseCases = datingapp.app.usecase.social.SocialUseCases.forWorkflowAccess(
                 connectionService,
                 TrustSafetyService.builder(trustSafety, interactions, users, AppConfig.defaults())
-                        .build());
+                        .build(),
+                communications);
         var noteUseCases = createProfileUseCases(users, AppConfig.defaults(), eventBus);
         ChatViewModel flakyViewModel = new ChatViewModel(
                 flakyMessagingUseCases,

@@ -98,7 +98,8 @@ class RelationshipHandlerTest {
                 matchQualityService,
                 new InProcessAppEventBus(),
                 dailyService);
-        SocialUseCases socialUseCases = new SocialUseCases(transitionService, trustSafetyService, communicationStorage);
+        SocialUseCases socialUseCases =
+                SocialUseCases.forWorkflowAccess(transitionService, trustSafetyService, communicationStorage);
 
         MatchingHandler.Dependencies deps = new MatchingHandler.Dependencies(
                 matchingService,

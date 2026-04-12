@@ -60,12 +60,19 @@ public final class DefaultCompatibilityCalculator implements CompatibilityCalcul
 
     @Override
     public double calculateAgeScore(User me, User them) {
-        if (me.getAge(config.safety().userTimeZone()).isEmpty()
-                || them.getAge(config.safety().userTimeZone()).isEmpty()) {
+        java.time.ZoneId timezone = config.safety().userTimeZone();
+        java.util.Optional<Integer> meAge = me.getAge(timezone);
+        java.util.Optional<Integer> themAge = them.getAge(timezone);
+        return calculateAgeScore(me, them, meAge, themAge);
+    }
+
+    @Override
+    public double calculateAgeScore(
+            User me, User them, java.util.Optional<Integer> meAge, java.util.Optional<Integer> themAge) {
+        if (meAge.isEmpty() || themAge.isEmpty()) {
             return NEUTRAL_SCORE;
         }
-        int ageDiff = Math.abs(me.getAge(config.safety().userTimeZone()).orElseThrow()
-                - them.getAge(config.safety().userTimeZone()).orElseThrow());
+        int ageDiff = Math.abs(meAge.orElseThrow() - themAge.orElseThrow());
         return calculateAgeScore(ageDiff, me, them, AGE_SIMILAR_YEARS);
     }
 

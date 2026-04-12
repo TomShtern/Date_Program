@@ -10,6 +10,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import datingapp.app.event.AppEvent;
 import datingapp.app.event.AppEventBus;
 import datingapp.app.testutil.TestEventBus;
+import datingapp.app.usecase.common.UseCaseError;
+import datingapp.app.usecase.common.UseCaseResult;
 import datingapp.app.usecase.common.UserContext;
 import datingapp.app.usecase.profile.ProfileInsightsUseCases.AchievementsQuery;
 import datingapp.app.usecase.profile.ProfileInsightsUseCases.SessionSummaryQuery;
@@ -24,6 +26,7 @@ import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
 import datingapp.core.metrics.AchievementService;
 import datingapp.core.metrics.ActivityMetricsService;
+import datingapp.core.metrics.EngagementDomain.UserStats;
 import datingapp.core.model.ProfileNote;
 import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
@@ -391,6 +394,40 @@ class ProfileUseCasesTest {
         assertTrue(stats.success());
         assertNotNull(achievements.data());
         assertNotNull(stats.data());
+    }
+
+    @Test
+    @DisplayName("getOrComputeStats surfaces slice failure instead of silently falling back")
+    void getOrComputeStatsSurfacesSliceFailureInsteadOfSilentlyFallingBack() {
+        ProfileInsightsUseCases failingInsights = new ProfileInsightsUseCases(achievementService, metricsService) {
+            @Override
+            public UseCaseResult<UserStats> getOrComputeStats(StatsQuery query) {
+                return UseCaseResult.failure(UseCaseError.internal("stats unavailable"));
+            }
+
+            @Override
+            UserStats getOrComputeStats(UUID userId) {
+                throw new AssertionError("direct stats fallback should not be used");
+            }
+        };
+        ProfileUseCases localUseCases = new ProfileUseCases(
+                userStorage,
+                profileService,
+                validationService,
+                new ProfileMutationUseCases(
+                        userStorage,
+                        validationService,
+                        achievementService,
+                        config,
+                        new ProfileActivationPolicy(),
+                        eventBus),
+                new ProfileNotesUseCases(userStorage, validationService, config, eventBus),
+                failingInsights);
+
+        var result = localUseCases.getOrComputeStats(new StatsQuery(UserContext.cli(UUID.randomUUID())));
+
+        assertFalse(result.success());
+        assertEquals("stats unavailable", result.error().message());
     }
 
     @Test

@@ -67,8 +67,11 @@ public class ChatViewModel extends BaseViewModel {
     private final AppSession session;
     private final Duration conversationPollInterval;
     private final Duration activeConversationPollInterval;
-    private final ObservableList<ConversationPreview> conversations = FXCollections.observableArrayList();
-    private final ObservableList<Message> activeMessages = FXCollections.observableArrayList();
+    private final ObservableList<ConversationPreview> conversationItems = FXCollections.observableArrayList();
+    private final ObservableList<Message> activeMessageItems = FXCollections.observableArrayList();
+    private final ObservableList<ConversationPreview> conversations =
+            FXCollections.unmodifiableObservableList(conversationItems);
+    private final ObservableList<Message> activeMessages = FXCollections.unmodifiableObservableList(activeMessageItems);
 
     private final ObjectProperty<ConversationPreview> selectedConversation = new SimpleObjectProperty<>();
     private final BooleanProperty sending = new SimpleBooleanProperty(false);
@@ -84,6 +87,7 @@ public class ChatViewModel extends BaseViewModel {
     private User currentUser;
     private TaskHandle conversationsPollingHandle;
     private TaskHandle messagesPollingHandle;
+    private final AtomicInteger messageLoadToken = new AtomicInteger();
     private final AtomicInteger noteLoadToken = new AtomicInteger();
     private PauseTransition profileNoteStatusDismissTransition;
 
@@ -129,13 +133,15 @@ public class ChatViewModel extends BaseViewModel {
                 return;
             }
             if (newVal != null) {
+                activeMessageItems.clear();
                 loadMessages(newVal);
                 startMessagesPolling();
                 clearProfileNoteState();
                 loadProfileNoteFor(newVal.otherUser());
                 refreshPresenceState(newVal.otherUser());
             } else {
-                activeMessages.clear();
+                messageLoadToken.incrementAndGet();
+                activeMessageItems.clear();
                 stopMessagesPolling();
                 clearProfileNoteState();
                 clearPresenceState();
@@ -150,12 +156,13 @@ public class ChatViewModel extends BaseViewModel {
      */
     @Override
     protected void onDispose() {
+        messageLoadToken.incrementAndGet();
         stopConversationsPolling();
         stopMessagesPolling();
         clearProfileNoteState();
         selectedConversation.removeListener(selectionListener);
-        conversations.clear();
-        activeMessages.clear();
+        conversationItems.clear();
+        activeMessageItems.clear();
         clearPresenceState();
         setLoadingState(false);
         sending.set(false);
@@ -354,7 +361,13 @@ public class ChatViewModel extends BaseViewModel {
     }
 
     public void setCurrentUser(User user) {
+        boolean switchingUsers =
+                user == null || currentUser == null || !currentUser.getId().equals(user.getId());
         this.currentUser = user;
+        if (switchingUsers) {
+            stopMessagesPolling();
+            resetVisibleChatState();
+        }
         refreshConversations();
         if (user != null) {
             startConversationsPolling();
@@ -362,6 +375,18 @@ public class ChatViewModel extends BaseViewModel {
             stopConversationsPolling();
             stopMessagesPolling();
         }
+    }
+
+    private void resetVisibleChatState() {
+        messageLoadToken.incrementAndGet();
+        selectedConversation.set(null);
+        conversationItems.clear();
+        activeMessageItems.clear();
+        totalUnreadCount.set(0);
+        sending.set(false);
+        clearProfileNoteState();
+        clearPresenceState();
+        setLoadingState(false);
     }
 
     /**
@@ -472,7 +497,7 @@ public class ChatViewModel extends BaseViewModel {
             return;
         }
 
-        List<ConversationPreview> updatedPreviews = new ArrayList<>(conversations);
+        List<ConversationPreview> updatedPreviews = new ArrayList<>(conversationItems);
         int existingIndex = -1;
         for (int index = 0; index < updatedPreviews.size(); index++) {
             if (updatedPreviews
@@ -516,12 +541,14 @@ public class ChatViewModel extends BaseViewModel {
 
         String conversationId = conversation.conversation().getId();
         UUID otherUserId = conversation.otherUser().getId();
+        int requestToken = messageLoadToken.incrementAndGet();
 
         if (silent) {
             asyncScope.runLatestSilently(
                     "chat-messages",
                     TASK_LOAD_MESSAGES,
-                    () -> loadMessagesInBackground(conversationId, otherUserId, user),
+                    () -> new SequencedMessageLoad(
+                            requestToken, loadMessagesInBackground(conversationId, otherUserId, user)),
                     this::updateMessagesOnFx);
             return;
         }
@@ -529,7 +556,8 @@ public class ChatViewModel extends BaseViewModel {
         asyncScope.runLatest(
                 "chat-messages",
                 TASK_LOAD_MESSAGES,
-                () -> loadMessagesInBackground(conversationId, otherUserId, user),
+                () -> new SequencedMessageLoad(
+                        requestToken, loadMessagesInBackground(conversationId, otherUserId, user)),
                 this::updateMessagesOnFx);
     }
 
@@ -561,14 +589,19 @@ public class ChatViewModel extends BaseViewModel {
      * @param messages       the loaded messages (or null if load failed)
      * @param unread         the new unread count (or null if computation failed)
      */
-    private void updateMessagesOnFx(MessageLoadData messageData) {
+    private void updateMessagesOnFx(SequencedMessageLoad sequencedLoad) {
+        if (sequencedLoad.requestToken() != messageLoadToken.get()) {
+            return;
+        }
+
+        MessageLoadData messageData = sequencedLoad.messageData();
         ConversationPreview selected = selectedConversation.get();
         // Final defensive check before updating UI
         if (!asyncScope.isDisposed()
                 && selected != null
                 && selected.conversation().getId().equals(messageData.conversationId())) {
-            if (messageData.messages() != null && !sameMessages(activeMessages, messageData.messages())) {
-                activeMessages.setAll(messageData.messages());
+            if (messageData.messages() != null && !sameMessages(activeMessageItems, messageData.messages())) {
+                activeMessageItems.setAll(messageData.messages());
             }
             if (messageData.previews() != null) {
                 int unread = messageData.unreadCount() != null ? messageData.unreadCount() : totalUnreadCount.get();
@@ -594,9 +627,10 @@ public class ChatViewModel extends BaseViewModel {
         }
 
         UUID otherUserId = conversation.otherUser().getId();
+        int requestToken = messageLoadToken.get();
         MessageLoadData messageData =
                 loadMessagesInBackground(conversation.conversation().getId(), otherUserId, user);
-        asyncScope.dispatchToUi(() -> updateMessagesOnFx(messageData));
+        asyncScope.dispatchToUi(() -> updateMessagesOnFx(new SequencedMessageLoad(requestToken, messageData)));
         pollPresenceState(otherUserId);
     }
 
@@ -715,8 +749,8 @@ public class ChatViewModel extends BaseViewModel {
                 ? selectedConversation.get().conversation().getId()
                 : null;
 
-        if (!sameConversationPreviews(conversations, previews)) {
-            conversations.setAll(previews);
+        if (!sameConversationPreviews(conversationItems, previews)) {
+            conversationItems.setAll(previews);
         }
         totalUnreadCount.set(unread);
         restoreSelection(previews, selectedConversationId);
@@ -732,7 +766,7 @@ public class ChatViewModel extends BaseViewModel {
                 .orElse(null);
         if (restored == null) {
             selectedConversation.set(null);
-            activeMessages.clear();
+            activeMessageItems.clear();
             return;
         }
         ConversationPreview currentlySelected = selectedConversation.get();
@@ -975,4 +1009,6 @@ public class ChatViewModel extends BaseViewModel {
     public StringProperty presenceUnavailableMessageProperty() {
         return presenceUnavailableMessage;
     }
+
+    private record SequencedMessageLoad(int requestToken, MessageLoadData messageData) {}
 }

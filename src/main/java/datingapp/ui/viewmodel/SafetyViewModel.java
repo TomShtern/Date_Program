@@ -4,7 +4,6 @@ import datingapp.app.event.AppEvent;
 import datingapp.app.usecase.common.UserContext;
 import datingapp.app.usecase.profile.ProfileMutationUseCases;
 import datingapp.app.usecase.profile.ProfileMutationUseCases.DeleteAccountCommand;
-import datingapp.app.usecase.profile.ProfileMutationUseCases.SaveProfileCommand;
 import datingapp.app.usecase.profile.ProfileUseCases;
 import datingapp.app.usecase.profile.VerificationUseCases;
 import datingapp.app.usecase.profile.VerificationUseCases.ConfirmVerificationCommand;
@@ -40,7 +39,6 @@ public final class SafetyViewModel extends BaseViewModel {
     private static final String PROFILE_VERIFICATION_UNAVAILABLE = "Profile verification is unavailable right now.";
     private static final String ACCOUNT_DELETION_UNAVAILABLE = "Account deletion is unavailable right now.";
 
-    private final TrustSafetyService trustSafetyService;
     private final SocialUseCases socialUseCases;
     private final VerificationUseCases verificationUseCases;
     private ProfileMutationUseCases profileMutationUseCases;
@@ -58,8 +56,7 @@ public final class SafetyViewModel extends BaseViewModel {
 
     public SafetyViewModel(TrustSafetyService trustSafetyService, AppSession session) {
         this(
-                trustSafetyService,
-                new SocialUseCases(trustSafetyService),
+                SocialUseCases.forTrustSafetyOnly(trustSafetyService),
                 null,
                 null,
                 null,
@@ -68,7 +65,7 @@ public final class SafetyViewModel extends BaseViewModel {
     }
 
     public SafetyViewModel(TrustSafetyService trustSafetyService, AppSession session, UiThreadDispatcher uiDispatcher) {
-        this(trustSafetyService, new SocialUseCases(trustSafetyService), null, null, null, session, uiDispatcher);
+        this(SocialUseCases.forTrustSafetyOnly(trustSafetyService), null, null, null, session, uiDispatcher);
     }
 
     public SafetyViewModel(
@@ -77,8 +74,7 @@ public final class SafetyViewModel extends BaseViewModel {
             AppSession session,
             UiThreadDispatcher uiDispatcher) {
         this(
-                trustSafetyService,
-                new SocialUseCases(trustSafetyService),
+                SocialUseCases.forTrustSafetyOnly(trustSafetyService),
                 profileUseCases != null ? profileUseCases.getProfileMutationUseCases() : null,
                 null,
                 profileUseCases,
@@ -87,7 +83,6 @@ public final class SafetyViewModel extends BaseViewModel {
     }
 
     public SafetyViewModel(
-            TrustSafetyService trustSafetyService,
             SocialUseCases socialUseCases,
             ProfileMutationUseCases profileMutationUseCases,
             VerificationUseCases verificationUseCases,
@@ -95,7 +90,6 @@ public final class SafetyViewModel extends BaseViewModel {
             AppSession session,
             UiThreadDispatcher uiDispatcher) {
         super("safety", uiDispatcher);
-        this.trustSafetyService = trustSafetyService;
         this.socialUseCases = Objects.requireNonNull(socialUseCases, "socialUseCases cannot be null");
         this.verificationUseCases = verificationUseCases;
         this.profileMutationUseCases = profileMutationUseCases;
@@ -109,7 +103,7 @@ public final class SafetyViewModel extends BaseViewModel {
             ProfileMutationUseCases profileMutationUseCases,
             AppSession session,
             UiThreadDispatcher uiDispatcher) {
-        this(null, socialUseCases, profileMutationUseCases, verificationUseCases, null, session, uiDispatcher);
+        this(socialUseCases, profileMutationUseCases, verificationUseCases, null, session, uiDispatcher);
     }
 
     public void initialize() {
@@ -229,41 +223,21 @@ public final class SafetyViewModel extends BaseViewModel {
             return;
         }
 
-        try {
-            if (verificationUseCases != null) {
-                var startResult = verificationUseCases.startVerification(new StartVerificationCommand(
-                        UserContext.ui(currentUser.getId()), verificationMethod.get(), verificationContact.get()));
-                if (!startResult.success()) {
-                    reportError(startResult.error().message());
-                    return;
-                }
-                session.setCurrentUser(startResult.data().user());
-                syncVerificationFieldsFromSession();
-                statusMessage.set("Verification code generated. Local/dev code: "
-                        + startResult.data().generatedCode());
-                return;
-            }
-
-            applyVerificationContact(currentUser);
-            String generatedCode = trustSafetyService.generateVerificationCode();
-            currentUser.startVerification(verificationMethod.get(), generatedCode);
-            ProfileMutationUseCases mutationUseCases = mutationUseCases();
-            if (mutationUseCases == null) {
-                reportError(PROFILE_VERIFICATION_UNAVAILABLE);
-                return;
-            }
-            var result = mutationUseCases.saveProfile(
-                    new SaveProfileCommand(UserContext.ui(currentUser.getId()), currentUser));
-            if (!result.success()) {
-                reportError(result.error().message());
-                return;
-            }
-            session.setCurrentUser(result.data().user());
-            syncVerificationFieldsFromSession();
-            statusMessage.set("Verification code generated. Local/dev code: " + generatedCode);
-        } catch (IllegalArgumentException e) {
-            reportError(e.getMessage());
+        if (verificationUseCases == null) {
+            reportError(PROFILE_VERIFICATION_UNAVAILABLE);
+            return;
         }
+
+        var startResult = verificationUseCases.startVerification(new StartVerificationCommand(
+                UserContext.ui(currentUser.getId()), verificationMethod.get(), verificationContact.get()));
+        if (!startResult.success()) {
+            reportError(startResult.error().message());
+            return;
+        }
+        session.setCurrentUser(startResult.data().user());
+        syncVerificationFieldsFromSession();
+        statusMessage.set("Verification code generated. Local/dev code: "
+                + startResult.data().generatedCode());
     }
 
     public void confirmVerification() {
@@ -275,37 +249,18 @@ public final class SafetyViewModel extends BaseViewModel {
             reportError(PROFILE_VERIFICATION_UNAVAILABLE);
             return;
         }
-        if (verificationUseCases != null) {
-            var confirmResult = verificationUseCases.confirmVerification(
-                    new ConfirmVerificationCommand(UserContext.ui(currentUser.getId()), verificationCode.get()));
-            if (!confirmResult.success()) {
-                reportError(confirmResult.error().message());
-                return;
-            }
-            session.setCurrentUser(confirmResult.data().user());
-            verificationCode.set("");
-            syncVerificationFieldsFromSession();
-            statusMessage.set("Profile verified successfully.");
-            return;
-        }
-        if (!trustSafetyService.verifyCode(currentUser, verificationCode.get())) {
-            reportError("Verification code is invalid or expired.");
-            return;
-        }
-
-        currentUser.markVerified();
-        ProfileMutationUseCases mutationUseCases = mutationUseCases();
-        if (mutationUseCases == null) {
+        if (verificationUseCases == null) {
             reportError(PROFILE_VERIFICATION_UNAVAILABLE);
             return;
         }
-        var result =
-                mutationUseCases.saveProfile(new SaveProfileCommand(UserContext.ui(currentUser.getId()), currentUser));
-        if (!result.success()) {
-            reportError(result.error().message());
+
+        var confirmResult = verificationUseCases.confirmVerification(
+                new ConfirmVerificationCommand(UserContext.ui(currentUser.getId()), verificationCode.get()));
+        if (!confirmResult.success()) {
+            reportError(confirmResult.error().message());
             return;
         }
-        session.setCurrentUser(result.data().user());
+        session.setCurrentUser(confirmResult.data().user());
         verificationCode.set("");
         syncVerificationFieldsFromSession();
         statusMessage.set("Profile verified successfully.");
@@ -355,19 +310,6 @@ public final class SafetyViewModel extends BaseViewModel {
             verificationMethod.set(currentMethod);
         }
         verificationContact.set(resolveVerificationContact(currentUser, verificationMethod.get()));
-    }
-
-    private void applyVerificationContact(User currentUser) {
-        VerificationMethod method =
-                verificationMethod.get() == null ? VerificationMethod.EMAIL : verificationMethod.get();
-        String contact = verificationContact.get() == null
-                ? ""
-                : verificationContact.get().trim();
-        if (method == VerificationMethod.EMAIL) {
-            currentUser.setEmail(contact);
-            return;
-        }
-        currentUser.setPhone(contact);
     }
 
     private String resolveVerificationContact(User currentUser, VerificationMethod method) {

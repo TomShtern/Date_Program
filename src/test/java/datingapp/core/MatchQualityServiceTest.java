@@ -104,6 +104,25 @@ class MatchQualityServiceTest {
         }
 
         @Test
+        @DisplayName("Computing quality looks up each user's age once")
+        void computingQualityLooksUpEachUsersAgeOnce() {
+            CountingUser alice = createCountingUser("Alice", 28, 32.0, 34.0);
+            CountingUser bob = createCountingUser("Bob", 26, 32.0, 34.0);
+
+            userStorage.save(alice);
+            userStorage.save(bob);
+
+            Match match = Match.create(alice.getId(), bob.getId());
+            addMutualLikes(alice.getId(), bob.getId());
+
+            MatchQuality quality = service.computeQuality(match, alice.getId()).orElseThrow();
+
+            assertTrue(quality.ageScore() > 0.0);
+            assertEquals(1, alice.ageLookupCount());
+            assertEquals(1, bob.ageLookupCount());
+        }
+
+        @Test
         @DisplayName("Matching lifestyle gives high lifestyle score")
         void matchingLifestyleGivesHighScore() {
             User alice = createUser("Alice", 25, 32.0, 34.0);
@@ -726,10 +745,51 @@ class MatchQualityServiceTest {
         return user;
     }
 
+    private CountingUser createCountingUser(String name, int age, double lat, double lon) {
+        CountingUser user = new CountingUser(UUID.randomUUID(), name);
+        user.setBirthDate(AppClock.today().minusYears(age));
+        user.setGender(Gender.OTHER);
+        user.setInterestedIn(EnumSet.of(Gender.OTHER));
+        user.setLocation(lat, lon);
+        user.setMaxDistanceKm(50, AppConfig.defaults().matching().maxDistanceKm());
+        user.setAgeRange(
+                18,
+                60,
+                AppConfig.defaults().validation().minAge(),
+                AppConfig.defaults().validation().maxAge());
+        user.addPhotoUrl("http://example.com/photo.jpg");
+        user.setBio("Test bio");
+        user.setPacePreferences(new PacePreferences(
+                MessagingFrequency.OFTEN,
+                TimeToFirstDate.FEW_DAYS,
+                CommunicationStyle.TEXT_ONLY,
+                DepthPreference.DEEP_CHAT));
+        return user;
+    }
+
     private void addMutualLikes(UUID userA, UUID userB) {
         Like likeA = Like.create(userA, userB, Like.Direction.LIKE);
         Like likeB = Like.create(userB, userA, Like.Direction.LIKE);
         likeStorage.save(likeA);
         likeStorage.save(likeB);
+    }
+
+    private static final class CountingUser extends User {
+
+        private int ageLookupCount;
+
+        private CountingUser(UUID id, String name) {
+            super(id, name);
+        }
+
+        @Override
+        public java.util.Optional<Integer> getAge(java.time.ZoneId timezone) {
+            ageLookupCount++;
+            return super.getAge(timezone);
+        }
+
+        private int ageLookupCount() {
+            return ageLookupCount;
+        }
     }
 }

@@ -224,7 +224,7 @@ public class MatchingController extends BaseController implements Initializable 
     }
 
     private UUID consumeSelectedCandidateId() {
-        return NavigationService.getInstance()
+        return navigationService()
                 .consumeNavigationContext(NavigationService.ViewType.MATCHING, UUID.class)
                 .orElse(null);
     }
@@ -626,7 +626,7 @@ public class MatchingController extends BaseController implements Initializable 
         dialog.showAndWait().ifPresent(response -> {
             if (Objects.equals(response, sendMessageBtn)) {
                 // Navigate to chat with this match
-                NavigationService navigationService = NavigationService.getInstance();
+                NavigationService navigationService = navigationService();
                 if (matchedUser != null) {
                     navigationService.setNavigationContext(NavigationService.ViewType.CHAT, matchedUser.getId());
                 }
@@ -708,20 +708,20 @@ public class MatchingController extends BaseController implements Initializable 
     private void handleExpandPreferences() {
         logInfo("User clicked Expand Preferences - navigating to Profile settings");
         // Navigate to filter/preferences screen
-        NavigationService.getInstance().navigateTo(NavigationService.ViewType.PREFERENCES);
+        navigationService().navigateTo(NavigationService.ViewType.PREFERENCES);
     }
 
     @FXML
     private void handleCheckLikes() {
         logInfo("User clicked Check Likes - navigating to Matches");
         // Navigate to Matches screen where they can see who liked them
-        NavigationService.getInstance().navigateTo(NavigationService.ViewType.MATCHES);
+        navigationService().navigateTo(NavigationService.ViewType.MATCHES);
     }
 
     @FXML
     private void handleImproveProfile() {
         logInfo("User clicked Improve Profile - navigating to Profile");
-        NavigationService.getInstance().navigateTo(NavigationService.ViewType.PROFILE);
+        navigationService().navigateTo(NavigationService.ViewType.PROFILE);
     }
 
     @SuppressWarnings("unused")
@@ -731,7 +731,7 @@ public class MatchingController extends BaseController implements Initializable 
         if (candidate == null) {
             return;
         }
-        NavigationService nav = NavigationService.getInstance();
+        NavigationService nav = navigationService();
         nav.setNavigationContext(NavigationService.ViewType.PROFILE_VIEW, candidate.getId());
         nav.navigateTo(NavigationService.ViewType.PROFILE_VIEW);
     }

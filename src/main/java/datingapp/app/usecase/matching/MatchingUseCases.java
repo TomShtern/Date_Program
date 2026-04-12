@@ -77,7 +77,7 @@ public class MatchingUseCases {
 
         @Override
         public void markDailyPickViewed(UUID userId) {
-            // no-op: null recommendation-service wrapper intentionally does nothing.
+            // Compatibility shim intentionally does nothing.
         }
 
         @Override
@@ -93,7 +93,7 @@ public class MatchingUseCases {
 
         @Override
         public void markInteracted(UUID seekerId, UUID standoutUserId) {
-            // no-op: null recommendation-service wrapper intentionally does nothing.
+            // Compatibility shim intentionally does nothing.
         }
 
         @Override
@@ -170,11 +170,21 @@ public class MatchingUseCases {
             return this;
         }
 
+        /**
+         * Compatibility hook for callers that still provide a single recommendation service.
+         * Explicit seam setters remain authoritative; this only seeds any missing seams.
+         */
         public Builder recommendationService(RecommendationService recommendationService) {
             this.recommendationService = recommendationService;
-            this.dailyLimitService = wrapDailyLimitService(recommendationService);
-            this.dailyPickService = wrapDailyPickService(recommendationService);
-            this.standoutService = wrapStandoutService(recommendationService);
+            if (this.dailyLimitService == null) {
+                this.dailyLimitService = wrapDailyLimitService(recommendationService);
+            }
+            if (this.dailyPickService == null) {
+                this.dailyPickService = wrapDailyPickService(recommendationService);
+            }
+            if (this.standoutService == null) {
+                this.standoutService = wrapStandoutService(recommendationService);
+            }
             return this;
         }
 
@@ -299,13 +309,13 @@ public class MatchingUseCases {
             return UseCaseResult.failure(UseCaseError.validation("Cannot swipe on yourself"));
         }
         try {
-            if (command.markDailyPickViewed()) {
-                dailyPickService.markDailyPickViewed(command.context().userId());
-            }
             MatchingService.SwipeResult result = matchingService.processSwipe(
                     command.currentUser(), command.candidate(), command.liked(), command.superLike());
             if (!result.success()) {
                 return UseCaseResult.failure(UseCaseError.conflict(result.message()));
+            }
+            if (command.markDailyPickViewed() && result.like() != null) {
+                dailyPickService.markDailyPickViewed(command.context().userId());
             }
             if (result.like() != null) {
                 eventBus.publish(new AppEvent.SwipeRecorded(
@@ -477,15 +487,27 @@ public class MatchingUseCases {
 
         try {
             Like like = Like.create(command.context().userId(), command.targetUserId(), command.direction());
-            Optional<Match> match = matchingService.recordLike(like);
-            eventBus.publish(new AppEvent.SwipeRecorded(
-                    like.whoLikes(), like.whoGotLiked(), like.direction(), match.isPresent(), AppClock.now()));
-            if (match.isPresent()) {
-                Match m = match.get();
-                eventBus.publish(
-                        new AppEvent.MatchCreated(m.getId(), like.whoLikes(), like.whoGotLiked(), AppClock.now()));
+            MatchingService.RecordLikeOutcome outcome = matchingService.recordLike(like);
+            if (outcome.rejected()) {
+                return UseCaseResult.failure(
+                        UseCaseError.conflict(outcome.rejectionMessage().orElseThrow()));
             }
-            return UseCaseResult.success(new RecordLikeResult(like, match));
+            if (outcome.persisted()) {
+                eventBus.publish(new AppEvent.SwipeRecorded(
+                        like.whoLikes(),
+                        like.whoGotLiked(),
+                        like.direction(),
+                        outcome.match().isPresent(),
+                        AppClock.now()));
+                if (outcome.match().isPresent()) {
+                    Match m = outcome.match().orElseThrow();
+                    eventBus.publish(
+                            new AppEvent.MatchCreated(m.getId(), like.whoLikes(), like.whoGotLiked(), AppClock.now()));
+                }
+            }
+            Like recordedLike = outcome.like().orElseThrow();
+            Optional<Match> match = outcome.match();
+            return UseCaseResult.success(new RecordLikeResult(recordedLike, match));
         } catch (Exception e) {
             return UseCaseResult.failure(UseCaseError.internal("Failed to record like interaction: " + e.getMessage()));
         }
@@ -554,8 +576,16 @@ public class MatchingUseCases {
             return UseCaseResult.failure(UseCaseError.forbidden("Match does not belong to current user"));
         }
         try {
-            interactionStorage.delete(command.matchId());
+            Match archivedMatch = copyMatch(match);
+            archivedMatch.unmatch(command.context().userId());
+            if (!interactionStorage.unmatchTransition(archivedMatch, Optional.empty())) {
+                return UseCaseResult.failure(UseCaseError.conflict("Failed to archive match"));
+            }
             return UseCaseResult.success(null);
+        } catch (IllegalStateException e) {
+            return UseCaseResult.failure(UseCaseError.conflict(e.getMessage()));
+        } catch (IllegalArgumentException e) {
+            return UseCaseResult.failure(UseCaseError.validation(e.getMessage()));
         } catch (Exception e) {
             return UseCaseResult.failure(UseCaseError.internal("Failed to archive match: " + e.getMessage()));
         }
@@ -567,8 +597,8 @@ public class MatchingUseCases {
         }
         try {
             UUID userId = query.context().userId();
-            RecommendationService.DailyStatus status = recommendationService.getStatus(userId);
-            String timeUntilReset = RecommendationService.formatDuration(recommendationService.getTimeUntilReset());
+            DailyLimitService.DailyStatus status = dailyLimitService.getStatus(userId);
+            String timeUntilReset = RecommendationService.formatDuration(dailyLimitService.getTimeUntilReset());
             return UseCaseResult.success(new DailyStatusResult(
                     status.likesUsed(), status.likesRemaining(), status.hasUnlimitedLikes(), timeUntilReset));
         } catch (Exception e) {
@@ -724,6 +754,20 @@ public class MatchingUseCases {
     public static record UndoAvailabilityQuery(UserContext context) {}
 
     public static record UndoAvailabilityResult(boolean canUndo, int secondsRemaining) {}
+
+    private static Match copyMatch(Match match) {
+        return new Match(
+                match.getId(),
+                match.getUserA(),
+                match.getUserB(),
+                match.getCreatedAt(),
+                match.getUpdatedAt(),
+                match.getState(),
+                match.getEndedAt(),
+                match.getEndedBy(),
+                match.getEndReason(),
+                match.getDeletedAt());
+    }
 
     public static DailyLimitService wrapDailyLimitService(RecommendationService recommendationService) {
         if (recommendationService == null) {

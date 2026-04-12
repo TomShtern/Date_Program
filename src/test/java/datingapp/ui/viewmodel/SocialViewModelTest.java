@@ -66,8 +66,8 @@ class SocialViewModelTest {
         TrustSafetyService trustSafetyService = TrustSafetyService.builder(
                         trustSafety, interactions, users, config, communications)
                 .build();
-        var socialUseCases =
-                new datingapp.app.usecase.social.SocialUseCases(connectionService, trustSafetyService, communications);
+        var socialUseCases = datingapp.app.usecase.social.SocialUseCases.forWorkflowAccess(
+                connectionService, trustSafetyService, communications);
 
         viewModel = new SocialViewModel(
                 connectionService,

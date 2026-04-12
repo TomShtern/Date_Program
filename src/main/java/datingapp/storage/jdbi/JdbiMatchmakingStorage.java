@@ -1,7 +1,5 @@
 package datingapp.storage.jdbi;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import datingapp.core.connection.ConnectionModels;
 import datingapp.core.connection.ConnectionModels.Conversation;
 import datingapp.core.connection.ConnectionModels.FriendRequest;
@@ -38,8 +36,6 @@ import org.jdbi.v3.sqlobject.statement.SqlUpdate;
 
 /** Consolidated JDBI storage for likes and matches. */
 public final class JdbiMatchmakingStorage implements OperationalInteractionStorage {
-
-    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
     private static final String PARAM_ID = "id";
     private static final String PARAM_WHO_LIKES = "whoLikes";
     private static final String PARAM_WHO_GOT_LIKED = "whoGotLiked";
@@ -186,19 +182,23 @@ public final class JdbiMatchmakingStorage implements OperationalInteractionStora
     private final String undoUpsertSql;
 
     public JdbiMatchmakingStorage(Jdbi jdbi) {
+        this(jdbi, SqlDialectSupport.detectDialect(jdbi));
+    }
+
+    public Undo.Storage undoStorage() {
+        return undoStorage;
+    }
+
+    public JdbiMatchmakingStorage(Jdbi jdbi, DatabaseDialect dialect) {
         this.jdbi = Objects.requireNonNull(jdbi, "jdbi cannot be null");
         this.likeDao = jdbi.onDemand(LikeDao.class);
         this.matchDao = jdbi.onDemand(MatchDao.class);
         this.undoDao = jdbi.onDemand(UndoDao.class);
         this.undoStorage = new UndoStorageAdapter();
-        DatabaseDialect dialect = detectDialect(jdbi);
+        Objects.requireNonNull(dialect, "dialect cannot be null");
         this.likeUpsertSql = buildLikeUpsertSql(dialect);
         this.matchUpsertSql = buildMatchUpsertSql(dialect);
         this.undoUpsertSql = buildUndoUpsertSql(dialect);
-    }
-
-    public Undo.Storage undoStorage() {
-        return undoStorage;
     }
 
     @Override
@@ -214,13 +214,13 @@ public final class JdbiMatchmakingStorage implements OperationalInteractionStora
 
     @Override
     public void save(Like like) {
+        Objects.requireNonNull(like, "like cannot be null");
         jdbi.useHandle(handle -> saveLike(handle, like));
     }
 
     @Override
     public LikeMatchWriteResult saveLikeAndMaybeCreateMatch(Like like) {
         Objects.requireNonNull(like, "like cannot be null");
-
         try {
             return jdbi.inTransaction(handle -> {
                 if (activeLikeExists(handle, like)) {
@@ -228,7 +228,6 @@ public final class JdbiMatchmakingStorage implements OperationalInteractionStora
                 }
 
                 saveLike(handle, like);
-
                 if (!isPositiveLikeDirection(like.direction())) {
                     return LikeMatchWriteResult.likeOnly();
                 }
@@ -598,7 +597,7 @@ public final class JdbiMatchmakingStorage implements OperationalInteractionStora
                 handle.createUpdate(SQL_SOFT_DELETE_PAIR_LIKES)
                         .bind(PARAM_USER_A, updatedMatch.getUserA())
                         .bind(PARAM_USER_B, updatedMatch.getUserB())
-                        .bind("deletedAt", updatedMatch.getUpdatedAt())
+                        .bind(PARAM_DELETED_AT, updatedMatch.getUpdatedAt())
                         .execute();
 
                 if (archivedConversation.isPresent()) {
@@ -715,14 +714,7 @@ public final class JdbiMatchmakingStorage implements OperationalInteractionStora
     }
 
     private String serializeNotificationData(Map<String, String> data) {
-        if (data == null || data.isEmpty()) {
-            return null;
-        }
-        try {
-            return OBJECT_MAPPER.writeValueAsString(data);
-        } catch (JsonProcessingException e) {
-            throw new StorageException("Failed to serialize notification data", e);
-        }
+        return JdbiNotificationJson.write(data);
     }
 
     private static boolean isPositiveLikeDirection(Like.Direction direction) {
@@ -820,11 +812,11 @@ public final class JdbiMatchmakingStorage implements OperationalInteractionStora
         public void save(Undo state) {
             jdbi.useHandle(handle -> {
                 try (var update = handle.createUpdate(undoUpsertSql)) {
-                    update.bind("userId", state.userId())
+                    update.bind(COLUMN_USER_ID, state.userId())
                             .bind("likeId", state.like().id())
-                            .bind("whoLikes", state.like().whoLikes())
-                            .bind("whoGotLiked", state.like().whoGotLiked())
-                            .bind("direction", state.like().direction().name())
+                            .bind(PARAM_WHO_LIKES, state.like().whoLikes())
+                            .bind(PARAM_WHO_GOT_LIKED, state.like().whoGotLiked())
+                            .bind(PARAM_DIRECTION, state.like().direction().name())
                             .bind("likeCreatedAt", state.like().createdAt())
                             .bind("expiresAt", state.expiresAt());
                     bindNullableString(update, "matchId", state.matchId());
@@ -922,13 +914,13 @@ public final class JdbiMatchmakingStorage implements OperationalInteractionStora
                 SELECT COUNT(*) FROM likes
                 WHERE who_likes = :userId AND direction = :direction AND deleted_at IS NULL
                 """)
-        int countByDirection(@Bind("userId") UUID userId, @Bind("direction") Like.Direction direction);
+        int countByDirection(@Bind("userId") UUID userId, @Bind(PARAM_DIRECTION) Like.Direction direction);
 
         @SqlQuery("""
                 SELECT COUNT(*) FROM likes
                 WHERE who_got_liked = :userId AND direction = :direction AND deleted_at IS NULL
                 """)
-        int countReceivedByDirection(@Bind("userId") UUID userId, @Bind("direction") Like.Direction direction);
+        int countReceivedByDirection(@Bind("userId") UUID userId, @Bind(PARAM_DIRECTION) Like.Direction direction);
 
         @SqlQuery("""
             SELECT COUNT(*) FROM likes l1
@@ -1134,17 +1126,6 @@ public final class JdbiMatchmakingStorage implements OperationalInteractionStora
         }
     }
 
-    private static DatabaseDialect detectDialect(Jdbi jdbi) {
-        return jdbi.withHandle(handle -> {
-            try {
-                return DatabaseDialect.fromDatabaseProductName(
-                        handle.getConnection().getMetaData().getDatabaseProductName());
-            } catch (SQLException exception) {
-                throw new IllegalStateException("Failed to detect database dialect", exception);
-            }
-        });
-    }
-
     private static Update bindMatchTransition(Update update, Match match) {
         update.bind(PARAM_ID, match.getId())
                 .bind(PARAM_STATE, match.getState().name())
@@ -1189,12 +1170,12 @@ public final class JdbiMatchmakingStorage implements OperationalInteractionStora
                 "likes",
                 List.of(
                         new SqlDialectSupport.ColumnBinding("id", "id"),
-                        new SqlDialectSupport.ColumnBinding("who_likes", "whoLikes"),
-                        new SqlDialectSupport.ColumnBinding(COLUMN_WHO_GOT_LIKED, "whoGotLiked"),
-                        new SqlDialectSupport.ColumnBinding("direction", "direction"),
-                        new SqlDialectSupport.ColumnBinding("created_at", "createdAt"),
-                        new SqlDialectSupport.ColumnBinding(COLUMN_DELETED_AT, "deletedAt")),
-                List.of("who_likes", COLUMN_WHO_GOT_LIKED));
+                        new SqlDialectSupport.ColumnBinding(COLUMN_WHO_LIKES, PARAM_WHO_LIKES),
+                        new SqlDialectSupport.ColumnBinding(COLUMN_WHO_GOT_LIKED, PARAM_WHO_GOT_LIKED),
+                        new SqlDialectSupport.ColumnBinding(PARAM_DIRECTION, PARAM_DIRECTION),
+                        new SqlDialectSupport.ColumnBinding(COLUMN_CREATED_AT, PARAM_CREATED_AT),
+                        new SqlDialectSupport.ColumnBinding(COLUMN_DELETED_AT, PARAM_DELETED_AT)),
+                List.of(COLUMN_WHO_LIKES, COLUMN_WHO_GOT_LIKED));
     }
 
     private static String buildMatchUpsertSql(DatabaseDialect dialect) {
@@ -1205,13 +1186,13 @@ public final class JdbiMatchmakingStorage implements OperationalInteractionStora
                         new SqlDialectSupport.ColumnBinding("id", "id"),
                         new SqlDialectSupport.ColumnBinding("user_a", PARAM_USER_A),
                         new SqlDialectSupport.ColumnBinding("user_b", PARAM_USER_B),
-                        new SqlDialectSupport.ColumnBinding("created_at", "createdAt"),
+                        new SqlDialectSupport.ColumnBinding(COLUMN_CREATED_AT, PARAM_CREATED_AT),
                         new SqlDialectSupport.ColumnBinding("updated_at", PARAM_UPDATED_AT),
-                        new SqlDialectSupport.ColumnBinding("state", "state"),
-                        new SqlDialectSupport.ColumnBinding("ended_at", "endedAt"),
-                        new SqlDialectSupport.ColumnBinding("ended_by", "endedBy"),
-                        new SqlDialectSupport.ColumnBinding("end_reason", "endReason"),
-                        new SqlDialectSupport.ColumnBinding(COLUMN_DELETED_AT, "deletedAt")),
+                        new SqlDialectSupport.ColumnBinding(PARAM_STATE, PARAM_STATE),
+                        new SqlDialectSupport.ColumnBinding("ended_at", PARAM_ENDED_AT),
+                        new SqlDialectSupport.ColumnBinding("ended_by", PARAM_ENDED_BY),
+                        new SqlDialectSupport.ColumnBinding("end_reason", PARAM_END_REASON),
+                        new SqlDialectSupport.ColumnBinding(COLUMN_DELETED_AT, PARAM_DELETED_AT)),
                 List.of("id"));
     }
 
@@ -1222,9 +1203,9 @@ public final class JdbiMatchmakingStorage implements OperationalInteractionStora
                 List.of(
                         new SqlDialectSupport.ColumnBinding(COLUMN_USER_ID, "userId"),
                         new SqlDialectSupport.ColumnBinding("like_id", "likeId"),
-                        new SqlDialectSupport.ColumnBinding("who_likes", "whoLikes"),
-                        new SqlDialectSupport.ColumnBinding(COLUMN_WHO_GOT_LIKED, "whoGotLiked"),
-                        new SqlDialectSupport.ColumnBinding("direction", "direction"),
+                        new SqlDialectSupport.ColumnBinding(COLUMN_WHO_LIKES, PARAM_WHO_LIKES),
+                        new SqlDialectSupport.ColumnBinding(COLUMN_WHO_GOT_LIKED, PARAM_WHO_GOT_LIKED),
+                        new SqlDialectSupport.ColumnBinding(PARAM_DIRECTION, PARAM_DIRECTION),
                         new SqlDialectSupport.ColumnBinding("like_created_at", "likeCreatedAt"),
                         new SqlDialectSupport.ColumnBinding("match_id", "matchId"),
                         new SqlDialectSupport.ColumnBinding("expires_at", "expiresAt")),

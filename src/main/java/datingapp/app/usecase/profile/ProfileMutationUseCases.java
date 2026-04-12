@@ -227,6 +227,17 @@ public final class ProfileMutationUseCases {
         return saveResult;
     }
 
+    /**
+     * Deletes a user account by soft-deletion.
+     *
+     * <p>
+     * Contract: This method creates a deleted copy of the user, persists it to storage, and then
+     * mutates the caller-visible User instance to reflect the deleted state. This ensures both
+     * storage durability and request-local consistency.
+     *
+     * @param command the delete account command containing context and reason
+     * @return success if the account was deleted; failure otherwise
+     */
     public UseCaseResult<Void> deleteAccount(DeleteAccountCommand command) {
         if (command == null || command.context() == null) {
             return UseCaseResult.failure(UseCaseError.validation(CONTEXT_REQUIRED));

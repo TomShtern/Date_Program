@@ -1,10 +1,12 @@
 package datingapp.storage.jdbi;
 
 import datingapp.storage.DatabaseDialect;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.StringJoiner;
+import org.jdbi.v3.core.Jdbi;
 
 /** Dialect-aware SQL helpers for JDBI storage upserts and expressions. */
 public final class SqlDialectSupport {
@@ -56,6 +58,18 @@ public final class SqlDialectSupport {
             case H2 -> "DATEDIFF('SECOND', %s, %s)".formatted(startedAtColumn, endedAtColumn);
             case POSTGRESQL -> "EXTRACT(EPOCH FROM (%s - %s))".formatted(endedAtColumn, startedAtColumn);
         };
+    }
+
+    public static DatabaseDialect detectDialect(Jdbi jdbi) {
+        Objects.requireNonNull(jdbi, "jdbi cannot be null");
+        return jdbi.withHandle(handle -> {
+            try {
+                return DatabaseDialect.fromDatabaseProductName(
+                        handle.getConnection().getMetaData().getDatabaseProductName());
+            } catch (SQLException exception) {
+                throw new IllegalStateException("Failed to detect database dialect", exception);
+            }
+        });
     }
 
     public record ColumnBinding(String column, String binding) {}

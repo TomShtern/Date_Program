@@ -55,6 +55,9 @@ import javafx.scene.text.TextAlignment;
  * Extends BaseController for automatic subscription cleanup.
  */
 public class ChatController extends BaseController implements Initializable {
+    private static final String STATUS_STYLE_ONLINE = "status-online";
+    private static final String STATUS_STYLE_AWAY = "status-away";
+    private static final String STATUS_STYLE_OFFLINE = "status-offline";
 
     private static final DateTimeFormatter TIME_FORMAT = DateTimeFormatter.ofPattern("HH:mm");
     private static final DateTimeFormatter CONVERSATION_DATE_FORMAT =
@@ -277,7 +280,7 @@ public class ChatController extends BaseController implements Initializable {
     }
 
     private void restoreNavigationSelection() {
-        NavigationService.getInstance()
+        navigationService()
                 .consumeNavigationContext(NavigationService.ViewType.CHAT, UUID.class)
                 .ifPresent(userId -> viewModel.openConversationWithUser(userId, this::selectConversationPreview));
     }
@@ -348,7 +351,7 @@ public class ChatController extends BaseController implements Initializable {
         if (chatPresenceDot == null) {
             return;
         }
-        chatPresenceDot.getStyleClass().removeAll("status-online", "status-away", "status-offline");
+        chatPresenceDot.getStyleClass().removeAll(STATUS_STYLE_ONLINE, STATUS_STYLE_AWAY, STATUS_STYLE_OFFLINE);
         PresenceStatus resolvedStatus = status != null ? status : PresenceStatus.UNKNOWN;
         boolean visible = resolvedStatus != PresenceStatus.UNKNOWN;
         if (visible) {
@@ -356,10 +359,9 @@ public class ChatController extends BaseController implements Initializable {
                     .getStyleClass()
                     .add(
                             switch (resolvedStatus) {
-                                case ONLINE -> "status-online";
-                                case AWAY -> "status-away";
-                                case OFFLINE -> "status-offline";
-                                case UNKNOWN -> "status-offline";
+                                case ONLINE -> STATUS_STYLE_ONLINE;
+                                case AWAY -> STATUS_STYLE_AWAY;
+                                case OFFLINE, UNKNOWN -> STATUS_STYLE_OFFLINE;
                             });
         }
         chatPresenceDot.setVisible(visible);
@@ -851,7 +853,7 @@ public class ChatController extends BaseController implements Initializable {
     @SuppressWarnings("unused")
     @FXML
     private void handleBrowseMatches() {
-        NavigationService.getInstance().navigateTo(NavigationService.ViewType.MATCHING);
+        navigationService().navigateTo(NavigationService.ViewType.MATCHING);
     }
 
     @SuppressWarnings("unused")

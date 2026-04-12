@@ -82,6 +82,27 @@ class ConnectionServiceTest {
     }
 
     @Test
+    @DisplayName("canMessage returns false when the recipient is no longer active")
+    void canMessageReturnsFalseWhenRecipientIsNoLongerActive() {
+        recipient.pause();
+
+        assertFalse(service.canMessage(sender.getId(), recipient.getId()));
+    }
+
+    @Test
+    @DisplayName("getOrCreateConversation rejects an inactive recipient even when the match still exists")
+    void getOrCreateConversationRejectsInactiveRecipientEvenWhenMatchStillExists() {
+        recipient.pause();
+        UUID senderId = sender.getId();
+        UUID recipientId = recipient.getId();
+
+        IllegalArgumentException error = assertThrows(
+                IllegalArgumentException.class, () -> service.getOrCreateConversation(senderId, recipientId));
+
+        assertEquals("Cannot message: no active match", error.getMessage());
+    }
+
+    @Test
     @DisplayName("getMessages(String, limit, offset) rejects invalid paging")
     void getMessagesByConversationIdRejectsInvalidPaging() {
         service.sendMessage(sender.getId(), recipient.getId(), "First message");

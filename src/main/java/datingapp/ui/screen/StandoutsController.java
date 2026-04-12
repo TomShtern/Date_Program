@@ -135,8 +135,9 @@ public class StandoutsController extends BaseController implements Initializable
             return;
         }
         viewModel.markInteracted(entry);
-        NavigationService.getInstance().setNavigationContext(NavigationService.ViewType.PROFILE_VIEW, entry.userId());
-        NavigationService.getInstance().navigateTo(NavigationService.ViewType.PROFILE_VIEW);
+        NavigationService navigationService = navigationService();
+        navigationService.setNavigationContext(NavigationService.ViewType.PROFILE_VIEW, entry.userId());
+        navigationService.navigateTo(NavigationService.ViewType.PROFILE_VIEW);
     }
 
     @SuppressWarnings("unused")

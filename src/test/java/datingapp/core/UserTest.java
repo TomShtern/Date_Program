@@ -3,6 +3,7 @@ package datingapp.core;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -346,6 +347,22 @@ class UserTest {
 
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> user.setPhone("abc123"));
         assertTrue(ex.getMessage().contains("Invalid phone format"));
+    }
+
+    @Test
+    @DisplayName("markVerified preserves the verification sent timestamp")
+    void markVerifiedPreservesVerificationSentAt() {
+        User user = new User(UUID.randomUUID(), "Verified User");
+        user.startVerification(VerificationMethod.EMAIL, "123456");
+        Instant sentAt = user.getVerificationSentAt();
+
+        TestClock.setFixed(FIXED_INSTANT.plusSeconds(60));
+        user.markVerified();
+
+        assertTrue(user.isVerified());
+        assertEquals(sentAt, user.getVerificationSentAt());
+        assertEquals(FIXED_INSTANT.plusSeconds(60), user.getVerifiedAt());
+        assertNull(user.getVerificationCode());
     }
 
     @Test
@@ -780,6 +797,21 @@ class UserTest {
         }
 
         @Test
+        @DisplayName("StorageBuilder maps dealbreakers")
+        void storageBuilderMapsDealbreakers() {
+            MatchPreferences.Dealbreakers dealbreakers = MatchPreferences.Dealbreakers.builder()
+                    .acceptSmoking(MatchPreferences.Lifestyle.Smoking.NEVER)
+                    .maxAgeDifference(4)
+                    .build();
+
+            User user = User.StorageBuilder.create(UUID.randomUUID(), "Dealbreaker User", AppClock.now())
+                    .dealbreakers(dealbreakers)
+                    .build();
+
+            assertEquals(dealbreakers, user.getDealbreakers());
+        }
+
+        @Test
         @DisplayName("StorageBuilder requires coordinates before setting hasLocationSet true")
         void storageBuilderRequiresCoordinatesBeforeEnablingLocation() {
             IllegalStateException error = assertThrows(IllegalStateException.class, this::buildLocationlessStorageUser);
@@ -799,6 +831,35 @@ class UserTest {
             assertFalse(user.hasLocation());
             assertEquals(0.0, user.getLat());
             assertEquals(0.0, user.getLon());
+        }
+
+        @Test
+        @DisplayName("copy preserves raw location state and dealbreakers from storage-backed users")
+        void copyPreservesRawLocationStateAndDealbreakersFromStorageBackedUsers() {
+            MatchPreferences.Dealbreakers dealbreakers = MatchPreferences.Dealbreakers.builder()
+                    .acceptSmoking(MatchPreferences.Lifestyle.Smoking.NEVER)
+                    .maxAgeDifference(4)
+                    .build();
+            User source = User.StorageBuilder.create(UUID.randomUUID(), "Detached", AppClock.now())
+                    .bio("Bio")
+                    .birthDate(LocalDate.of(1990, 1, 1))
+                    .gender(Gender.FEMALE)
+                    .interestedIn(EnumSet.of(Gender.MALE))
+                    .rawLocation(32.0853, 34.7818, false)
+                    .dealbreakers(dealbreakers)
+                    .verificationSentAt(AppClock.now().minusSeconds(30))
+                    .verifiedAt(AppClock.now().minusSeconds(5))
+                    .verified(true)
+                    .build();
+
+            User copy = source.copy();
+
+            assertFalse(copy.hasLocationSet());
+            assertEquals(32.0853, copy.getLat());
+            assertEquals(34.7818, copy.getLon());
+            assertEquals(dealbreakers, copy.getDealbreakers());
+            assertEquals(source.getVerificationSentAt(), copy.getVerificationSentAt());
+            assertEquals(source.getVerifiedAt(), copy.getVerifiedAt());
         }
 
         private User buildLocationlessStorageUser() {

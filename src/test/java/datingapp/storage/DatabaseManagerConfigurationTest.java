@@ -280,6 +280,51 @@ class DatabaseManagerConfigurationTest {
         assertEquals("jdbc:h2:./data/dating", currentJdbcUrl());
     }
 
+    @Test
+    @DisplayName("clearInstance preserves the configured JDBC URL while dropping the singleton")
+    void clearInstancePreservesConfiguredJdbcUrlWhileDroppingSingleton() throws Exception {
+        String customJdbcUrl = "jdbc:h2:./target/dbmanager-config-clear-" + UUID.randomUUID();
+        DatabaseManager.setJdbcUrl(customJdbcUrl);
+        DatabaseManager.getInstance();
+
+        DatabaseManager.clearInstance();
+
+        assertEquals(customJdbcUrl, currentJdbcUrl());
+    }
+
+    @Test
+    @DisplayName("configurePoolSettings rejects changes after the live pool is initialized")
+    void configurePoolSettingsRejectsChangesAfterTheLivePoolIsInitialized() throws Exception {
+        System.setProperty(PROFILE_PROPERTY, "test");
+        String jdbcUrl = "jdbc:h2:mem:dbmanager-live-pool-" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1";
+        DatabaseManager manager = DatabaseManager.createIsolated(jdbcUrl);
+        AppConfig.StorageConfig updatedPoolConfig = AppConfig.builder()
+                .databaseDialect("H2")
+                .databaseUrl(jdbcUrl)
+                .databaseUsername("sa")
+                .queryTimeoutSeconds(30)
+                .maxPoolSize(14)
+                .minIdle(4)
+                .connectionTimeoutSeconds(7)
+                .validationTimeoutSeconds(5)
+                .idleTimeoutSeconds(900)
+                .maxLifetimeSeconds(2400)
+                .keepaliveTimeSeconds(120)
+                .build()
+                .storage();
+
+        try (Connection connection = manager.getConnection()) {
+            assertNotNull(connection);
+            IllegalStateException exception =
+                    assertThrows(IllegalStateException.class, () -> manager.configurePoolSettings(updatedPoolConfig));
+
+            assertEquals("Pool settings can only be changed before the pool is initialized", exception.getMessage());
+        } finally {
+            manager.shutdown();
+            System.clearProperty(PROFILE_PROPERTY);
+        }
+    }
+
     private static String invokeEffectiveJdbcUrl(String jdbcUrl, String profile, String explicitPassword) {
         return DatabaseManager.resolveJdbcUrl(jdbcUrl, profile, explicitPassword);
     }

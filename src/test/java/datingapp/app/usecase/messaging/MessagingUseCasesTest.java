@@ -99,6 +99,22 @@ class MessagingUseCasesTest {
     }
 
     @Test
+    @DisplayName("sendMessage succeeds even when post-persistence event publication fails")
+    void sendMessageSucceedsEvenWhenPostPersistenceEventPublicationFails() {
+        MessagingUseCases failingEventUseCases = new MessagingUseCases(
+                new ConnectionService(AppConfig.defaults(), communicationStorage, interactionStorage, userStorage),
+                new ThrowingEventBus());
+
+        var result = failingEventUseCases.sendMessage(
+                new SendMessageCommand(UserContext.cli(sender.getId()), recipient.getId(), "Hello there"));
+
+        assertTrue(result.success());
+        assertTrue(result.data().success());
+        assertNotNull(result.data().message());
+        assertTrue(communicationStorage.getMessage(result.data().message().id()).isPresent());
+    }
+
+    @Test
     @DisplayName("listConversations returns unread totals")
     void listConversationsIncludesUnreadTotal() {
         useCases.sendMessage(
@@ -163,6 +179,8 @@ class MessagingUseCasesTest {
         assertEquals("Conversation preview not found", result.error().message());
     }
 
+    @Test
+    @DisplayName("openConversation returns a preview for a newly created empty conversation")
     void openConversationReturnsPreviewForNewlyCreatedEmptyConversation() {
         var result = useCases.openConversation(
                 new MessagingUseCases.OpenConversationCommand(UserContext.cli(sender.getId()), recipient.getId()));
@@ -356,5 +374,24 @@ class MessagingUseCasesTest {
                 // Not needed for these tests.
             }
         };
+    }
+
+    private static final class ThrowingEventBus implements AppEventBus {
+
+        @Override
+        public void publish(AppEvent event) {
+            throw new RuntimeException("simulated event publication failure");
+        }
+
+        @Override
+        public <T extends AppEvent> void subscribe(Class<T> eventType, AppEventHandler<T> handler) {
+            throw new UnsupportedOperationException("stub");
+        }
+
+        @Override
+        public <T extends AppEvent> void subscribe(
+                Class<T> eventType, AppEventHandler<T> handler, HandlerPolicy policy) {
+            throw new UnsupportedOperationException("stub");
+        }
     }
 }

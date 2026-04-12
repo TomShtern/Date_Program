@@ -218,6 +218,28 @@ class JdbiUserStorageNormalizationTest {
     }
 
     @Test
+    @DisplayName("get preserves raw stored coordinates when hasLocationSet is false")
+    void getPreservesRawStoredCoordinatesWhenHasLocationSetIsFalse() {
+        UUID detachedId = UUID.randomUUID();
+        User detached = User.StorageBuilder.create(
+                        detachedId, "DetachedLocation", Instant.parse("2026-01-01T10:00:00Z"))
+                .birthDate(LocalDate.of(1990, 1, 1))
+                .gender(Gender.FEMALE)
+                .interestedIn(Set.of(Gender.MALE))
+                .rawLocation(32.0853, 34.7818, false)
+                .state(UserState.INCOMPLETE)
+                .updatedAt(Instant.parse("2026-01-01T10:00:00Z"))
+                .build();
+        storage.save(detached);
+
+        User loaded = storage.get(detachedId).orElseThrow();
+
+        assertTrue(!loaded.hasLocationSet());
+        assertEquals(32.0853, loaded.getLat());
+        assertEquals(34.7818, loaded.getLon());
+    }
+
+    @Test
     @DisplayName("findByIds batches normalized reads and preserves profile data")
     void findByIdsBatchesNormalizedReadsAndPreservesProfileData() {
         User first = createActiveUser(UUID.randomUUID(), "BatchOne", Gender.FEMALE, Set.of(Gender.MALE), true);

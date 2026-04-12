@@ -41,11 +41,15 @@ import java.util.Optional;
 import java.util.Scanner;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 /**
  * Unit tests for SafetyHandler CLI commands: blockUser(), reportUser(),
@@ -84,11 +88,11 @@ class SafetyHandlerTest {
 
     private SafetyHandler createHandler(String input, AppConfig config, SecureRandom random) {
         InputReader inputReader = new InputReader(new Scanner(new StringReader(input)));
-        TrustSafetyService trustSafetyService = createTrustSafetyService(config, random);
+        TrustSafetyService trustSafetyService = createTrustSafetyService(config);
         return new SafetyHandler(
-                new SocialUseCases(trustSafetyService),
+                SocialUseCases.forTrustSafetyOnly(trustSafetyService),
                 buildProfileUseCases(userStorage, config),
-                new VerificationUseCases(userStorage, trustSafetyService),
+                new VerificationUseCases(userStorage, random, VerificationUseCases.DEFAULT_VERIFICATION_TTL),
                 session,
                 inputReader,
                 config);
@@ -112,9 +116,8 @@ class SafetyHandlerTest {
                 new ProfileInsightsUseCases(TestAchievementService.empty(), TestActivityMetricsService.empty()));
     }
 
-    private TrustSafetyService createTrustSafetyService(AppConfig config, SecureRandom random) {
+    private TrustSafetyService createTrustSafetyService(AppConfig config) {
         return TrustSafetyService.builder(trustSafetyStorage, interactionStorage, userStorage, config)
-                .random(random)
                 .build();
     }
 
@@ -219,7 +222,7 @@ class SafetyHandlerTest {
             User otherUser = createActiveUser("UseCaseUser");
             userStorage.save(otherUser);
 
-            TrustSafetyService trustSafetyService = createTrustSafetyService(AppConfig.defaults(), new SecureRandom());
+            TrustSafetyService trustSafetyService = createTrustSafetyService(AppConfig.defaults());
             ProfileUseCases base = buildProfileUseCases(userStorage, AppConfig.defaults());
             ProfileUseCases profileUseCases =
                     new ProfileUseCases(
@@ -236,7 +239,7 @@ class SafetyHandlerTest {
                     };
 
             SafetyHandler handler = new SafetyHandler(
-                    new SocialUseCases(trustSafetyService),
+                    SocialUseCases.forTrustSafetyOnly(trustSafetyService),
                     profileUseCases,
                     new VerificationUseCases(userStorage, trustSafetyService),
                     session,
@@ -435,7 +438,7 @@ class SafetyHandlerTest {
             User blocked = createActiveUser("BlockedUser");
             userStorage.save(blocked);
 
-            TrustSafetyService trustSafetyService = createTrustSafetyService(AppConfig.defaults(), new SecureRandom());
+            TrustSafetyService trustSafetyService = createTrustSafetyService(AppConfig.defaults());
             RecordingSocialUseCases socialUseCases = new RecordingSocialUseCases(trustSafetyService, blocked);
             ProfileUseCases profileUseCases = buildProfileUseCases(userStorage, AppConfig.defaults());
 
@@ -475,13 +478,13 @@ class SafetyHandlerTest {
         @DisplayName("Verifies by email with correct code")
         void verifiesByEmailWithCorrectCode() {
             AppConfig config = AppConfig.defaults();
-            TrustSafetyService trustSafetyService = createTrustSafetyService(config, fixedVerificationRandom());
-            assertEquals("123456", trustSafetyService.generateVerificationCode());
+            TrustSafetyService trustSafetyService = createTrustSafetyService(config);
             ProfileUseCases profileUseCases = buildProfileUseCases(userStorage, config);
             SafetyHandler handler = new SafetyHandler(
-                    new SocialUseCases(trustSafetyService),
+                    SocialUseCases.forTrustSafetyOnly(trustSafetyService),
                     profileUseCases,
-                    new VerificationUseCases(userStorage, trustSafetyService),
+                    new VerificationUseCases(
+                            userStorage, fixedVerificationRandom(), VerificationUseCases.DEFAULT_VERIFICATION_TTL),
                     session,
                     new InputReader(new Scanner(new StringReader("1\ntest@example.com\n123456\n"))),
                     config);
@@ -505,31 +508,20 @@ class SafetyHandlerTest {
             assertFalse(testUser.isVerified());
         }
 
-        @Test
-        @DisplayName("Cancels verification (0)")
-        void cancelsVerification() {
-            SafetyHandler handler = createHandler("0\n");
+        @ParameterizedTest(name = "{0}")
+        @MethodSource("incompleteVerificationInputs")
+        void incompleteVerificationInputKeepsUserUnverified(String scenario, String input) {
+            SafetyHandler handler = createHandler(input);
             handler.verifyProfile();
 
             assertFalse(testUser.isVerified());
         }
 
-        @Test
-        @DisplayName("Requires email for email verification")
-        void requiresEmailForEmailVerification() {
-            SafetyHandler handler = createHandler("1\n\n");
-            handler.verifyProfile();
-
-            assertFalse(testUser.isVerified());
-        }
-
-        @Test
-        @DisplayName("Requires phone for phone verification")
-        void requiresPhoneForPhoneVerification() {
-            SafetyHandler handler = createHandler("2\n\n");
-            handler.verifyProfile();
-
-            assertFalse(testUser.isVerified());
+        private static Stream<Arguments> incompleteVerificationInputs() {
+            return Stream.of(
+                    Arguments.of("Cancels verification (0)", "0\n"),
+                    Arguments.of("Requires email for email verification", "1\n\n"),
+                    Arguments.of("Requires phone for phone verification", "2\n\n"));
         }
 
         @Test
@@ -547,14 +539,12 @@ class SafetyHandlerTest {
         @Test
         @DisplayName("verifyProfile delegates start and confirm to VerificationUseCases")
         void verifyProfileDelegatesStartAndConfirmToVerificationUseCases() {
-            TrustSafetyService trustSafetyService =
-                    createTrustSafetyService(AppConfig.defaults(), fixedVerificationRandom());
+            TrustSafetyService trustSafetyService = createTrustSafetyService(AppConfig.defaults());
             ProfileUseCases profileUseCases = buildProfileUseCases(userStorage, AppConfig.defaults());
-            RecordingVerificationUseCases verificationUseCases =
-                    new RecordingVerificationUseCases(userStorage, trustSafetyService);
+            RecordingVerificationUseCases verificationUseCases = new RecordingVerificationUseCases(userStorage);
 
             SafetyHandler handler = new SafetyHandler(
-                    new SocialUseCases(trustSafetyService),
+                    SocialUseCases.forTrustSafetyOnly(trustSafetyService),
                     profileUseCases,
                     verificationUseCases,
                     session,
@@ -573,8 +563,8 @@ class SafetyHandlerTest {
         private boolean startCalled;
         private boolean confirmCalled;
 
-        private RecordingVerificationUseCases(TestStorages.Users userStorage, TrustSafetyService trustSafetyService) {
-            super(userStorage, trustSafetyService);
+        private RecordingVerificationUseCases(TestStorages.Users userStorage) {
+            super(userStorage, fixedVerificationRandom(), VerificationUseCases.DEFAULT_VERIFICATION_TTL);
         }
 
         @Override
@@ -596,7 +586,15 @@ class SafetyHandlerTest {
         private boolean unblockUserCalled;
 
         private RecordingSocialUseCases(TrustSafetyService trustSafetyService, User blockedUser) {
-            super(trustSafetyService);
+            super(
+                    new datingapp.core.connection.ConnectionService(
+                            AppConfig.defaults(),
+                            new TestStorages.Communications(),
+                            new TestStorages.Interactions(),
+                            new TestStorages.Users()),
+                    trustSafetyService,
+                    new TestStorages.Communications(),
+                    new TestEventBus());
             this.blockedUser = blockedUser;
         }
 

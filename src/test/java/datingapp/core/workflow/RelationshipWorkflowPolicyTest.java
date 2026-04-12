@@ -194,42 +194,44 @@ class RelationshipWorkflowPolicyTest {
     }
 
     @Nested
-    @DisplayName("canSendMessage")
-    class CanSendMessage {
+    @DisplayName("evaluateMessageSend")
+    class EvaluateMessageSend {
 
         @Test
         @DisplayName("requires active sender")
-        void canSendMessageRequiresActiveSender() {
-            WorkflowDecision d = policy.canSendMessage(activeMatch(), null, TestUserFactory.createActiveUser("Bob"));
-            assertTrue(d.isDenied());
-            assertEquals("SENDER_NOT_ACTIVE", ((WorkflowDecision.Denied) d).reasonCode());
+        void evaluateMessageSendRequiresActiveSender() {
+            var decision = policy.evaluateMessageSend(activeMatch(), null, TestUserFactory.createActiveUser("Bob"));
+            assertTrue(!decision.allowed());
+            assertEquals(RelationshipWorkflowPolicy.MessageSendDeniedReason.SENDER_NOT_ACTIVE, decision.deniedReason());
         }
 
         @Test
         @DisplayName("requires active recipient")
-        void canSendMessageRequiresActiveRecipient() {
-            WorkflowDecision d = policy.canSendMessage(activeMatch(), TestUserFactory.createActiveUser("Alice"), null);
-            assertTrue(d.isDenied());
-            assertEquals("RECIPIENT_NOT_ACTIVE", ((WorkflowDecision.Denied) d).reasonCode());
+        void evaluateMessageSendRequiresActiveRecipient() {
+            var decision = policy.evaluateMessageSend(activeMatch(), TestUserFactory.createActiveUser("Alice"), null);
+            assertTrue(!decision.allowed());
+            assertEquals(
+                    RelationshipWorkflowPolicy.MessageSendDeniedReason.RECIPIENT_NOT_ACTIVE, decision.deniedReason());
         }
 
         @Test
         @DisplayName("requires messageable match")
-        void canSendMessageRequiresMessageableMatch() {
-            WorkflowDecision d = policy.canSendMessage(
+        void evaluateMessageSendRequiresMessageableMatch() {
+            var decision = policy.evaluateMessageSend(
                     blockedMatch(), TestUserFactory.createActiveUser("Alice"), TestUserFactory.createActiveUser("Bob"));
-            assertTrue(d.isDenied());
-            assertEquals("MATCH_NOT_MESSAGEABLE", ((WorkflowDecision.Denied) d).reasonCode());
+            assertTrue(!decision.allowed());
+            assertEquals(
+                    RelationshipWorkflowPolicy.MessageSendDeniedReason.MATCH_NOT_MESSAGEABLE, decision.deniedReason());
         }
 
         @Test
         @DisplayName("allowed when all conditions met")
-        void canSendMessageWhenAllConditionsMet() {
-            assertTrue(policy.canSendMessage(
+        void evaluateMessageSendAllowsValidMessages() {
+            assertTrue(policy.evaluateMessageSend(
                             activeMatch(),
                             TestUserFactory.createActiveUser("Alice"),
                             TestUserFactory.createActiveUser("Bob"))
-                    .isAllowed());
+                    .allowed());
         }
     }
 

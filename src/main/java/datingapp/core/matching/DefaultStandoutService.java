@@ -22,6 +22,8 @@ import java.util.UUID;
  */
 public final class DefaultStandoutService implements StandoutService {
 
+    private static final double UNKNOWN_DISTANCE_SCORE = 0.5;
+
     private final CompatibilityCalculator calculator;
     private final UserStorage userStorage;
     private final CandidateFinder candidateFinder;
@@ -112,7 +114,8 @@ public final class DefaultStandoutService implements StandoutService {
                     date,
                     i + 1,
                     scoredCandidate.score(),
-                    scoredCandidate.reason()));
+                    scoredCandidate.reason(),
+                    clock.instant()));
         }
 
         standoutStorage.saveStandouts(seeker.getId(), standouts, date);
@@ -120,15 +123,8 @@ public final class DefaultStandoutService implements StandoutService {
     }
 
     private ScoredCandidate scoreCandidate(User seeker, User candidate) {
-        double distanceKm;
-        if (seeker.hasLocationSet() && candidate.hasLocationSet()) {
-            distanceKm = GeoUtils.distanceKm(seeker.getLat(), seeker.getLon(), candidate.getLat(), candidate.getLon());
-        } else {
-            distanceKm = -1;
-        }
-        double distanceScore = distanceKm >= 0 && seeker.getMaxDistanceKm() > 0
-                ? Math.max(0, 1.0 - (distanceKm / seeker.getMaxDistanceKm()))
-                : 0.5;
+        double distanceKm = calculateDistanceKm(seeker, candidate);
+        double distanceScore = calculateDistanceScore(seeker, distanceKm);
 
         double ageScore = calculator.calculateAgeScore(seeker, candidate);
 
@@ -139,17 +135,32 @@ public final class DefaultStandoutService implements StandoutService {
         double completenessScore = profileService.calculate(candidate).score() / 100.0;
         double activityScore = calculator.calculateActivityScore(candidate);
 
-        double composite = distanceScore * config.algorithm().standoutDistanceWeight()
-                + ageScore * config.algorithm().standoutAgeWeight()
-                + interestScore * config.algorithm().standoutInterestWeight()
-                + lifestyleScore * config.algorithm().standoutLifestyleWeight()
-                + completenessScore * config.algorithm().standoutCompletenessWeight()
-                + activityScore * config.algorithm().standoutActivityWeight();
+        WeightedScore composite = WeightedScore.empty()
+                .add(distanceScore, config.algorithm().standoutDistanceWeight())
+                .add(ageScore, config.algorithm().standoutAgeWeight())
+                .add(interestScore, config.algorithm().standoutInterestWeight())
+                .add(lifestyleScore, config.algorithm().standoutLifestyleWeight())
+                .add(completenessScore, config.algorithm().standoutCompletenessWeight())
+                .add(activityScore, config.algorithm().standoutActivityWeight());
 
-        int score = (int) Math.round(composite * 100);
+        int score = (int) Math.round(composite.weightedSum() * 100);
         String reason = generateStandoutReason(seeker, candidate, interests, distanceKm, lifestyleScore);
 
         return new ScoredCandidate(candidate, score, reason);
+    }
+
+    private double calculateDistanceKm(User seeker, User candidate) {
+        if (!seeker.hasLocationSet() || !candidate.hasLocationSet()) {
+            return -1;
+        }
+        return GeoUtils.distanceKm(seeker.getLat(), seeker.getLon(), candidate.getLat(), candidate.getLon());
+    }
+
+    private double calculateDistanceScore(User seeker, double distanceKm) {
+        if (distanceKm < 0 || seeker.getMaxDistanceKm() <= 0) {
+            return UNKNOWN_DISTANCE_SCORE;
+        }
+        return calculator.calculateDistanceScore(distanceKm, seeker.getMaxDistanceKm());
     }
 
     private String generateStandoutReason(

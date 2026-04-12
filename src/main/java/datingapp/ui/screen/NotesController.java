@@ -101,7 +101,7 @@ public class NotesController extends BaseController implements Initializable {
     }
 
     protected void navigateToMatching(UUID userId) {
-        NavigationService navigationService = NavigationService.getInstance();
+        NavigationService navigationService = navigationService();
         navigationService.setNavigationContext(NavigationService.ViewType.MATCHING, userId);
         navigationService.navigateTo(NavigationService.ViewType.MATCHING);
     }

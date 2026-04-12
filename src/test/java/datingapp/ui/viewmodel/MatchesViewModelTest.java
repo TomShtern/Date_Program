@@ -133,7 +133,7 @@ class MatchesViewModelTest {
         TrustSafetyService trustSafetyService = TrustSafetyService.builder(
                         trustSafetyStorage, interactions, users, config, communications)
                 .build();
-        socialUseCases = new datingapp.app.usecase.social.SocialUseCases(
+        socialUseCases = datingapp.app.usecase.social.SocialUseCases.forWorkflowAccess(
                 new ConnectionService(config, communications, interactions, users), trustSafetyService, communications);
 
         viewModel = new MatchesViewModel(

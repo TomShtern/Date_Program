@@ -15,6 +15,41 @@ import java.util.Set;
  */
 public final class RelationshipWorkflowPolicy {
 
+    public enum MessageSendDeniedReason {
+        SENDER_NOT_ACTIVE("Sender must be an active user"),
+        RECIPIENT_NOT_ACTIVE("Recipient must be an active user"),
+        MATCH_NOT_MESSAGEABLE("Match does not allow messaging");
+
+        private final String message;
+
+        MessageSendDeniedReason(String message) {
+            this.message = message;
+        }
+
+        public String message() {
+            return message;
+        }
+    }
+
+    public static record MessageSendDecision(boolean allowed, MessageSendDeniedReason deniedReason) {
+        public MessageSendDecision {
+            if (allowed && deniedReason != null) {
+                throw new IllegalArgumentException("deniedReason must be null when allowed");
+            }
+            if (!allowed && deniedReason == null) {
+                throw new IllegalArgumentException("deniedReason is required when denied");
+            }
+        }
+
+        public static MessageSendDecision allow() {
+            return new MessageSendDecision(true, null);
+        }
+
+        public static MessageSendDecision deny(MessageSendDeniedReason deniedReason) {
+            return new MessageSendDecision(false, deniedReason);
+        }
+    }
+
     private static final Map<MatchState, Set<MatchState>> ALLOWED_TRANSITIONS = Map.of(
             MatchState.ACTIVE,
                     Set.of(MatchState.FRIENDS, MatchState.UNMATCHED, MatchState.GRACEFUL_EXIT, MatchState.BLOCKED),
@@ -61,17 +96,17 @@ public final class RelationshipWorkflowPolicy {
         return canTransition(match, MatchState.BLOCKED);
     }
 
-    public WorkflowDecision canSendMessage(Match match, User sender, User recipient) {
+    public MessageSendDecision evaluateMessageSend(Match match, User sender, User recipient) {
         if (sender == null || sender.getState() != UserState.ACTIVE) {
-            return WorkflowDecision.deny("SENDER_NOT_ACTIVE", "Sender must be an active user");
+            return MessageSendDecision.deny(MessageSendDeniedReason.SENDER_NOT_ACTIVE);
         }
         if (recipient == null || recipient.getState() != UserState.ACTIVE) {
-            return WorkflowDecision.deny("RECIPIENT_NOT_ACTIVE", "Recipient must be an active user");
+            return MessageSendDecision.deny(MessageSendDeniedReason.RECIPIENT_NOT_ACTIVE);
         }
         if (match == null || !match.canMessage()) {
-            return WorkflowDecision.deny("MATCH_NOT_MESSAGEABLE", "Match does not allow messaging");
+            return MessageSendDecision.deny(MessageSendDeniedReason.MATCH_NOT_MESSAGEABLE);
         }
-        return WorkflowDecision.allow();
+        return MessageSendDecision.allow();
     }
 
     /** Returns the set of states reachable from the given state. */

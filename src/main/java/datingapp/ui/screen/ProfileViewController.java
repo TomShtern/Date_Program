@@ -57,7 +57,7 @@ public final class ProfileViewController extends BaseController implements Initi
         addSubscription(viewModel.currentPhotoUrlProperty().subscribe(this::updatePhoto));
         addSubscription(viewModel.currentPhotoIndexProperty().subscribe(_ -> updatePhotoIndicator()));
 
-        UUID targetUserId = NavigationService.getInstance()
+        UUID targetUserId = navigationService()
                 .consumeNavigationContext(NavigationService.ViewType.PROFILE_VIEW, UUID.class)
                 .orElse(null);
         viewModel.loadUser(targetUserId);

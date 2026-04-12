@@ -267,7 +267,7 @@ public class MatchQualityService {
         Optional<Integer> themAge = them.getAge(config.safety().userTimeZone());
         boolean comparableAge = meAge.isPresent() && themAge.isPresent();
         int ageDiff = comparableAge ? Math.abs(meAge.get() - themAge.get()) : 0;
-        double ageScore = comparableAge ? calculator.calculateAgeScore(me, them) : 0.5;
+        double ageScore = comparableAge ? calculator.calculateAgeScore(me, them, meAge, themAge) : 0.5;
 
         InterestMatcher.MatchResult interestMatch = InterestMatcher.compare(me.getInterests(), them.getInterests());
         double interestScore = calculator.calculateInterestScore(me, them);
@@ -310,22 +310,15 @@ public class MatchQualityService {
     }
 
     private int calculateCompatibilityScore(MatchComputation computation) {
-        double totalWeight = config.matching().distanceWeight()
-                + config.matching().ageWeight()
-                + config.matching().interestWeight()
-                + config.matching().lifestyleWeight()
-                + config.matching().paceWeight()
-                + config.matching().responseWeight();
+        WeightedScore weightedScore = WeightedScore.empty()
+                .add(computation.distanceScore(), config.matching().distanceWeight())
+                .add(computation.ageScore(), config.matching().ageWeight())
+                .add(computation.interestScore(), config.matching().interestWeight())
+                .add(computation.lifestyleScore(), config.matching().lifestyleWeight())
+                .add(computation.paceScore(), config.matching().paceWeight())
+                .add(computation.responseScore(), config.matching().responseWeight());
 
-        double weightedScore = computation.distanceScore() * config.matching().distanceWeight()
-                + computation.ageScore() * config.matching().ageWeight()
-                + computation.interestScore() * config.matching().interestWeight()
-                + computation.lifestyleScore() * config.matching().lifestyleWeight()
-                + computation.paceScore() * config.matching().paceWeight()
-                + computation.responseScore() * config.matching().responseWeight();
-
-        double normalizedScore = totalWeight > 0 ? (weightedScore / totalWeight) : 0.0;
-        return (int) Math.round(normalizedScore * 100);
+        return (int) Math.round(weightedScore.normalized() * 100);
     }
 
     // === Score Calculation Methods ===

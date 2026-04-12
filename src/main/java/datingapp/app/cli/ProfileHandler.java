@@ -43,9 +43,9 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.Set;
 import java.util.UUID;
-import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -118,7 +118,7 @@ public class ProfileHandler implements LoggingSupport {
             User currentUser = session.getCurrentUser();
             logInfo("\n" + I18n.text("cli.profile.complete.header", currentUser.getName()) + "\n");
 
-            User draft = copyForProfileEditing(currentUser);
+            User draft = currentUser.copy();
 
             promptBio(draft);
             promptBirthDate(draft);
@@ -149,10 +149,6 @@ public class ProfileHandler implements LoggingSupport {
             logInfo(I18n.text("cli.profile.complete.saved") + "\n");
             displayNewAchievements(saveResult.data().newlyUnlocked());
         });
-    }
-
-    private static User copyForProfileEditing(User source) {
-        return source.copy();
     }
 
     /**
@@ -442,27 +438,14 @@ public class ProfileHandler implements LoggingSupport {
         for (String rawToken : input.split("[,\\s]+")) {
             String token = rawToken.trim();
             if (!token.isEmpty()) {
-                Integer idx = parseInterestIndex(token, options.size());
-                if (idx != null) {
-                    toggleInterestSelection(interestSet, options.get(idx));
+                OptionalInt selectedIndex = CliTextAndInput.parseOneBasedIndex(token, options.size());
+                if (selectedIndex.isPresent()) {
+                    toggleInterestSelection(interestSet, options.get(selectedIndex.getAsInt()));
+                } else {
+                    logDebug("Invalid interest selection: {}", token);
+                    logInfo("⚠️  Invalid selection: {}", token);
                 }
             }
-        }
-    }
-
-    @Nullable
-    private Integer parseInterestIndex(String token, int size) {
-        try {
-            int idx = Integer.parseInt(token) - 1;
-            if (idx < 0 || idx >= size) {
-                logInfo("⚠️  Invalid selection: {}", token);
-                return null;
-            }
-            return idx;
-        } catch (NumberFormatException ex) {
-            logDebug("Invalid interest selection: {}", ex.getMessage());
-            logInfo("⚠️  Invalid selection: {}", token);
-            return null;
         }
     }
 
@@ -511,22 +494,17 @@ public class ProfileHandler implements LoggingSupport {
         if (input.isBlank()) {
             return defaultCountry;
         }
-        try {
-            int selectedIndex = Integer.parseInt(input) - 1;
-            if (selectedIndex < 0 || selectedIndex >= countries.size()) {
-                logInfo("⚠️  Invalid selection. Using {}.", defaultCountry.displayName());
-                return defaultCountry;
-            }
-            Country selectedCountry = countries.get(selectedIndex);
-            if (!selectedCountry.available()) {
-                logInfo("⚠️  {} is coming soon. Using {}.", selectedCountry.name(), defaultCountry.displayName());
-                return defaultCountry;
-            }
-            return selectedCountry;
-        } catch (NumberFormatException _) {
+        OptionalInt selectedIndex = CliTextAndInput.parseOneBasedIndex(input, countries.size());
+        if (selectedIndex.isEmpty()) {
             logInfo("⚠️  Invalid selection. Using {}.", defaultCountry.displayName());
             return defaultCountry;
         }
+        Country selectedCountry = countries.get(selectedIndex.getAsInt());
+        if (!selectedCountry.available()) {
+            logInfo("⚠️  {} is coming soon. Using {}.", selectedCountry.name(), defaultCountry.displayName());
+            return defaultCountry;
+        }
+        return selectedCountry;
     }
 
     private Optional<ResolvedLocation> promptCitySelection(String countryCode) {
@@ -554,20 +532,15 @@ public class ProfileHandler implements LoggingSupport {
         }
         String selection =
                 inputReader.readLine("Choose city number (or 0 to use ZIP): ").trim();
-        try {
-            int selectedIndex = Integer.parseInt(selection) - 1;
-            if (selectedIndex == -1) {
-                return Optional.empty();
-            }
-            if (selectedIndex < 0 || selectedIndex >= results.size()) {
-                logInfo("⚠️  Invalid city selection. Try ZIP instead.");
-                return Optional.empty();
-            }
-            return Optional.of(locationService.resolveCity(results.get(selectedIndex)));
-        } catch (NumberFormatException _) {
+        if (CliTextAndInput.isZeroSelection(selection)) {
+            return Optional.empty();
+        }
+        OptionalInt selectedIndex = CliTextAndInput.parseOneBasedIndex(selection, results.size());
+        if (selectedIndex.isEmpty()) {
             logInfo("⚠️  Invalid city selection. Try ZIP instead.");
             return Optional.empty();
         }
+        return Optional.of(locationService.resolveCity(results.get(selectedIndex.getAsInt())));
     }
 
     private Optional<ResolvedLocation> promptZipSelection(String countryCode) {
@@ -1037,18 +1010,14 @@ public class ProfileHandler implements LoggingSupport {
     private void handleNoteSelection(List<ProfileNote> notes) {
         String input = inputReader.readLine("Choice: ");
 
-        try {
-            int idx = Integer.parseInt(input) - 1;
-            if (idx >= 0 && idx < notes.size()) {
-                ProfileNote note = notes.get(idx);
-                var subjectResult = profileUseCases.getUserById(note.subjectId());
-                String subjectName =
-                        subjectResult.success() ? subjectResult.data().getName() : "this user";
-                manageNoteFor(note.subjectId(), subjectName);
-            }
-        } catch (NumberFormatException e) {
-            logTrace("Non-numeric input for note selection: {}", e.getMessage());
-            // Back to menu - user entered non-numeric input
+        OptionalInt selectedIndex = CliTextAndInput.parseOneBasedIndex(input, notes.size());
+        if (selectedIndex.isPresent()) {
+            ProfileNote note = notes.get(selectedIndex.getAsInt());
+            var subjectResult = profileUseCases.getUserById(note.subjectId());
+            String subjectName = subjectResult.success() ? subjectResult.data().getName() : "this user";
+            manageNoteFor(note.subjectId(), subjectName);
+        } else if (!CliTextAndInput.isZeroSelection(input)) {
+            logTrace("Non-numeric input for note selection: {}", input);
         }
     }
 
@@ -1170,26 +1139,23 @@ public class ProfileHandler implements LoggingSupport {
         }
 
         String input = inputReader.readLine("\nSelect user number (or 0 to cancel): ");
-        try {
-            int idx = Integer.parseInt(input) - 1;
-            if (idx < 0 || idx >= users.size()) {
-                if (idx != -1) {
-                    logInfo("\n❌ Invalid selection.\n");
-                }
-                return;
-            }
-
-            User selected = users.get(idx);
-            var selectedUserResult = profileUseCases.getUserById(selected.getId());
-            if (!selectedUserResult.success()) {
-                logInfo(ERROR_WITH_GAP_FORMAT, selectedUserResult.error().message());
-                return;
-            }
-            session.setCurrentUser(selectedUserResult.data());
-            logInfo("\n✅ Selected: {}\n", session.getCurrentUser().getName());
-        } catch (NumberFormatException _) {
-            logInfo("❌ Invalid input.\n");
+        if (CliTextAndInput.isZeroSelection(input)) {
+            return;
         }
+        OptionalInt selectedIndex = CliTextAndInput.parseOneBasedIndex(input, users.size());
+        if (selectedIndex.isEmpty()) {
+            logInfo("❌ Invalid input.\n");
+            return;
+        }
+
+        User selected = users.get(selectedIndex.getAsInt());
+        var selectedUserResult = profileUseCases.getUserById(selected.getId());
+        if (!selectedUserResult.success()) {
+            logInfo(ERROR_WITH_GAP_FORMAT, selectedUserResult.error().message());
+            return;
+        }
+        session.setCurrentUser(selectedUserResult.data());
+        logInfo("\n✅ Selected: {}\n", session.getCurrentUser().getName());
     }
 
     private static String normalizeName(String name) {

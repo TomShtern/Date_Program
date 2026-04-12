@@ -25,6 +25,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class MatchingService {
 
     private static final String LIKE_REQUIRED = "like cannot be null";
+    private static final String MATCH_REQUIRED = "match cannot be null";
     private static final String BLOCKED_SWIPE_MESSAGE = "Cannot swipe on a blocked user.";
     private static final Object IN_FLIGHT_SENTINEL = new Object();
 
@@ -133,47 +134,56 @@ public final class MatchingService {
     }
 
     /**
-     * Records a like action and checks for mutual match. If session tracking is
-     * enabled, also updates
-     * the user's session.
+     * Records a like action and checks for mutual match.
      *
      * @param like The like to record
-     * @return The created Match if mutual like exists, empty otherwise
+     * @return the primitive persistence outcome for the like attempt
      */
-    public Optional<Match> recordLike(Like like) {
+    public RecordLikeOutcome recordLike(Like like) {
         Objects.requireNonNull(like, LIKE_REQUIRED);
-        final InteractionStorage.LikeMatchWriteResult[] resultHolder = new InteractionStorage.LikeMatchWriteResult[1];
+        final RecordLikeOutcome[] resultHolder = new RecordLikeOutcome[1];
         userStorage.executeWithUserLock(
-                like.whoLikes(), () -> storeWriteResult(resultHolder, recordLikeWithinLock(like)));
-        return resultHolder[0].createdMatch();
+                like.whoLikes(), () -> storeRecordLikeOutcome(resultHolder, recordLikeWithinLock(like)));
+        RecordLikeOutcome outcome = resultHolder[0];
+        if (outcome.persisted()) {
+            invalidateCandidateCaches(like.whoLikes(), like.whoGotLiked());
+        }
+        return outcome;
     }
 
-    private InteractionStorage.LikeMatchWriteResult recordLikeWithinLock(Like like) {
-        if (!isDirectLikeAllowed(like)) {
-            return InteractionStorage.LikeMatchWriteResult.duplicateLike();
+    private RecordLikeOutcome recordLikeWithinLock(Like like) {
+        Optional<String> eligibilityError = validateRecordLikeEligibility(like);
+        if (eligibilityError.isPresent()) {
+            return RecordLikeOutcome.rejected(eligibilityError.orElseThrow());
         }
-        return persistLikeAndMaybeCreateMatch(like);
+        InteractionStorage.LikeMatchWriteResult writeResult = persistLikeAndMaybeCreateMatch(like);
+        if (!writeResult.likePersisted()) {
+            Like persistedLike = interactionStorage
+                    .getLike(like.whoLikes(), like.whoGotLiked())
+                    .orElseThrow(() -> new IllegalStateException("Duplicate like was not found in storage"));
+            return RecordLikeOutcome.duplicate(persistedLike);
+        }
+        return RecordLikeOutcome.persisted(like, writeResult.createdMatch());
     }
 
     private InteractionStorage.LikeMatchWriteResult persistLikeAndMaybeCreateMatch(Like like) {
-        InteractionStorage.LikeMatchWriteResult writeResult = interactionStorage.saveLikeAndMaybeCreateMatch(like);
-        if (writeResult.likePersisted()) {
-            boolean matched = writeResult.createdMatch().isPresent();
-            activityMetricsService.ifPresent(svc -> svc.recordSwipe(like.whoLikes(), like.direction(), matched));
-            invalidateCandidateCaches(like.whoLikes(), like.whoGotLiked());
-        }
-        return writeResult;
+        return interactionStorage.saveLikeAndMaybeCreateMatch(like);
     }
 
-    private boolean isDirectLikeAllowed(Like like) {
-        if (validatePersistedSwipeEligibility(like.whoLikes(), like.whoGotLiked())
-                .isPresent()) {
-            return false;
+    private Optional<String> validateRecordLikeEligibility(Like like) {
+        Optional<String> eligibilityError = validatePersistedSwipeEligibility(like.whoLikes(), like.whoGotLiked());
+        if (eligibilityError.isPresent()) {
+            return eligibilityError;
         }
         return switch (like.direction()) {
-            case LIKE -> dailyService.canLike(like.whoLikes());
-            case SUPER_LIKE -> dailyService.canSuperLike(like.whoLikes());
-            case PASS -> dailyService.canPass(like.whoLikes());
+            case LIKE ->
+                dailyService.canLike(like.whoLikes()) ? Optional.empty() : Optional.of("Daily like limit reached.");
+            case SUPER_LIKE ->
+                dailyService.canSuperLike(like.whoLikes())
+                        ? Optional.empty()
+                        : Optional.of("Daily super-like limit reached.");
+            case PASS ->
+                dailyService.canPass(like.whoLikes()) ? Optional.empty() : Optional.of("Daily pass limit reached.");
         };
     }
 
@@ -251,8 +261,7 @@ public final class MatchingService {
         }
     }
 
-    private static void storeWriteResult(
-            InteractionStorage.LikeMatchWriteResult[] resultHolder, InteractionStorage.LikeMatchWriteResult result) {
+    private static void storeRecordLikeOutcome(RecordLikeOutcome[] resultHolder, RecordLikeOutcome result) {
         resultHolder[0] = result;
     }
 
@@ -287,6 +296,7 @@ public final class MatchingService {
         }
 
         Optional<Match> match = writeResult.createdMatch();
+        // Keep undo state inside the user lock so the most recent swipe remains serialized per user.
         undoService.recordSwipe(currentUser.getId(), like, match.orElse(null));
 
         if (match.isPresent()) {
@@ -425,6 +435,49 @@ public final class MatchingService {
     }
 
     /**
+     * Outcome of the primitive recordLike path.
+     *
+     * <p>The like is present for persisted writes and idempotent duplicate reads;
+     * it is empty only when the request was rejected before persistence.
+     */
+    public static record RecordLikeOutcome(
+            boolean persisted, Optional<Like> like, Optional<Match> match, Optional<String> rejectionMessage) {
+        public RecordLikeOutcome {
+            Objects.requireNonNull(like, LIKE_REQUIRED);
+            Objects.requireNonNull(match, MATCH_REQUIRED);
+            Objects.requireNonNull(rejectionMessage, "rejectionMessage cannot be null");
+        }
+
+        public static RecordLikeOutcome persisted(Like like, Optional<Match> match) {
+            return new RecordLikeOutcome(
+                    true,
+                    Optional.of(Objects.requireNonNull(like, LIKE_REQUIRED)),
+                    Objects.requireNonNull(match, MATCH_REQUIRED),
+                    Optional.empty());
+        }
+
+        public static RecordLikeOutcome duplicate(Like like) {
+            return new RecordLikeOutcome(
+                    false,
+                    Optional.of(Objects.requireNonNull(like, LIKE_REQUIRED)),
+                    Optional.empty(),
+                    Optional.empty());
+        }
+
+        public static RecordLikeOutcome rejected(String message) {
+            return new RecordLikeOutcome(
+                    false,
+                    Optional.empty(),
+                    Optional.empty(),
+                    Optional.of(Objects.requireNonNull(message, "message cannot be null")));
+        }
+
+        public boolean rejected() {
+            return rejectionMessage.isPresent();
+        }
+    }
+
+    /**
      * Result of a swipe action containing success status, match information, and
      * user-friendly message.
      */
@@ -434,7 +487,7 @@ public final class MatchingService {
         }
 
         public static SwipeResult matched(Match m, Like l) {
-            Objects.requireNonNull(m, "match cannot be null");
+            Objects.requireNonNull(m, MATCH_REQUIRED);
             Objects.requireNonNull(l, LIKE_REQUIRED);
             return new SwipeResult(true, true, m, l, "It's a match!");
         }

@@ -6,13 +6,20 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import datingapp.app.event.AppEvent.SwipeRecorded;
+import datingapp.app.event.InProcessAppEventBus;
+import datingapp.app.event.handlers.MetricsEventHandler;
 import datingapp.app.testutil.TestEventBus;
+import datingapp.app.usecase.common.UseCaseError;
 import datingapp.app.usecase.common.UserContext;
+import datingapp.app.usecase.matching.MatchingUseCases.ArchiveMatchCommand;
 import datingapp.app.usecase.matching.MatchingUseCases.BrowseCandidatesCommand;
+import datingapp.app.usecase.matching.MatchingUseCases.DailyStatusQuery;
 import datingapp.app.usecase.matching.MatchingUseCases.ListActiveMatchesQuery;
 import datingapp.app.usecase.matching.MatchingUseCases.ListPagedMatchesQuery;
 import datingapp.app.usecase.matching.MatchingUseCases.ProcessSwipeCommand;
 import datingapp.app.usecase.matching.MatchingUseCases.RemoveLikeCommand;
+import datingapp.app.usecase.matching.MatchingUseCases.StandoutsQuery;
 import datingapp.app.usecase.matching.MatchingUseCases.UndoSwipeCommand;
 import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
@@ -26,6 +33,7 @@ import datingapp.core.matching.RecommendationService;
 import datingapp.core.matching.Standout;
 import datingapp.core.matching.StandoutService;
 import datingapp.core.matching.UndoService;
+import datingapp.core.metrics.ActivityMetricsService;
 import datingapp.core.model.Match;
 import datingapp.core.model.User;
 import datingapp.core.model.User.UserState;
@@ -38,6 +46,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -56,6 +65,7 @@ class MatchingUseCasesTest {
     private MatchingService matchingService;
     private MatchQualityService matchQualityService;
     private MatchingUseCases useCases;
+    private TestEventBus eventBus;
     private User currentUser;
     private User candidate;
 
@@ -95,6 +105,7 @@ class MatchingUseCasesTest {
                 .candidateFinder(candidateFinder)
                 .build();
 
+        eventBus = new TestEventBus();
         useCases = new MatchingUseCases(
                 candidateFinder,
                 matchingService,
@@ -105,7 +116,7 @@ class MatchingUseCasesTest {
                 interactionStorage,
                 userStorage,
                 matchQualityService,
-                new TestEventBus(),
+                eventBus,
                 recommendationService);
     }
 
@@ -244,6 +255,138 @@ class MatchingUseCasesTest {
         assertTrue(interactionStorage
                 .getLike(currentUser.getId(), candidate.getId())
                 .isEmpty());
+    }
+
+    @Test
+    @DisplayName("recordLike rejects blocked users without publishing SwipeRecorded")
+    void recordLikeRejectsBlockedUsersWithoutPublishingSwipeRecorded() {
+        trustSafetyStorage.save(
+                datingapp.core.connection.ConnectionModels.Block.create(currentUser.getId(), candidate.getId()));
+
+        var result = useCases.recordLike(new MatchingUseCases.RecordLikeCommand(
+                UserContext.cli(currentUser.getId()), candidate.getId(), Like.Direction.LIKE, true));
+
+        assertFalse(result.success());
+        assertEquals(UseCaseError.Code.CONFLICT, result.error().code());
+        assertTrue(eventBus.publishedEventsOfType(SwipeRecorded.class).isEmpty());
+        assertTrue(interactionStorage
+                .getLike(currentUser.getId(), candidate.getId())
+                .isEmpty());
+    }
+
+    @Test
+    @DisplayName("duplicate recordLike keeps the persisted like and does not republish SwipeRecorded")
+    void duplicateRecordLikeKeepsPersistedLikeAndDoesNotRepublishSwipeRecorded() {
+        var firstLike = useCases.recordLike(new MatchingUseCases.RecordLikeCommand(
+                UserContext.cli(currentUser.getId()), candidate.getId(), Like.Direction.LIKE, true));
+        assertTrue(firstLike.success());
+        assertTrue(firstLike.data().match().isEmpty());
+        assertEquals(1, eventBus.publishedEventsOfType(SwipeRecorded.class).size());
+
+        var duplicateLike = useCases.recordLike(new MatchingUseCases.RecordLikeCommand(
+                UserContext.cli(currentUser.getId()), candidate.getId(), Like.Direction.LIKE, true));
+
+        assertTrue(duplicateLike.success());
+        assertEquals(firstLike.data().like().id(), duplicateLike.data().like().id());
+        assertEquals(
+                interactionStorage
+                        .getLike(currentUser.getId(), candidate.getId())
+                        .orElseThrow()
+                        .id(),
+                duplicateLike.data().like().id());
+        assertEquals(1, eventBus.publishedEventsOfType(SwipeRecorded.class).size());
+    }
+
+    @Test
+    @DisplayName("recordLike records swipe metrics exactly once when the metrics handler is registered")
+    void recordLikeRecordsSwipeMetricsExactlyOnceWhenMetricsHandlerIsRegistered() {
+        ActivityMetricsService metricsService = new ActivityMetricsService(
+                interactionStorage, trustSafetyStorage, new TestStorages.Analytics(), AppConfig.defaults());
+        InProcessAppEventBus metricsEventBus = new InProcessAppEventBus();
+        new MetricsEventHandler(metricsService).register(metricsEventBus);
+
+        RecommendationService recommendationService =
+                new RecommendationService(dailyLimitService, dailyPickService, standoutService);
+        MatchingService localMatchingService = MatchingService.builder()
+                .interactionStorage(interactionStorage)
+                .trustSafetyStorage(trustSafetyStorage)
+                .userStorage(userStorage)
+                .activityMetricsService(metricsService)
+                .undoService(undoService)
+                .dailyService(recommendationService)
+                .candidateFinder(candidateFinder)
+                .build();
+        MatchingUseCases localUseCases = new MatchingUseCases(
+                candidateFinder,
+                localMatchingService,
+                dailyLimitService,
+                dailyPickService,
+                standoutService,
+                undoService,
+                interactionStorage,
+                userStorage,
+                matchQualityService,
+                metricsEventBus,
+                recommendationService);
+
+        var result = localUseCases.recordLike(new MatchingUseCases.RecordLikeCommand(
+                UserContext.cli(currentUser.getId()), candidate.getId(), Like.Direction.LIKE, true));
+
+        assertTrue(result.success());
+        assertEquals(
+                1,
+                metricsService
+                        .getCurrentSession(currentUser.getId())
+                        .orElseThrow()
+                        .getSwipeCount());
+    }
+
+    @Test
+    @DisplayName("processSwipe does not mark the daily pick viewed when the swipe fails")
+    void processSwipeDoesNotMarkDailyPickViewedWhenSwipeFails() {
+        AtomicInteger markDailyPickViewedCount = new AtomicInteger();
+        DailyPickService trackingDailyPickService = new DailyPickService() {
+            @Override
+            public Optional<DailyPick> getDailyPick(User seeker) {
+                return Optional.empty();
+            }
+
+            @Override
+            public boolean hasViewedDailyPick(UUID userId) {
+                return false;
+            }
+
+            @Override
+            public void markDailyPickViewed(UUID userId) {
+                markDailyPickViewedCount.incrementAndGet();
+            }
+
+            @Override
+            public int cleanupOldDailyPickViews(java.time.LocalDate before) {
+                return 0;
+            }
+        };
+        MatchingUseCases trackingUseCases = new MatchingUseCases(
+                candidateFinder,
+                matchingService,
+                dailyLimitService,
+                trackingDailyPickService,
+                standoutService,
+                undoService,
+                interactionStorage,
+                userStorage,
+                matchQualityService,
+                eventBus,
+                new RecommendationService(dailyLimitService, trackingDailyPickService, standoutService));
+
+        trustSafetyStorage.save(
+                datingapp.core.connection.ConnectionModels.Block.create(currentUser.getId(), candidate.getId()));
+
+        var result = trackingUseCases.processSwipe(new ProcessSwipeCommand(
+                UserContext.cli(currentUser.getId()), currentUser, candidate, true, false, true));
+
+        assertFalse(result.success());
+        assertEquals(0, markDailyPickViewedCount.get());
     }
 
     @Test
@@ -414,6 +557,158 @@ class MatchingUseCasesTest {
         assertEquals(1, result.data().page().items().size());
         assertEquals(1, result.data().page().totalCount());
         assertTrue(result.data().usersById().containsKey(candidate.getId()));
+    }
+
+    @Test
+    @DisplayName("builder preserves explicit seam overrides regardless of recommendationService setter order")
+    void builderPreservesExplicitSeamOverridesRegardlessOfRecommendationServiceSetterOrder() {
+        DailyLimitService explicitDailyLimitService = dailyLimitServiceWithDistinctStatus(2, 8, Duration.ofHours(2));
+        DailyPickService explicitDailyPickService = dailyPickServiceWithDistinctPick("explicit-daily-pick", true);
+        StandoutService explicitStandoutService = standoutServiceWithDistinctMessage("explicit-standouts");
+        RecommendationService recommendationService = new RecommendationService(
+                dailyLimitServiceWithDistinctStatus(9, 1, Duration.ofMinutes(45)),
+                dailyPickServiceWithDistinctPick("wrapper-daily-pick", false),
+                standoutServiceWithDistinctMessage("wrapper-standouts"));
+
+        assertExplicitSeamsAreUsed(buildMatchingUseCases(
+                true,
+                recommendationService,
+                explicitDailyLimitService,
+                explicitDailyPickService,
+                explicitStandoutService));
+        assertExplicitSeamsAreUsed(buildMatchingUseCases(
+                false,
+                recommendationService,
+                explicitDailyLimitService,
+                explicitDailyPickService,
+                explicitStandoutService));
+    }
+
+    @Test
+    @DisplayName("getDailyStatus honors the configured dailyLimitService seam")
+    void getDailyStatusHonorsTheConfiguredDailyLimitServiceSeam() {
+        DailyLimitService explicitDailyLimitService = dailyLimitServiceWithDistinctStatus(3, 7, Duration.ofHours(3));
+        RecommendationService failingRecommendationService = new RecommendationService(
+                new DailyLimitService() {
+                    @Override
+                    public boolean canLike(UUID userId) {
+                        return true;
+                    }
+
+                    @Override
+                    public boolean canSuperLike(UUID userId) {
+                        return true;
+                    }
+
+                    @Override
+                    public boolean canPass(UUID userId) {
+                        return true;
+                    }
+
+                    @Override
+                    public DailyStatus getStatus(UUID userId) {
+                        throw new AssertionError("recommendationService status should not be queried");
+                    }
+
+                    @Override
+                    public Duration getTimeUntilReset() {
+                        throw new AssertionError("recommendationService reset time should not be queried");
+                    }
+                },
+                noDailyPickService(),
+                noStandoutService());
+
+        MatchingUseCases localUseCases = buildMatchingUseCases(
+                true,
+                failingRecommendationService,
+                explicitDailyLimitService,
+                noDailyPickService(),
+                noStandoutService());
+
+        var result = localUseCases.getDailyStatus(new DailyStatusQuery(UserContext.cli(currentUser.getId())));
+
+        assertTrue(result.success());
+        assertEquals(3, result.data().likesUsed());
+        assertEquals(7, result.data().likesRemaining());
+        assertFalse(result.data().hasUnlimitedLikes());
+        assertEquals("03:00:00", result.data().timeUntilReset());
+    }
+
+    @Test
+    @DisplayName("archiveMatch preserves the match and removes it from active-match queries")
+    void archiveMatchPreservesTheMatchAndRemovesItFromActiveMatchQueries() {
+        Match match = Match.create(currentUser.getId(), candidate.getId());
+        interactionStorage.save(match);
+
+        var result =
+                useCases.archiveMatch(new ArchiveMatchCommand(UserContext.cli(currentUser.getId()), match.getId()));
+
+        assertTrue(result.success());
+
+        Match archivedMatch = interactionStorage.get(match.getId()).orElseThrow();
+        assertEquals(Match.MatchState.UNMATCHED, archivedMatch.getState());
+        assertEquals(Match.MatchArchiveReason.UNMATCH, archivedMatch.getEndReason());
+        assertFalse(archivedMatch.isDeleted());
+        assertEquals(1, interactionStorage.countMatchesFor(currentUser.getId()));
+        assertEquals(0, interactionStorage.countActiveMatchesFor(currentUser.getId()));
+
+        var activeMatches =
+                useCases.listActiveMatches(new ListActiveMatchesQuery(UserContext.cli(currentUser.getId())));
+        assertTrue(activeMatches.success());
+        assertTrue(activeMatches.data().matches().isEmpty());
+    }
+
+    @Test
+    @DisplayName("archiveMatch clears stale likes so the pair can rematch")
+    void archiveMatchClearsStaleLikesSoThePairCanRematch() {
+        var firstLike = useCases.recordLike(new MatchingUseCases.RecordLikeCommand(
+                UserContext.cli(currentUser.getId()), candidate.getId(), Like.Direction.LIKE, true));
+        assertTrue(firstLike.success());
+        assertTrue(firstLike.data().match().isEmpty());
+
+        var secondLike = useCases.recordLike(new MatchingUseCases.RecordLikeCommand(
+                UserContext.cli(candidate.getId()), currentUser.getId(), Like.Direction.LIKE, true));
+        assertTrue(secondLike.success());
+        Match match = secondLike.data().match().orElseThrow();
+
+        var archiveResult =
+                useCases.archiveMatch(new ArchiveMatchCommand(UserContext.cli(currentUser.getId()), match.getId()));
+        assertTrue(archiveResult.success());
+        assertTrue(interactionStorage
+                .getLike(currentUser.getId(), candidate.getId())
+                .isEmpty());
+        assertTrue(interactionStorage
+                .getLike(candidate.getId(), currentUser.getId())
+                .isEmpty());
+
+        var rematchFirst = useCases.recordLike(new MatchingUseCases.RecordLikeCommand(
+                UserContext.cli(currentUser.getId()), candidate.getId(), Like.Direction.LIKE, true));
+        assertTrue(rematchFirst.success());
+        assertTrue(rematchFirst.data().match().isEmpty());
+
+        var rematchSecond = useCases.recordLike(new MatchingUseCases.RecordLikeCommand(
+                UserContext.cli(candidate.getId()), currentUser.getId(), Like.Direction.LIKE, true));
+        assertTrue(rematchSecond.success());
+        assertTrue(rematchSecond.data().match().isPresent());
+        assertEquals(
+                Match.MatchState.ACTIVE,
+                interactionStorage.get(match.getId()).orElseThrow().getState());
+    }
+
+    @Test
+    @DisplayName("archiveMatch returns a conflict for an already-ended match")
+    void archiveMatchReturnsAConflictForAnAlreadyEndedMatch() {
+        Match match = Match.create(currentUser.getId(), candidate.getId());
+        match.unmatch(currentUser.getId());
+        interactionStorage.save(match);
+
+        var result =
+                useCases.archiveMatch(new ArchiveMatchCommand(UserContext.cli(currentUser.getId()), match.getId()));
+
+        assertFalse(result.success());
+        assertNotNull(result.error());
+        assertEquals(UseCaseError.Code.CONFLICT, result.error().code());
+        assertEquals("Cannot unmatch from UNMATCHED state", result.error().message());
     }
 
     @Test
@@ -642,6 +937,140 @@ class MatchingUseCasesTest {
             @Override
             public Result getStandouts(User seeker) {
                 return Result.empty("none");
+            }
+
+            @Override
+            public void markInteracted(UUID seekerId, UUID standoutUserId) {
+                // No-op: standouts are irrelevant for this use-case test setup.
+            }
+
+            @Override
+            public java.util.Map<UUID, User> resolveUsers(List<Standout> standouts) {
+                return java.util.Map.of();
+            }
+        };
+    }
+
+    private MatchingUseCases buildMatchingUseCases(
+            boolean recommendationServiceFirst,
+            RecommendationService recommendationService,
+            DailyLimitService dailyLimitService,
+            DailyPickService dailyPickService,
+            StandoutService standoutService) {
+        MatchingUseCases.Builder builder = MatchingUseCases.builder()
+                .candidateFinder(candidateFinder)
+                .matchingService(matchingService)
+                .undoService(undoService)
+                .interactionStorage(interactionStorage)
+                .userStorage(userStorage)
+                .matchQualityService(matchQualityService)
+                .eventBus(new TestEventBus());
+
+        if (recommendationServiceFirst) {
+            return builder.recommendationService(recommendationService)
+                    .dailyLimitService(dailyLimitService)
+                    .dailyPickService(dailyPickService)
+                    .standoutService(standoutService)
+                    .build();
+        }
+
+        return builder.dailyLimitService(dailyLimitService)
+                .dailyPickService(dailyPickService)
+                .standoutService(standoutService)
+                .recommendationService(recommendationService)
+                .build();
+    }
+
+    private void assertExplicitSeamsAreUsed(MatchingUseCases matchingUseCases) {
+        var dailyStatus = matchingUseCases.getDailyStatus(new DailyStatusQuery(UserContext.cli(currentUser.getId())));
+        assertTrue(dailyStatus.success());
+        assertEquals(2, dailyStatus.data().likesUsed());
+        assertEquals(8, dailyStatus.data().likesRemaining());
+        assertFalse(dailyStatus.data().hasUnlimitedLikes());
+        assertEquals("02:00:00", dailyStatus.data().timeUntilReset());
+
+        var browseResult = matchingUseCases.browseCandidates(
+                new BrowseCandidatesCommand(UserContext.cli(currentUser.getId()), currentUser));
+        assertTrue(browseResult.success());
+        assertTrue(browseResult.data().dailyPick().isPresent());
+        assertEquals(
+                "explicit-daily-pick",
+                browseResult.data().dailyPick().orElseThrow().reason());
+        assertTrue(browseResult.data().dailyPickViewed());
+
+        var standoutsResult =
+                matchingUseCases.standouts(new StandoutsQuery(UserContext.cli(currentUser.getId()), currentUser));
+        assertTrue(standoutsResult.success());
+        assertEquals("explicit-standouts", standoutsResult.data().result().message());
+    }
+
+    private static DailyLimitService dailyLimitServiceWithDistinctStatus(
+            int likesUsed, int likesRemaining, Duration timeUntilReset) {
+        return new DailyLimitService() {
+            @Override
+            public boolean canLike(UUID userId) {
+                return true;
+            }
+
+            @Override
+            public boolean canSuperLike(UUID userId) {
+                return true;
+            }
+
+            @Override
+            public boolean canPass(UUID userId) {
+                return true;
+            }
+
+            @Override
+            public DailyStatus getStatus(UUID userId) {
+                return new DailyStatus(
+                        likesUsed,
+                        likesRemaining,
+                        0,
+                        0,
+                        0,
+                        0,
+                        AppClock.today(),
+                        AppClock.now().plus(timeUntilReset));
+            }
+
+            @Override
+            public Duration getTimeUntilReset() {
+                return timeUntilReset;
+            }
+        };
+    }
+
+    private DailyPickService dailyPickServiceWithDistinctPick(String reason, boolean alreadySeen) {
+        return new DailyPickService() {
+            @Override
+            public Optional<DailyPick> getDailyPick(User seeker) {
+                return Optional.of(new DailyPick(candidate, AppClock.today(), reason, alreadySeen));
+            }
+
+            @Override
+            public boolean hasViewedDailyPick(UUID userId) {
+                return alreadySeen;
+            }
+
+            @Override
+            public void markDailyPickViewed(UUID userId) {
+                // No-op: the test only needs a deterministic, side-effect-free daily-pick service.
+            }
+
+            @Override
+            public int cleanupOldDailyPickViews(java.time.LocalDate before) {
+                return 0;
+            }
+        };
+    }
+
+    private static StandoutService standoutServiceWithDistinctMessage(String message) {
+        return new StandoutService() {
+            @Override
+            public Result getStandouts(User seeker) {
+                return Result.empty(message);
             }
 
             @Override

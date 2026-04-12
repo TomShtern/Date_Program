@@ -202,7 +202,7 @@ public class LoginController extends BaseController implements Initializable {
                 case GO_TO_DASHBOARD -> {
                     NavigationService.ViewType destination = NavigationService.ViewType.DASHBOARD;
                     logInfo(LOG_LOGIN_SUCCESS, destination);
-                    NavigationService.getInstance().navigateTo(destination);
+                    navigationService().navigateTo(destination);
                 }
                 case START_ONBOARDING -> {
                     User selected = viewModel.getSelectedUser();
@@ -211,7 +211,7 @@ public class LoginController extends BaseController implements Initializable {
                     } else {
                         NavigationService.ViewType destination = NavigationService.ViewType.PROFILE;
                         logInfo(LOG_LOGIN_SUCCESS, destination);
-                        NavigationService.getInstance().navigateTo(destination);
+                        navigationService().navigateTo(destination);
                     }
                 }
                 default -> throw new IllegalStateException("Unsupported post-login decision: " + decision);
@@ -295,7 +295,7 @@ public class LoginController extends BaseController implements Initializable {
     }
 
     private void navigateToOnboarding(OnboardingContext context) {
-        NavigationService navigationService = NavigationService.getInstance();
+        NavigationService navigationService = navigationService();
         navigationService.setNavigationContext(NavigationService.ViewType.PROFILE, context);
         logInfo(LOG_LOGIN_SUCCESS, NavigationService.ViewType.PROFILE);
         navigationService.navigateTo(NavigationService.ViewType.PROFILE);

@@ -440,7 +440,8 @@ class ChatControllerTest {
             var noteUseCases = createProfileUseCases(users, config);
             var messagingUseCases = new datingapp.app.usecase.messaging.MessagingUseCases(
                     connectionService, new InProcessAppEventBus());
-            var socialUseCases = new datingapp.app.usecase.social.SocialUseCases(connectionService, trustSafetyService);
+            var socialUseCases = datingapp.app.usecase.social.SocialUseCases.forWorkflowAccess(
+                    connectionService, trustSafetyService, communications);
             this.viewModel = new ChatViewModel(
                     messagingUseCases,
                     socialUseCases,

@@ -75,7 +75,7 @@ public final class SafetyController extends BaseController implements Initializa
         addSubscription(viewModel.accountDeletedProperty().subscribe(deleted -> {
             if (Boolean.TRUE.equals(deleted)) {
                 cleanup();
-                datingapp.ui.NavigationService.getInstance().navigateTo(datingapp.ui.NavigationService.ViewType.LOGIN);
+                navigationService().navigateTo(datingapp.ui.NavigationService.ViewType.LOGIN);
             }
         }));
         viewModel.initialize();

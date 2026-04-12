@@ -152,6 +152,10 @@ public class MessagingUseCases {
         return UseCaseResult.success(result);
     }
 
+    /**
+     * Publishes the message-sent event on a best-effort basis after persistence succeeds.
+     * Persistence is the success boundary; event publication must not retroactively fail the send.
+     */
     private void publishMessageSentEvent(SendMessageCommand command, ConnectionService.SendResult result) {
         publishEvent(
                 new AppEvent.MessageSent(

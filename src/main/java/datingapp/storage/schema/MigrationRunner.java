@@ -34,7 +34,9 @@ public final class MigrationRunner {
     private static final String TABLE_MATCHES = "MATCHES";
     private static final String SQL_TABLE_MATCHES = "matches";
     private static final String TABLE_USERS = "USERS";
+    private static final String SQL_TABLE_USERS = "users";
     private static final String TABLE_CONVERSATIONS = "CONVERSATIONS";
+    private static final String SQL_TABLE_CONVERSATIONS = "conversations";
     private static final String TABLE_MESSAGES = "MESSAGES";
     private static final String TABLE_UNDO_STATES = "UNDO_STATES";
     private static final String TABLE_LIKES = "LIKES";
@@ -74,6 +76,15 @@ public final class MigrationRunner {
     private static final String VALUE_FRIEND_ZONE = "FRIEND_ZONE";
     private static final String VALUE_UNMATCH = "UNMATCH";
     private static final String VALUE_BLOCK = "BLOCK";
+    private static final List<String> LEGACY_SERIALIZED_PROFILE_COLUMNS = List.of(
+            "photo_urls",
+            "interests",
+            "interested_in",
+            "db_smoking",
+            "db_drinking",
+            "db_wants_kids",
+            "db_looking_for",
+            "db_education");
 
     private MigrationRunner() {
         // Utility class — static methods only
@@ -115,7 +126,8 @@ public final class MigrationRunner {
                     MigrationRunner::applyV2),
             new VersionedMigration(
                     3,
-                    "Drop legacy serialized users-table columns after normalized profile rollout",
+                    "Drop legacy serialized users-table columns after normalized profile rollout "
+                            + "(irreversible; recover dropped values from a pre-V3 backup)",
                     MigrationRunner::applyV3),
             new VersionedMigration(
                     4,
@@ -189,30 +201,90 @@ public final class MigrationRunner {
      * @throws SQLException if any migration statement fails
      */
     public static void runAllPending(Statement stmt) throws SQLException {
+        runWithMigrationTransaction(stmt, () -> runAllPendingInternal(stmt));
+    }
+
+    private static void runAllPendingInternal(Statement stmt) throws SQLException {
         boolean freshDatabase = isFreshApplicationSchema(stmt);
         createSchemaVersionTable(stmt);
 
         if (freshDatabase) {
-            if (LOG.isInfoEnabled()) {
-                LOG.info("Applying current fresh baseline schema without replaying historical migrations");
-            }
-            applyV1(stmt);
-            recordFreshBaselineCoverage(stmt);
+            applyFreshBaseline(stmt);
             return;
         }
 
+        applyPendingMigrations(stmt);
+    }
+
+    private static void applyFreshBaseline(Statement stmt) throws SQLException {
+        if (LOG.isInfoEnabled()) {
+            LOG.info("Applying current fresh baseline schema without replaying historical migrations");
+        }
+        applyV1(stmt);
+        recordFreshBaselineCoverage(stmt);
+    }
+
+    private static void applyPendingMigrations(Statement stmt) throws SQLException {
         for (VersionedMigration migration : MIGRATIONS) {
-            if (!isVersionApplied(stmt.getConnection(), migration.version())) {
-                if (LOG.isInfoEnabled()) {
-                    LOG.info("Applying migration V{}: {}", migration.version(), migration.description());
-                }
-                migration.action().apply(stmt);
-                recordSchemaVersion(stmt, migration.version(), migration.description());
-                if (LOG.isInfoEnabled()) {
-                    LOG.info("Migration V{} applied successfully", migration.version());
-                }
+            if (isVersionApplied(stmt.getConnection(), migration.version())) {
+                continue;
+            }
+            if (LOG.isInfoEnabled()) {
+                LOG.info("Applying migration V{}: {}", migration.version(), migration.description());
+            }
+            migration.action().apply(stmt);
+            recordSchemaVersion(stmt, migration.version(), migration.description());
+            if (LOG.isInfoEnabled()) {
+                LOG.info("Migration V{} applied successfully", migration.version());
             }
         }
+    }
+
+    @SuppressWarnings("PMD.CloseResource")
+    private static void runWithMigrationTransaction(Statement stmt, SqlWork work) throws SQLException {
+        Connection connection = stmt.getConnection();
+        boolean autoCommit = connection.getAutoCommit();
+        if (!autoCommit) {
+            work.run();
+            return;
+        }
+
+        connection.setAutoCommit(false);
+        try {
+            work.run();
+            connection.commit();
+        } catch (SQLException exception) {
+            rollbackMigrationTransaction(connection, exception);
+            throw exception;
+        } finally {
+            restoreAutoCommit(connection);
+        }
+    }
+
+    private static void rollbackMigrationTransaction(Connection connection, SQLException exception) {
+        try {
+            connection.rollback();
+        } catch (SQLException rollbackFailure) {
+            exception.addSuppressed(rollbackFailure);
+        }
+    }
+
+    private static void restoreAutoCommit(Connection connection) throws SQLException {
+        try {
+            connection.setAutoCommit(true);
+        } catch (SQLException restoreFailure) {
+            try {
+                connection.close();
+            } catch (SQLException closeFailure) {
+                restoreFailure.addSuppressed(closeFailure);
+            }
+            throw restoreFailure;
+        }
+    }
+
+    @FunctionalInterface
+    private interface SqlWork {
+        void run() throws SQLException;
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -257,14 +329,14 @@ public final class MigrationRunner {
      * tables are the single source of truth.
      */
     private static void applyV3(Statement stmt) throws SQLException {
-        stmt.execute("ALTER TABLE users DROP COLUMN IF EXISTS photo_urls");
-        stmt.execute("ALTER TABLE users DROP COLUMN IF EXISTS interests");
-        stmt.execute("ALTER TABLE users DROP COLUMN IF EXISTS interested_in");
-        stmt.execute("ALTER TABLE users DROP COLUMN IF EXISTS db_smoking");
-        stmt.execute("ALTER TABLE users DROP COLUMN IF EXISTS db_drinking");
-        stmt.execute("ALTER TABLE users DROP COLUMN IF EXISTS db_wants_kids");
-        stmt.execute("ALTER TABLE users DROP COLUMN IF EXISTS db_looking_for");
-        stmt.execute("ALTER TABLE users DROP COLUMN IF EXISTS db_education");
+        LOG.warn(
+                "Migration V3 permanently drops legacy users profile columns {}. "
+                        + "Recover dropped values only from a pre-migration database backup.",
+                LEGACY_SERIALIZED_PROFILE_COLUMNS);
+        for (String columnName : LEGACY_SERIALIZED_PROFILE_COLUMNS) {
+            stmt.addBatch(SQL_ALTER_TABLE_PREFIX + SQL_TABLE_USERS + " DROP COLUMN IF EXISTS " + columnName);
+        }
+        stmt.executeBatch();
     }
 
     /**
@@ -396,10 +468,12 @@ public final class MigrationRunner {
      */
     private static void applyV10(Statement stmt) throws SQLException {
         if (hasTable(stmt, TABLE_DAILY_PICK_VIEWS)) {
-            addForeignKeyIfMissing(stmt, "daily_pick_views", "fk_daily_pick_views_user", "user_id", "users", "id");
+            addForeignKeyIfMissing(
+                    stmt, "daily_pick_views", "fk_daily_pick_views_user", "user_id", SQL_TABLE_USERS, "id");
         }
         if (hasTable(stmt, TABLE_USER_ACHIEVEMENTS)) {
-            addForeignKeyIfMissing(stmt, "user_achievements", "fk_user_achievements_user", "user_id", "users", "id");
+            addForeignKeyIfMissing(
+                    stmt, "user_achievements", "fk_user_achievements_user", "user_id", SQL_TABLE_USERS, "id");
         }
     }
 
@@ -413,7 +487,8 @@ public final class MigrationRunner {
             return;
         }
 
-        stmt.execute("ALTER TABLE friend_requests ADD COLUMN IF NOT EXISTS pair_key VARCHAR(73)");
+        stmt.execute(
+                "ALTER TABLE friend_requests ADD COLUMN IF NOT EXISTS pair_key " + SchemaInitializer.PAIR_ID_SQL_TYPE);
         stmt.execute("ALTER TABLE friend_requests ADD COLUMN IF NOT EXISTS pending_marker VARCHAR(10)");
 
         stmt.execute("""
@@ -468,7 +543,7 @@ public final class MigrationRunner {
                     + " row(s) have ended_by outside the matched pair");
         }
 
-        addForeignKeyIfMissing(stmt, SQL_TABLE_MATCHES, "fk_matches_ended_by", "ended_by", "users", "id");
+        addForeignKeyIfMissing(stmt, SQL_TABLE_MATCHES, "fk_matches_ended_by", "ended_by", SQL_TABLE_USERS, "id");
         addCheckConstraintIfMissing(
                 stmt,
                 SQL_TABLE_MATCHES,
@@ -513,7 +588,7 @@ public final class MigrationRunner {
     private static void applyV17(Statement stmt) throws SQLException {
         alterTimestampColumnsToTimeZone(
                 stmt,
-                "users",
+                SQL_TABLE_USERS,
                 COLUMN_CREATED_AT,
                 COLUMN_UPDATED_AT,
                 "verification_sent_at",
@@ -530,7 +605,7 @@ public final class MigrationRunner {
         alterTimestampColumnsToTimeZone(stmt, TABLE_USER_ACHIEVEMENTS, "unlocked_at");
         alterTimestampColumnsToTimeZone(
                 stmt,
-                "conversations",
+                SQL_TABLE_CONVERSATIONS,
                 COLUMN_CREATED_AT,
                 "last_message_at",
                 "user_a_last_read_at",
@@ -560,27 +635,27 @@ public final class MigrationRunner {
         if (hasColumn(stmt, TABLE_USERS, "EMAIL")) {
             stmt.execute("UPDATE users SET email = NULL WHERE email IS NOT NULL AND TRIM(email) = ''");
             stmt.execute("UPDATE users SET email = TRIM(email) WHERE email IS NOT NULL");
-            long duplicateEmails = countDuplicateTrimmedValues(stmt, "users", "email");
+            long duplicateEmails = countDuplicateTrimmedValues(stmt, SQL_TABLE_USERS, "email");
             if (duplicateEmails > 0) {
                 throw new SQLException("Cannot enforce unique users.email values: " + duplicateEmails
                         + " duplicate trimmed value(s) exist");
             }
             addCheckConstraintIfMissing(
-                    stmt, "users", "ck_users_email_trimmed", "email IS NULL OR email = TRIM(email)");
-            addUniqueConstraintIfMissing(stmt, "users", "uk_users_email", "email");
+                    stmt, SQL_TABLE_USERS, "ck_users_email_trimmed", "email IS NULL OR email = TRIM(email)");
+            addUniqueConstraintIfMissing(stmt, SQL_TABLE_USERS, "uk_users_email", "email");
         }
 
         if (hasColumn(stmt, TABLE_USERS, "PHONE")) {
             stmt.execute("UPDATE users SET phone = NULL WHERE phone IS NOT NULL AND TRIM(phone) = ''");
             stmt.execute("UPDATE users SET phone = TRIM(phone) WHERE phone IS NOT NULL");
-            long duplicatePhones = countDuplicateTrimmedValues(stmt, "users", "phone");
+            long duplicatePhones = countDuplicateTrimmedValues(stmt, SQL_TABLE_USERS, "phone");
             if (duplicatePhones > 0) {
                 throw new SQLException("Cannot enforce unique users.phone values: " + duplicatePhones
                         + " duplicate trimmed value(s) exist");
             }
             addCheckConstraintIfMissing(
-                    stmt, "users", "ck_users_phone_trimmed", "phone IS NULL OR phone = TRIM(phone)");
-            addUniqueConstraintIfMissing(stmt, "users", "uk_users_phone", "phone");
+                    stmt, SQL_TABLE_USERS, "ck_users_phone_trimmed", "phone IS NULL OR phone = TRIM(phone)");
+            addUniqueConstraintIfMissing(stmt, SQL_TABLE_USERS, "uk_users_phone", "phone");
         }
     }
 
@@ -690,7 +765,7 @@ public final class MigrationRunner {
 
     private static boolean isFreshApplicationSchema(Statement stmt) throws SQLException {
         String currentSchema = stmt.getConnection().getSchema();
-        String metadataTableName = metadataIdentifier(stmt.getConnection(), "users");
+        String metadataTableName = metadataIdentifier(stmt.getConnection(), SQL_TABLE_USERS);
         String metadataSchema = currentSchema == null ? null : metadataIdentifier(stmt.getConnection(), currentSchema);
         try (ResultSet rs = stmt.getConnection()
                 .getMetaData()
@@ -866,7 +941,7 @@ public final class MigrationRunner {
         }
         addAllowedValuesConstraint(
                 stmt,
-                "users",
+                SQL_TABLE_USERS,
                 COLUMN_STATE,
                 "ck_users_state_values",
                 false,
@@ -875,16 +950,38 @@ public final class MigrationRunner {
                 "PAUSED",
                 "BANNED");
         addAllowedValuesConstraint(
-                stmt, "users", "gender", "ck_users_gender_values", true, "MALE", "FEMALE", VALUE_OTHER);
-        addAllowedValuesConstraint(
-                stmt, "users", "smoking", "ck_users_smoking_values", true, VALUE_NEVER, "SOMETIMES", VALUE_REGULARLY);
-        addAllowedValuesConstraint(
-                stmt, "users", "drinking", "ck_users_drinking_values", true, VALUE_NEVER, "SOCIALLY", VALUE_REGULARLY);
-        addAllowedValuesConstraint(
-                stmt, "users", "wants_kids", "ck_users_wants_kids_values", true, "NO", "OPEN", "SOMEDAY", "HAS_KIDS");
+                stmt, SQL_TABLE_USERS, "gender", "ck_users_gender_values", true, "MALE", "FEMALE", VALUE_OTHER);
         addAllowedValuesConstraint(
                 stmt,
-                "users",
+                SQL_TABLE_USERS,
+                "smoking",
+                "ck_users_smoking_values",
+                true,
+                VALUE_NEVER,
+                "SOMETIMES",
+                VALUE_REGULARLY);
+        addAllowedValuesConstraint(
+                stmt,
+                SQL_TABLE_USERS,
+                "drinking",
+                "ck_users_drinking_values",
+                true,
+                VALUE_NEVER,
+                "SOCIALLY",
+                VALUE_REGULARLY);
+        addAllowedValuesConstraint(
+                stmt,
+                SQL_TABLE_USERS,
+                "wants_kids",
+                "ck_users_wants_kids_values",
+                true,
+                "NO",
+                "OPEN",
+                "SOMEDAY",
+                "HAS_KIDS");
+        addAllowedValuesConstraint(
+                stmt,
+                SQL_TABLE_USERS,
                 "looking_for",
                 "ck_users_looking_for_values",
                 true,
@@ -895,7 +992,7 @@ public final class MigrationRunner {
                 "UNSURE");
         addAllowedValuesConstraint(
                 stmt,
-                "users",
+                SQL_TABLE_USERS,
                 "education",
                 "ck_users_education_values",
                 true,
@@ -907,10 +1004,16 @@ public final class MigrationRunner {
                 "TRADE_SCHOOL",
                 VALUE_OTHER);
         addAllowedValuesConstraint(
-                stmt, "users", "verification_method", "ck_users_verification_method_values", true, "EMAIL", "PHONE");
+                stmt,
+                SQL_TABLE_USERS,
+                "verification_method",
+                "ck_users_verification_method_values",
+                true,
+                "EMAIL",
+                "PHONE");
         addAllowedValuesConstraint(
                 stmt,
-                "users",
+                SQL_TABLE_USERS,
                 "pace_messaging_frequency",
                 "ck_users_pace_msg_freq_values",
                 true,
@@ -920,7 +1023,7 @@ public final class MigrationRunner {
                 "WILDCARD");
         addAllowedValuesConstraint(
                 stmt,
-                "users",
+                SQL_TABLE_USERS,
                 "pace_time_to_first_date",
                 "ck_users_pace_first_date_values",
                 true,
@@ -931,7 +1034,7 @@ public final class MigrationRunner {
                 "WILDCARD");
         addAllowedValuesConstraint(
                 stmt,
-                "users",
+                SQL_TABLE_USERS,
                 "pace_communication_style",
                 "ck_users_pace_comm_style_values",
                 true,
@@ -942,7 +1045,7 @@ public final class MigrationRunner {
                 "MIX_OF_EVERYTHING");
         addAllowedValuesConstraint(
                 stmt,
-                "users",
+                SQL_TABLE_USERS,
                 "pace_depth_preference",
                 "ck_users_pace_depth_values",
                 true,
@@ -980,13 +1083,14 @@ public final class MigrationRunner {
                     VALUE_UNMATCH,
                     VALUE_BLOCK);
             if (hasColumn(stmt, TABLE_MATCHES, "ID")) {
-                addCheckConstraintIfMissing(stmt, SQL_TABLE_MATCHES, "ck_matches_id_length", "CHAR_LENGTH(id) = 73");
+                addCheckConstraintIfMissing(
+                        stmt, SQL_TABLE_MATCHES, "ck_matches_id_length", SchemaInitializer.pairIdLengthCheck("id"));
             }
         }
         if (hasTable(stmt, TABLE_CONVERSATIONS)) {
             addAllowedValuesConstraint(
                     stmt,
-                    "conversations",
+                    SQL_TABLE_CONVERSATIONS,
                     "archive_reason_a",
                     "ck_conversations_archive_reason_a_values",
                     true,
@@ -996,7 +1100,7 @@ public final class MigrationRunner {
                     VALUE_BLOCK);
             addAllowedValuesConstraint(
                     stmt,
-                    "conversations",
+                    SQL_TABLE_CONVERSATIONS,
                     "archive_reason_b",
                     "ck_conversations_archive_reason_b_values",
                     true,
@@ -1006,12 +1110,18 @@ public final class MigrationRunner {
                     VALUE_BLOCK);
             if (hasColumn(stmt, TABLE_CONVERSATIONS, "ID")) {
                 addCheckConstraintIfMissing(
-                        stmt, "conversations", "ck_conversations_id_length", "CHAR_LENGTH(id) = 73");
+                        stmt,
+                        SQL_TABLE_CONVERSATIONS,
+                        "ck_conversations_id_length",
+                        SchemaInitializer.pairIdLengthCheck("id"));
             }
         }
         if (hasTable(stmt, TABLE_MESSAGES) && hasColumn(stmt, TABLE_MESSAGES, "CONVERSATION_ID")) {
             addCheckConstraintIfMissing(
-                    stmt, "messages", "ck_messages_conversation_id_length", "CHAR_LENGTH(conversation_id) = 73");
+                    stmt,
+                    "messages",
+                    "ck_messages_conversation_id_length",
+                    SchemaInitializer.pairIdLengthCheck("conversation_id"));
         }
         if (hasTable(stmt, TABLE_FRIEND_REQUESTS)) {
             addAllowedValuesConstraint(
@@ -1067,7 +1177,7 @@ public final class MigrationRunner {
                         stmt,
                         "undo_states",
                         "ck_undo_states_match_id_length",
-                        "match_id IS NULL OR CHAR_LENGTH(match_id) = 73");
+                        SchemaInitializer.nullablePairIdLengthCheck("match_id"));
             }
         }
     }
@@ -1131,19 +1241,19 @@ public final class MigrationRunner {
     private static void applyFreshBaselineStructuralConstraints(Statement stmt) throws SQLException {
         if (hasTable(stmt, TABLE_USERS)) {
             if (hasColumn(stmt, TABLE_USERS, "MIN_AGE") && hasColumn(stmt, TABLE_USERS, "MAX_AGE")) {
-                addCheckConstraintIfMissing(stmt, "users", "ck_users_age_bounds", "min_age <= max_age");
+                addCheckConstraintIfMissing(stmt, SQL_TABLE_USERS, "ck_users_age_bounds", "min_age <= max_age");
             }
             if (hasColumn(stmt, TABLE_USERS, "DB_MIN_HEIGHT_CM") && hasColumn(stmt, TABLE_USERS, "DB_MAX_HEIGHT_CM")) {
                 addCheckConstraintIfMissing(
                         stmt,
-                        "users",
+                        SQL_TABLE_USERS,
                         "ck_users_height_bounds",
                         "db_min_height_cm IS NULL OR db_max_height_cm IS NULL OR db_min_height_cm <= db_max_height_cm");
             }
             if (hasColumn(stmt, TABLE_USERS, "DB_MAX_AGE_DIFF")) {
                 addCheckConstraintIfMissing(
                         stmt,
-                        "users",
+                        SQL_TABLE_USERS,
                         "ck_users_max_age_diff_nonnegative",
                         "db_max_age_diff IS NULL OR db_max_age_diff >= 0");
             }
@@ -1151,7 +1261,7 @@ public final class MigrationRunner {
         addDistinctUsersConstraintIfPresent(stmt, "likes", "who_likes", "who_got_liked", "ck_likes_distinct_users");
         addDistinctUsersConstraintIfPresent(stmt, SQL_TABLE_MATCHES, "user_a", "user_b", "ck_matches_distinct_users");
         addDistinctUsersConstraintIfPresent(
-                stmt, "conversations", "user_a", "user_b", "ck_conversations_distinct_users");
+                stmt, SQL_TABLE_CONVERSATIONS, "user_a", "user_b", "ck_conversations_distinct_users");
         addDistinctUsersConstraintIfPresent(
                 stmt, "friend_requests", "from_user_id", "to_user_id", "ck_friend_requests_distinct_users");
         addDistinctUsersConstraintIfPresent(stmt, "blocks", "blocker_id", "blocked_id", "ck_blocks_distinct_users");

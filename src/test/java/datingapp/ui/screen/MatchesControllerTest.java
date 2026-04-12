@@ -213,7 +213,7 @@ class MatchesControllerTest {
             TrustSafetyService trustSafetyService = TrustSafetyService.builder(
                             trustSafetyStorage, interactions, users, config, communications)
                     .build();
-            var socialUseCases = new datingapp.app.usecase.social.SocialUseCases(
+            var socialUseCases = datingapp.app.usecase.social.SocialUseCases.forWorkflowAccess(
                     new ConnectionService(config, communications, interactions, users),
                     trustSafetyService,
                     communications);

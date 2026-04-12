@@ -43,6 +43,20 @@ class BaseControllerTest {
     }
 
     @Test
+    @DisplayName("cleanup and back handling are safe without a navigation service")
+    void cleanupAndBackHandlingAreSafeWithoutNavigationService() throws Exception {
+        NullNavigationController controller = new NullNavigationController();
+
+        JavaFxTestSupport.runOnFxAndWait(() -> {
+            controller.cleanup();
+            controller.invokeHandleBack();
+            controller.cleanup();
+        });
+
+        assertTrue(true);
+    }
+
+    @Test
     @DisplayName("handleBack is safe with and without navigation history")
     void handleBackIsSafeWithAndWithoutNavigationHistory() throws Exception {
         TestController controller = new TestController();
@@ -74,6 +88,17 @@ class BaseControllerTest {
     }
 
     private static final class TestController extends BaseController {
+        void invokeHandleBack() {
+            handleBack();
+        }
+    }
+
+    private static final class NullNavigationController extends BaseController {
+        @Override
+        protected NavigationService navigationService() {
+            return null;
+        }
+
         void invokeHandleBack() {
             handleBack();
         }

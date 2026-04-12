@@ -125,6 +125,24 @@ class MatchingViewModelTest {
     }
 
     @Test
+    @DisplayName("distance display uses injected distance calculator")
+    void distanceDisplayUsesInjectedDistanceCalculator() {
+        Fixture fixture = new Fixture();
+        fixture.saveUsers();
+
+        MatchingViewModel viewModel = fixture.createViewModel(
+                TEST_DISPATCHER,
+                new UseCaseUiProfileNoteDataAccess(fixture.createNoteUseCases().getProfileNotesUseCases()),
+                (lat1, lon1, lat2, lon2) -> 4.2);
+        viewModel.initialize(fixture.prioritizedCandidate.getId());
+
+        waitUntil(() -> viewModel.currentCandidateProperty().get() != null, 5000);
+
+        assertEquals("4.2 km away", viewModel.getDistanceDisplay(fixture.prioritizedCandidate));
+        viewModel.dispose();
+    }
+
+    @Test
     @DisplayName("save and delete note update matching note state")
     void saveAndDeleteCandidateNote() {
         Fixture fixture = new Fixture();
@@ -346,6 +364,13 @@ class MatchingViewModelTest {
 
         private MatchingViewModel createViewModel(
                 UiThreadDispatcher dispatcher, UiProfileNoteDataAccess noteDataAccess) {
+            return createViewModel(dispatcher, noteDataAccess, CandidateFinder.GeoUtils::distanceKm);
+        }
+
+        private MatchingViewModel createViewModel(
+                UiThreadDispatcher dispatcher,
+                UiProfileNoteDataAccess noteDataAccess,
+                MatchingViewModel.DistanceCalculator distanceCalculator) {
             CandidateFinder candidateFinder =
                     new CandidateFinder(users, interactions, trustSafetyStorage, ZoneId.of("UTC"));
             ProfileService profileService = new ProfileService(users);
@@ -393,8 +418,9 @@ class MatchingViewModelTest {
                                     new MatchQualityService(users, interactions, config),
                                     new datingapp.app.event.InProcessAppEventBus(),
                                     recommendationService),
-                            new datingapp.app.usecase.social.SocialUseCases(trustSafetyService),
-                            noteDataAccess),
+                            datingapp.app.usecase.social.SocialUseCases.forTrustSafetyOnly(trustSafetyService),
+                            noteDataAccess,
+                            distanceCalculator),
                     session,
                     dispatcher);
         }

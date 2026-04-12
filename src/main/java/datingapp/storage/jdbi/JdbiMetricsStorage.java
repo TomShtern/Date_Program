@@ -21,8 +21,9 @@ import java.util.Optional;
 import java.util.UUID;
 import org.jdbi.v3.core.Jdbi;
 import org.jdbi.v3.core.mapper.RowMapper;
+import org.jdbi.v3.core.statement.PreparedBatch;
+import org.jdbi.v3.core.statement.SqlStatement;
 import org.jdbi.v3.core.statement.StatementContext;
-import org.jdbi.v3.core.statement.Update;
 import org.jdbi.v3.sqlobject.config.RegisterRowMapper;
 import org.jdbi.v3.sqlobject.customizer.Bind;
 import org.jdbi.v3.sqlobject.customizer.BindMethods;
@@ -63,11 +64,15 @@ public final class JdbiMetricsStorage implements AnalyticsStorage, Standout.Stor
     private final String standoutUpsertSql;
 
     public JdbiMetricsStorage(Jdbi jdbi) {
+        this(jdbi, SqlDialectSupport.detectDialect(jdbi));
+    }
+
+    public JdbiMetricsStorage(Jdbi jdbi, DatabaseDialect dialect) {
         this.jdbi = Objects.requireNonNull(jdbi, "jdbi cannot be null");
         this.statsDao = jdbi.onDemand(StatsDao.class);
         this.sessionDao = jdbi.onDemand(SessionDao.class);
         this.standoutDao = jdbi.onDemand(StandoutDao.class);
-        DatabaseDialect dialect = detectDialect(jdbi);
+        Objects.requireNonNull(dialect, "dialect cannot be null");
         this.profileViewUpsertSql = buildProfileViewUpsertSql(dialect);
         this.userAchievementUpsertSql = buildUserAchievementUpsertSql(dialect);
         this.dailyPickViewUpsertSql = buildDailyPickViewUpsertSql(dialect);
@@ -310,6 +315,7 @@ public final class JdbiMetricsStorage implements AnalyticsStorage, Standout.Stor
         }
 
         jdbi.useTransaction(handle -> {
+            PreparedBatch batch = handle.prepareBatch(standoutUpsertSql);
             for (Standout standout : standouts) {
                 if (standout == null) {
                     continue;
@@ -329,19 +335,19 @@ public final class JdbiMetricsStorage implements AnalyticsStorage, Standout.Stor
                             standout.interactedAt());
                 }
 
-                try (var update = handle.createUpdate(standoutUpsertSql)) {
-                    update.bind("id", normalized.id())
-                            .bind("seekerId", normalized.seekerId())
-                            .bind("standoutUserId", normalized.standoutUserId())
-                            .bind("featuredDate", normalized.featuredDate())
-                            .bind("rank", normalized.rank())
-                            .bind(SCORE_COLUMN, normalized.score())
-                            .bind(REASON_COLUMN, normalized.reason())
-                            .bind(CREATED_AT_BIND, normalized.createdAt());
-                    bindNullableInstant(update, "interactedAt", normalized.interactedAt());
-                    update.execute();
-                }
+                batch.bind("id", normalized.id())
+                        .bind("seekerId", normalized.seekerId())
+                        .bind("standoutUserId", normalized.standoutUserId())
+                        .bind("featuredDate", normalized.featuredDate())
+                        .bind("rank", normalized.rank())
+                        .bind(SCORE_COLUMN, normalized.score())
+                        .bind(REASON_COLUMN, normalized.reason())
+                        .bind(CREATED_AT_BIND, normalized.createdAt());
+                bindNullableInstant(batch, "interactedAt", normalized.interactedAt());
+                batch.add();
             }
+
+            batch.execute();
         });
     }
 
@@ -752,23 +758,12 @@ public final class JdbiMetricsStorage implements AnalyticsStorage, Standout.Stor
         }
     }
 
-    private static DatabaseDialect detectDialect(Jdbi jdbi) {
-        return jdbi.withHandle(handle -> {
-            try {
-                return DatabaseDialect.fromDatabaseProductName(
-                        handle.getConnection().getMetaData().getDatabaseProductName());
-            } catch (SQLException exception) {
-                throw new IllegalStateException("Failed to detect database dialect", exception);
-            }
-        });
-    }
-
-    private static void bindNullableInstant(Update update, String parameter, Instant value) {
+    private static void bindNullableInstant(SqlStatement<?> statement, String parameter, Instant value) {
         if (value != null) {
-            update.bind(parameter, value);
+            statement.bind(parameter, value);
             return;
         }
-        update.bindNull(parameter, Types.TIMESTAMP);
+        statement.bindNull(parameter, Types.TIMESTAMP);
     }
 
     private static String buildProfileViewUpsertSql(DatabaseDialect dialect) {

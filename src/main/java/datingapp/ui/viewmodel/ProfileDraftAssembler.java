@@ -43,34 +43,7 @@ final class ProfileDraftAssembler {
     }
 
     private static User copyCurrentUserToDraft(User currentUser) {
-        return User.StorageBuilder.create(currentUser.getId(), currentUser.getName(), currentUser.getCreatedAt())
-                .bio(currentUser.getBio())
-                .birthDate(currentUser.getBirthDate())
-                .gender(currentUser.getGender())
-                .interestedIn(currentUser.getInterestedIn())
-                .location(currentUser.getLat(), currentUser.getLon())
-                .hasLocationSet(currentUser.hasLocationSet())
-                .maxDistanceKm(currentUser.getMaxDistanceKm())
-                .ageRange(currentUser.getMinAge(), currentUser.getMaxAge())
-                .photoUrls(currentUser.getPhotoUrls())
-                .state(currentUser.getState())
-                .updatedAt(currentUser.getUpdatedAt())
-                .interests(currentUser.getInterests())
-                .smoking(currentUser.getSmoking())
-                .drinking(currentUser.getDrinking())
-                .wantsKids(currentUser.getWantsKids())
-                .lookingFor(currentUser.getLookingFor())
-                .education(currentUser.getEducation())
-                .heightCm(currentUser.getHeightCm())
-                .email(currentUser.getEmail())
-                .phone(currentUser.getPhone())
-                .verified(currentUser.isVerified())
-                .verificationMethod(currentUser.getVerificationMethod())
-                .verificationCode(currentUser.getVerificationCode())
-                .verificationSentAt(currentUser.getVerificationSentAt())
-                .verifiedAt(currentUser.getVerifiedAt())
-                .pacePreferences(currentUser.getPacePreferences())
-                .build();
+        return currentUser.copy();
     }
 
     private void applyBasicFields(User user, DraftState state, Consumer<String> warningSink) {

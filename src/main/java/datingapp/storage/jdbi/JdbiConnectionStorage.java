@@ -1,8 +1,5 @@
 package datingapp.storage.jdbi;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import datingapp.core.AppClock;
 import datingapp.core.connection.ConnectionModels.Conversation;
 import datingapp.core.connection.ConnectionModels.FriendRequest;
@@ -12,7 +9,6 @@ import datingapp.core.connection.ConnectionModels.Notification;
 import datingapp.core.connection.ConnectionModels.Notification.Type;
 import datingapp.core.model.Match.MatchArchiveReason;
 import datingapp.core.storage.OperationalCommunicationStorage;
-import datingapp.storage.DatabaseManager.StorageException;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Instant;
@@ -607,8 +603,6 @@ public final class JdbiConnectionStorage implements OperationalCommunicationStor
     @RegisterRowMapper(NotificationMapper.class)
     private interface SocialDao {
 
-        ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-
         @SqlUpdate("""
                 INSERT INTO friend_requests (
                     id, from_user_id, to_user_id, created_at, status, responded_at, pair_key, pending_marker
@@ -728,14 +722,7 @@ public final class JdbiConnectionStorage implements OperationalCommunicationStor
         }
 
         static String toJson(Map<String, String> data) {
-            if (data == null) {
-                return null;
-            }
-            try {
-                return OBJECT_MAPPER.writeValueAsString(data);
-            } catch (JsonProcessingException e) {
-                throw new StorageException("Failed to serialize notification data", e);
-            }
+            return JdbiNotificationJson.write(data);
         }
     }
 
@@ -804,8 +791,6 @@ public final class JdbiConnectionStorage implements OperationalCommunicationStor
     }
 
     public static class NotificationMapper implements RowMapper<Notification> {
-        private static final TypeReference<Map<String, String>> MAP_TYPE = new TypeReference<>() {};
-
         @Override
         public Notification map(ResultSet rs, StatementContext ctx) throws SQLException {
             var id = JdbiTypeCodecs.SqlRowReaders.readUuid(rs, "id");
@@ -815,20 +800,9 @@ public final class JdbiConnectionStorage implements OperationalCommunicationStor
             var message = rs.getString("message");
             var createdAt = JdbiTypeCodecs.SqlRowReaders.readInstant(rs, ConversationMapper.COL_CREATED_AT);
             var isRead = rs.getBoolean("is_read");
-            var data = fromJson(rs.getString("data_json"));
+            var data = JdbiNotificationJson.read(rs.getString("data_json"));
 
             return new Notification(id, userId, type, title, message, createdAt, isRead, data);
-        }
-
-        private Map<String, String> fromJson(String json) {
-            if (json == null) {
-                return Map.of();
-            }
-            try {
-                return SocialDao.OBJECT_MAPPER.readValue(json, MAP_TYPE);
-            } catch (JsonProcessingException e) {
-                throw new StorageException("Failed to deserialize notification data", e);
-            }
         }
     }
 }

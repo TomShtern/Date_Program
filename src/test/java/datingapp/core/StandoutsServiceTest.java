@@ -327,6 +327,35 @@ class StandoutsServiceTest {
 
             assertTrue(result.count() <= 10);
         }
+
+        @Test
+        @DisplayName("Should stamp generated standouts with the injected clock")
+        void generatedStandoutsUseInjectedClockInstant() {
+            Instant injectedInstant = FIXED_INSTANT.plus(Duration.ofDays(1));
+            Clock injectedClock = Clock.fixed(injectedInstant, ZoneId.of("UTC"));
+            RecommendationService customService = RecommendationService.builder()
+                    .userStorage(userStorage)
+                    .interactionStorage(interactionStorage)
+                    .trustSafetyStorage(trustSafetyStorage)
+                    .analyticsStorage(analyticsStorage)
+                    .candidateFinder(candidateFinder)
+                    .standoutStorage(standoutStorage)
+                    .profileService(profileCompletionService)
+                    .config(config)
+                    .clock(injectedClock)
+                    .build();
+
+            User seeker = createUserWithGender("Seeker", Gender.FEMALE, Gender.MALE);
+            User candidate = createUserWithGender("Candidate", Gender.MALE, Gender.FEMALE);
+            userStorage.save(seeker);
+            userStorage.save(candidate);
+
+            RecommendationService.Result result = customService.getStandouts(seeker);
+
+            assertFalse(result.isEmpty());
+            assertFalse(standoutStorage.savedStandouts.isEmpty());
+            assertEquals(injectedInstant, standoutStorage.savedStandouts.get(0).createdAt());
+        }
     }
 
     @Nested

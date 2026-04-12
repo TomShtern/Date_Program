@@ -48,7 +48,8 @@ final class AppConfigValidator {
 
         double weightSum = distanceWeight + ageWeight + interestWeight + lifestyleWeight + paceWeight + responseWeight;
         if (Math.abs(weightSum - 1.0) > 0.01) {
-            throw new IllegalArgumentException("Match-quality weights must sum to 1.0, got: " + weightSum);
+            throw new IllegalArgumentException(
+                    "Match-quality weights must sum to 1.0 within +/- 0.01 tolerance, got: " + weightSum);
         }
     }
 

@@ -1,9 +1,9 @@
-we are on windows 11, usually using powershell, we are working in VS Code-Insiders (sometimes in IntelliJ). we are using java 25, and using javafx 25, maven, palantir format/style and the java by Red Hat extension.
+we are on windows 11, usually using powershell, we are working in VS Code-Insiders. we are using java 25, and using javafx 25, maven, palantir format/style and the java by Red Hat extension.
 make sure to leverage the tools you have as an ai coding agent together with the IDE tools and also the tools we have here on this system.
 
 You are operating in an environment where ast-grep is installed. For any code search that requires understanding of syntax or code structure, you should default to using ast-grep --lang [language] -p '<pattern>'. Adjust the --lang flag as needed for the specific programming language. Avoid using text-only search tools unless a plain-text search is explicitly requested.
 
-Deploy multiple parallel subagents for different tasks when needed, and coordinate their work through a parent agent. Use the `agent` tool to invoke subagents with specific instructions and context. For example, you might have one subagent focused on code analysis using ast-grep, while another handles code edits or refactoring. The parent agent can manage the overall workflow, ensuring that each subagent has the information it needs to perform its task effectively while keeping the process organized and efficient.
+Deploy multiple parallel subagents for different tasks when needed, and coordinate their work through a parent agent. Use the `agent` tool to invoke subagents with specific detailed and defined instructions/tasks and context. For example, you might have one subagent focused on code analysis using ast-grep, while another handles code edits or refactoring. The parent agent can manage the overall workflow, ensuring that each subagent has the information it needs to perform its task effectively while keeping the process organized and efficient.
 The goal is to have you, the parent agent, orchestrate the work of multiple specialized subagents to achieve complex tasks that require different types of expertise or operations, such as code analysis, refactoring, testing, and documentation. Each subagent can focus on its specific area while you coordinate their efforts to ensure a cohesive and efficient workflow.
 Dont forget to use the specialized agents when appropriate, such as the executionSubagent for executing shell commands, or the runSubagent command. For read-only codebase exploration, prefer a similar available agent such as `Explore` first, and `codebase-context-gatherer` second, instead of retrying a flaky helper path.
 
@@ -49,18 +49,116 @@ Dont forget to use the specialized agents when appropriate, such as the executio
 
 </system_tools>
 
-Optimize for: predictable, minimal, contract-driven code
-Determinism: same inputs → same outputs. Seed randomness and isolate side effects.
-Explicit contracts: types + schemas + pre/post conditions. Use OpenAPI/JSON Schema/Protobuf where relevant.
-Small modules & functions: tiny units of behavior that are easy to test and swap.
-Idempotent interfaces: safe to retry; clear state transitions.
-Observability: structured logs, metrics, clear errors — machines need signals.
-Stable public surface: semantic versioning, changelogs.
-Concrete rules / thresholds (safe defaults)
-Max function length: ≤ 100 lines.
-Max nesting depth: ≤ 5.
-Cyclomatic complexity per function: ≤ 10.
-One responsibility per function/module (SRP).
+
+## Code quality and design principles
+Optimize for correctness, clarity, and maintainability first.
+Use structure and constraints as guidance, not rigid rules.
+
+### Core principles
+- Prefer clear, readable, and correct code over strict adherence to style rules.
+- Keep solutions as simple as possible, but not simpler than the problem requires.
+- Avoid unnecessary complexity, but do not under-engineer solutions that require proper structure.
+- Match the level of design to the scope of the task (small fix vs. system change).
+
+### Determinism and side effects
+- Aim for deterministic behavior where possible: same inputs → same outputs.
+- Isolate side effects and make them explicit.
+- Seed or control randomness when determinism is required.
+
+### Contracts and boundaries
+- Use explicit contracts where they provide real value: types, validation, and clear pre/post conditions.
+- Prefer strong typing and clear interfaces over implicit assumptions.
+- Use schemas (OpenAPI, JSON Schema, Protobuf) only when there is a real boundary (API, serialization, cross-service communication).
+
+### Modularity and structure
+- Prefer small, focused functions and modules, but do not fragment logic excessively.
+- Each function or module should have a clear responsibility (SRP).
+- Group related logic together when it improves readability and understanding.
+
+### Idempotency and state
+- Prefer idempotent operations where appropriate (safe retries, predictable state transitions).
+- Make state transitions explicit and easy to reason about.
+
+### Observability
+- Provide meaningful errors and logs where they help debugging and system understanding.
+- Avoid excessive or noisy logging.
+
+### Public surface and stability
+- Keep public APIs stable and intentional.
+- When relevant, follow semantic versioning and maintain clear change intent.
+
+### Heuristics (not strict limits)
+These are guidelines, not hard constraints. Break them when doing so improves clarity or correctness.
+
+- Function length: aim for ~20–100 lines
+- Nesting depth: aim for ≤ 5
+- Cyclomatic complexity: aim for ≤ 10
+
+If exceeding these improves readability or avoids unnecessary fragmentation, prefer the clearer solution.
+
+
+## Operating principle
+Optimize for the user's requested outcome first.
+
+-  Default to the smallest correct change ONLY when it fully satisfies the request.
+-  Do-NOT minimize the diff when the task requires broader changes such as redesign, refactor, cleanup, migration, or consistency fixes.
+-  If a narrow fix would leave the system semantically inconsistent, incomplete, misleading, or fragile, prefer a broader, coherent solution.
+-  Do-NOT avoid expanding scope just because a smaller patch is possible.
+-  Avoid unrelated refactors, BUT include all necessary related changes required to correctly complete the task.
+-  Treat these instructions as defaults, not constraints. Override them when the task clearly requires it.
+
+
+## Source of truth = the actual code
+The codebase is the only reliable source of truth.
+If any instruction file, documentation, or comment disagrees with the code, trust the code:
+- `src/main/java`
+- `src/test/java`
+- `pom.xml`
+
+### Rules for using documentation
+- Documentation is often stale or incorrect. Treat it as non-authoritative.
+- Use documentation only for high-level context, naming, or intent — never as proof of behavior.
+- Do not assume documentation is correct unless it is verified against the actual code.
+
+### Verification requirement
+- Always confirm behavior, structure, and logic directly in the code before relying on it.
+- Do not base decisions solely on documentation without checking the corresponding implementation.
+
+### Conflict resolution
+-  If documentation and code disagree, ignore the documentation.
+-  Do-NOT attempt to “reconcile” differences by guessing — follow the code EXACTLY.
+-  If the code appears inconsistent or unclear, investigate further in the codebase rather than relying on documentation.
+
+### Failure mode to avoid
+Relying on outdated documentation instead of the code will lead to incorrect changes, broken behavior, or invalid assumptions. Avoid this completely.
+
+
+## Environment defaults
+
+- Windows 11
+- PowerShell 7.6
+- VS Code Insiders
+- Java 25 with preview enabled
+- JavaFX 25.0.2
+- Maven
+- Palantir Java Format / Spotless
+- Java by Red Hat extension
+
+Use PowerShell-friendly commands.
+
+When Maven test selection uses a comma-separated `-Dtest=...,...` list, prefer:
+
+```powershell
+mvn --% ...
+
+
+
+
+
+
+
+
+
 
 
 # Dating App - Copilot Instructions
@@ -72,33 +170,15 @@ One responsibility per function/module (SRP).
 ## Source of truth
 
 If any instruction file disagrees with the codebase, trust:
-
 - `src/main/java`
 - `src/test/java`
 - `pom.xml`
-
 Use the lower-level docs only to explain or operationalize what the code already does.
 
-## Environment defaults
 
-- Windows 11
-- PowerShell 7.5.6
-- VS Code Insiders
-- Java 25 with preview enabled
-- JavaFX 25.0.2
-- Maven
-- Palantir Java Format / Spotless
-- Java by Red Hat extension
-
-Use PowerShell-friendly commands. When Maven test selection uses a comma-separated `-Dtest=...,...` list, prefer:
-
-`mvn --% ...`
 
 ## Patch and direct-edit policy
 
-- Prefer direct, exact-match edit tools for tiny localized changes such as a single import, one method call, or one small block replacement.
-- Reserve `apply_patch` for multi-line structural edits, multi-hunk changes, coordinated multi-file changes, or explicit file add/delete/rename work.
-- Keep patches as small and local as possible; avoid broad whole-file rewrites when a narrower edit will do.
 - If a patch fails, re-read the file and retry once with narrower context; if it still fails, switch to a more precise edit strategy instead of looping.
 - Avoid delete-plus-add of the same path in one patch unless there is no safer alternative.
 - Treat the tool result payload as the source of truth for patch/edit success; do not rely on top-level tool status alone.

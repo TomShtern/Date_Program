@@ -1,7 +1,5 @@
 package datingapp.ui.viewmodel;
 
-import static datingapp.core.matching.CandidateFinder.GeoUtils.distanceKm;
-
 import datingapp.app.usecase.common.UserContext;
 import datingapp.app.usecase.matching.MatchingUseCases;
 import datingapp.app.usecase.matching.MatchingUseCases.BrowseCandidatesCommand;
@@ -54,6 +52,7 @@ public class MatchingViewModel extends BaseViewModel {
     private final MatchingUseCases matchingUseCases;
     private final SocialUseCases socialUseCases;
     private final UiProfileNoteDataAccess noteDataAccess;
+    private final DistanceCalculator distanceCalculator;
     private final AppSession session;
 
     private final Queue<User> candidateQueue = new ConcurrentLinkedQueue<>();
@@ -83,6 +82,11 @@ public class MatchingViewModel extends BaseViewModel {
     private final AtomicInteger noteLoadToken = new AtomicInteger();
     private TaskHandle undoCountdownHandle;
 
+    @FunctionalInterface
+    public interface DistanceCalculator {
+        double distanceKm(double lat1, double lon1, double lat2, double lon2);
+    }
+
     public record Dependencies(
             CandidateFinder candidateFinder,
             MatchingService matchingService,
@@ -90,7 +94,8 @@ public class MatchingViewModel extends BaseViewModel {
             TrustSafetyService trustSafetyService,
             MatchingUseCases matchingUseCases,
             SocialUseCases socialUseCases,
-            UiProfileNoteDataAccess noteDataAccess) {
+            UiProfileNoteDataAccess noteDataAccess,
+            DistanceCalculator distanceCalculator) {
 
         public Dependencies {
             Objects.requireNonNull(candidateFinder, "candidateFinder cannot be null");
@@ -100,6 +105,7 @@ public class MatchingViewModel extends BaseViewModel {
             Objects.requireNonNull(matchingUseCases, "matchingUseCases cannot be null");
             Objects.requireNonNull(socialUseCases, "socialUseCases cannot be null");
             Objects.requireNonNull(noteDataAccess, "noteDataAccess cannot be null");
+            Objects.requireNonNull(distanceCalculator, "distanceCalculator cannot be null");
         }
     }
 
@@ -111,6 +117,7 @@ public class MatchingViewModel extends BaseViewModel {
         this.matchingUseCases = resolvedDependencies.matchingUseCases();
         this.socialUseCases = resolvedDependencies.socialUseCases();
         this.noteDataAccess = resolvedDependencies.noteDataAccess();
+        this.distanceCalculator = resolvedDependencies.distanceCalculator();
         this.session = Objects.requireNonNull(session, "session cannot be null");
     }
 
@@ -559,7 +566,7 @@ public class MatchingViewModel extends BaseViewModel {
         double lon2 = candidate.getLon();
 
         if (lat1 != 0 && lon1 != 0 && lat2 != 0 && lon2 != 0) {
-            double distKm = distanceKm(lat1, lon1, lat2, lon2);
+            double distKm = distanceCalculator.distanceKm(lat1, lon1, lat2, lon2);
             if (distKm < 1) {
                 return "< 1 km away";
             } else if (distKm < 10) {

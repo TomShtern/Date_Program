@@ -25,15 +25,12 @@ class VerificationUseCasesTest {
     @DisplayName("startVerification persists contact details and generated code")
     void startVerificationPersistsContactDetailsAndGeneratedCode() {
         TestStorages.Users users = new TestStorages.Users();
-        TestStorages.TrustSafety trustSafetyStorage = new TestStorages.TrustSafety();
-        TestStorages.Interactions interactions = new TestStorages.Interactions();
-        AppConfig config = AppConfig.defaults();
 
         User user = createActiveUser("Verifier");
         users.save(user);
 
-        VerificationUseCases useCases =
-                new VerificationUseCases(users, trustSafetyService(users, trustSafetyStorage, interactions, config));
+        VerificationUseCases useCases = new VerificationUseCases(
+                users, fixedVerificationRandom(), VerificationUseCases.DEFAULT_VERIFICATION_TTL);
 
         var result = useCases.startVerification(new VerificationUseCases.StartVerificationCommand(
                 UserContext.cli(user.getId()), VerificationMethod.EMAIL, "verified@example.com"));
@@ -50,15 +47,12 @@ class VerificationUseCasesTest {
     @DisplayName("startVerification rejects blank contact details")
     void startVerificationRejectsBlankContactDetails() {
         TestStorages.Users users = new TestStorages.Users();
-        TestStorages.TrustSafety trustSafetyStorage = new TestStorages.TrustSafety();
-        TestStorages.Interactions interactions = new TestStorages.Interactions();
-        AppConfig config = AppConfig.defaults();
 
         User user = createActiveUser("Verifier");
         users.save(user);
 
-        VerificationUseCases useCases =
-                new VerificationUseCases(users, trustSafetyService(users, trustSafetyStorage, interactions, config));
+        VerificationUseCases useCases = new VerificationUseCases(
+                users, fixedVerificationRandom(), VerificationUseCases.DEFAULT_VERIFICATION_TTL);
 
         var result = useCases.startVerification(new VerificationUseCases.StartVerificationCommand(
                 UserContext.cli(user.getId()), VerificationMethod.PHONE, "   "));
@@ -68,18 +62,33 @@ class VerificationUseCasesTest {
     }
 
     @Test
-    @DisplayName("confirmVerification marks the user verified for a matching code")
-    void confirmVerificationMarksTheUserVerifiedForMatchingCode() {
+    @DisplayName("startVerification rejects malformed contact details as validation failures")
+    void startVerificationRejectsMalformedContactDetailsAsValidationFailures() {
         TestStorages.Users users = new TestStorages.Users();
-        TestStorages.TrustSafety trustSafetyStorage = new TestStorages.TrustSafety();
-        TestStorages.Interactions interactions = new TestStorages.Interactions();
-        AppConfig config = AppConfig.defaults();
 
         User user = createActiveUser("Verifier");
         users.save(user);
 
-        VerificationUseCases useCases =
-                new VerificationUseCases(users, trustSafetyService(users, trustSafetyStorage, interactions, config));
+        VerificationUseCases useCases = new VerificationUseCases(
+                users, fixedVerificationRandom(), VerificationUseCases.DEFAULT_VERIFICATION_TTL);
+
+        var result = useCases.startVerification(new VerificationUseCases.StartVerificationCommand(
+                UserContext.cli(user.getId()), VerificationMethod.EMAIL, "not-an-email"));
+
+        assertFalse(result.success());
+        assertEquals("Invalid email format", result.error().message());
+    }
+
+    @Test
+    @DisplayName("confirmVerification marks the user verified for a matching code")
+    void confirmVerificationMarksTheUserVerifiedForMatchingCode() {
+        TestStorages.Users users = new TestStorages.Users();
+
+        User user = createActiveUser("Verifier");
+        users.save(user);
+
+        VerificationUseCases useCases = new VerificationUseCases(
+                users, fixedVerificationRandom(), VerificationUseCases.DEFAULT_VERIFICATION_TTL);
         useCases.startVerification(new VerificationUseCases.StartVerificationCommand(
                 UserContext.cli(user.getId()), VerificationMethod.EMAIL, "verified@example.com"));
 
@@ -94,15 +103,12 @@ class VerificationUseCasesTest {
     @DisplayName("confirmVerification rejects an incorrect code")
     void confirmVerificationRejectsIncorrectCode() {
         TestStorages.Users users = new TestStorages.Users();
-        TestStorages.TrustSafety trustSafetyStorage = new TestStorages.TrustSafety();
-        TestStorages.Interactions interactions = new TestStorages.Interactions();
-        AppConfig config = AppConfig.defaults();
 
         User user = createActiveUser("Verifier");
         users.save(user);
 
-        VerificationUseCases useCases =
-                new VerificationUseCases(users, trustSafetyService(users, trustSafetyStorage, interactions, config));
+        VerificationUseCases useCases = new VerificationUseCases(
+                users, fixedVerificationRandom(), VerificationUseCases.DEFAULT_VERIFICATION_TTL);
         useCases.startVerification(new VerificationUseCases.StartVerificationCommand(
                 UserContext.cli(user.getId()), VerificationMethod.EMAIL, "verified@example.com"));
 
@@ -111,16 +117,6 @@ class VerificationUseCasesTest {
 
         assertFalse(result.success());
         assertEquals("Incorrect code.", result.error().message());
-    }
-
-    private static datingapp.core.matching.TrustSafetyService trustSafetyService(
-            TestStorages.Users users,
-            TestStorages.TrustSafety trustSafetyStorage,
-            TestStorages.Interactions interactions,
-            AppConfig config) {
-        return datingapp.core.matching.TrustSafetyService.builder(trustSafetyStorage, interactions, users, config)
-                .random(fixedVerificationRandom())
-                .build();
     }
 
     private static SecureRandom fixedVerificationRandom() {

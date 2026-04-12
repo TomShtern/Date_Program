@@ -5,6 +5,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import datingapp.app.usecase.common.UserContext;
+import datingapp.app.usecase.profile.VerificationUseCases;
 import datingapp.core.connection.ConnectionModels.Block;
 import datingapp.core.connection.ConnectionModels.Conversation;
 import datingapp.core.connection.ConnectionModels.Report;
@@ -380,40 +382,50 @@ class TrustSafetyServiceTest {
             var tss = new TestStorages.TrustSafety();
             var iss = new TestStorages.Interactions();
             var us = new TestStorages.Users();
-            TrustSafetyService trustSafetyService = TrustSafetyService.builder(tss, iss, us, AppConfig.defaults())
-                    .verificationTtl(Duration.ofMinutes(15))
-                    .random(new SecureRandom(new byte[] {1, 2, 3, 4}))
-                    .build();
+            VerificationUseCases verificationUseCases =
+                    new VerificationUseCases(us, fixedVerificationRandom(), Duration.ofMinutes(15));
 
             User user = createActiveUser("ExpiredVerify");
-            user.startVerification(VerificationMethod.EMAIL, "123456");
+            us.save(user);
+            verificationUseCases.startVerification(new VerificationUseCases.StartVerificationCommand(
+                    UserContext.cli(user.getId()), VerificationMethod.EMAIL, "expired@example.com"));
 
             // Create a copy with verification sent in the past (expired)
             User expired = copyWithVerificationSentAt(
-                    user,
+                    us.get(user.getId()).orElseThrow(),
                     user.getVerificationSentAt() != null
-                            ? user.getVerificationSentAt().minus(Duration.ofMinutes(16))
+                            ? us.get(user.getId())
+                                    .orElseThrow()
+                                    .getVerificationSentAt()
+                                    .minus(Duration.ofMinutes(16))
                             : AppClock.now().minus(Duration.ofMinutes(16)));
+            us.save(expired);
 
-            assertFalse(trustSafetyService.verifyCode(expired, "123456"));
-            assertTrue(trustSafetyService.isExpired(expired.getVerificationSentAt()));
+            var result = verificationUseCases.confirmVerification(
+                    new VerificationUseCases.ConfirmVerificationCommand(UserContext.cli(expired.getId()), "123456"));
+
+            assertFalse(result.success());
+            assertEquals("Code expired. Please try again.", result.error().message());
         }
 
         @Test
         @DisplayName("Returns false when code mismatches")
         void returnsFalseWhenCodeMismatches() {
-            TrustSafetyService trustSafetyService = TrustSafetyService.builder(
-                            new TestStorages.TrustSafety(),
-                            new TestStorages.Interactions(),
-                            new TestStorages.Users(),
-                            AppConfig.defaults())
-                    .build();
+            TestStorages.Users users = new TestStorages.Users();
+            VerificationUseCases verificationUseCases = new VerificationUseCases(
+                    users, fixedVerificationRandom(), VerificationUseCases.DEFAULT_VERIFICATION_TTL);
 
             User user = createActiveUser("MismatchVerify");
-            user.startVerification(VerificationMethod.PHONE, "123456");
+            users.save(user);
+            verificationUseCases.startVerification(new VerificationUseCases.StartVerificationCommand(
+                    UserContext.cli(user.getId()), VerificationMethod.PHONE, "+15551234567"));
 
-            assertFalse(trustSafetyService.verifyCode(user, "000000"));
-            assertFalse(user.isVerified());
+            var result = verificationUseCases.confirmVerification(
+                    new VerificationUseCases.ConfirmVerificationCommand(UserContext.cli(user.getId()), "000000"));
+
+            assertFalse(result.success());
+            assertEquals("Incorrect code.", result.error().message());
+            assertFalse(users.get(user.getId()).orElseThrow().isVerified());
         }
     }
 
@@ -568,6 +580,15 @@ class TrustSafetyServiceTest {
                 .verifiedAt(user.getVerifiedAt())
                 .pacePreferences(user.getPacePreferences())
                 .build();
+    }
+
+    private static SecureRandom fixedVerificationRandom() {
+        return new SecureRandom() {
+            @Override
+            public int nextInt(int bound) {
+                return 123456;
+            }
+        };
     }
 
     // ============================================================

@@ -118,21 +118,7 @@ public class ProfileUseCases {
 
     public UseCaseResult<datingapp.core.metrics.EngagementDomain.UserStats> getOrComputeStats(
             ProfileInsightsUseCases.StatsQuery query) {
-        UseCaseResult<datingapp.core.metrics.EngagementDomain.UserStats> result =
-                profileInsightsUseCases.getOrComputeStats(query);
-        if (result.success()) {
-            return result;
-        }
-        if (query == null || query.context() == null) {
-            return result;
-        }
-
-        try {
-            return UseCaseResult.success(
-                    profileInsightsUseCases.getOrComputeStats(query.context().userId()));
-        } catch (Exception e) {
-            return UseCaseResult.failure(UseCaseError.internal("Failed to load user statistics: " + e.getMessage()));
-        }
+        return profileInsightsUseCases.getOrComputeStats(query);
     }
 
     public UseCaseResult<ProfileInsightsUseCases.SessionSummaryResult> getSessionSummary(

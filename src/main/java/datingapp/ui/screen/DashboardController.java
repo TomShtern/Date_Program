@@ -282,31 +282,31 @@ public class DashboardController extends BaseController
     @FXML
     private void handleBrowse() {
         logger.info("Navigating to Matching screen");
-        NavigationService.getInstance().navigateTo(NavigationService.ViewType.MATCHING);
+        navigationService().navigateTo(NavigationService.ViewType.MATCHING);
     }
 
     @FXML
     private void handleMatches() {
         logger.info("Navigating to Matches screen");
-        NavigationService.getInstance().navigateTo(NavigationService.ViewType.MATCHES);
+        navigationService().navigateTo(NavigationService.ViewType.MATCHES);
     }
 
     @FXML
     private void handleStats() {
         logger.info("Navigating to Stats screen");
-        NavigationService.getInstance().navigateTo(NavigationService.ViewType.STATS);
+        navigationService().navigateTo(NavigationService.ViewType.STATS);
     }
 
     @FXML
     private void handleChat() {
         logger.info("Navigating to Chat screen");
-        NavigationService.getInstance().navigateTo(NavigationService.ViewType.CHAT);
+        navigationService().navigateTo(NavigationService.ViewType.CHAT);
     }
 
     @FXML
     private void handleProfile() {
         logger.info("Navigating to Profile screen");
-        NavigationService.getInstance().navigateTo(NavigationService.ViewType.PROFILE);
+        navigationService().navigateTo(NavigationService.ViewType.PROFILE);
     }
 
     @FXML
@@ -317,37 +317,37 @@ public class DashboardController extends BaseController
         }
         logger.info("Viewing daily pick - navigating to Matching");
         viewModel.markDailyPickViewed();
+        NavigationService navigationService = navigationService();
         if (viewModel.dailyPickUserIdProperty().get() != null) {
-            NavigationService.getInstance()
-                    .setNavigationContext(
-                            NavigationService.ViewType.MATCHING,
-                            viewModel.dailyPickUserIdProperty().get());
+            navigationService.setNavigationContext(
+                    NavigationService.ViewType.MATCHING,
+                    viewModel.dailyPickUserIdProperty().get());
         }
-        NavigationService.getInstance().navigateTo(NavigationService.ViewType.MATCHING);
+        navigationService.navigateTo(NavigationService.ViewType.MATCHING);
     }
 
     @FXML
     private void handleStandouts() {
         logger.info("Navigating to Standouts screen");
-        NavigationService.getInstance().navigateTo(NavigationService.ViewType.STANDOUTS);
+        navigationService().navigateTo(NavigationService.ViewType.STANDOUTS);
     }
 
     @FXML
     private void handleSocial() {
         logger.info("Navigating to Social screen");
-        NavigationService.getInstance().navigateTo(NavigationService.ViewType.SOCIAL);
+        navigationService().navigateTo(NavigationService.ViewType.SOCIAL);
     }
 
     @FXML
     private void handleSafety() {
         logger.info("Navigating to Safety screen");
-        NavigationService.getInstance().navigateTo(NavigationService.ViewType.SAFETY);
+        navigationService().navigateTo(NavigationService.ViewType.SAFETY);
     }
 
     @FXML
     private void handleNotes() {
         logger.info("Navigating to Notes screen");
-        NavigationService.getInstance().navigateTo(NavigationService.ViewType.NOTES);
+        navigationService().navigateTo(NavigationService.ViewType.NOTES);
     }
 
     @FXML
@@ -358,7 +358,7 @@ public class DashboardController extends BaseController
                 "You will need to log in again to continue.",
                 () -> {
                     logger.info("Logging out");
-                    NavigationService navigationService = NavigationService.getInstance();
+                    NavigationService navigationService = navigationService();
                     viewModel.logout();
                     navigationService.getViewModelFactory().reset();
                     navigationService.resetNavigationState();
@@ -473,7 +473,7 @@ public class DashboardController extends BaseController
 
         cancelPendingAchievementTimers();
 
-        StackPane rootStack = NavigationService.getInstance().getRootStack();
+        StackPane rootStack = overlayRootStack();
         if (rootStack == null || rootPane == null) {
             return;
         }

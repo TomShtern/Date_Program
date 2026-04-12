@@ -293,6 +293,21 @@ public class User {
             return this;
         }
 
+        public StorageBuilder dealbreakers(MatchPreferences.Dealbreakers dealbreakers) {
+            if (dealbreakers != null) {
+                user.dealbreakers = dealbreakers.toBuilder().build();
+            }
+            return this;
+        }
+
+        public StorageBuilder rawLocation(double lat, double lon, boolean hasLocationSet) {
+            user.lat = lat;
+            user.lon = lon;
+            user.hasLocationSet = hasLocationSet;
+            locationProvided = true;
+            return this;
+        }
+
         public StorageBuilder email(String email) {
             user.email = email;
             return this;
@@ -583,7 +598,6 @@ public class User {
         this.isVerified = true;
         this.verifiedAt = AppClock.now();
         this.verificationCode = null;
-        this.verificationSentAt = null;
         touch();
     }
 
@@ -909,13 +923,12 @@ public class User {
 
     /** Returns a deep copy of this user, including dealbreakers and mutable collections. */
     public User copy() {
-        User copy = StorageBuilder.create(id, name, createdAt)
+        return StorageBuilder.create(id, name, createdAt)
                 .bio(bio)
                 .birthDate(birthDate)
                 .gender(gender)
                 .interestedIn(interestedIn)
-                .location(lat, lon)
-                .hasLocationSet(hasLocationSet)
+                .rawLocation(lat, lon, hasLocationSet)
                 .maxDistanceKm(maxDistanceKm)
                 .ageRange(minAge, maxAge)
                 .photoUrls(photoUrls)
@@ -928,6 +941,7 @@ public class User {
                 .lookingFor(lookingFor)
                 .education(education)
                 .heightCm(heightCm)
+                .dealbreakers(dealbreakers)
                 .email(email)
                 .phone(phone)
                 .verified(isVerified)
@@ -938,11 +952,6 @@ public class User {
                 .pacePreferences(pacePreferences)
                 .deletedAt(deletedAt)
                 .build();
-
-        if (dealbreakers != null) {
-            copy.dealbreakers = dealbreakers.toBuilder().build();
-        }
-        return copy;
     }
 
     /** Marks this entity as soft-deleted at the given instant. */

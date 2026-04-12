@@ -14,9 +14,6 @@ import datingapp.core.storage.OperationalInteractionStorage;
 import datingapp.core.storage.TrustSafetyStorage;
 import datingapp.core.storage.UserStorage;
 import datingapp.core.workflow.RelationshipWorkflowPolicy;
-import java.security.SecureRandom;
-import java.time.Duration;
-import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -42,15 +39,11 @@ public final class TrustSafetyService {
     private static final String AUDIT_KEY_MODERATION_REASON_CODE = "moderation_reason_code";
     private static final String AUDIT_KEY_REPORT_COUNT = "report_count";
     private static final String AUDIT_KEY_THRESHOLD = "threshold";
-    public static final Duration DEFAULT_VERIFICATION_TTL = Duration.ofMinutes(15);
-
     private final TrustSafetyStorage trustSafetyStorage;
     private final OperationalInteractionStorage interactionStorage;
     private final UserStorage userStorage;
     private final AppConfig config;
     private final CommunicationStorage communicationStorage; // nullable
-    private final Duration verificationTtl;
-    private final SecureRandom random;
     private final RelationshipWorkflowPolicy workflowPolicy;
     private final ModerationAuditLogger moderationAuditLogger = new ModerationAuditLogger();
     private CandidateFinder candidateFinder;
@@ -94,9 +87,6 @@ public final class TrustSafetyService {
         this.userStorage = Objects.requireNonNull(resolvedBuilder.userStorage, "userStorage cannot be null");
         this.config = Objects.requireNonNull(resolvedBuilder.config, "config cannot be null");
         this.communicationStorage = resolvedBuilder.communicationStorage;
-        this.verificationTtl =
-                Objects.requireNonNull(resolvedBuilder.verificationTtl, "verificationTtl cannot be null");
-        this.random = Objects.requireNonNull(resolvedBuilder.random, "random cannot be null");
         this.workflowPolicy = Objects.requireNonNull(resolvedBuilder.workflowPolicy, "workflowPolicy cannot be null");
     }
 
@@ -106,8 +96,6 @@ public final class TrustSafetyService {
         private UserStorage userStorage;
         private AppConfig config;
         private CommunicationStorage communicationStorage;
-        private Duration verificationTtl = DEFAULT_VERIFICATION_TTL;
-        private SecureRandom random = new SecureRandom();
         private RelationshipWorkflowPolicy workflowPolicy = new RelationshipWorkflowPolicy();
 
         private Builder() {}
@@ -137,16 +125,6 @@ public final class TrustSafetyService {
             return this;
         }
 
-        public Builder verificationTtl(Duration verificationTtl) {
-            this.verificationTtl = verificationTtl;
-            return this;
-        }
-
-        public Builder random(SecureRandom random) {
-            this.random = random;
-            return this;
-        }
-
         public Builder workflowPolicy(RelationshipWorkflowPolicy workflowPolicy) {
             this.workflowPolicy = workflowPolicy;
             return this;
@@ -155,38 +133,6 @@ public final class TrustSafetyService {
         public TrustSafetyService build() {
             return new TrustSafetyService(this);
         }
-    }
-
-    /** Generates a six-digit verification code. */
-    public String generateVerificationCode() {
-        int value = random.nextInt(1_000_000);
-        return String.format("%06d", value);
-    }
-
-    /** Returns true if the verification code has expired. */
-    public boolean isExpired(Instant sentAt) {
-        return sentAt == null || sentAt.plus(verificationTtl).isBefore(AppClock.now());
-    }
-
-    /**
-     * Validates a user-provided verification code against stored user data.
-     *
-     * @param user      the user to verify
-     * @param inputCode the user-provided code
-     * @return true if the code matches and is not expired
-     */
-    public boolean verifyCode(User user, String inputCode) {
-        Objects.requireNonNull(user, "user cannot be null");
-        if (inputCode == null || inputCode.isBlank()) {
-            return false;
-        }
-
-        String expected = user.getVerificationCode();
-        if (expected == null) {
-            return false;
-        }
-
-        return !isExpired(user.getVerificationSentAt()) && expected.equals(inputCode.trim());
     }
 
     /** Report a user for inappropriate behavior and return moderation action. */

@@ -5,15 +5,13 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import datingapp.core.AppClock;
 import io.javalin.http.Context;
 import java.lang.reflect.Field;
 import java.lang.reflect.Proxy;
 import java.time.Duration;
-import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
-import org.junit.jupiter.api.AfterEach;
+import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -23,11 +21,6 @@ class RestApiRequestGuardsTest {
     private static final String HEALTH_PATH = "/api/health";
     private static final String USERS_PATH = "/api/users/abc";
     private static final String LOOPBACK_IP = "127.0.0.1";
-
-    @AfterEach
-    void resetClock() {
-        AppClock.reset();
-    }
 
     @Test
     @DisplayName("enforceLocalhostOnly allows loopback and rejects non-loopback clients")
@@ -75,15 +68,15 @@ class RestApiRequestGuardsTest {
     @Test
     @DisplayName("stale rate-limit windows are evicted on the scheduled sweep")
     void staleRateLimitWindowsAreEvictedOnTheScheduledSweep() throws Exception {
-        AppClock.setFixed(Instant.parse("2026-04-03T00:00:00Z"));
+        AtomicLong ticker = new AtomicLong(0L);
         RestApiRequestGuards guards =
-                new RestApiRequestGuards(new RestApiIdentityPolicy(), Duration.ofSeconds(5), 1000);
+                new RestApiRequestGuards(new RestApiIdentityPolicy(), Duration.ofSeconds(5), 1000, ticker::get);
 
         for (int i = 0; i < 255; i++) {
             guards.enforceRateLimit(context(USERS_PATH, "GET", LOOPBACK_IP, Map.of(), Map.of()));
         }
 
-        AppClock.setFixed(AppClock.now().plusSeconds(11));
+        ticker.set(Duration.ofSeconds(11).toNanos());
         guards.enforceRateLimit(context(USERS_PATH, "GET", LOOPBACK_IP, Map.of(), Map.of()));
 
         Field rateLimiterField = RestApiRequestGuards.class.getDeclaredField("rateLimiter");
@@ -96,6 +89,23 @@ class RestApiRequestGuardsTest {
                 (java.util.concurrent.ConcurrentHashMap<String, ?>) windowsField.get(rateLimiter);
 
         assertEquals(1, windows.size());
+    }
+
+    @Test
+    @DisplayName("rate limiting uses the injected monotonic ticker instead of AppClock")
+    void rateLimitingUsesInjectedMonotonicTickerInsteadOfAppClock() {
+        AtomicLong ticker = new AtomicLong(0L);
+        RestApiRequestGuards guards =
+                new RestApiRequestGuards(new RestApiIdentityPolicy(), Duration.ofSeconds(5), 1, ticker::get);
+        Context ctx = context(USERS_PATH, "GET", LOOPBACK_IP, Map.of(), Map.of());
+
+        guards.enforceRateLimit(ctx);
+        RestApiRequestGuards.ApiTooManyRequestsException blocked = assertThrows(
+                RestApiRequestGuards.ApiTooManyRequestsException.class, () -> guards.enforceRateLimit(ctx));
+        assertEquals(2, blocked.status().used());
+
+        ticker.set(Duration.ofSeconds(6).toNanos());
+        assertDoesNotThrow(() -> guards.enforceRateLimit(ctx));
     }
 
     private static Context context(

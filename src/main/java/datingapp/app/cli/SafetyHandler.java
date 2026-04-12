@@ -23,6 +23,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.OptionalInt;
 import java.util.Set;
 import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
@@ -164,19 +165,16 @@ public class SafetyHandler implements LoggingSupport {
         }
 
         String reasonInput = inputReader.readLine("Select reason: ");
-        try {
-            int reasonIdx = Integer.parseInt(reasonInput) - 1;
-            if (reasonIdx < 0 || reasonIdx >= reasons.length) {
-                logInfo("❌ Invalid reason.\n");
-                return null;
-            }
-            return reasons[reasonIdx];
-        } catch (NumberFormatException _) {
+        OptionalInt selectedIndex = CliTextAndInput.parseOneBasedIndex(reasonInput, reasons.length);
+        if (selectedIndex.isPresent()) {
+            return reasons[selectedIndex.getAsInt()];
+        }
+        if (!CliTextAndInput.isZeroSelection(reasonInput)) {
             String lengthMeta = reasonInput == null ? EMPTY_INPUT_META : String.valueOf(reasonInput.length());
             logger.debug("Invalid report reason input; length={}", lengthMeta);
-            logInfo("❌ Invalid input.\n");
-            return null;
         }
+        logInfo("❌ Invalid input.\n");
+        return null;
     }
 
     /**
@@ -297,22 +295,18 @@ public class SafetyHandler implements LoggingSupport {
         }
 
         String input = inputReader.readLine(prompt);
-        try {
-            int idx = Integer.parseInt(input) - 1;
-            if (idx < 0 || idx >= users.size()) {
-                if (idx != -1) {
-                    logInfo(CliTextAndInput.INVALID_INPUT);
-                }
-                return null;
-            }
-            return users.get(idx);
-        } catch (NumberFormatException _) {
-            logger.warn("Invalid safety handler selection input");
-            String lengthMeta = input == null ? EMPTY_INPUT_META : String.valueOf(input.length());
-            logger.debug("Invalid safety input length={}", lengthMeta);
-            logInfo(CliTextAndInput.INVALID_INPUT);
+        if (CliTextAndInput.isZeroSelection(input)) {
             return null;
         }
+        OptionalInt selectedIndex = CliTextAndInput.parseOneBasedIndex(input, users.size());
+        if (selectedIndex.isPresent()) {
+            return users.get(selectedIndex.getAsInt());
+        }
+        logger.warn("Invalid safety handler selection input");
+        String lengthMeta = input == null ? EMPTY_INPUT_META : String.valueOf(input.length());
+        logger.debug("Invalid safety input length={}", lengthMeta);
+        logInfo(CliTextAndInput.INVALID_INPUT);
+        return null;
     }
 
     @Nullable
@@ -323,22 +317,18 @@ public class SafetyHandler implements LoggingSupport {
         }
 
         String input = inputReader.readLine(prompt);
-        try {
-            int idx = Integer.parseInt(input) - 1;
-            if (idx < 0 || idx >= blockedUsers.size()) {
-                if (idx != -1) {
-                    logInfo(CliTextAndInput.INVALID_INPUT);
-                }
-                return null;
-            }
-            return blockedUsers.get(idx);
-        } catch (NumberFormatException _) {
-            logger.warn("Invalid safety handler selection input");
-            String lengthMeta = input == null ? EMPTY_INPUT_META : String.valueOf(input.length());
-            logger.debug("Invalid safety input length={}", lengthMeta);
-            logInfo(CliTextAndInput.INVALID_INPUT);
+        if (CliTextAndInput.isZeroSelection(input)) {
             return null;
         }
+        OptionalInt selectedIndex = CliTextAndInput.parseOneBasedIndex(input, blockedUsers.size());
+        if (selectedIndex.isPresent()) {
+            return blockedUsers.get(selectedIndex.getAsInt());
+        }
+        logger.warn("Invalid safety handler selection input");
+        String lengthMeta = input == null ? EMPTY_INPUT_META : String.valueOf(input.length());
+        logger.debug("Invalid safety input length={}", lengthMeta);
+        logInfo(CliTextAndInput.INVALID_INPUT);
+        return null;
     }
 
     // =========================================================================

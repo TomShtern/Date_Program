@@ -905,7 +905,9 @@ class SchemaInitializerTest {
                         + "created_at TIMESTAMP NOT NULL, "
                         + "status VARCHAR(20) NOT NULL, "
                         + "responded_at TIMESTAMP, "
-                        + "pair_key VARCHAR(73), "
+                        + "pair_key "
+                        + SchemaInitializer.PAIR_ID_SQL_TYPE
+                        + ", "
                         + "pending_marker VARCHAR(10)"
                         + ")");
                 stmt.execute("CREATE TABLE profile_views ("
@@ -1248,6 +1250,68 @@ class SchemaInitializerTest {
                     ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM schema_version WHERE version = 18")) {
                 assertTrue(rs.next());
                 assertEquals(1, rs.getInt(1), "Schema version 18 should be recorded");
+            }
+        }
+
+        @Test
+        @DisplayName("should roll back V18 contact normalization when duplicate normalized values block the migration")
+        void v18MigrationRollsBackNormalizedContactUpdatesWhenDuplicatesAbortMigration() throws SQLException {
+            try (Statement stmt = connection.createStatement()) {
+                stmt.execute("CREATE TABLE users ("
+                        + "id UUID PRIMARY KEY, "
+                        + "name VARCHAR(100) NOT NULL, "
+                        + "email VARCHAR(200), "
+                        + "phone VARCHAR(50), "
+                        + "created_at TIMESTAMP WITH TIME ZONE NOT NULL, "
+                        + "updated_at TIMESTAMP WITH TIME ZONE NOT NULL, "
+                        + "state VARCHAR(20) NOT NULL"
+                        + ")");
+                stmt.execute("CREATE TABLE schema_version ("
+                        + "version INT PRIMARY KEY, "
+                        + "applied_at TIMESTAMP WITH TIME ZONE NOT NULL, "
+                        + "description VARCHAR(255)"
+                        + ")");
+                stmt.execute("INSERT INTO schema_version(version, applied_at, description) VALUES "
+                        + "(1, CURRENT_TIMESTAMP(), 'V1 baseline schema'), "
+                        + "(2, CURRENT_TIMESTAMP(), 'V2 daily picks cache table'), "
+                        + "(3, CURRENT_TIMESTAMP(), 'V3 normalized profile cleanup'), "
+                        + "(4, CURRENT_TIMESTAMP(), 'V4 soft-delete columns'), "
+                        + "(5, CURRENT_TIMESTAMP(), 'V5 profile view primary key'), "
+                        + "(6, CURRENT_TIMESTAMP(), 'V6 matches updated_at backfill'), "
+                        + "(7, CURRENT_TIMESTAMP(), 'V7 messages conversation index'), "
+                        + "(8, CURRENT_TIMESTAMP(), 'V8 query optimization indexes'), "
+                        + "(9, CURRENT_TIMESTAMP(), 'V9 matches updated_at repair'), "
+                        + "(10, CURRENT_TIMESTAMP(), 'V10 named foreign keys'), "
+                        + "(11, CURRENT_TIMESTAMP(), 'V11 friend request uniqueness helpers'), "
+                        + "(12, CURRENT_TIMESTAMP(), 'V12 enum and length checks'), "
+                        + "(13, CURRENT_TIMESTAMP(), 'V13 matches ended_by integrity'), "
+                        + "(14, CURRENT_TIMESTAMP(), 'V14 structural and nonblank checks'), "
+                        + "(15, CURRENT_TIMESTAMP(), 'V15 remaining enum checks'), "
+                        + "(16, CURRENT_TIMESTAMP(), 'V16 query/index alignment'), "
+                        + "(17, CURRENT_TIMESTAMP(), 'V17 timestamptz conversion')");
+
+                stmt.execute(
+                        "INSERT INTO users (id, name, email, created_at, updated_at, state) VALUES "
+                                + "('11111111-1111-1111-1111-111111111111', 'Alice', ' alice@example.com ', CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP(), 'ACTIVE')");
+                stmt.execute(
+                        "INSERT INTO users (id, name, email, created_at, updated_at, state) VALUES "
+                                + "('22222222-2222-2222-2222-222222222222', 'Bob', 'alice@example.com', CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP(), 'ACTIVE')");
+
+                SQLException exception = assertThrows(SQLException.class, () -> MigrationRunner.runAllPending(stmt));
+                assertTrue(exception.getMessage().contains("Cannot enforce unique users.email values"));
+            }
+
+            try (Statement stmt = connection.createStatement();
+                    ResultSet rs = stmt.executeQuery(
+                            "SELECT email FROM users WHERE id = '11111111-1111-1111-1111-111111111111'")) {
+                assertTrue(rs.next());
+                assertEquals(" alice@example.com ", rs.getString(1));
+            }
+
+            try (Statement stmt = connection.createStatement();
+                    ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM schema_version WHERE version = 18")) {
+                assertTrue(rs.next());
+                assertEquals(0, rs.getInt(1), "Schema version 18 must not be recorded when migration fails");
             }
         }
     }

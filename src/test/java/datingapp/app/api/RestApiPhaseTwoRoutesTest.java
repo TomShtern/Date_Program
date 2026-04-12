@@ -1,6 +1,7 @@
 package datingapp.app.api;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -367,7 +368,11 @@ class RestApiPhaseTwoRoutesTest {
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
         assertEquals(204, archiveMatchResponse.statusCode());
-        assertTrue(interactionStorage.get(Match.generateId(aliceId, bobId)).isEmpty());
+        Match archivedMatch =
+                interactionStorage.get(Match.generateId(aliceId, bobId)).orElseThrow();
+        assertEquals(Match.MatchState.UNMATCHED, archivedMatch.getState());
+        assertEquals(Match.MatchArchiveReason.UNMATCH, archivedMatch.getEndReason());
+        assertFalse(archivedMatch.isDeleted());
     }
 
     @Test

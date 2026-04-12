@@ -306,13 +306,13 @@ public class ProfileController extends BaseController implements Initializable {
     }
 
     protected void navigateToDashboard() {
-        NavigationService.getInstance().navigateTo(NavigationService.ViewType.DASHBOARD);
+        navigationService().navigateTo(NavigationService.ViewType.DASHBOARD);
     }
 
     @Override
     public void initialize(URL location, ResourceBundle resources) {
         viewModel.setErrorHandler(UiFeedbackService::showError);
-        NavigationService.getInstance()
+        navigationService()
                 .consumeNavigationContext(NavigationService.ViewType.PROFILE, OnboardingContext.class)
                 .ifPresent(viewModel::setOnboardingContext);
 
@@ -964,7 +964,7 @@ public class ProfileController extends BaseController implements Initializable {
     }
 
     protected void navigateToLogin() {
-        NavigationService.getInstance().navigateTo(NavigationService.ViewType.LOGIN);
+        navigationService().navigateTo(NavigationService.ViewType.LOGIN);
     }
 
     private boolean isOnboardingActive() {

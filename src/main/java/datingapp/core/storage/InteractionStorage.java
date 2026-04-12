@@ -97,7 +97,9 @@ public interface InteractionStorage {
      *
      * <p>
      * Default implementation preserves existing behavior for non-transactional
-     * storages.
+     * storages by synchronizing only within the current storage instance. It is a
+     * best-effort compatibility fallback for single-instance/in-memory setups, not
+     * a production-grade cross-instance isolation guarantee.
      */
     default LikeMatchWriteResult saveLikeAndMaybeCreateMatch(Like like) {
         Objects.requireNonNull(like, "like cannot be null");

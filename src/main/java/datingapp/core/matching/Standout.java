@@ -40,8 +40,13 @@ public record Standout(
     /** Factory for creating new standout. */
     public static Standout create(
             UUID seekerId, UUID standoutUserId, LocalDate date, int rank, int score, String reason) {
-        return new Standout(
-                UUID.randomUUID(), seekerId, standoutUserId, date, rank, score, reason, AppClock.now(), null);
+        return create(seekerId, standoutUserId, date, rank, score, reason, AppClock.now());
+    }
+
+    /** Factory for creating new standout with an explicit timestamp. */
+    public static Standout create(
+            UUID seekerId, UUID standoutUserId, LocalDate date, int rank, int score, String reason, Instant createdAt) {
+        return new Standout(UUID.randomUUID(), seekerId, standoutUserId, date, rank, score, reason, createdAt, null);
     }
 
     /** Factory for loading from database. */

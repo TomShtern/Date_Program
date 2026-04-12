@@ -24,7 +24,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
-import javafx.application.Platform;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.IntegerProperty;
 import javafx.beans.property.SimpleBooleanProperty;
@@ -61,6 +60,7 @@ public class MatchesViewModel extends BaseViewModel {
     private final MatchListLoader matchListLoader;
     private final RelationshipActionRunner relationshipActionRunner;
     private final AppSession session;
+    private final AsyncExecutionMode asyncExecutionMode;
     private final ObservableList<MatchCardData> matches = FXCollections.observableArrayList();
     private final ObservableList<LikeCardData> likesReceived = FXCollections.observableArrayList();
     private final ObservableList<LikeCardData> likesSent = FXCollections.observableArrayList();
@@ -93,12 +93,27 @@ public class MatchesViewModel extends BaseViewModel {
 
     private final AtomicReference<User> currentUser = new AtomicReference<>();
 
+    public enum AsyncExecutionMode {
+        SYNC,
+        ASYNC
+    }
+
     public record Dependencies(
             RecommendationService dailyService,
             MatchingUseCases matchingUseCases,
             ProfileUseCases profileUseCases,
             SocialUseCases socialUseCases,
-            AppConfig config) {
+            AppConfig config,
+            AsyncExecutionMode asyncExecutionMode) {
+
+        public Dependencies(
+                RecommendationService dailyService,
+                MatchingUseCases matchingUseCases,
+                ProfileUseCases profileUseCases,
+                SocialUseCases socialUseCases,
+                AppConfig config) {
+            this(dailyService, matchingUseCases, profileUseCases, socialUseCases, config, AsyncExecutionMode.SYNC);
+        }
 
         public Dependencies {
             Objects.requireNonNull(dailyService, "dailyService cannot be null");
@@ -106,6 +121,7 @@ public class MatchesViewModel extends BaseViewModel {
             Objects.requireNonNull(profileUseCases, "profileUseCases cannot be null");
             Objects.requireNonNull(socialUseCases, "socialUseCases cannot be null");
             Objects.requireNonNull(config, "config cannot be null");
+            Objects.requireNonNull(asyncExecutionMode, "asyncExecutionMode cannot be null");
         }
     }
 
@@ -122,6 +138,7 @@ public class MatchesViewModel extends BaseViewModel {
                 resolvedDependencies.config());
         this.relationshipActionRunner = new RelationshipActionRunner(asyncScope);
         this.session = Objects.requireNonNull(session, "session cannot be null");
+        this.asyncExecutionMode = resolvedDependencies.asyncExecutionMode();
     }
 
     /** Initialize and load matches for current user. */
@@ -178,24 +195,6 @@ public class MatchesViewModel extends BaseViewModel {
             return;
         }
         refreshAllSync(userId, userName, capturedEpoch);
-    }
-
-    /**
-     * Check if the JavaFX toolkit is available. Returns false in unit test
-     * environments.
-     */
-    private boolean isFxToolkitAvailable() {
-        try {
-            if (Platform.isFxApplicationThread()) {
-                return true;
-            }
-            Platform.runLater(() -> {
-                // probe only
-            });
-            return true;
-        } catch (IllegalStateException _) {
-            return false;
-        }
     }
 
     /**
@@ -557,7 +556,7 @@ public class MatchesViewModel extends BaseViewModel {
     }
 
     private boolean shouldRunAsync() {
-        return isFxToolkitAvailable() && Platform.isFxApplicationThread();
+        return asyncExecutionMode == AsyncExecutionMode.ASYNC;
     }
 
     public BooleanProperty loadFailedProperty() {

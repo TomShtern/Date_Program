@@ -71,14 +71,14 @@ public class ConnectionService {
         String matchId = Match.generateId(senderId, recipientId);
         Match match = interactionStorage.get(matchId).orElse(null);
 
-        WorkflowDecision decision = workflowPolicy.canSendMessage(match, sender, recipient);
-        if (decision.isDenied()) {
-            String reasonCode = ((WorkflowDecision.Denied) decision).reasonCode();
-            return switch (reasonCode) {
-                case "SENDER_NOT_ACTIVE" -> SendResult.failure(SENDER_NOT_FOUND, SendResult.ErrorCode.USER_NOT_FOUND);
-                case "RECIPIENT_NOT_ACTIVE" ->
+        RelationshipWorkflowPolicy.MessageSendDecision decision =
+                workflowPolicy.evaluateMessageSend(match, sender, recipient);
+        if (!decision.allowed()) {
+            return switch (decision.deniedReason()) {
+                case SENDER_NOT_ACTIVE -> SendResult.failure(SENDER_NOT_FOUND, SendResult.ErrorCode.USER_NOT_FOUND);
+                case RECIPIENT_NOT_ACTIVE ->
                     SendResult.failure(RECIPIENT_NOT_FOUND, SendResult.ErrorCode.USER_NOT_FOUND);
-                default -> SendResult.failure(NO_ACTIVE_MATCH, SendResult.ErrorCode.NO_ACTIVE_MATCH);
+                case MATCH_NOT_MESSAGEABLE -> SendResult.failure(NO_ACTIVE_MATCH, SendResult.ErrorCode.NO_ACTIVE_MATCH);
             };
         }
 
@@ -319,9 +319,13 @@ public class ConnectionService {
     }
 
     public boolean canMessage(UUID userA, UUID userB) {
+        Objects.requireNonNull(userA, "userA cannot be null");
+        Objects.requireNonNull(userB, "userB cannot be null");
         String matchId = Match.generateId(userA, userB);
-        Optional<Match> matchOpt = interactionStorage.get(matchId);
-        return matchOpt.isPresent() && matchOpt.get().canMessage();
+        Match match = interactionStorage.get(matchId).orElse(null);
+        User sender = userStorage.get(userA).orElse(null);
+        User recipient = userStorage.get(userB).orElse(null);
+        return workflowPolicy.evaluateMessageSend(match, sender, recipient).allowed();
     }
 
     public Conversation getOrCreateConversation(UUID userA, UUID userB) {

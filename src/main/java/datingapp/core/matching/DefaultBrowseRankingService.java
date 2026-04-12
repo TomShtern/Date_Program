@@ -61,28 +61,17 @@ public final class DefaultBrowseRankingService implements BrowseRankingService {
         double completenessScore = profileService.calculate(candidate).score() / 100.0;
         double activityScore = calculator.calculateActivityScore(candidate);
 
-        double weightedScore = distanceScore * config.matching().distanceWeight()
-                + ageScore * config.matching().ageWeight()
-                + interestScore * config.matching().interestWeight()
-                + lifestyleScore * config.matching().lifestyleWeight()
-                + paceScore * config.matching().paceWeight()
-                + completenessScore * config.algorithm().standoutCompletenessWeight()
-                + activityScore * config.algorithm().standoutActivityWeight();
-
-        double totalWeight = config.matching().distanceWeight()
-                + config.matching().ageWeight()
-                + config.matching().interestWeight()
-                + config.matching().lifestyleWeight()
-                + config.matching().paceWeight()
-                + config.algorithm().standoutCompletenessWeight()
-                + config.algorithm().standoutActivityWeight();
-
-        if (totalWeight <= 0.0) {
-            return new ScoredCandidate(candidate, 0.0, completenessScore, activityScore, candidate.getUpdatedAt());
-        }
+        WeightedScore weightedScore = WeightedScore.empty()
+                .add(distanceScore, config.matching().distanceWeight())
+                .add(ageScore, config.matching().ageWeight())
+                .add(interestScore, config.matching().interestWeight())
+                .add(lifestyleScore, config.matching().lifestyleWeight())
+                .add(paceScore, config.matching().paceWeight())
+                .add(completenessScore, config.algorithm().standoutCompletenessWeight())
+                .add(activityScore, config.algorithm().standoutActivityWeight());
 
         return new ScoredCandidate(
-                candidate, weightedScore / totalWeight, completenessScore, activityScore, candidate.getUpdatedAt());
+                candidate, weightedScore.normalized(), completenessScore, activityScore, candidate.getUpdatedAt());
     }
 
     private double calculateDistanceScore(User seeker, User candidate) {

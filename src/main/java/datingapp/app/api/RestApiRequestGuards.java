@@ -1,6 +1,5 @@
 package datingapp.app.api;
 
-import datingapp.core.AppClock;
 import io.javalin.Javalin;
 import io.javalin.http.Context;
 import java.net.InetAddress;
@@ -8,6 +7,7 @@ import java.net.UnknownHostException;
 import java.time.Duration;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
+import java.util.function.LongSupplier;
 
 final class RestApiRequestGuards {
 
@@ -17,8 +17,13 @@ final class RestApiRequestGuards {
     private final LocalRateLimiter rateLimiter;
 
     RestApiRequestGuards(RestApiIdentityPolicy identityPolicy, Duration window, int maxRequests) {
+        this(identityPolicy, window, maxRequests, System::nanoTime);
+    }
+
+    RestApiRequestGuards(
+            RestApiIdentityPolicy identityPolicy, Duration window, int maxRequests, LongSupplier monotonicTicker) {
         this.identityPolicy = identityPolicy;
-        this.rateLimiter = new LocalRateLimiter(window, maxRequests);
+        this.rateLimiter = new LocalRateLimiter(window, maxRequests, monotonicTicker);
     }
 
     void registerRequestGuards(Javalin app, Consumer<Context> localhostOnlyGuard) {
@@ -76,41 +81,44 @@ final class RestApiRequestGuards {
 
     private static final class LocalRateLimiter {
         private static final int EVICTION_INTERVAL = 256;
-        private final long windowMillis;
+        private static final long NANOS_PER_SECOND = 1_000_000_000L;
+        private final long windowNanos;
         private final int maxRequests;
+        private final LongSupplier monotonicTicker;
         private final ConcurrentHashMap<String, Window> windows = new ConcurrentHashMap<>();
         private final java.util.concurrent.atomic.AtomicInteger callCounter =
                 new java.util.concurrent.atomic.AtomicInteger(0);
 
-        private LocalRateLimiter(Duration window, int maxRequests) {
-            this.windowMillis = window.toMillis();
+        private LocalRateLimiter(Duration window, int maxRequests, LongSupplier monotonicTicker) {
+            this.windowNanos = window.toNanos();
             this.maxRequests = maxRequests;
+            this.monotonicTicker = monotonicTicker;
         }
 
         private RateLimitDecision tryAcquire(String key) {
-            long now = AppClock.now().toEpochMilli();
+            long now = monotonicTicker.getAsLong();
             Window window = windows.compute(key, (ignored, current) -> {
-                if (current == null || now - current.windowStartedAtMillis >= windowMillis) {
+                if (current == null || now - current.windowStartedAtNanos >= windowNanos) {
                     return new Window(now, 1);
                 }
-                return new Window(current.windowStartedAtMillis, current.requestCount + 1);
+                return new Window(current.windowStartedAtNanos, current.requestCount + 1);
             });
             if (callCounter.incrementAndGet() % EVICTION_INTERVAL == 0) {
                 evictStaleEntries(now);
             }
-            long retryAfterMillis = Math.max(0L, windowMillis - (now - window.windowStartedAtMillis));
-            long retryAfterSeconds = Math.max(1L, (retryAfterMillis + 999L) / 1000L);
+            long retryAfterNanos = Math.max(0L, windowNanos - (now - window.windowStartedAtNanos));
+            long retryAfterSeconds = Math.max(1L, (retryAfterNanos + NANOS_PER_SECOND - 1L) / NANOS_PER_SECOND);
             return new RateLimitDecision(
                     window.requestCount <= maxRequests,
                     new RateLimitStatus(maxRequests, window.requestCount, retryAfterSeconds));
         }
 
         private void evictStaleEntries(long now) {
-            long expiryThreshold = windowMillis * 2;
-            windows.values().removeIf(w -> now - w.windowStartedAtMillis >= expiryThreshold);
+            long expiryThreshold = windowNanos * 2;
+            windows.values().removeIf(w -> now - w.windowStartedAtNanos >= expiryThreshold);
         }
 
-        private record Window(long windowStartedAtMillis, int requestCount) {}
+        private record Window(long windowStartedAtNanos, int requestCount) {}
     }
 
     private record RateLimitDecision(boolean allowed, RateLimitStatus status) {}

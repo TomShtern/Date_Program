@@ -55,21 +55,29 @@ public class SocialUseCases {
     private final CommunicationStorage communicationStorage;
     private final AppEventBus eventBus;
 
-    public SocialUseCases(ConnectionService connectionService, TrustSafetyService trustSafetyService) {
-        this.connectionService = connectionService;
-        this.trustSafetyService = Objects.requireNonNull(trustSafetyService, TRUST_SAFETY_SERVICE_REQUIRED);
-        this.communicationStorage = null;
-        this.eventBus = COMPATIBILITY_NO_OP_EVENT_BUS;
+    /** Compatibility factory for moderation-only callers. */
+    public static SocialUseCases forTrustSafetyOnly(TrustSafetyService trustSafetyService) {
+        return new SocialUseCases(trustSafetyService);
     }
 
-    public SocialUseCases(TrustSafetyService trustSafetyService) {
+    /** Compatibility factory for relationship workflows without event publication. */
+    public static SocialUseCases forWorkflowAccess(
+            ConnectionService connectionService,
+            TrustSafetyService trustSafetyService,
+            CommunicationStorage communicationStorage) {
+        return new SocialUseCases(connectionService, trustSafetyService, communicationStorage);
+    }
+
+    /** Named compatibility mode for moderation-only callers. */
+    private SocialUseCases(TrustSafetyService trustSafetyService) {
         this.connectionService = null;
         this.trustSafetyService = Objects.requireNonNull(trustSafetyService, TRUST_SAFETY_SERVICE_REQUIRED);
         this.communicationStorage = null;
         this.eventBus = COMPATIBILITY_NO_OP_EVENT_BUS;
     }
 
-    public SocialUseCases(
+    /** Named compatibility mode for relationship workflows without event publication. */
+    private SocialUseCases(
             ConnectionService connectionService,
             TrustSafetyService trustSafetyService,
             CommunicationStorage communicationStorage) {
@@ -79,6 +87,7 @@ public class SocialUseCases {
         this.eventBus = COMPATIBILITY_NO_OP_EVENT_BUS;
     }
 
+    /** Canonical runtime constructor — all workflow dependencies explicit. */
     public SocialUseCases(
             ConnectionService connectionService,
             TrustSafetyService trustSafetyService,
@@ -430,7 +439,7 @@ public class SocialUseCases {
 
     public static record FriendRequestsQuery(UserContext context) {}
 
-    public static enum FriendRequestAction {
+    public enum FriendRequestAction {
         ACCEPT,
         DECLINE
     }

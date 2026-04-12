@@ -188,14 +188,10 @@ public class MessagingHandler implements LoggingSupport {
      * @return Updated list of conversation previews
      */
     private void handleConversationSelection(String choice, List<ConversationPreview> previews, User currentUser) {
-        try {
-            int idx = Integer.parseInt(choice) - 1;
-            if (idx >= 0 && idx < previews.size()) {
-                showConversation(currentUser, previews.get(idx));
-            } else {
-                logInfo(CliTextAndInput.INVALID_SELECTION);
-            }
-        } catch (NumberFormatException _) {
+        OptionalInt selectedIndex = CliTextAndInput.parseOneBasedIndex(choice, previews.size());
+        if (selectedIndex.isPresent()) {
+            showConversation(currentUser, previews.get(selectedIndex.getAsInt()));
+        } else {
             logInfo(CliTextAndInput.INVALID_INPUT);
         }
     }

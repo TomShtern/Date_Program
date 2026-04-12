@@ -82,11 +82,15 @@ public final class JdbiUserStorage implements OperationalUserStorage {
     }
 
     public JdbiUserStorage(Jdbi jdbi) {
+        this(jdbi, SqlDialectSupport.detectDialect(jdbi));
+    }
+
+    public JdbiUserStorage(Jdbi jdbi, DatabaseDialect dialect) {
         this.jdbi = Objects.requireNonNull(jdbi, "jdbi cannot be null");
         this.dao = jdbi.onDemand(Dao.class);
         this.normalizedProfileRepository = new NormalizedProfileRepository(jdbi);
         this.normalizedProfileHydrator = new NormalizedProfileHydrator(new DealbreakerAssembler());
-        DatabaseDialect dialect = detectDialect(jdbi);
+        Objects.requireNonNull(dialect, "dialect cannot be null");
         this.userUpsertSql = buildUserUpsertSql(dialect);
         this.profileNoteUpsertSql = buildProfileNoteUpsertSql(dialect);
     }
@@ -525,8 +529,7 @@ public final class JdbiUserStorage implements OperationalUserStorage {
                     .bio(rs.getString("bio"))
                     .birthDate(JdbiTypeCodecs.SqlRowReaders.readLocalDate(rs, "birth_date"))
                     .gender(JdbiTypeCodecs.SqlRowReaders.readEnum(rs, GENDER_COLUMN, Gender.class))
-                    .location(lat != null ? lat : 0.0, lon != null ? lon : 0.0)
-                    .hasLocationSet(hasLocationSet)
+                    .rawLocation(lat != null ? lat : 0.0, lon != null ? lon : 0.0, hasLocationSet)
                     .maxDistanceKm(rs.getInt("max_distance_km"))
                     .ageRange(rs.getInt("min_age"), rs.getInt("max_age"))
                     .state(JdbiTypeCodecs.SqlRowReaders.readEnum(rs, STATE_COLUMN, UserState.class))
@@ -763,17 +766,6 @@ public final class JdbiUserStorage implements OperationalUserStorage {
         public Instant getDeletedAt() {
             return user.getDeletedAt();
         }
-    }
-
-    private static DatabaseDialect detectDialect(Jdbi jdbi) {
-        return jdbi.withHandle(handle -> {
-            try {
-                return DatabaseDialect.fromDatabaseProductName(
-                        handle.getConnection().getMetaData().getDatabaseProductName());
-            } catch (SQLException e) {
-                throw new IllegalStateException("Failed to detect database dialect", e);
-            }
-        });
     }
 
     private static String buildUserUpsertSql(DatabaseDialect dialect) {

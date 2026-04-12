@@ -2,8 +2,6 @@ package datingapp.core.matching;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertInstanceOf;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -17,8 +15,6 @@ import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
 import datingapp.core.model.User.UserState;
 import datingapp.core.testutil.TestStorages;
-import java.lang.reflect.Field;
-import java.security.SecureRandom;
 import java.time.LocalDate;
 import java.util.HashSet;
 import java.util.List;
@@ -39,33 +35,24 @@ class TrustSafetyServiceSecurityTest {
     }
 
     @Test
-    void builder_usesSecureRandomByDefaultAndExposesSecureRandomSetter() throws Exception {
-        TestStorages.TrustSafety trustSafetyStorage = new TestStorages.TrustSafety();
-        TrustSafetyService service = TrustSafetyService.builder(
-                        trustSafetyStorage, new TestStorages.Interactions(), userStorage, config)
-                .build();
-
-        Field randomField = TrustSafetyService.class.getDeclaredField("random");
-        randomField.setAccessible(true);
-
-        Object random = randomField.get(service);
-        assertInstanceOf(SecureRandom.class, random);
-        assertNotNull(TrustSafetyService.Builder.class.getDeclaredMethod("random", SecureRandom.class));
+    void verificationConfigurationIsNotExposedOnTrustSafetyServiceBuilder() {
+        assertThrows(
+                NoSuchMethodException.class,
+                () -> TrustSafetyService.Builder.class.getDeclaredMethod("random", java.security.SecureRandom.class));
+        assertThrows(
+                NoSuchMethodException.class,
+                () -> TrustSafetyService.Builder.class.getDeclaredMethod("verificationTtl", java.time.Duration.class));
     }
 
     @Test
-    void generateVerificationCode_producesValidSixDigitCode() {
-        TrustSafetyService service = TrustSafetyService.builder(
-                        new TestStorages.TrustSafety(), new TestStorages.Interactions(), userStorage, config)
-                .random(new SecureRandom(new byte[] {1, 2, 3, 4}))
-                .build();
-
-        for (int i = 0; i < 100; i++) {
-            String code = service.generateVerificationCode();
-            assertNotNull(code);
-            assertEquals(6, code.length(), "Code must be 6 digits");
-            assertTrue(code.matches("\\d{6}"), "Code must contain only digits: " + code);
-        }
+    void verificationHelpersAreNotExposedOnTrustSafetyService() {
+        assertThrows(NoSuchMethodException.class, () -> TrustSafetyService.class.getMethod("generateVerificationCode"));
+        assertThrows(
+                NoSuchMethodException.class,
+                () -> TrustSafetyService.class.getMethod("verifyCode", User.class, String.class));
+        assertThrows(
+                NoSuchMethodException.class,
+                () -> TrustSafetyService.class.getMethod("isExpired", java.time.Instant.class));
     }
 
     @Test

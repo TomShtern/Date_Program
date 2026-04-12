@@ -187,7 +187,7 @@ class SocialControllerTest {
             TrustSafetyService trustSafetyService = TrustSafetyService.builder(
                             trustSafety, interactions, users, config, communications)
                     .build();
-            var socialUseCases = new datingapp.app.usecase.social.SocialUseCases(
+            var socialUseCases = datingapp.app.usecase.social.SocialUseCases.forWorkflowAccess(
                     connectionService, trustSafetyService, communications);
             this.viewModel = new SocialViewModel(
                     connectionService,

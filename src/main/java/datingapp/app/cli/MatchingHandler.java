@@ -51,6 +51,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -370,39 +371,34 @@ public class MatchingHandler implements LoggingSupport {
 
     private void viewMatchDetails(List<Match> matches, User currentUser) {
         String input = inputReader.readLine("Enter match number to view: ");
-        try {
-            int idx = Integer.parseInt(input) - 1;
-            if (idx < 0 || idx >= matches.size()) {
-                logInfo(CliTextAndInput.INVALID_SELECTION);
-                return;
-            }
-
-            Match match = matches.get(idx);
-            UUID otherUserId = match.getOtherUser(currentUser.getId());
-            User otherUser = userStorage.get(otherUserId).orElse(null);
-            if (otherUser == null) {
-                logInfo("  Other user not found — user may have been removed.");
-                return;
-            }
-            var qualityResult = matchingUseCases.matchQuality(
-                    new MatchingUseCases.MatchQualityQuery(UserContext.cli(currentUser.getId()), match));
-            if (!qualityResult.success()) {
-                logInfo("  Match quality unavailable — user may have been removed.");
-                return;
-            }
-            MatchQualitySnapshot quality = qualityResult.data();
-
-            displayMatchQuality(otherUser, quality);
-
-            logInfo(CliTextAndInput.MENU_DIVIDER_WITH_NEWLINES);
-            logInfo("  (U)nmatch | (B)lock | (F)riend Zone | (G)raceful Exit | back");
-            String action = inputReader.readLine("  Your choice: ").toLowerCase(Locale.ROOT);
-
-            handleMatchDetailAction(action, otherUser, otherUserId, currentUser);
-
-        } catch (NumberFormatException _) {
+        OptionalInt selectedIndex = CliTextAndInput.parseOneBasedIndex(input, matches.size());
+        if (selectedIndex.isEmpty()) {
             logInfo(CliTextAndInput.INVALID_INPUT);
+            return;
         }
+
+        Match match = matches.get(selectedIndex.getAsInt());
+        UUID otherUserId = match.getOtherUser(currentUser.getId());
+        User otherUser = userStorage.get(otherUserId).orElse(null);
+        if (otherUser == null) {
+            logInfo("  Other user not found — user may have been removed.");
+            return;
+        }
+        var qualityResult = matchingUseCases.matchQuality(
+                new MatchingUseCases.MatchQualityQuery(UserContext.cli(currentUser.getId()), match));
+        if (!qualityResult.success()) {
+            logInfo("  Match quality unavailable — user may have been removed.");
+            return;
+        }
+        MatchQualitySnapshot quality = qualityResult.data();
+
+        displayMatchQuality(otherUser, quality);
+
+        logInfo(CliTextAndInput.MENU_DIVIDER_WITH_NEWLINES);
+        logInfo("  (U)nmatch | (B)lock | (F)riend Zone | (G)raceful Exit | back");
+        String action = inputReader.readLine("  Your choice: ").toLowerCase(Locale.ROOT);
+
+        handleMatchDetailAction(action, otherUser, otherUserId, currentUser);
     }
 
     private void displayMatchQuality(User otherUser, MatchQualitySnapshot quality) {
@@ -465,70 +461,62 @@ public class MatchingHandler implements LoggingSupport {
 
     private void unmatchFromList(List<Match> matches, User currentUser) {
         String input = inputReader.readLine("Enter match number to unmatch: ");
-        try {
-            int idx = Integer.parseInt(input) - 1;
-            if (idx < 0 || idx >= matches.size()) {
-                logInfo(CliTextAndInput.INVALID_SELECTION);
-                return;
-            }
-
-            Match match = matches.get(idx);
-            UUID otherUserId = match.getOtherUser(currentUser.getId());
-            User otherUser = userStorage.get(otherUserId).orElse(null);
-            if (otherUser == null) {
-                logInfo("❌ User not found — may have already been deleted.\n");
-                return;
-            }
-
-            String confirm = inputReader.readLine("Unmatch with " + otherUser.getName() + "? (y/n): ");
-            if ("y".equalsIgnoreCase(confirm)) {
-                var result = socialUseCases.unmatch(
-                        new RelationshipCommand(UserContext.cli(currentUser.getId()), otherUserId));
-                if (result.success()) {
-                    logInfo("✅ Unmatched with {}.\n", otherUser.getName());
-                } else {
-                    logInfo(ERR_FAILED, result.error().message());
-                }
-            } else {
-                logInfo(CliTextAndInput.CANCELLED);
-            }
-        } catch (NumberFormatException _) {
+        OptionalInt selectedIndex = CliTextAndInput.parseOneBasedIndex(input, matches.size());
+        if (selectedIndex.isEmpty()) {
             logInfo(CliTextAndInput.INVALID_INPUT);
+            return;
+        }
+
+        Match match = matches.get(selectedIndex.getAsInt());
+        UUID otherUserId = match.getOtherUser(currentUser.getId());
+        User otherUser = userStorage.get(otherUserId).orElse(null);
+        if (otherUser == null) {
+            logInfo("❌ User not found — may have already been deleted.\n");
+            return;
+        }
+
+        String confirm = inputReader.readLine("Unmatch with " + otherUser.getName() + "? (y/n): ");
+        if ("y".equalsIgnoreCase(confirm)) {
+            var result =
+                    socialUseCases.unmatch(new RelationshipCommand(UserContext.cli(currentUser.getId()), otherUserId));
+            if (result.success()) {
+                logInfo("✅ Unmatched with {}.\n", otherUser.getName());
+            } else {
+                logInfo(ERR_FAILED, result.error().message());
+            }
+        } else {
+            logInfo(CliTextAndInput.CANCELLED);
         }
     }
 
     private void blockFromMatches(List<Match> matches, User currentUser) {
         String input = inputReader.readLine("Enter match number to block: ");
-        try {
-            int idx = Integer.parseInt(input) - 1;
-            if (idx < 0 || idx >= matches.size()) {
-                logInfo(CliTextAndInput.INVALID_SELECTION);
-                return;
-            }
-
-            Match match = matches.get(idx);
-            UUID otherUserId = match.getOtherUser(currentUser.getId());
-            User otherUser = userStorage.get(otherUserId).orElse(null);
-            if (otherUser == null) {
-                logInfo("❌ User not found — may have already been deleted.\n");
-                return;
-            }
-
-            String confirm = inputReader.readLine(
-                    CliTextAndInput.BLOCK_PREFIX + otherUser.getName() + "? This will end your match. (y/n): ");
-            if ("y".equalsIgnoreCase(confirm)) {
-                var result = socialUseCases.blockUser(
-                        new RelationshipCommand(UserContext.cli(currentUser.getId()), otherUserId));
-                if (result.success()) {
-                    logInfo("🚫 Blocked {}. Match ended.\n", otherUser.getName());
-                } else {
-                    logInfo("❌ {}\n", result.error().message());
-                }
-            } else {
-                logInfo(CliTextAndInput.CANCELLED);
-            }
-        } catch (NumberFormatException _) {
+        OptionalInt selectedIndex = CliTextAndInput.parseOneBasedIndex(input, matches.size());
+        if (selectedIndex.isEmpty()) {
             logInfo(CliTextAndInput.INVALID_INPUT);
+            return;
+        }
+
+        Match match = matches.get(selectedIndex.getAsInt());
+        UUID otherUserId = match.getOtherUser(currentUser.getId());
+        User otherUser = userStorage.get(otherUserId).orElse(null);
+        if (otherUser == null) {
+            logInfo("❌ User not found — may have already been deleted.\n");
+            return;
+        }
+
+        String confirm = inputReader.readLine(
+                CliTextAndInput.BLOCK_PREFIX + otherUser.getName() + "? This will end your match. (y/n): ");
+        if ("y".equalsIgnoreCase(confirm)) {
+            var result = socialUseCases.blockUser(
+                    new RelationshipCommand(UserContext.cli(currentUser.getId()), otherUserId));
+            if (result.success()) {
+                logInfo("🚫 Blocked {}. Match ended.\n", otherUser.getName());
+            } else {
+                logInfo("❌ {}\n", result.error().message());
+            }
+        } else {
+            logInfo(CliTextAndInput.CANCELLED);
         }
     }
 
@@ -780,36 +768,31 @@ public class MatchingHandler implements LoggingSupport {
     }
 
     private void handleFriendRequestResponse(List<FriendRequest> requests, String choice) {
-        try {
-            int idx = Integer.parseInt(choice) - 1;
-            if (idx < 0 || idx >= requests.size()) {
-                logInfo("Invalid selection.");
-                return;
-            }
+        OptionalInt selectedIndex = CliTextAndInput.parseOneBasedIndex(choice, requests.size());
+        if (selectedIndex.isEmpty()) {
+            logInfo("Invalid selection.");
+            return;
+        }
 
-            FriendRequest req = requests.get(idx);
-            User from = userStorage.get(req.fromUserId()).orElse(null);
-            String fromName = from != null ? from.getName() : "Unknown User";
-            logInfo("\nFriend Request from {}", fromName);
+        FriendRequest req = requests.get(selectedIndex.getAsInt());
+        User from = userStorage.get(req.fromUserId()).orElse(null);
+        String fromName = from != null ? from.getName() : "Unknown User";
+        logInfo("\nFriend Request from {}", fromName);
 
-            String action = inputReader
-                    .readLine("Do you want to (A)ccept or (D)ecline? ")
-                    .toLowerCase(Locale.ROOT);
-            User currentUser = session.getCurrentUser();
+        String action =
+                inputReader.readLine("Do you want to (A)ccept or (D)ecline? ").toLowerCase(Locale.ROOT);
+        User currentUser = session.getCurrentUser();
 
-            if ("a".equals(action)) {
-                logTransitionResult(
-                        socialUseCases.respondToFriendRequest(new RespondFriendRequestCommand(
-                                UserContext.cli(currentUser.getId()), req.id(), FriendRequestAction.ACCEPT)),
-                        "✅ You are now friends with " + fromName + "! You can find them in your matches.\n");
-            } else if ("d".equals(action)) {
-                logTransitionResult(
-                        socialUseCases.respondToFriendRequest(new RespondFriendRequestCommand(
-                                UserContext.cli(currentUser.getId()), req.id(), FriendRequestAction.DECLINE)),
-                        "Declined friend request from " + fromName + ".\n");
-            }
-        } catch (NumberFormatException e) {
-            logInfo("Error processing request: {}\n", e.getMessage());
+        if ("a".equals(action)) {
+            logTransitionResult(
+                    socialUseCases.respondToFriendRequest(new RespondFriendRequestCommand(
+                            UserContext.cli(currentUser.getId()), req.id(), FriendRequestAction.ACCEPT)),
+                    "✅ You are now friends with " + fromName + "! You can find them in your matches.\n");
+        } else if ("d".equals(action)) {
+            logTransitionResult(
+                    socialUseCases.respondToFriendRequest(new RespondFriendRequestCommand(
+                            UserContext.cli(currentUser.getId()), req.id(), FriendRequestAction.DECLINE)),
+                    "Declined friend request from " + fromName + ".\n");
         }
     }
 

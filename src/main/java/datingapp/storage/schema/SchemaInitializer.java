@@ -14,9 +14,19 @@ import java.sql.Statement;
 public final class SchemaInitializer {
 
     static final String FLOAT64_SQL_TYPE = "DOUBLE PRECISION";
+    static final int PAIR_ID_LENGTH = 73;
+    static final String PAIR_ID_SQL_TYPE = "VARCHAR(" + PAIR_ID_LENGTH + ")";
 
     private SchemaInitializer() {
         // Utility class — static methods only
+    }
+
+    static String pairIdLengthCheck(String columnName) {
+        return "CHAR_LENGTH(" + columnName + ") = " + PAIR_ID_LENGTH;
+    }
+
+    static String nullablePairIdLengthCheck(String columnName) {
+        return columnName + " IS NULL OR " + pairIdLengthCheck(columnName);
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -226,13 +236,13 @@ public final class SchemaInitializer {
                     CONSTRAINT ck_matches_end_reason_values CHECK (
                         end_reason IS NULL OR end_reason IN ('FRIEND_ZONE', 'GRACEFUL_EXIT', 'UNMATCH', 'BLOCK')
                     ),
-                    CONSTRAINT ck_matches_id_length CHECK (CHAR_LENGTH(id) = 73),
+                    CONSTRAINT ck_matches_id_length CHECK (%s),
                     CONSTRAINT ck_matches_ended_by_participant CHECK (
                         ended_by IS NULL OR ended_by = user_a OR ended_by = user_b
                     ),
                     CONSTRAINT ck_matches_distinct_users CHECK (user_a <> user_b)
                 )
-                """);
+                """.formatted(pairIdLengthCheck("id")));
     }
 
     static void createSwipeSessionsTable(Statement stmt) throws SQLException {
@@ -384,12 +394,12 @@ public final class SchemaInitializer {
                         archive_reason_b IS NULL
                             OR archive_reason_b IN ('FRIEND_ZONE', 'GRACEFUL_EXIT', 'UNMATCH', 'BLOCK')
                         ),
-                        CONSTRAINT ck_conversations_id_length CHECK (CHAR_LENGTH(id) = 73),
+                        CONSTRAINT ck_conversations_id_length CHECK (%s),
                         CONSTRAINT ck_conversations_distinct_users CHECK (user_a <> user_b),
                         FOREIGN KEY (user_a) REFERENCES users(id) ON DELETE CASCADE,
                         FOREIGN KEY (user_b) REFERENCES users(id) ON DELETE CASCADE
                 )
-                """);
+                """.formatted(pairIdLengthCheck("id")));
 
         stmt.execute("CREATE INDEX IF NOT EXISTS idx_conversations_user_a ON conversations(user_a)");
         stmt.execute("CREATE INDEX IF NOT EXISTS idx_conversations_user_b ON conversations(user_b)");
@@ -416,12 +426,12 @@ public final class SchemaInitializer {
                     content VARCHAR(1000) NOT NULL,
                     created_at TIMESTAMP WITH TIME ZONE NOT NULL,
                     deleted_at TIMESTAMP WITH TIME ZONE,
-                    CONSTRAINT ck_messages_conversation_id_length CHECK (CHAR_LENGTH(conversation_id) = 73),
+                    CONSTRAINT ck_messages_conversation_id_length CHECK (%s),
                     CONSTRAINT ck_messages_content_nonblank CHECK (CHAR_LENGTH(TRIM(content)) > 0),
                     FOREIGN KEY (sender_id) REFERENCES users(id) ON DELETE CASCADE,
                     FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE
                 )
-                """);
+                """.formatted(pairIdLengthCheck("conversation_id")));
 
         stmt.execute("CREATE INDEX IF NOT EXISTS idx_messages_conversation_created "
                 + "ON messages(conversation_id, created_at)");
@@ -442,7 +452,7 @@ public final class SchemaInitializer {
                     created_at TIMESTAMP WITH TIME ZONE NOT NULL,
                     status VARCHAR(20) NOT NULL,
                     responded_at TIMESTAMP WITH TIME ZONE,
-                    pair_key VARCHAR(73),
+                    pair_key %s,
                     pending_marker VARCHAR(10),
                     CONSTRAINT ck_friend_requests_status_values CHECK (
                         status IN ('PENDING', 'ACCEPTED', 'DECLINED', 'EXPIRED')
@@ -451,7 +461,7 @@ public final class SchemaInitializer {
                     FOREIGN KEY (from_user_id) REFERENCES users(id) ON DELETE CASCADE,
                     FOREIGN KEY (to_user_id) REFERENCES users(id) ON DELETE CASCADE
                 )
-                """);
+                """.formatted(PAIR_ID_SQL_TYPE));
 
         stmt.execute("CREATE INDEX IF NOT EXISTS idx_friend_req_users "
                 + "ON friend_requests(from_user_id, to_user_id, status)");
@@ -696,9 +706,9 @@ public final class SchemaInitializer {
                     expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
                     CONSTRAINT ck_undo_states_distinct_users CHECK (who_likes <> who_got_liked),
                     CONSTRAINT ck_undo_states_direction_values CHECK (direction IN ('LIKE', 'SUPER_LIKE', 'PASS')),
-                    CONSTRAINT ck_undo_states_match_id_length CHECK (match_id IS NULL OR CHAR_LENGTH(match_id) = 73)
+                    CONSTRAINT ck_undo_states_match_id_length CHECK (%s)
                 )
-                """);
+                """.formatted(nullablePairIdLengthCheck("match_id")));
 
         stmt.execute("CREATE INDEX IF NOT EXISTS idx_undo_states_expires ON undo_states(expires_at)");
     }

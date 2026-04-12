@@ -79,8 +79,9 @@ public final class StorageFactory {
 
         Jdbi jdbi = createJdbi(dbManager);
         registerTypeCodecs(jdbi);
+        DatabaseDialect dialect = datingapp.storage.jdbi.SqlDialectSupport.detectDialect(jdbi);
 
-        PersistenceComponents persistence = createPersistenceComponents(jdbi);
+        PersistenceComponents persistence = createPersistenceComponents(jdbi, dialect);
         DomainServices domain = createDomainServices(config, persistence);
 
         registerEventHandlers(persistence, domain);
@@ -105,11 +106,11 @@ public final class StorageFactory {
         jdbi.registerColumnMapper(new JdbiTypeCodecs.EnumSetSqlCodec.InterestColumnMapper());
     }
 
-    private static PersistenceComponents createPersistenceComponents(Jdbi jdbi) {
-        OperationalUserStorage userStorage = new JdbiUserStorage(jdbi);
-        JdbiMatchmakingStorage matchmakingStorage = new JdbiMatchmakingStorage(jdbi);
+    private static PersistenceComponents createPersistenceComponents(Jdbi jdbi, DatabaseDialect dialect) {
+        OperationalUserStorage userStorage = new JdbiUserStorage(jdbi, dialect);
+        JdbiMatchmakingStorage matchmakingStorage = new JdbiMatchmakingStorage(jdbi, dialect);
         OperationalCommunicationStorage communicationStorage = new JdbiConnectionStorage(jdbi);
-        JdbiMetricsStorage metricsStorage = new JdbiMetricsStorage(jdbi);
+        JdbiMetricsStorage metricsStorage = new JdbiMetricsStorage(jdbi, dialect);
         TrustSafetyStorage trustSafetyStorage = jdbi.onDemand(JdbiTrustSafetyStorage.class);
         AccountCleanupStorage accountCleanupStorage = new JdbiAccountCleanupStorage(jdbi);
 

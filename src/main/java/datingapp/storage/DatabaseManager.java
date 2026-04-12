@@ -13,9 +13,8 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.UnaryOperator;
 
 /**
- * Manages H2 database connection pooling and lifecycle. Schema creation is
- * delegated to {@link
- * datingapp.storage.schema.SchemaInitializer} and migrations to
+ * Manages runtime database pooling and lifecycle for the supported local and SQL-backed dialects.
+ * Schema creation is delegated to {@link datingapp.storage.schema.SchemaInitializer} and migrations to
  * {@link MigrationRunner}.
  */
 public final class DatabaseManager {
@@ -56,12 +55,24 @@ public final class DatabaseManager {
         jdbcUrl = Objects.requireNonNull(url, "JDBC URL cannot be null");
     }
 
-    public static synchronized void resetInstance() {
+    /**
+     * Drops the singleton instance without altering the currently configured JDBC URL.
+     * Use this when callers need a fresh manager instance but want to preserve explicit URL state.
+     */
+    public static synchronized void clearInstance() {
         if (instance != null) {
             instance.shutdown();
             instance = null;
         }
-        jdbcUrl = DEFAULT_JDBC_URL;
+    }
+
+    /**
+     * Resets the singleton and restores the default JDBC URL.
+     * This is the legacy "full reset" path used by tests that need both lifecycle and URL state cleared.
+     */
+    public static synchronized void resetInstance() {
+        clearInstance();
+        resetJdbcUrlToDefault();
     }
 
     private DatabaseManager() {
@@ -86,48 +97,15 @@ public final class DatabaseManager {
 
     public void configurePoolSettings(AppConfig.StorageConfig storageConfig) {
         Objects.requireNonNull(storageConfig, "storageConfig cannot be null");
-        if (storageConfig.maxPoolSize() <= 0) {
-            throw new IllegalArgumentException("maxPoolSize must be positive");
+        validatePoolSettings(storageConfig);
+        if (dataSource.get() != null || initialized) {
+            throw new IllegalStateException("Pool settings can only be changed before the pool is initialized");
         }
-        if (storageConfig.minIdle() < 0 || storageConfig.minIdle() > storageConfig.maxPoolSize()) {
-            throw new IllegalArgumentException("minIdle must be between 0 and maxPoolSize");
-        }
-        if (storageConfig.connectionTimeoutSeconds() <= 0) {
-            throw new IllegalArgumentException("connectionTimeoutSeconds must be positive");
-        }
-        if (storageConfig.validationTimeoutSeconds() <= 0) {
-            throw new IllegalArgumentException("validationTimeoutSeconds must be positive");
-        }
-        if (storageConfig.validationTimeoutSeconds() >= storageConfig.connectionTimeoutSeconds()) {
-            throw new IllegalArgumentException("validationTimeoutSeconds must be less than connectionTimeoutSeconds");
-        }
-        if (storageConfig.idleTimeoutSeconds() < 0) {
-            throw new IllegalArgumentException("idleTimeoutSeconds must be non-negative");
-        }
-        if (storageConfig.maxLifetimeSeconds() < 0) {
-            throw new IllegalArgumentException("maxLifetimeSeconds must be non-negative");
-        }
-        if (storageConfig.maxLifetimeSeconds() > 0
-                && storageConfig.maxLifetimeSeconds() < storageConfig.idleTimeoutSeconds()) {
-            throw new IllegalArgumentException("maxLifetimeSeconds must be >= idleTimeoutSeconds (or 0 for disabled)");
-        }
-        if (storageConfig.keepaliveTimeSeconds() < 0) {
-            throw new IllegalArgumentException("keepaliveTimeSeconds must be non-negative");
-        }
-
-        PoolConfig newConfig = new PoolConfig(
-                storageConfig.maxPoolSize(),
-                storageConfig.minIdle(),
-                storageConfig.connectionTimeoutSeconds(),
-                storageConfig.validationTimeoutSeconds(),
-                storageConfig.idleTimeoutSeconds(),
-                storageConfig.maxLifetimeSeconds(),
-                storageConfig.keepaliveTimeSeconds());
-        configRef.set(newConfig);
+        applyPoolSettings(storageConfig);
     }
 
     public synchronized void configureStorage(AppConfig.StorageConfig storageConfig) {
-        configurePoolSettings(storageConfig);
+        validatePoolSettings(storageConfig);
         configureStorage(
                 storageConfig,
                 DatabaseDialect.fromConfig(storageConfig.databaseDialect(), storageConfig.databaseUrl()));
@@ -141,6 +119,7 @@ public final class DatabaseManager {
         }
         runtimeStorageState.set(new RuntimeStorageState(storageConfig, dialect));
         configureQueryTimeoutSeconds(storageConfig.queryTimeoutSeconds());
+        applyPoolSettings(storageConfig);
     }
 
     synchronized void clearRuntimeStorageConfiguration() {
@@ -263,11 +242,14 @@ public final class DatabaseManager {
             throw new StorageException("Connection pool is not initialized");
         }
 
-        try (Connection conn = localDataSource.getConnection();
-                Statement stmt = conn.createStatement()) {
+        try (Connection conn = localDataSource.getConnection()) {
+            applySessionQueryTimeout(conn);
 
-            MigrationRunner.runAllPending(stmt);
-            initialized = true;
+            try (Statement stmt = conn.createStatement()) {
+
+                MigrationRunner.runAllPending(stmt);
+                initialized = true;
+            }
 
         } catch (SQLException e) {
             throw new StorageException("Failed to initialize database schema", e);
@@ -412,6 +394,53 @@ public final class DatabaseManager {
 
     private static boolean isExplicitDevOrTestProfile(String profile) {
         return TEST_PROFILE.equalsIgnoreCase(profile) || DEV_PROFILE.equalsIgnoreCase(profile);
+    }
+
+    private static void validatePoolSettings(AppConfig.StorageConfig storageConfig) {
+        if (storageConfig.maxPoolSize() <= 0) {
+            throw new IllegalArgumentException("maxPoolSize must be positive");
+        }
+        if (storageConfig.minIdle() < 0 || storageConfig.minIdle() > storageConfig.maxPoolSize()) {
+            throw new IllegalArgumentException("minIdle must be between 0 and maxPoolSize");
+        }
+        if (storageConfig.connectionTimeoutSeconds() <= 0) {
+            throw new IllegalArgumentException("connectionTimeoutSeconds must be positive");
+        }
+        if (storageConfig.validationTimeoutSeconds() <= 0) {
+            throw new IllegalArgumentException("validationTimeoutSeconds must be positive");
+        }
+        if (storageConfig.validationTimeoutSeconds() >= storageConfig.connectionTimeoutSeconds()) {
+            throw new IllegalArgumentException("validationTimeoutSeconds must be less than connectionTimeoutSeconds");
+        }
+        if (storageConfig.idleTimeoutSeconds() < 0) {
+            throw new IllegalArgumentException("idleTimeoutSeconds must be non-negative");
+        }
+        if (storageConfig.maxLifetimeSeconds() < 0) {
+            throw new IllegalArgumentException("maxLifetimeSeconds must be non-negative");
+        }
+        if (storageConfig.maxLifetimeSeconds() > 0
+                && storageConfig.maxLifetimeSeconds() < storageConfig.idleTimeoutSeconds()) {
+            throw new IllegalArgumentException("maxLifetimeSeconds must be >= idleTimeoutSeconds (or 0 for disabled)");
+        }
+        if (storageConfig.keepaliveTimeSeconds() < 0) {
+            throw new IllegalArgumentException("keepaliveTimeSeconds must be non-negative");
+        }
+    }
+
+    private void applyPoolSettings(AppConfig.StorageConfig storageConfig) {
+        PoolConfig newConfig = new PoolConfig(
+                storageConfig.maxPoolSize(),
+                storageConfig.minIdle(),
+                storageConfig.connectionTimeoutSeconds(),
+                storageConfig.validationTimeoutSeconds(),
+                storageConfig.idleTimeoutSeconds(),
+                storageConfig.maxLifetimeSeconds(),
+                storageConfig.keepaliveTimeSeconds());
+        configRef.set(newConfig);
+    }
+
+    private static void resetJdbcUrlToDefault() {
+        jdbcUrl = DEFAULT_JDBC_URL;
     }
 
     private void applySessionQueryTimeout(Connection connection) {

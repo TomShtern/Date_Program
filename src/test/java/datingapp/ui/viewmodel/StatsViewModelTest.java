@@ -15,7 +15,6 @@ import datingapp.app.usecase.profile.ProfileUseCases;
 import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
 import datingapp.core.AppSession;
-import datingapp.core.connection.ConnectionModels.Like;
 import datingapp.core.connection.ConnectionService;
 import datingapp.core.metrics.AchievementService;
 import datingapp.core.metrics.ActivityMetricsService;
@@ -199,37 +198,29 @@ class StatsViewModelTest {
     }
 
     @Test
-    @DisplayName("refresh uses ProfileUseCases fallback before touching the view-model metrics service")
-    void refreshUsesProfileUseCasesFallbackBeforeTouchingViewModelMetricsService() throws InterruptedException {
+    @DisplayName("refresh surfaces ProfileUseCases stats failure instead of falling back")
+    void refreshSurfacesProfileUseCasesStatsFailureInsteadOfFallingBack() throws InterruptedException {
         TestStorages.Users users = new TestStorages.Users();
-        TestStorages.Interactions fallbackInteractions = new TestStorages.Interactions();
-        TestStorages.TrustSafety fallbackTrustSafety = new TestStorages.TrustSafety();
-        TestStorages.Analytics fallbackAnalytics = new TestStorages.Analytics();
+        TestStorages.Interactions interactions = new TestStorages.Interactions();
         TestStorages.Communications communications = new TestStorages.Communications();
         AppConfig config = AppConfig.defaults();
 
         User currentUser = createActiveUser("Stats User");
-        User likedUser = createActiveUser("Fallback Target");
         users.save(currentUser);
-        users.save(likedUser);
-        fallbackInteractions.save(Like.create(currentUser.getId(), likedUser.getId(), Like.Direction.LIKE));
         AppSession.getInstance().setCurrentUser(currentUser);
 
-        ActivityMetricsService fallbackMetricsService =
-                new ActivityMetricsService(fallbackInteractions, fallbackTrustSafety, fallbackAnalytics, config);
-        ProfileInsightsUseCases fallbackFailingInsights =
-                new ProfileInsightsUseCases(TestAchievementService.empty(), fallbackMetricsService) {
-                    @Override
-                    public UseCaseResult<UserStats> getOrComputeStats(StatsQuery query) {
-                        return UseCaseResult.failure(UseCaseError.internal("primary stats load failed"));
-                    }
-                };
+        ProfileInsightsUseCases failingInsights = new ProfileInsightsUseCases(TestAchievementService.empty(), null) {
+            @Override
+            public UseCaseResult<UserStats> getOrComputeStats(StatsQuery query) {
+                return UseCaseResult.failure(UseCaseError.internal("stats unavailable"));
+            }
+        };
 
         ProfileUseCases profileUseCases =
-                createProfileUseCases(users, config, TestAchievementService.empty(), fallbackFailingInsights);
+                createProfileUseCases(users, config, TestAchievementService.empty(), failingInsights);
 
         StatsViewModel viewModel = new StatsViewModel(
-                new ConnectionService(config, communications, fallbackInteractions, users),
+                new ConnectionService(config, communications, interactions, users),
                 profileUseCases,
                 AppSession.getInstance(),
                 AppClock.clock(),
@@ -237,12 +228,9 @@ class StatsViewModelTest {
 
         viewModel.initialize();
 
-        assertTrue(JavaFxTestSupport.waitUntil(
-                () -> viewModel.totalLikesGivenProperty().get() == 1
-                        || viewModel.loadFailedProperty().get(),
-                5000));
-        assertFalse(viewModel.loadFailedProperty().get());
-        assertEquals(1, viewModel.totalLikesGivenProperty().get());
+        assertTrue(
+                JavaFxTestSupport.waitUntil(() -> viewModel.loadFailedProperty().get(), 5000));
+        assertTrue(viewModel.loadFailedProperty().get());
 
         viewModel.dispose();
     }

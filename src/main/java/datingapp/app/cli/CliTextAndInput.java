@@ -5,6 +5,7 @@ import java.util.EnumSet;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.Scanner;
 import java.util.Set;
 import org.slf4j.Logger;
@@ -95,6 +96,28 @@ public final class CliTextAndInput {
     }
 
     /**
+     * Parses a one-based menu selection and returns the zero-based index.
+     */
+    public static OptionalInt parseOneBasedIndex(String input, int optionCount) {
+        if (input == null || input.isBlank() || optionCount <= 0) {
+            return OptionalInt.empty();
+        }
+        try {
+            int index = Integer.parseInt(input.trim()) - 1;
+            if (index < 0 || index >= optionCount) {
+                return OptionalInt.empty();
+            }
+            return OptionalInt.of(index);
+        } catch (NumberFormatException _) {
+            return OptionalInt.empty();
+        }
+    }
+
+    public static boolean isZeroSelection(String input) {
+        return input != null && "0".equals(input.trim());
+    }
+
+    /**
      * Executes the action only if a user is logged in to AppSession.
      * Logs "Please select a user first" if not logged in.
      *
@@ -168,16 +191,12 @@ public final class CliTextAndInput {
             }
 
             String input = reader.readLine("Your choice: ");
-            try {
-                int choice = Integer.parseInt(input.trim());
-                if (choice == 0 && allowSkip) {
-                    return Optional.empty();
-                }
-                if (choice >= 1 && choice <= values.length) {
-                    return Optional.of(values[choice - 1]);
-                }
-            } catch (NumberFormatException ignored) {
-                log.debug("Invalid numeric selection", ignored);
+            OptionalInt selection = parseOneBasedIndex(input, values.length);
+            if (selection.isPresent()) {
+                return Optional.of(values[selection.getAsInt()]);
+            }
+            if (allowSkip && isZeroSelection(input)) {
+                return Optional.empty();
             }
 
             log.info("⚠️ Invalid selection, skipping.");
@@ -202,14 +221,7 @@ public final class CliTextAndInput {
 
             Set<E> result = EnumSet.noneOf(enumClass);
             for (String part : input.split(",")) {
-                try {
-                    int choice = Integer.parseInt(part.trim());
-                    if (choice >= 1 && choice <= values.length) {
-                        result.add(values[choice - 1]);
-                    }
-                } catch (NumberFormatException ignored) {
-                    log.debug("Skipping invalid selection entry", ignored);
-                }
+                parseOneBasedIndex(part, values.length).ifPresent(index -> result.add(values[index]));
             }
             return result;
         }

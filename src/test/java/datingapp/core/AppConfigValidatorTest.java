@@ -21,6 +21,7 @@ class AppConfigValidatorTest {
                 () -> new AppConfig.MatchingConfig(
                         10, 2, 10, 100, 168, 3.0, true, 0.5, 0.5, 0.5, 0.0, 0.0, 0.0, 1, 3, 500));
         org.junit.jupiter.api.Assertions.assertTrue(ex.getMessage().contains("sum to 1.0"));
+        org.junit.jupiter.api.Assertions.assertTrue(ex.getMessage().contains("+/- 0.01"));
     }
 
     @Test

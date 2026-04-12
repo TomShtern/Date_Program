@@ -58,7 +58,7 @@ public abstract class BaseController {
         if (overlay == null) {
             return;
         }
-        StackPane rootStack = NavigationService.getInstance().getRootStack();
+        StackPane rootStack = overlayRootStack();
         if (rootStack != null) {
             rootStack.getChildren().add(overlay);
             overlays.add(overlay);
@@ -90,7 +90,7 @@ public abstract class BaseController {
         subscriptions.forEach(Subscription::unsubscribe);
         subscriptions.clear();
 
-        StackPane rootStack = NavigationService.getInstance().getRootStack();
+        StackPane rootStack = overlayRootStack();
         for (Node overlay : overlays) {
             if (overlay != null) {
                 overlay.visibleProperty().unbind();
@@ -110,12 +110,24 @@ public abstract class BaseController {
     @SuppressWarnings("unused")
     @FXML
     protected void handleBack() {
-        NavigationService navigationService = NavigationService.getInstance();
+        NavigationService navigationService = navigationService();
+        if (navigationService == null) {
+            return;
+        }
         if (navigationService.canGoBack()) {
             navigationService.goBack();
             return;
         }
         navigationService.navigateTo(NavigationService.ViewType.DASHBOARD);
+    }
+
+    protected NavigationService navigationService() {
+        return NavigationService.getInstance();
+    }
+
+    protected StackPane overlayRootStack() {
+        NavigationService navigationService = navigationService();
+        return navigationService != null ? navigationService.getRootStack() : null;
     }
 
     /**

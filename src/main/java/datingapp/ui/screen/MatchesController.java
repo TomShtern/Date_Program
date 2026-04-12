@@ -609,22 +609,7 @@ public class MatchesController extends BaseController implements Initializable {
             e.consume();
             handleStartChat(match);
         });
-
-        // Button hover animation
-        messageBtn.setOnMouseEntered(e -> {
-            e.consume();
-            ScaleTransition bounce = new ScaleTransition(Duration.millis(100), messageBtn);
-            bounce.setToX(1.08);
-            bounce.setToY(1.08);
-            bounce.play();
-        });
-        messageBtn.setOnMouseExited(e -> {
-            e.consume();
-            ScaleTransition unbounce = new ScaleTransition(Duration.millis(100), messageBtn);
-            unbounce.setToX(1.0);
-            unbounce.setToY(1.0);
-            unbounce.play();
-        });
+        configureHoverScale(messageBtn, 1.08);
 
         Button friendZoneBtn = createMatchActionButton("Friend zone", event -> {
             event.consume();
@@ -670,9 +655,34 @@ public class MatchesController extends BaseController implements Initializable {
     }
 
     private void handleViewProfile(MatchCardData match) {
-        NavigationService nav = NavigationService.getInstance();
+        NavigationService nav = navigationService();
         nav.setNavigationContext(NavigationService.ViewType.PROFILE_VIEW, match.userId());
         nav.navigateTo(NavigationService.ViewType.PROFILE_VIEW);
+    }
+
+    private void configureHoverScale(Button button, double hoverScale) {
+        ScaleTransition grow = createHoverScaleTransition(button, hoverScale);
+        ScaleTransition reset = createHoverScaleTransition(button, 1.0);
+        trackAnimation(grow);
+        trackAnimation(reset);
+
+        button.setOnMouseEntered(event -> {
+            event.consume();
+            reset.stop();
+            grow.playFromStart();
+        });
+        button.setOnMouseExited(event -> {
+            event.consume();
+            grow.stop();
+            reset.playFromStart();
+        });
+    }
+
+    private static ScaleTransition createHoverScaleTransition(Button button, double scale) {
+        ScaleTransition transition = new ScaleTransition(Duration.millis(100), button);
+        transition.setToX(scale);
+        transition.setToY(scale);
+        return transition;
     }
 
     private Button createMatchActionButton(String text, javafx.event.EventHandler<javafx.event.ActionEvent> handler) {
@@ -730,7 +740,7 @@ public class MatchesController extends BaseController implements Initializable {
 
     protected void navigateToChat(UUID userId) {
         // Set navigation context so ChatController knows which user to chat with
-        NavigationService nav = NavigationService.getInstance();
+        NavigationService nav = navigationService();
         nav.setNavigationContext(NavigationService.ViewType.CHAT, userId);
         nav.navigateTo(NavigationService.ViewType.CHAT);
     }
@@ -738,7 +748,7 @@ public class MatchesController extends BaseController implements Initializable {
     @FXML
     private void handleBrowse() {
         logInfo("Navigating to browse/matching screen");
-        NavigationService.getInstance().navigateTo(NavigationService.ViewType.MATCHING);
+        navigationService().navigateTo(NavigationService.ViewType.MATCHING);
     }
 
     private void wireNavigationButtons() {

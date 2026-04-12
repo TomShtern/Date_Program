@@ -31,6 +31,7 @@ import java.util.EnumSet;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.LockSupport;
 import java.util.function.BooleanSupplier;
 import javafx.application.Platform;
@@ -225,6 +226,37 @@ class SafetyViewModelTest {
         assertTrue(users.get(currentUser.getId()).orElseThrow().isDeleted());
         assertNull(AppSession.getInstance().getCurrentUser());
         assertFalse(viewModel.statusMessageProperty().get().contains("[SIMULATED]"));
+    }
+
+    @Test
+    @DisplayName("legacy safety constructor does not bypass VerificationUseCases")
+    void legacySafetyConstructorDoesNotBypassVerificationUseCases() {
+        TestStorages.Users users = new TestStorages.Users();
+        TestStorages.Interactions interactions = new TestStorages.Interactions();
+        TestStorages.TrustSafety trustSafetyStorage = new TestStorages.TrustSafety();
+        TestStorages.Communications communications = new TestStorages.Communications();
+        AppConfig config = AppConfig.defaults();
+
+        User currentUser = createUser("LegacyVerifier", Gender.FEMALE, EnumSet.of(Gender.MALE));
+        users.save(currentUser);
+        AppSession.getInstance().setCurrentUser(currentUser);
+
+        TrustSafetyService trustSafetyService = TrustSafetyService.builder(
+                        trustSafetyStorage, interactions, users, config, communications)
+                .build();
+        AtomicReference<String> errorMessage = new AtomicReference<>();
+
+        viewModel = new SafetyViewModel(trustSafetyService, AppSession.getInstance(), TEST_DISPATCHER);
+        viewModel.setErrorHandler(errorMessage::set);
+        viewModel.verificationMethodProperty().set(VerificationMethod.EMAIL);
+        viewModel.verificationContactProperty().set("legacy@example.com");
+
+        viewModel.startVerification();
+
+        assertEquals("Profile verification is unavailable right now.", errorMessage.get());
+        User stored = users.get(currentUser.getId()).orElseThrow();
+        assertNull(stored.getVerificationCode());
+        assertNull(stored.getEmail());
     }
 
     private static boolean waitUntil(BooleanSupplier condition, long timeoutMillis) throws InterruptedException {

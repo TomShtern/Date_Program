@@ -22,6 +22,9 @@ import java.util.concurrent.atomic.LongAdder;
 
 /**
  * Consolidated service for session tracking and metrics/statistics computation.
+ *
+ * <p>The five-argument constructor is the canonical runtime path. The four-argument constructor exists for
+ * compatibility and test wiring that does not need user-storage-backed metric aggregation.
  */
 public class ActivityMetricsService {
 
@@ -42,7 +45,7 @@ public class ActivityMetricsService {
     private final LongAdder recordMatchNoOpCount = new LongAdder();
     private final LongAdder endSessionNoOpCount = new LongAdder();
 
-    /** Canonical constructor — all dependencies are required. */
+    /** Compatibility/test constructor when user-storage-backed aggregation is not needed. */
     public ActivityMetricsService(
             OperationalInteractionStorage interactionStorage,
             TrustSafetyStorage trustSafetyStorage,
@@ -51,7 +54,7 @@ public class ActivityMetricsService {
         this(null, interactionStorage, trustSafetyStorage, analyticsStorage, config, false);
     }
 
-    /** Canonical constructor — all dependencies are required. */
+    /** Canonical runtime constructor — all dependencies are required. */
     public ActivityMetricsService(
             OperationalUserStorage userStorage,
             OperationalInteractionStorage interactionStorage,

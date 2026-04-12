@@ -114,29 +114,33 @@ class MatchingServiceTest {
             userStorage.save(activeUser(bob, "Bob"));
 
             Like like = Like.create(alice, bob, Like.Direction.LIKE);
-            Optional<Match> result = matchingService.recordLike(like);
+            MatchingService.RecordLikeOutcome result = matchingService.recordLike(like);
 
-            assertTrue(result.isEmpty(), "First like should not create match");
+            assertTrue(result.persisted(), "First like should be recorded");
+            assertTrue(result.match().isEmpty(), "First like should not create match");
+            assertTrue(result.like().isPresent(), "Persisted outcome should expose the recorded like");
             assertTrue(interactionStorage.exists(alice, bob), "Like should be saved");
         }
 
         @Test
-        @DisplayName("recordLike tracks swipe metrics and invalidates cached candidates")
-        void recordLikeTracksMetricsAndInvalidatesCaches() {
+        @DisplayName(
+                "recordLike invalidates cached candidates outside the user lock without recording metrics directly")
+        void recordLikeInvalidatesCachesOutsideTheUserLockWithoutRecordingMetricsDirectly() {
+            TransactionInterceptionUsers lockAwareUsers = new TransactionInterceptionUsers();
             UUID alice = UUID.randomUUID();
             UUID bob = UUID.randomUUID();
 
-            userStorage.save(activeUser(alice, "Alice"));
-            userStorage.save(activeUser(bob, "Bob"));
+            lockAwareUsers.save(activeUser(alice, "Alice"));
+            lockAwareUsers.save(activeUser(bob, "Bob"));
 
             TrackingCandidateFinder trackingCandidateFinder =
-                    new TrackingCandidateFinder(userStorage, interactionStorage, trustSafetyStorage);
+                    new TrackingCandidateFinder(lockAwareUsers, interactionStorage, trustSafetyStorage);
             CountingActivityMetricsService activityMetricsService =
-                    new CountingActivityMetricsService(interactionStorage, trustSafetyStorage);
+                    new CountingActivityMetricsService(lockAwareUsers, interactionStorage, trustSafetyStorage);
             MatchingService service = MatchingService.builder()
                     .interactionStorage(interactionStorage)
                     .trustSafetyStorage(trustSafetyStorage)
-                    .userStorage(userStorage)
+                    .userStorage(lockAwareUsers)
                     .activityMetricsService(activityMetricsService)
                     .undoService(new UndoService(interactionStorage, undoStorage, AppConfig.defaults()))
                     .dailyService(new RecommendationService(
@@ -144,10 +148,11 @@ class MatchingServiceTest {
                     .candidateFinder(trackingCandidateFinder)
                     .build();
 
-            Optional<Match> result = service.recordLike(Like.create(alice, bob, Like.Direction.PASS));
+            MatchingService.RecordLikeOutcome result = service.recordLike(Like.create(alice, bob, Like.Direction.PASS));
 
-            assertTrue(result.isEmpty(), "Pass should never create match");
-            assertEquals(1, activityMetricsService.recordSwipeCount());
+            assertTrue(result.persisted(), "Pass should persist when allowed");
+            assertTrue(result.match().isEmpty(), "Pass should never create match");
+            assertEquals(0, activityMetricsService.recordSwipeCount());
             assertEquals(Set.of(alice, bob), trackingCandidateFinder.invalidatedUserIds());
         }
 
@@ -161,9 +166,13 @@ class MatchingServiceTest {
             userStorage.save(activeUser(bob, "Bob"));
             trustSafetyStorage.save(Block.create(alice, bob));
 
-            Optional<Match> result = matchingService.recordLike(Like.create(alice, bob, Like.Direction.LIKE));
+            MatchingService.RecordLikeOutcome result =
+                    matchingService.recordLike(Like.create(alice, bob, Like.Direction.LIKE));
 
-            assertTrue(result.isEmpty(), "Blocked likes should be rejected");
+            assertTrue(result.rejected(), "Blocked likes should be rejected");
+            assertEquals(
+                    "Cannot swipe on a blocked user.", result.rejectionMessage().orElseThrow());
+            assertTrue(result.like().isEmpty(), "Rejected outcome should not expose a persisted like");
             assertFalse(interactionStorage.exists(alice, bob), "Blocked like should not be saved");
         }
 
@@ -181,9 +190,10 @@ class MatchingServiceTest {
 
             // Alice passes Bob
             Like pass = Like.create(alice, bob, Like.Direction.PASS);
-            Optional<Match> result = matchingService.recordLike(pass);
+            MatchingService.RecordLikeOutcome result = matchingService.recordLike(pass);
 
-            assertTrue(result.isEmpty(), "Pass should never create match");
+            assertTrue(result.persisted(), "Pass should persist when allowed");
+            assertTrue(result.match().isEmpty(), "Pass should never create match");
         }
 
         @Test
@@ -201,10 +211,11 @@ class MatchingServiceTest {
 
             // Bob likes Alice back
             Like bobLikesAlice = Like.create(bob, alice, Like.Direction.LIKE);
-            Optional<Match> result = matchingService.recordLike(bobLikesAlice);
+            MatchingService.RecordLikeOutcome result = matchingService.recordLike(bobLikesAlice);
 
-            assertTrue(result.isPresent(), "Mutual likes should create match");
-            Match match = result.get();
+            assertTrue(result.persisted(), "Mutual like should persist");
+            assertTrue(result.match().isPresent(), "Mutual likes should create match");
+            Match match = result.match().orElseThrow();
             assertTrue(match.involves(alice), "Match should involve Alice");
             assertTrue(match.involves(bob), "Match should involve Bob");
             assertTrue(interactionStorage.exists(match.getId()), "Match should be saved");
@@ -222,10 +233,16 @@ class MatchingServiceTest {
             Like like1 = Like.create(alice, bob, Like.Direction.LIKE);
             Like like2 = Like.create(alice, bob, Like.Direction.LIKE);
 
-            matchingService.recordLike(like1);
-            Optional<Match> result = matchingService.recordLike(like2);
+            MatchingService.RecordLikeOutcome first = matchingService.recordLike(like1);
+            MatchingService.RecordLikeOutcome result = matchingService.recordLike(like2);
 
-            assertTrue(result.isEmpty(), "Duplicate like should be ignored");
+            assertTrue(first.persisted(), "First like should persist");
+            assertFalse(result.persisted(), "Duplicate like should be an idempotent no-op");
+            assertFalse(result.rejected(), "Duplicate like should not be treated as a rejection");
+            assertTrue(result.like().isPresent(), "Duplicate outcome should expose the persisted like");
+            assertEquals(
+                    first.like().orElseThrow().id(), result.like().orElseThrow().id());
+            assertTrue(result.match().isEmpty(), "Duplicate like should not create a match");
         }
 
         @Test
@@ -242,9 +259,11 @@ class MatchingServiceTest {
             matchingService.recordLike(Like.create(bob, alice, Like.Direction.LIKE));
 
             // Try to re-like (should be ignored because like already exists)
-            Optional<Match> result = matchingService.recordLike(Like.create(alice, bob, Like.Direction.LIKE));
+            MatchingService.RecordLikeOutcome result =
+                    matchingService.recordLike(Like.create(alice, bob, Like.Direction.LIKE));
 
-            assertTrue(result.isEmpty(), "Re-like should not create another match");
+            assertFalse(result.persisted(), "Re-like should stay idempotent");
+            assertTrue(result.match().isEmpty(), "Re-like should not create another match");
         }
     }
 
@@ -285,9 +304,10 @@ class MatchingServiceTest {
             matchingService.recordLike(Like.create(bob, alice, Like.Direction.LIKE));
 
             // Alice likes Bob back
-            Optional<Match> result = matchingService.recordLike(Like.create(alice, bob, Like.Direction.LIKE));
+            MatchingService.RecordLikeOutcome result =
+                    matchingService.recordLike(Like.create(alice, bob, Like.Direction.LIKE));
 
-            assertTrue(result.isPresent(), "Order should not matter for matching");
+            assertTrue(result.match().isPresent(), "Order should not matter for matching");
         }
     }
 
@@ -809,26 +829,37 @@ class MatchingServiceTest {
 
     private static final class TransactionInterceptionUsers extends TestStorages.Users {
         private Runnable pauseHook;
+        private final AtomicInteger lockDepth = new AtomicInteger();
 
         void setPauseHook(Runnable hook) {
             this.pauseHook = hook;
         }
 
+        boolean isUserLockHeld() {
+            return lockDepth.get() > 0;
+        }
+
         @Override
         public synchronized void executeWithUserLock(UUID userId, Runnable operation) {
+            lockDepth.incrementAndGet();
             if (pauseHook != null) {
                 pauseHook.run();
                 pauseHook = null;
             }
-            super.executeWithUserLock(userId, operation);
+            try {
+                super.executeWithUserLock(userId, operation);
+            } finally {
+                lockDepth.decrementAndGet();
+            }
         }
     }
 
     private static final class TrackingCandidateFinder extends CandidateFinder {
+        private final TransactionInterceptionUsers userStorage;
         private final Set<UUID> invalidatedUserIds = new HashSet<>();
 
         private TrackingCandidateFinder(
-                TestStorages.Users userStorage,
+                TransactionInterceptionUsers userStorage,
                 TestStorages.Interactions interactionStorage,
                 TestStorages.TrustSafety trustSafetyStorage) {
             super(
@@ -836,10 +867,12 @@ class MatchingServiceTest {
                     interactionStorage,
                     trustSafetyStorage,
                     AppClock.clock().getZone());
+            this.userStorage = userStorage;
         }
 
         @Override
         public void invalidateCacheFor(UUID userId) {
+            assertFalse(userStorage.isUserLockHeld(), "candidate invalidation should happen outside the user lock");
             if (userId != null) {
                 invalidatedUserIds.add(userId);
             }
@@ -852,16 +885,21 @@ class MatchingServiceTest {
     }
 
     private static final class CountingActivityMetricsService extends ActivityMetricsService {
+        private final TransactionInterceptionUsers userStorage;
         private final AtomicInteger recordSwipeCount = new AtomicInteger();
 
         private CountingActivityMetricsService(
-                TestStorages.Interactions interactionStorage, TestStorages.TrustSafety trustSafetyStorage) {
+                TransactionInterceptionUsers userStorage,
+                TestStorages.Interactions interactionStorage,
+                TestStorages.TrustSafety trustSafetyStorage) {
             super(interactionStorage, trustSafetyStorage, new TestStorages.Analytics(), AppConfig.defaults());
+            this.userStorage = userStorage;
         }
 
         @Override
         public ActivityMetricsService.SwipeGateResult recordSwipe(
                 UUID userId, Like.Direction direction, boolean matched) {
+            assertFalse(userStorage.isUserLockHeld(), "metrics should happen outside the user lock");
             recordSwipeCount.incrementAndGet();
             return super.recordSwipe(userId, direction, matched);
         }

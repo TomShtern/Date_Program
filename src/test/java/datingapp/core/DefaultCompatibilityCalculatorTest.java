@@ -85,4 +85,44 @@ class DefaultCompatibilityCalculatorTest {
 
         assertTrue(calculator.calculateInterestScore(me, them) > 0.0);
     }
+
+    @Test
+    @DisplayName("age score reads each user's age once")
+    void calculateAgeScoreUsesEachAgeOnce() {
+        DefaultCompatibilityCalculator calculator =
+                new DefaultCompatibilityCalculator(AppConfig.defaults(), Clock.fixed(FIXED_INSTANT, ZoneId.of("UTC")));
+
+        CountingUser me = new CountingUser(UUID.randomUUID(), "Me");
+        me.setBirthDate(LocalDate.of(1995, 1, 1));
+        me.setAgeRange(18, 40, 18, 120);
+
+        CountingUser them = new CountingUser(UUID.randomUUID(), "Them");
+        them.setBirthDate(LocalDate.of(2001, 1, 1));
+        them.setAgeRange(18, 40, 18, 120);
+
+        double score = calculator.calculateAgeScore(me, them);
+
+        assertTrue(score > 0.0);
+        assertEquals(1, me.ageLookupCount());
+        assertEquals(1, them.ageLookupCount());
+    }
+
+    private static final class CountingUser extends User {
+
+        private int ageLookupCount;
+
+        private CountingUser(UUID id, String name) {
+            super(id, name);
+        }
+
+        @Override
+        public java.util.Optional<Integer> getAge(ZoneId timezone) {
+            ageLookupCount++;
+            return super.getAge(timezone);
+        }
+
+        private int ageLookupCount() {
+            return ageLookupCount;
+        }
+    }
 }

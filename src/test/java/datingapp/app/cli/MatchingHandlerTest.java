@@ -126,7 +126,8 @@ class MatchingHandlerTest {
                 matchQualityService,
                 new InProcessAppEventBus(),
                 dailyService);
-        SocialUseCases socialUseCases = new SocialUseCases(connectionService, trustSafetyService, communicationStorage);
+        SocialUseCases socialUseCases =
+                SocialUseCases.forWorkflowAccess(connectionService, trustSafetyService, communicationStorage);
 
         MatchingHandler.Dependencies deps = new MatchingHandler.Dependencies(
                 matchingService,
