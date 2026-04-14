@@ -30,6 +30,9 @@ public final class LocationService {
     private static final String CITY_RISHON_LEZION = "Rishon LeZion";
     private static final String CITY_PETAH_TIKVA = "Petah Tikva";
     private static final String DISTRICT_CENTRAL = "Central District";
+    private static final String DISTRICT_NORTHERN = "Northern District";
+    private static final String DISTRICT_SOUTHERN = "Southern District";
+    private static final String DISTRICT_JUDEA_SAMARIA = "Judea and Samaria Area";
     private static final int DEFAULT_RESULT_LIMIT = 10;
     private static final double ZIP_MATCH_MAX_KM = 3.0;
     private static final double CITY_MATCH_MAX_KM = 12.0;
@@ -49,16 +52,51 @@ public final class LocationService {
             new City(CITY_HAIFA, DISTRICT_HAIFA, 32.7940, 34.9896, COUNTRY_IL, 1),
             new City(CITY_RISHON_LEZION, DISTRICT_CENTRAL, 31.9642, 34.8054, COUNTRY_IL, 1),
             new City(CITY_PETAH_TIKVA, DISTRICT_CENTRAL, 32.0870, 34.8877, COUNTRY_IL, 1),
-            new City("Ashdod", "Southern District", 31.8044, 34.6553, COUNTRY_IL, 2),
+            new City("Ashdod", DISTRICT_SOUTHERN, 31.8044, 34.6553, COUNTRY_IL, 2),
             new City("Netanya", DISTRICT_CENTRAL, 32.3215, 34.8532, COUNTRY_IL, 2),
-            new City("Be'er Sheva", "Southern District", 31.2518, 34.7913, COUNTRY_IL, 2),
+            new City("Be'er Sheva", DISTRICT_SOUTHERN, 31.2518, 34.7913, COUNTRY_IL, 2),
             new City("Holon", DISTRICT_TEL_AVIV, 32.0117, 34.7738, COUNTRY_IL, 2),
             new City("Bnei Brak", DISTRICT_TEL_AVIV, 32.0808, 34.8338, COUNTRY_IL, 2),
             new City("Ramat Gan", DISTRICT_TEL_AVIV, 32.0703, 34.8267, COUNTRY_IL, 3),
             new City("Rehovot", DISTRICT_CENTRAL, 31.8934, 34.8100, COUNTRY_IL, 3),
             new City("Herzliya", DISTRICT_TEL_AVIV, 32.1667, 34.8500, COUNTRY_IL, 3),
             new City("Kfar Saba", DISTRICT_CENTRAL, 32.1742, 34.9067, COUNTRY_IL, 3),
-            new City("Modi'in", DISTRICT_CENTRAL, 31.8969, 35.0061, COUNTRY_IL, 3));
+            new City("Modi'in", DISTRICT_CENTRAL, 31.8969, 35.0061, COUNTRY_IL, 3),
+            new City("Ashkelon", DISTRICT_SOUTHERN, 31.6688, 34.5743, COUNTRY_IL, 4),
+            new City("Bat Yam", DISTRICT_TEL_AVIV, 32.0238, 34.7503, COUNTRY_IL, 4),
+            new City("Hadera", DISTRICT_HAIFA, 32.4340, 34.9197, COUNTRY_IL, 4),
+            new City("Lod", DISTRICT_CENTRAL, 31.9522, 34.8884, COUNTRY_IL, 4),
+            new City("Ramla", DISTRICT_CENTRAL, 31.9302, 34.8656, COUNTRY_IL, 4),
+            new City("Ra'anana", DISTRICT_CENTRAL, 32.1848, 34.8713, COUNTRY_IL, 4),
+            new City("Hod HaSharon", DISTRICT_CENTRAL, 32.1592, 34.8932, COUNTRY_IL, 4),
+            new City("Givatayim", DISTRICT_TEL_AVIV, 32.0723, 34.8113, COUNTRY_IL, 4),
+            new City("Or Yehuda", DISTRICT_TEL_AVIV, 32.0290, 34.8578, COUNTRY_IL, 4),
+            new City("Beit Shemesh", DISTRICT_JERUSALEM, 31.7497, 34.9886, COUNTRY_IL, 4),
+            new City("Yavne", DISTRICT_CENTRAL, 31.8781, 34.7398, COUNTRY_IL, 4),
+            new City("Rosh HaAyin", DISTRICT_CENTRAL, 32.0956, 34.9566, COUNTRY_IL, 4),
+            new City("Nahariya", DISTRICT_NORTHERN, 33.0080, 35.0981, COUNTRY_IL, 4),
+            new City("Acre", DISTRICT_NORTHERN, 32.9234, 35.0818, COUNTRY_IL, 4),
+            new City("Carmiel", DISTRICT_NORTHERN, 32.9190, 35.3046, COUNTRY_IL, 4),
+            new City("Tiberias", DISTRICT_NORTHERN, 32.7940, 35.5312, COUNTRY_IL, 4),
+            new City("Nazareth", DISTRICT_NORTHERN, 32.6996, 35.3035, COUNTRY_IL, 4),
+            new City("Afula", DISTRICT_NORTHERN, 32.6091, 35.2892, COUNTRY_IL, 4),
+            new City("Tirat Carmel", DISTRICT_HAIFA, 32.7618, 34.9715, COUNTRY_IL, 4),
+            new City("Nesher", DISTRICT_HAIFA, 32.7650, 35.0500, COUNTRY_IL, 4),
+            new City("Kiryat Ata", DISTRICT_HAIFA, 32.8115, 35.1137, COUNTRY_IL, 4),
+            new City("Kiryat Bialik", DISTRICT_HAIFA, 32.8271, 35.0871, COUNTRY_IL, 4),
+            new City("Kiryat Motzkin", DISTRICT_HAIFA, 32.8356, 35.0770, COUNTRY_IL, 4),
+            new City("Kiryat Yam", DISTRICT_HAIFA, 32.8486, 35.0665, COUNTRY_IL, 4),
+            new City("Kiryat Gat", DISTRICT_SOUTHERN, 31.6096, 34.7642, COUNTRY_IL, 4),
+            new City("Sderot", DISTRICT_SOUTHERN, 31.5242, 34.5958, COUNTRY_IL, 4),
+            new City("Netivot", DISTRICT_SOUTHERN, 31.4231, 34.5890, COUNTRY_IL, 4),
+            new City("Ofakim", DISTRICT_SOUTHERN, 31.3141, 34.6202, COUNTRY_IL, 4),
+            new City("Dimona", DISTRICT_SOUTHERN, 31.0708, 35.0333, COUNTRY_IL, 4),
+            new City("Arad", DISTRICT_SOUTHERN, 31.2589, 35.2128, COUNTRY_IL, 4),
+            new City("Eilat", DISTRICT_SOUTHERN, 29.5577, 34.9519, COUNTRY_IL, 4),
+            new City("Kiryat Shmona", DISTRICT_NORTHERN, 33.2073, 35.5697, COUNTRY_IL, 4),
+            new City("Ma'ale Adumim", DISTRICT_JERUSALEM, 31.7680, 35.3015, COUNTRY_IL, 4),
+            new City("Ariel", DISTRICT_JUDEA_SAMARIA, 32.1047, 35.1889, COUNTRY_IL, 4),
+            new City("Pardes Hanna-Karkur", DISTRICT_HAIFA, 32.4728, 34.9774, COUNTRY_IL, 4));
 
     private static final List<ZipRange> ISRAEL_ZIP_RANGES = List.of(
             new ZipRange("6701", COUNTRY_IL, CITY_TEL_AVIV, DISTRICT_TEL_AVIV, 32.0650, 34.7700),
@@ -113,7 +151,7 @@ public final class LocationService {
 
     public List<City> getPopularCities(String countryCode, int limit) {
         return citiesFor(countryCode).stream()
-                .sorted(Comparator.comparingInt(City::priority).thenComparing(City::name))
+                .sorted(Comparator.comparingInt(City::priority))
                 .limit(Math.max(1, limit))
                 .toList();
     }
@@ -129,7 +167,7 @@ public final class LocationService {
         String normalizedQuery = normalizeText(query);
         return citiesFor(countryCode).stream()
                 .filter(city -> matches(city, normalizedQuery))
-                .sorted(Comparator.comparingInt(City::priority).thenComparing(City::name))
+                .sorted(Comparator.comparingInt(City::priority))
                 .limit(Math.max(1, limit))
                 .toList();
     }

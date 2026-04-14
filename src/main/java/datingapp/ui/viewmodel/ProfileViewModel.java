@@ -9,6 +9,8 @@ import datingapp.core.AppSession;
 import datingapp.core.model.LocationModels.ResolvedLocation;
 import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
+import datingapp.core.profile.GeocodingService;
+import datingapp.core.profile.LocalGeocodingService;
 import datingapp.core.profile.LocationService;
 import datingapp.core.profile.MatchPreferences.Dealbreakers;
 import datingapp.core.profile.MatchPreferences.Interest;
@@ -68,6 +70,7 @@ public class ProfileViewModel extends BaseViewModel {
     private final ProfileActivationPolicy activationPolicy;
     private final AppSession session;
     private final LocationService locationService;
+    private final GeocodingService geocodingService;
     private final ValidationService validationService;
     private final ProfileDraftAssembler draftAssembler;
     private final PhotoMutationCoordinator photoMutationCoordinator;
@@ -152,15 +155,13 @@ public class ProfileViewModel extends BaseViewModel {
             AppSession session,
             UiThreadDispatcher uiDispatcher,
             ProfileActivationPolicy activationPolicy) {
-        this(new Dependencies(
+        this(createDependencies(
                 userStore,
                 profileCompletionService,
                 profileMutationUseCases,
                 profileUseCases,
                 config,
                 session,
-                new ValidationService(config),
-                new LocationService(new ValidationService(config)),
                 uiDispatcher,
                 activationPolicy));
     }
@@ -178,6 +179,9 @@ public class ProfileViewModel extends BaseViewModel {
         this.validationService =
                 Objects.requireNonNull(dependencies.validationService(), "validationService cannot be null");
         this.locationService = Objects.requireNonNull(dependencies.locationService(), "locationService cannot be null");
+        this.geocodingService = dependencies.geocodingService() != null
+                ? dependencies.geocodingService()
+                : new LocalGeocodingService(this.locationService);
         this.draftAssembler = new ProfileDraftAssembler(config);
         this.photoMutationCoordinator = new PhotoMutationCoordinator(
                 Objects.requireNonNull(dependencies.userStore(), "userStore cannot be null"), new LocalPhotoStore());
@@ -749,6 +753,10 @@ public class ProfileViewModel extends BaseViewModel {
         return locationService;
     }
 
+    public GeocodingService getGeocodingService() {
+        return geocodingService;
+    }
+
     /**
      * Toggles a gender preference.
      *
@@ -1193,6 +1201,7 @@ public class ProfileViewModel extends BaseViewModel {
             AppSession session,
             ValidationService validationService,
             LocationService locationService,
+            GeocodingService geocodingService,
             UiThreadDispatcher uiDispatcher,
             ProfileActivationPolicy activationPolicy) {}
 
@@ -1205,6 +1214,7 @@ public class ProfileViewModel extends BaseViewModel {
             UiThreadDispatcher uiDispatcher,
             ProfileActivationPolicy activationPolicy) {
         ValidationService validationService = new ValidationService(config);
+        LocationService locationService = new LocationService(validationService);
         return new Dependencies(
                 userStore,
                 profileCompletionService,
@@ -1213,7 +1223,33 @@ public class ProfileViewModel extends BaseViewModel {
                 config,
                 session,
                 validationService,
-                new LocationService(validationService),
+                locationService,
+                new LocalGeocodingService(locationService),
+                uiDispatcher,
+                activationPolicy);
+    }
+
+    private static Dependencies createDependencies(
+            UiUserStore userStore,
+            ProfileService profileCompletionService,
+            ProfileMutationUseCases profileMutationUseCases,
+            ProfileUseCases profileUseCases,
+            AppConfig config,
+            AppSession session,
+            UiThreadDispatcher uiDispatcher,
+            ProfileActivationPolicy activationPolicy) {
+        ValidationService validationService = new ValidationService(config);
+        LocationService locationService = new LocationService(validationService);
+        return new Dependencies(
+                userStore,
+                profileCompletionService,
+                profileMutationUseCases,
+                profileUseCases,
+                config,
+                session,
+                validationService,
+                locationService,
+                new LocalGeocodingService(locationService),
                 uiDispatcher,
                 activationPolicy);
     }

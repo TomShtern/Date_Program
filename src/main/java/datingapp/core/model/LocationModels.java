@@ -9,6 +9,7 @@ public final class LocationModels {
     private LocationModels() {}
 
     public enum Precision {
+        ADDRESS,
         CITY,
         ZIP
     }

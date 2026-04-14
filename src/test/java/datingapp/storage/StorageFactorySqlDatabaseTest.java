@@ -1,5 +1,6 @@
 package datingapp.storage;
 
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -21,8 +22,9 @@ class StorageFactorySqlDatabaseTest {
                     () -> StorageFactory.buildSqlDatabase(dbManager, AppConfig.defaults()));
 
             String message = exception.getMessage();
-            assertTrue(message.contains("detect"), "Expected message to mention 'detect'");
-            assertTrue(message.contains("dialect"), "Expected message to mention 'dialect'");
+            assertAll(
+                    () -> assertTrue(message.contains("detect"), "Expected message to mention 'detect'"),
+                    () -> assertTrue(message.contains("dialect"), "Expected message to mention 'dialect'"));
         } finally {
             dbManager.shutdown();
         }

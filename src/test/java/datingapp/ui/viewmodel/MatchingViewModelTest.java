@@ -1,10 +1,13 @@
 package datingapp.ui.viewmodel;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.app.event.InProcessAppEventBus;
+import datingapp.app.usecase.common.UseCaseResult;
+import datingapp.app.usecase.matching.MatchingUseCases;
 import datingapp.app.usecase.profile.ProfileInsightsUseCases;
 import datingapp.app.usecase.profile.ProfileMutationUseCases;
 import datingapp.app.usecase.profile.ProfileNotesUseCases;
@@ -38,7 +41,9 @@ import java.util.EnumSet;
 import java.util.Optional;
 import java.util.Queue;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.LockSupport;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
@@ -219,6 +224,41 @@ class MatchingViewModelTest {
     }
 
     @Test
+    @DisplayName("like does not block caller while swipe work is running")
+    void likeDoesNotBlockCallerWhileSwipeWorkIsRunning() throws Exception {
+        Fixture fixture = new Fixture();
+        fixture.saveUsers();
+        CountDownLatch swipeStarted = new CountDownLatch(1);
+        CountDownLatch releaseSwipe = new CountDownLatch(1);
+
+        MatchingViewModel viewModel =
+                fixture.createBlockingViewModel(TEST_DISPATCHER, swipeStarted, releaseSwipe, null, null);
+        viewModel.initialize(fixture.prioritizedCandidate.getId());
+
+        waitUntil(() -> viewModel.currentCandidateProperty().get() != null, 5000);
+
+        AtomicReference<Throwable> callerFailure = new AtomicReference<>();
+        Thread caller = Thread.ofPlatform().start(() -> {
+            try {
+                viewModel.like();
+            } catch (Throwable throwable) {
+                callerFailure.set(throwable);
+            }
+        });
+
+        assertTrue(swipeStarted.await(5, TimeUnit.SECONDS));
+
+        caller.join(250);
+
+        assertNull(callerFailure.get());
+        assertFalse(caller.isAlive(), "like() should return promptly and leave swipe work to asyncScope");
+
+        releaseSwipe.countDown();
+        waitUntil(() -> viewModel.undoAvailableProperty().get(), 5000);
+        viewModel.dispose();
+    }
+
+    @Test
     @DisplayName("undo without recent swipe publishes info message")
     void undoWithoutRecentSwipePublishesInfoMessage() {
         Fixture fixture = new Fixture();
@@ -232,6 +272,42 @@ class MatchingViewModelTest {
 
         waitUntil(() -> viewModel.infoMessageProperty().get() != null, 5000);
 
+        assertEquals("No recent swipe to undo", viewModel.infoMessageProperty().get());
+        viewModel.dispose();
+    }
+
+    @Test
+    @DisplayName("undo does not block caller while undo work is running")
+    void undoDoesNotBlockCallerWhileUndoWorkIsRunning() throws Exception {
+        Fixture fixture = new Fixture();
+        fixture.saveUsers();
+        CountDownLatch undoStarted = new CountDownLatch(1);
+        CountDownLatch releaseUndo = new CountDownLatch(1);
+
+        MatchingViewModel viewModel =
+                fixture.createBlockingViewModel(TEST_DISPATCHER, null, null, undoStarted, releaseUndo);
+        viewModel.initialize(fixture.prioritizedCandidate.getId());
+
+        waitUntil(() -> viewModel.currentCandidateProperty().get() != null, 5000);
+
+        AtomicReference<Throwable> callerFailure = new AtomicReference<>();
+        Thread caller = Thread.ofPlatform().start(() -> {
+            try {
+                viewModel.undo();
+            } catch (Throwable throwable) {
+                callerFailure.set(throwable);
+            }
+        });
+
+        assertTrue(undoStarted.await(5, TimeUnit.SECONDS));
+
+        caller.join(250);
+
+        assertNull(callerFailure.get());
+        assertFalse(caller.isAlive(), "undo() should return promptly and leave undo work to asyncScope");
+
+        releaseUndo.countDown();
+        waitUntil(() -> viewModel.infoMessageProperty().get() != null, 5000);
         assertEquals("No recent swipe to undo", viewModel.infoMessageProperty().get());
         viewModel.dispose();
     }
@@ -256,6 +332,11 @@ class MatchingViewModelTest {
 
         viewModel.like();
         viewModel.like();
+
+        waitUntil(
+                () -> fixture.interactions.countByDirection(fixture.currentUser.getId(), Like.Direction.LIKE) == 1
+                        && dispatcher.hasPending(),
+                5000);
 
         assertEquals(
                 fixture.prioritizedCandidate.getId(),
@@ -371,6 +452,33 @@ class MatchingViewModelTest {
                 UiThreadDispatcher dispatcher,
                 UiProfileNoteDataAccess noteDataAccess,
                 MatchingViewModel.DistanceCalculator distanceCalculator) {
+            return createViewModel(dispatcher, noteDataAccess, distanceCalculator, null, null, null, null);
+        }
+
+        private MatchingViewModel createBlockingViewModel(
+                UiThreadDispatcher dispatcher,
+                CountDownLatch swipeStarted,
+                CountDownLatch releaseSwipe,
+                CountDownLatch undoStarted,
+                CountDownLatch releaseUndo) {
+            return createViewModel(
+                    dispatcher,
+                    new UseCaseUiProfileNoteDataAccess(createNoteUseCases().getProfileNotesUseCases()),
+                    CandidateFinder.GeoUtils::distanceKm,
+                    swipeStarted,
+                    releaseSwipe,
+                    undoStarted,
+                    releaseUndo);
+        }
+
+        private MatchingViewModel createViewModel(
+                UiThreadDispatcher dispatcher,
+                UiProfileNoteDataAccess noteDataAccess,
+                MatchingViewModel.DistanceCalculator distanceCalculator,
+                CountDownLatch swipeStarted,
+                CountDownLatch releaseSwipe,
+                CountDownLatch undoStarted,
+                CountDownLatch releaseUndo) {
             CandidateFinder candidateFinder =
                     new CandidateFinder(users, interactions, trustSafetyStorage, ZoneId.of("UTC"));
             ProfileService profileService = new ProfileService(users);
@@ -396,6 +504,34 @@ class MatchingViewModelTest {
             TrustSafetyService trustSafetyService = TrustSafetyService.builder(
                             trustSafetyStorage, interactions, users, config, communications)
                     .build();
+            MatchingUseCases matchingUseCases =
+                    new MatchingUseCases(
+                            candidateFinder,
+                            matchingService,
+                            datingapp.app.usecase.matching.MatchingUseCases.wrapDailyLimitService(
+                                    recommendationService),
+                            datingapp.app.usecase.matching.MatchingUseCases.wrapDailyPickService(recommendationService),
+                            datingapp.app.usecase.matching.MatchingUseCases.wrapStandoutService(recommendationService),
+                            undoService,
+                            interactions,
+                            users,
+                            new MatchQualityService(users, interactions, config),
+                            new datingapp.app.event.InProcessAppEventBus(),
+                            recommendationService) {
+                        @Override
+                        public UseCaseResult<MatchingUseCases.SwipeOutcome> processSwipe(
+                                MatchingUseCases.ProcessSwipeCommand command) {
+                            awaitGate(swipeStarted, releaseSwipe, "swipe");
+                            return super.processSwipe(command);
+                        }
+
+                        @Override
+                        public UseCaseResult<MatchingUseCases.UndoOutcome> undoSwipe(
+                                MatchingUseCases.UndoSwipeCommand command) {
+                            awaitGate(undoStarted, releaseUndo, "undo");
+                            return super.undoSwipe(command);
+                        }
+                    };
 
             return new MatchingViewModel(
                     new MatchingViewModel.Dependencies(
@@ -403,26 +539,25 @@ class MatchingViewModelTest {
                             matchingService,
                             undoService,
                             trustSafetyService,
-                            new datingapp.app.usecase.matching.MatchingUseCases(
-                                    candidateFinder,
-                                    matchingService,
-                                    datingapp.app.usecase.matching.MatchingUseCases.wrapDailyLimitService(
-                                            recommendationService),
-                                    datingapp.app.usecase.matching.MatchingUseCases.wrapDailyPickService(
-                                            recommendationService),
-                                    datingapp.app.usecase.matching.MatchingUseCases.wrapStandoutService(
-                                            recommendationService),
-                                    undoService,
-                                    interactions,
-                                    users,
-                                    new MatchQualityService(users, interactions, config),
-                                    new datingapp.app.event.InProcessAppEventBus(),
-                                    recommendationService),
+                            matchingUseCases,
                             datingapp.app.usecase.social.SocialUseCases.forTrustSafetyOnly(trustSafetyService),
                             noteDataAccess,
                             distanceCalculator),
                     session,
                     dispatcher);
+        }
+
+        private void awaitGate(CountDownLatch started, CountDownLatch release, String operationName) {
+            if (started == null || release == null) {
+                return;
+            }
+            started.countDown();
+            try {
+                assertTrue(release.await(5, TimeUnit.SECONDS), operationName + " gate was never released");
+            } catch (InterruptedException exception) {
+                Thread.currentThread().interrupt();
+                throw new AssertionError("Interrupted while waiting to release " + operationName, exception);
+            }
         }
 
         private ProfileUseCases createNoteUseCases() {
@@ -540,6 +675,12 @@ class MatchingViewModelTest {
                 } finally {
                     uiThread.set(previous);
                 }
+            }
+        }
+
+        private boolean hasPending() {
+            synchronized (pending) {
+                return !pending.isEmpty();
             }
         }
     }

@@ -170,7 +170,6 @@ public class SafetyHandler implements LoggingSupport {
             return reasons[selectedIndex.getAsInt()];
         }
         if (!CliTextAndInput.isZeroSelection(reasonInput)) {
-            logger.warn("Invalid report reason input");
             String lengthMeta = reasonInput == null ? EMPTY_INPUT_META : String.valueOf(reasonInput.length());
             logger.debug("Invalid report reason input; length={}", lengthMeta);
         }
@@ -303,9 +302,8 @@ public class SafetyHandler implements LoggingSupport {
         if (selectedIndex.isPresent()) {
             return users.get(selectedIndex.getAsInt());
         }
-        logger.warn("Invalid safety handler selection input");
         String lengthMeta = input == null ? EMPTY_INPUT_META : String.valueOf(input.length());
-        logger.debug("Invalid safety input length={}", lengthMeta);
+        logger.debug("Invalid safety selection input; length={}", lengthMeta);
         logInfo(CliTextAndInput.INVALID_INPUT);
         return null;
     }
@@ -325,9 +323,8 @@ public class SafetyHandler implements LoggingSupport {
         if (selectedIndex.isPresent()) {
             return blockedUsers.get(selectedIndex.getAsInt());
         }
-        logger.warn("Invalid safety handler selection input");
         String lengthMeta = input == null ? EMPTY_INPUT_META : String.valueOf(input.length());
-        logger.debug("Invalid safety input length={}", lengthMeta);
+        logger.debug("Invalid safety selection input; length={}", lengthMeta);
         logInfo(CliTextAndInput.INVALID_INPUT);
         return null;
     }

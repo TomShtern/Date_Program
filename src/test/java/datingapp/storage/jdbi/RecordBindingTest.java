@@ -2,13 +2,17 @@ package datingapp.storage.jdbi;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.core.connection.ConnectionModels.Block;
 import datingapp.core.connection.ConnectionModels.Like;
 import datingapp.core.connection.ConnectionModels.Report;
+import datingapp.core.metrics.SwipeState.Undo;
 import datingapp.storage.DatabaseManager;
+import java.time.Duration;
 import java.time.Instant;
+import java.util.Optional;
 import java.util.UUID;
 import org.jdbi.v3.core.Jdbi;
 import org.jdbi.v3.sqlobject.SqlObjectPlugin;
@@ -213,5 +217,55 @@ class RecordBindingTest {
                 1L,
                 pairRowCount,
                 "Recreating a report should revive the existing pair row rather than creating duplicates");
+    }
+
+    @Test
+    @DisplayName("Undo state can be persisted and retrieved via undoStorage()")
+    void undoStatePersistenceWorks() {
+        UUID user1 = UUID.fromString("00000000-0000-0000-0000-000000000001");
+        UUID user2 = UUID.fromString("00000000-0000-0000-0000-000000000002");
+
+        Like like = Like.create(user1, user2, Like.Direction.LIKE);
+        Instant expiresAt = Instant.now().plusSeconds(3600);
+        Undo state = new Undo(user1, like, null, expiresAt);
+
+        matchmakingStorage.undoStorage().save(state);
+
+        Optional<Undo> found = matchmakingStorage.undoStorage().findByUserId(user1);
+        assertTrue(found.isPresent(), "Undo state should be retrievable by user ID");
+        Undo retrieved = found.get();
+        assertEquals(user1, retrieved.userId());
+        assertEquals(like.id(), retrieved.like().id());
+        assertEquals(like.whoLikes(), retrieved.like().whoLikes());
+        assertEquals(like.whoGotLiked(), retrieved.like().whoGotLiked());
+        assertEquals(like.direction(), retrieved.like().direction());
+        // H2 truncates Instant nanoseconds; compare with millisecond tolerance
+        assertTrue(
+                Duration.between(like.createdAt(), retrieved.like().createdAt())
+                                .abs()
+                                .toMillis()
+                        < 100,
+                "like.createdAt should round-trip within 100ms");
+        assertNull(retrieved.matchId());
+        assertTrue(
+                Duration.between(expiresAt, retrieved.expiresAt()).abs().toMillis() < 100,
+                "expiresAt should round-trip within 100ms");
+    }
+
+    @Test
+    @DisplayName("Undo state with matchId round-trips through persistence")
+    void undoStateWithMatchIdRoundTrips() {
+        UUID user1 = UUID.fromString("00000000-0000-0000-0000-000000000001");
+        UUID user2 = UUID.fromString("00000000-0000-0000-0000-000000000002");
+
+        Like like = Like.create(user1, user2, Like.Direction.SUPER_LIKE);
+        String matchId = "00000000-0000-0000-0000-000000000003~00000000-0000-0000-0000-000000000004";
+        Undo state = new Undo(user1, like, matchId, Instant.now().plusSeconds(7200));
+
+        matchmakingStorage.undoStorage().save(state);
+
+        Optional<Undo> found = matchmakingStorage.undoStorage().findByUserId(user1);
+        assertTrue(found.isPresent());
+        assertEquals(matchId, found.get().matchId());
     }
 }

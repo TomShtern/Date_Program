@@ -99,7 +99,7 @@ public final class JdbiTypeCodecs {
                 throws SQLException {
             Objects.requireNonNull(enumType, "enumType cannot be null");
             String value = rs.getString(column);
-            if (value == null) {
+            if (value == null || value.isBlank()) {
                 return null;
             }
             try {

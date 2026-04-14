@@ -17,6 +17,8 @@ import javafx.scene.layout.BorderPane;
 @SuppressWarnings("unused") // FXML-injected members and handlers are referenced from FXML.
 public final class ProfileViewController extends BaseController implements Initializable {
 
+    private long profilePhotoRequestId;
+
     @FXML
     private BorderPane rootPane;
 
@@ -66,7 +68,21 @@ public final class ProfileViewController extends BaseController implements Initi
     }
 
     private void updatePhoto(String photoUrl) {
-        profileImageView.setImage(ImageCache.getImage(photoUrl, 360, 240));
+        profilePhotoRequestId++;
+        long requestId = profilePhotoRequestId;
+        profileImageView.setImage(null);
+        ImageCache.getImageAsync(photoUrl, 360, 240, image -> {
+            if (requestId != profilePhotoRequestId) {
+                return;
+            }
+            profileImageView.setImage(image);
+        });
+    }
+
+    @Override
+    public void cleanup() {
+        profilePhotoRequestId++;
+        super.cleanup();
     }
 
     private void updatePhotoIndicator() {

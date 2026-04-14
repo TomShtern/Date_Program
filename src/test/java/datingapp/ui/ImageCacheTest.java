@@ -21,6 +21,7 @@ import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import javafx.application.Platform;
 import javafx.scene.image.Image;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -152,6 +153,71 @@ class ImageCacheTest {
         assertTrue(thrownByPrimary instanceof AssertionError);
         assertTrue(thrownByWaiter instanceof CompletionException);
         assertTrue(thrownByWaiter.getCause() instanceof AssertionError);
+    }
+
+    @Test
+    @DisplayName("async image loading does not block the FX thread for uncached images")
+    void asyncImageLoadingDoesNotBlockFxThreadForUncachedImages() throws Exception {
+        try (BlockingImageServer server = new BlockingImageServer()) {
+            CountDownLatch callbackInvoked = new CountDownLatch(1);
+            AtomicReference<Image> loadedImage = new AtomicReference<>();
+            AtomicReference<Boolean> callbackOnFxThread = new AtomicReference<>(false);
+
+            FutureTask<Void> fxCall = new FutureTask<>(() -> {
+                ImageCache.getImageAsync(server.imageUrl(), 64, 64, image -> {
+                    loadedImage.set(image);
+                    callbackOnFxThread.set(Platform.isFxApplicationThread());
+                    callbackInvoked.countDown();
+                });
+                return null;
+            });
+
+            Platform.runLater(fxCall);
+            fxCall.get(1, TimeUnit.SECONDS);
+
+            assertTrue(server.awaitRequestStarted(), "async load should reach the blocking image server");
+            assertTrue(callbackInvoked.getCount() == 1, "callback should not run before the image finishes loading");
+
+            server.releaseResponse();
+
+            assertTrue(callbackInvoked.await(5, TimeUnit.SECONDS), "callback should run after the image loads");
+            assertNotNull(loadedImage.get());
+            assertTrue(Boolean.TRUE.equals(callbackOnFxThread.get()), "callback should run on the FX thread");
+        }
+    }
+
+    @Test
+    @DisplayName("async image loading does not block the FX thread when a preload is already in flight")
+    void asyncImageLoadingDoesNotBlockFxThreadWhenPreloadIsInFlight() throws Exception {
+        try (BlockingImageServer server = new BlockingImageServer()) {
+            CountDownLatch callbackInvoked = new CountDownLatch(1);
+            AtomicReference<Image> loadedImage = new AtomicReference<>();
+            AtomicReference<Boolean> callbackOnFxThread = new AtomicReference<>(false);
+
+            ImageCache.preload(server.imageUrl(), 64, 64);
+            assertTrue(server.awaitRequestStarted(), "preload should begin the blocking image request");
+
+            FutureTask<Void> fxCall = new FutureTask<>(() -> {
+                ImageCache.getImageAsync(server.imageUrl(), 64, 64, image -> {
+                    loadedImage.set(image);
+                    callbackOnFxThread.set(Platform.isFxApplicationThread());
+                    callbackInvoked.countDown();
+                });
+                return null;
+            });
+
+            Platform.runLater(fxCall);
+            fxCall.get(1, TimeUnit.SECONDS);
+
+            assertTrue(callbackInvoked.getCount() == 1, "callback should wait for the in-flight preload to finish");
+
+            server.releaseResponse();
+
+            assertTrue(callbackInvoked.await(5, TimeUnit.SECONDS), "callback should run after the preload completes");
+            assertNotNull(loadedImage.get());
+            assertTrue(Boolean.TRUE.equals(callbackOnFxThread.get()), "callback should run on the FX thread");
+            assertEquals(1, server.getRequestCount(), "async lookups should reuse the existing in-flight load");
+        }
     }
 
     private static Throwable captureThrowable(ThrowableRunnable action) {

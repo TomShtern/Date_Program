@@ -508,6 +508,7 @@ class ProfileControllerTest {
                 AppSession.getInstance(),
                 validationService,
                 new LocationService(validationService),
+                new datingapp.core.profile.LocalGeocodingService(new LocationService(validationService)),
                 TEST_DISPATCHER,
                 new datingapp.core.workflow.ProfileActivationPolicy()));
     }

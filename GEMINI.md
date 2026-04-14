@@ -1,4 +1,4 @@
-> 🚀 **VERIFIED & UPDATED: 2026-04-05**
+> 🚀 **VERIFIED & UPDATED: 2026-04-13**
 > This document merges the repo-wide rules from `.github/copilot-instructions.md`, the verified repo map from `CLAUDE.md`, and the workflow discipline from `AGENTS.md`.
 
 # GEMINI.md — Merged Repo Guide
@@ -30,10 +30,10 @@ If any markdown guidance conflicts with the implementation, trust:
 
 PowerShell note: when Maven uses a comma-separated `-Dtest=...,...` list, prefer `mvn --% ...`.
 
-## 3. Verified codebase snapshot (2026-04-05)
+## 3. Verified codebase snapshot (2026-04-13)
 
-- Java files: **373 total** (`175` main / `198` test)
-- Java LOC (`tokei src`, Java only): **104,527 total / 84,743 code / 14,882 blank / 4,902 comments**
+- Java files: **387 total** (`182` main / `205` test)
+- Java LOC (`tokei src`, Java only): **109,121 total / 88,669 code / 15,404 blank / 5,048 comments**
 
 ## 4. Architecture snapshot
 
@@ -41,37 +41,63 @@ PowerShell note: when Maven uses a comma-separated `-Dtest=...,...` list, prefer
 datingapp/
   Main.java
   app/
-    api/{RestApiDtos,RestApiServer}.java
-    bootstrap/{ApplicationStartup,CleanupScheduler}.java
-    cli/{CliTextAndInput,MainMenuRegistry,MatchingCliPresenter,MatchingHandler,MessagingHandler,ProfileHandler,SafetyHandler,StatsHandler}.java
-    error/{AppError,AppResult}.java
-    event/{AppEvent,AppEventBus,InProcessAppEventBus}.java
-    event/handlers/{AchievementEventHandler,MetricsEventHandler,NotificationEventHandler}.java
+    api/
+      {RestApiDtos,RestApiIdentityPolicy,RestApiRequestGuards,RestApiServer,RestApiUserDtos,RestRouteSupport,UserDtoMapper}.java
+    bootstrap/
+      {ApplicationStartup,CleanupScheduler}.java
+    cli/
+      {CliTextAndInput,MainMenuRegistry,MatchingCliPresenter,MatchingHandler,MessagingHandler,ProfileHandler,SafetyHandler,StatsHandler}.java
+    event/
+      {AppEvent,AppEventBus,InProcessAppEventBus}.java
+      handlers/
+        {AchievementEventHandler,MetricsEventHandler,NotificationEventHandler}.java
+    support/
+      UserPresentationSupport.java
     usecase/
-      common/{UseCaseError,UseCaseResult,UserContext}.java
-      matching/MatchingUseCases.java
-      messaging/MessagingUseCases.java
-      profile/{ProfileUseCases,VerificationUseCases}.java
-      social/SocialUseCases.java
+      common/
+        {UseCaseError,UseCaseResult,UserContext}.java
+      dashboard/
+        DashboardUseCases.java
+      matching/
+        MatchingUseCases.java
+      messaging/
+        MessagingUseCases.java
+      profile/
+        {ProfileInsightsUseCases,ProfileMutationUseCases,ProfileNormalizationSupport,ProfileNotesUseCases,ProfileUseCases,VerificationUseCases}.java
+      social/
+        SocialUseCases.java
   core/
-    {AppClock,AppConfig,AppConfigValidator,AppSession,EnumSetUtil,LoggingSupport,ServiceRegistry,TextUtil}.java
-    connection/{ConnectionModels,ConnectionService}.java
-    i18n/I18n.java
-    matching/{CandidateFinder,CompatibilityCalculator,DailyLimitService,DailyPickService,DefaultCompatibilityCalculator,DefaultDailyLimitService,DefaultDailyPickService,DefaultStandoutService,InterestMatcher,LifestyleMatcher,MatchingService,MatchQualityService,ModerationAuditEvent,ModerationAuditLogger,RecommendationService,Standout,StandoutService,TrustSafetyService,UndoService}.java
-    metrics/{AchievementService,ActivityMetricsService,DefaultAchievementService,EngagementDomain,SwipeState}.java
-    model/{LocationModels,Match,ProfileNote,User}.java
-    profile/{LocationService,MatchPreferences,ProfileCompletionSupport,ProfileService,SanitizerUtils,ValidationService}.java
-    storage/{AccountCleanupStorage,AnalyticsStorage,CommunicationStorage,InteractionStorage,PageData,TrustSafetyStorage,UserStorage}.java
-    workflow/{ProfileActivationPolicy,RelationshipWorkflowPolicy,WorkflowDecision}.java
+    {AppClock,AppConfig,AppConfigValidator,AppSession,EnumSetUtil,LoggingSupport,RuntimeEnvironment,ServiceRegistry,TextUtil}.java
+    connection/
+      {ConnectionModels,ConnectionService}.java
+    i18n/
+      I18n.java
+    matching/
+      {BrowseRankingService,CandidateFinder,CompatibilityCalculator,DailyLimitService,DailyPickService,DefaultBrowseRankingService,DefaultCompatibilityCalculator,DefaultDailyLimitService,DefaultDailyPickService,DefaultStandoutService,InterestMatcher,LifestyleMatcher,MatchQualityService,MatchingService,ModerationAuditEvent,ModerationAuditLogger,RecommendationService,Standout,StandoutService,TrustSafetyService,UndoService,WeightedScore}.java
+    metrics/
+      {AchievementService,ActivityMetricsService,DefaultAchievementService,EngagementDomain,SwipeState}.java
+    model/
+      {LocationModels,Match,ProfileNote,User}.java
+    profile/
+      {LocationService,MatchPreferences,ProfileCompletionSupport,ProfileService,SanitizerUtils,ValidationService}.java
+    storage/
+      {AccountCleanupStorage,AnalyticsStorage,CommunicationStorage,InteractionStorage,OperationalCommunicationStorage,OperationalInteractionStorage,OperationalUserStorage,PageData,TrustSafetyStorage,UserStorage}.java
+    workflow/
+      {ProfileActivationPolicy,RelationshipWorkflowPolicy,WorkflowDecision}.java
   storage/
     {DatabaseDialect,DatabaseManager,DevDataSeeder,StorageFactory}.java
-    jdbi/{JdbiAccountCleanupStorage,JdbiConnectionStorage,JdbiMatchmakingStorage,JdbiMetricsStorage,JdbiTrustSafetyStorage,JdbiTypeCodecs,JdbiUserStorage,SqlDialectSupport}.java
-    schema/{MigrationRunner,SchemaInitializer}.java
+    jdbi/
+      {DealbreakerAssembler,JdbiAccountCleanupStorage,JdbiConnectionStorage,JdbiMatchmakingStorage,JdbiMetricsStorage,JdbiNotificationJson,JdbiTrustSafetyStorage,JdbiTypeCodecs,JdbiUserStorage,NormalizedEnumParser,NormalizedProfileHydrator,NormalizedProfileRepository,SqlDialectSupport}.java
+    schema/
+      {MigrationRunner,SchemaInitializer}.java
   ui/
-    {DatingApp,ImageCache,LocalPhotoStore,NavigationService,UiAnimations,UiComponents,UiConstants,UiDialogs,UiFeedbackService,UiPreferencesStore,UiThemeService,UiUtils}.java
-    async/{AsyncErrorRouter,JavaFxUiThreadDispatcher,PollingTaskHandle,TaskHandle,TaskPolicy,UiThreadDispatcher,ViewModelAsyncScope}.java
-    screen/{BaseController,ChatController,DashboardController,LocationSelectionDialog,LoginController,MatchesController,MatchingController,MilestonePopupController,NotesController,PreferencesController,ProfileController,ProfileFormValidator,ProfileViewController,SafetyController,SocialController,StandoutsController,StatsController}.java
-    viewmodel/{BaseViewModel,ChatViewModel,DashboardViewModel,LoginViewModel,MatchesViewModel,MatchingViewModel,NotesViewModel,PreferencesViewModel,ProfileReadOnlyViewModel,ProfileViewModel,SafetyViewModel,SocialViewModel,StandoutsViewModel,StatsViewModel,UiDataAdapters,ViewModelErrorSink,ViewModelFactory}.java
+    {DatingApp,ImageCache,LocalPhotoStore,NavigationService,OnboardingContext,UiAnimations,UiComponents,UiConstants,UiDialogs,UiFeedbackService,UiPreferencesStore,UiThemeService,UiUtils}.java
+    async/
+      {AsyncErrorRouter,JavaFxUiThreadDispatcher,PollingTaskHandle,TaskHandle,TaskPolicy,UiThreadDispatcher,ViewModelAsyncScope}.java
+    screen/
+      {BaseController,ChatController,CreateAccountDialogFactory,DashboardController,LocationSelectionDialog,LoginController,MatchesController,MatchingController,MilestonePopupController,NotesController,PreferencesController,ProfileController,ProfileFormValidator,ProfileViewController,SafetyController,SocialController,StandoutsController,StatsController}.java
+    viewmodel/
+      {BaseViewModel,ChatViewModel,ConversationLoader,DashboardViewModel,LoginViewModel,MatchListLoader,MatchesViewModel,MatchingViewModel,NotesViewModel,PhotoCarouselState,PhotoMutationCoordinator,PreferencesViewModel,ProfileDraftAssembler,ProfileOnboardingState,ProfileReadOnlyViewModel,ProfileViewModel,RelationshipActionRunner,SafetyViewModel,SocialViewModel,StandoutsViewModel,StatsViewModel,UiAdapterCache,UiDataAdapters,ViewModelErrorSink,ViewModelFactory}.java
 ```
 
 ## 5. Composition roots and boundaries
@@ -191,4 +217,5 @@ mvn spotless:apply verify
 2|2026-03-25 15:58:00|agent:antigravity|docs-source-truth-sync|MASSIVE EXHAUSTIVE EXPANSION: Created the ultimate definitive source of truth file mapped via an AST extraction script|GEMINI.md
 3|2026-03-25 16:15:00|agent:antigravity|docs-ai-optimization|TRANSFORMATION: Recognized 1000-line AST dump as bloat for AI agents. Replaced it with structural copy-paste Cookbooks, Event Ledgers, and Domain Constants. Reduced parsing context load and supercharged synthesis speed.|GEMINI.md
 4|2026-03-30 15:20:00|agent:github_copilot|scope:docs-hierarchy-refresh|Rewrote GEMINI.md as a merged repo guide aligned with copilot-instructions, CLAUDE.md, AGENTS.md, and current source/build facts|GEMINI.md
+5|2026-04-13 12:15:00|agent:antigravity|docs-architecture-refresh|Updated codebase LOC and snapshot tree to accurately reflect recent package restructure and file additions|GEMINI.md
 ---AGENT-LOG-END---

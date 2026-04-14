@@ -299,6 +299,7 @@ public class ProfileController extends BaseController implements Initializable {
 
     private final ProfileViewModel viewModel;
     private final ProfileFormValidator formValidator;
+    private long profilePhotoRequestId;
 
     public ProfileController(ProfileViewModel viewModel) {
         this.viewModel = viewModel;
@@ -656,22 +657,37 @@ public class ProfileController extends BaseController implements Initializable {
             return;
         }
 
+        profilePhotoRequestId++;
+        long requestId = profilePhotoRequestId;
         if (photoUrl == null || photoUrl.isBlank()) {
-            profileImageView.setImage(null);
-            profileImageView.setVisible(false);
-            if (avatarPlaceholderIcon != null) {
-                avatarPlaceholderIcon.setVisible(true);
-            }
+            showAvatarPlaceholder();
             return;
         }
 
-        Image image = ImageCache.getImage(photoUrl, 200, 200);
+        showAvatarPlaceholder();
+        ImageCache.getImageAsync(photoUrl, 200, 200, image -> {
+            if (requestId != profilePhotoRequestId) {
+                return;
+            }
+            showProfileImage(image);
+        });
+        preloadAdjacentProfilePhotos();
+    }
+
+    private void showAvatarPlaceholder() {
+        profileImageView.setImage(null);
+        profileImageView.setVisible(false);
+        if (avatarPlaceholderIcon != null) {
+            avatarPlaceholderIcon.setVisible(true);
+        }
+    }
+
+    private void showProfileImage(Image image) {
         profileImageView.setImage(image);
         profileImageView.setVisible(true);
         if (avatarPlaceholderIcon != null) {
             avatarPlaceholderIcon.setVisible(false);
         }
-        preloadAdjacentProfilePhotos();
     }
 
     private void preloadAdjacentProfilePhotos() {
@@ -950,6 +966,12 @@ public class ProfileController extends BaseController implements Initializable {
     }
 
     @Override
+    public void cleanup() {
+        profilePhotoRequestId++;
+        super.cleanup();
+    }
+
+    @Override
     @FXML
     protected void handleBack() {
         if (!confirmDiscardUnsavedChanges()) {
@@ -1079,6 +1101,7 @@ public class ProfileController extends BaseController implements Initializable {
         LocationSelectionDialog.show(
                         rootPane,
                         viewModel.getLocationService(),
+                        viewModel.getGeocodingService(),
                         viewModel.hasLocationSet(),
                         viewModel.getLatitude(),
                         viewModel.getLongitude())
@@ -1413,12 +1436,22 @@ public class ProfileController extends BaseController implements Initializable {
         photoContainer.setPrefHeight(220);
 
         if (!snapshot.photoUrls().isEmpty()) {
-            ImageView imageView =
-                    new ImageView(ImageCache.getImage(snapshot.photoUrls().getFirst(), 360, 220));
+            ImageView imageView = new ImageView();
             imageView.setFitWidth(360);
             imageView.setFitHeight(220);
             imageView.setPreserveRatio(true);
-            photoContainer.getChildren().add(imageView);
+            imageView.setVisible(false);
+
+            FontIcon placeholderIcon = new FontIcon("mdi2a-account-circle");
+            placeholderIcon.setIconSize(72);
+            placeholderIcon.setIconColor(Color.web("#94a3b8"));
+
+            photoContainer.getChildren().addAll(placeholderIcon, imageView);
+            ImageCache.getImageAsync(snapshot.photoUrls().getFirst(), 360, 220, image -> {
+                imageView.setImage(image);
+                imageView.setVisible(true);
+                placeholderIcon.setVisible(false);
+            });
             return photoContainer;
         }
 

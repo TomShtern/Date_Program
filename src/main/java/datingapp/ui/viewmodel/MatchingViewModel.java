@@ -1,5 +1,6 @@
 package datingapp.ui.viewmodel;
 
+import datingapp.app.usecase.common.UseCaseResult;
 import datingapp.app.usecase.common.UserContext;
 import datingapp.app.usecase.matching.MatchingUseCases;
 import datingapp.app.usecase.matching.MatchingUseCases.BrowseCandidatesCommand;
@@ -396,7 +397,8 @@ public class MatchingViewModel extends BaseViewModel {
             return;
         }
         User candidate = currentCandidate.get();
-        if (candidate == null || ensureCurrentUser() == null) {
+        User user = ensureCurrentUser();
+        if (candidate == null || user == null) {
             swipeInProgress.set(false);
             return;
         }
@@ -405,11 +407,16 @@ public class MatchingViewModel extends BaseViewModel {
         if (liked) {
             action = superLike ? "super-liked" : "liked";
         }
-        logInfo("User {} {} candidate {}", currentUser.getName(), action, candidate.getName());
+        logInfo("User {} {} candidate {}", user.getName(), action, candidate.getName());
 
-        var result = matchingUseCases.processSwipe(new ProcessSwipeCommand(
-                UserContext.ui(currentUser.getId()), currentUser, candidate, liked, superLike, false));
+        asyncScope.runFireAndForget("process swipe", () -> {
+            UseCaseResult<MatchingUseCases.SwipeOutcome> result = matchingUseCases.processSwipe(
+                    new ProcessSwipeCommand(UserContext.ui(user.getId()), user, candidate, liked, superLike, false));
+            asyncScope.dispatchToUi(() -> applySwipeResult(result, candidate));
+        });
+    }
 
+    private void applySwipeResult(UseCaseResult<MatchingUseCases.SwipeOutcome> result, User candidate) {
         if (!result.success()) {
             logWarn("Swipe failed: {}", result.error().message());
             infoMessage.set(result.error().message());
@@ -421,7 +428,6 @@ public class MatchingViewModel extends BaseViewModel {
         lastSwipedCandidate = candidate;
         startUndoCountdown();
 
-        // Check for a match and notify UI
         if (swipeResult.matched()) {
             logInfo("IT'S A MATCH! {} matched with {}", currentUser.getName(), candidate.getName());
             lastMatch.set(swipeResult.match());
@@ -432,23 +438,30 @@ public class MatchingViewModel extends BaseViewModel {
     }
 
     public void undo() {
-        if (ensureCurrentUser() == null) {
+        User user = ensureCurrentUser();
+        if (user == null) {
             return;
         }
 
         logInfo(
                 "Undoing swipe on {}",
                 lastSwipedCandidate != null ? lastSwipedCandidate.getName() : "previous candidate");
-        var result = matchingUseCases.undoSwipe(new UndoSwipeCommand(UserContext.ui(currentUser.getId())));
+        User previousCandidate = lastSwipedCandidate;
+        asyncScope.runFireAndForget("undo swipe", () -> {
+            UseCaseResult<MatchingUseCases.UndoOutcome> result =
+                    matchingUseCases.undoSwipe(new UndoSwipeCommand(UserContext.ui(user.getId())));
+            asyncScope.dispatchToUi(() -> applyUndoResult(result, previousCandidate));
+        });
+    }
 
+    private void applyUndoResult(UseCaseResult<MatchingUseCases.UndoOutcome> result, User previousCandidate) {
         if (result.success()) {
             stopUndoCountdown();
-            // Return last candidate to view
-            if (lastSwipedCandidate != null) {
-                currentCandidate.set(lastSwipedCandidate);
-                photoCarousel.setPhotos(lastSwipedCandidate.getPhotoUrls());
+            if (previousCandidate != null) {
+                currentCandidate.set(previousCandidate);
+                photoCarousel.setPhotos(previousCandidate.getPhotoUrls());
                 syncPhotoCarousel();
-                loadNoteForCandidate(lastSwipedCandidate);
+                loadNoteForCandidate(previousCandidate);
                 lastSwipedCandidate = null;
                 hasMoreCandidates.set(true);
                 swipeInProgress.set(false);

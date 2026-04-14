@@ -3,6 +3,7 @@ package datingapp.ui;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.CompletableFuture;
@@ -12,6 +13,8 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
+import javafx.application.Platform;
 import javafx.scene.image.Image;
 import javafx.scene.image.PixelWriter;
 import javafx.scene.image.WritableImage;
@@ -105,6 +108,43 @@ public final class ImageCache {
         return getOrLoadCachedImage(key, () -> loadImage(path, width, height));
     }
 
+    /**
+     * Loads an image off the caller thread and dispatches the callback on the FX thread.
+     */
+    public static void getImageAsync(String path, double width, double height, Consumer<Image> callback) {
+        Objects.requireNonNull(callback, "callback cannot be null");
+
+        if (path == null || path.isBlank()) {
+            dispatchToFx(() -> callback.accept(getDefaultAvatar(width, height)));
+            return;
+        }
+
+        String key = cacheKey(path, width, height);
+        synchronized (CACHE) {
+            Image cached = CACHE.get(key);
+            if (cached != null) {
+                dispatchToFx(() -> callback.accept(cached));
+                return;
+            }
+        }
+
+        CompletableFuture<Image> inFlight = IN_FLIGHT_LOADS.get(key);
+        if (inFlight != null) {
+            attachAsyncCallback(inFlight, width, height, callback);
+            return;
+        }
+
+        try {
+            PRELOAD_EXECUTOR.execute(() -> {
+                Image image = getImage(path, width, height);
+                dispatchToFx(() -> callback.accept(image));
+            });
+        } catch (RejectedExecutionException _) {
+            logDebug("Dropped async image request for {} because the queue is full", path);
+            dispatchToFx(() -> callback.accept(getDefaultAvatar(width, height)));
+        }
+    }
+
     /** Loads an image with error handling. */
     private static Image loadImage(String path, double width, double height) {
         try {
@@ -177,6 +217,23 @@ public final class ImageCache {
 
     static CompletableFuture<Image> inFlightLoad(String key) {
         return IN_FLIGHT_LOADS.get(key);
+    }
+
+    private static void attachAsyncCallback(
+            CompletableFuture<Image> inFlight, double width, double height, Consumer<Image> callback) {
+        inFlight.handle((image, throwable) -> {
+            Image resolvedImage = throwable == null ? image : getDefaultAvatar(width, height);
+            dispatchToFx(() -> callback.accept(resolvedImage));
+            return null;
+        });
+    }
+
+    private static void dispatchToFx(Runnable action) {
+        if (Platform.isFxApplicationThread()) {
+            action.run();
+            return;
+        }
+        Platform.runLater(action);
     }
 
     /** Loads the default avatar image from resources or creates a placeholder. */

@@ -6,12 +6,15 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.core.AppConfig;
-import datingapp.core.model.LocationModels.City;
 import datingapp.core.model.LocationModels.Country;
+import datingapp.core.model.LocationModels.Precision;
 import datingapp.core.model.LocationModels.ResolvedLocation;
+import datingapp.core.profile.GeocodingService;
+import datingapp.core.profile.LocalGeocodingService;
 import datingapp.core.profile.LocationService;
 import datingapp.core.profile.ValidationService;
 import datingapp.ui.JavaFxTestSupport;
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 import javafx.scene.control.Button;
@@ -29,6 +32,7 @@ import org.junit.jupiter.api.Test;
 class LocationSelectionDialogTest {
 
     private LocationService locationService;
+    private LocalGeocodingService geocodingService;
 
     @BeforeAll
     static void initJfx() throws InterruptedException {
@@ -38,6 +42,7 @@ class LocationSelectionDialogTest {
     @BeforeEach
     void setUp() {
         locationService = new LocationService(new ValidationService(AppConfig.defaults()));
+        geocodingService = new LocalGeocodingService(locationService);
     }
 
     @Test
@@ -60,6 +65,7 @@ class LocationSelectionDialogTest {
                 locationService,
                 locationService.getDefaultCountry(),
                 Optional.empty(),
+                "",
                 "9999999",
                 true,
                 Optional.empty());
@@ -71,11 +77,11 @@ class LocationSelectionDialogTest {
     }
 
     @Test
-    @DisplayName("selecting a city keeps the selection active")
-    void selectingCityKeepsTheSelectionActive() throws Exception {
+    @DisplayName("selecting a local city geocoding result keeps the selection active")
+    void selectingLocalCityGeocodingResultKeepsTheSelectionActive() throws Exception {
         ComboBox<Country> countryCombo = JavaFxTestSupport.callOnFxAndWait(ComboBox::new);
         TextField citySearchField = JavaFxTestSupport.callOnFxAndWait(TextField::new);
-        ListView<City> cityListView = JavaFxTestSupport.callOnFxAndWait(ListView::new);
+        ListView<GeocodingService.GeocodingResult> cityListView = JavaFxTestSupport.callOnFxAndWait(ListView::new);
         TextField zipField = JavaFxTestSupport.callOnFxAndWait(TextField::new);
         CheckBox approximateFallbackCheck = JavaFxTestSupport.callOnFxAndWait(CheckBox::new);
         Label previewLabel = JavaFxTestSupport.callOnFxAndWait(() -> new Label(""));
@@ -87,9 +93,7 @@ class LocationSelectionDialogTest {
         JavaFxTestSupport.runOnFxAndWait(() -> {
             countryCombo.getItems().setAll(locationService.getAvailableCountries());
             countryCombo.setValue(locationService.getDefaultCountry());
-            cityListView
-                    .getItems()
-                    .setAll(locationService.searchCities(countryCombo.getValue().code(), "Tel", 10));
+            cityListView.getItems().setAll(geocodingService.search("Tel", 10));
 
             LocationSelectionDialog.DialogControls controls = new LocationSelectionDialog.DialogControls(
                     countryCombo,
@@ -100,22 +104,79 @@ class LocationSelectionDialogTest {
                     previewLabel,
                     errorLabel,
                     confirmButton);
-            LocationSelectionDialog.bindDialogInteractions(locationService, controls, seededLocation, pendingLocation);
+            LocationSelectionDialog.bindDialogInteractions(
+                    locationService, geocodingService, controls, seededLocation, pendingLocation);
         });
 
-        City selectedCity = JavaFxTestSupport.callOnFxAndWait(() -> cityListView.getItems().stream()
-                .filter(city -> "Tel Aviv".equals(city.name()))
-                .findFirst()
-                .orElseGet(() -> cityListView.getItems().getFirst()));
+        GeocodingService.GeocodingResult selectedCity =
+                JavaFxTestSupport.callOnFxAndWait(() -> cityListView.getItems().stream()
+                        .filter(city -> city.displayName().contains("Tel Aviv"))
+                        .findFirst()
+                        .orElseGet(() -> cityListView.getItems().getFirst()));
 
         JavaFxTestSupport.runOnFxAndWait(() -> cityListView.getSelectionModel().select(selectedCity));
 
         assertEquals(selectedCity, JavaFxTestSupport.callOnFxAndWait(() -> cityListView
                 .getSelectionModel()
                 .getSelectedItem()));
-        assertEquals(selectedCity.name(), JavaFxTestSupport.callOnFxAndWait(citySearchField::getText));
         assertFalse(JavaFxTestSupport.callOnFxAndWait(confirmButton::isDisabled));
-        assertTrue(JavaFxTestSupport.callOnFxAndWait(previewLabel::getText).contains(selectedCity.name()));
+        assertTrue(JavaFxTestSupport.callOnFxAndWait(previewLabel::getText).contains("Tel Aviv"));
         assertNotNull(pendingLocation.get());
+        assertEquals(Precision.CITY, pendingLocation.get().precision());
+    }
+
+    @Test
+    @DisplayName("searching and selecting an address-level geocode result updates the pending location")
+    void searchingAndSelectingAddressLevelGeocodeResultUpdatesPendingLocation() throws Exception {
+        ComboBox<Country> countryCombo = JavaFxTestSupport.callOnFxAndWait(ComboBox::new);
+        TextField citySearchField = JavaFxTestSupport.callOnFxAndWait(TextField::new);
+        ListView<GeocodingService.GeocodingResult> cityListView = JavaFxTestSupport.callOnFxAndWait(ListView::new);
+        TextField zipField = JavaFxTestSupport.callOnFxAndWait(TextField::new);
+        CheckBox approximateFallbackCheck = JavaFxTestSupport.callOnFxAndWait(CheckBox::new);
+        Label previewLabel = JavaFxTestSupport.callOnFxAndWait(() -> new Label(""));
+        Label errorLabel = JavaFxTestSupport.callOnFxAndWait(Label::new);
+        Button confirmButton = JavaFxTestSupport.callOnFxAndWait(Button::new);
+        AtomicReference<ResolvedLocation> seededLocation = new AtomicReference<>();
+        AtomicReference<ResolvedLocation> pendingLocation = new AtomicReference<>();
+        GeocodingService fakeGeocodingService = (query, maxResults) -> query != null && query.contains("Rothschild")
+                ? List.of(new GeocodingService.GeocodingResult(
+                        "Rothschild Boulevard, Tel Aviv-Yafo, Israel", 32.0651, 34.7778, Precision.ADDRESS))
+                : List.of();
+
+        JavaFxTestSupport.runOnFxAndWait(() -> {
+            countryCombo.getItems().setAll(locationService.getAvailableCountries());
+            countryCombo.setValue(locationService.getDefaultCountry());
+
+            LocationSelectionDialog.DialogControls controls = new LocationSelectionDialog.DialogControls(
+                    countryCombo,
+                    citySearchField,
+                    cityListView,
+                    zipField,
+                    approximateFallbackCheck,
+                    previewLabel,
+                    errorLabel,
+                    confirmButton);
+            LocationSelectionDialog.bindDialogInteractions(
+                    locationService, fakeGeocodingService, controls, seededLocation, pendingLocation);
+            citySearchField.setText("Rothschild");
+        });
+
+        assertTrue(JavaFxTestSupport.waitUntil(
+                () -> {
+                    try {
+                        return !JavaFxTestSupport.callOnFxAndWait(cityListView.getItems()::isEmpty);
+                    } catch (InterruptedException e) {
+                        throw new IllegalStateException(e);
+                    }
+                },
+                5000));
+
+        GeocodingService.GeocodingResult selectedResult =
+                JavaFxTestSupport.callOnFxAndWait(() -> cityListView.getItems().getFirst());
+        JavaFxTestSupport.runOnFxAndWait(() -> cityListView.getSelectionModel().select(selectedResult));
+
+        assertFalse(JavaFxTestSupport.callOnFxAndWait(confirmButton::isDisabled));
+        assertTrue(JavaFxTestSupport.callOnFxAndWait(previewLabel::getText).contains("Rothschild Boulevard"));
+        assertEquals(Precision.ADDRESS, pendingLocation.get().precision());
     }
 }

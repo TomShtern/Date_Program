@@ -57,6 +57,10 @@ public final class JdbiMatchmakingStorage implements OperationalInteractionStora
     private static final String PARAM_USER_A = "userA";
     private static final String PARAM_USER_B = "userB";
     private static final String PARAM_USER_ID = "userId";
+    private static final String PARAM_LIKE_ID = "likeId";
+    private static final String PARAM_LIKE_CREATED_AT = "likeCreatedAt";
+    private static final String PARAM_EXPIRES_AT = "expiresAt";
+    private static final String PARAM_MATCH_ID = "matchId";
     private static final String COLUMN_USER_ID = "user_id";
     private static final String COLUMN_WHO_LIKES = "who_likes";
     private static final String COLUMN_WHO_GOT_LIKED = "who_got_liked";
@@ -814,13 +818,13 @@ public final class JdbiMatchmakingStorage implements OperationalInteractionStora
             jdbi.useHandle(handle -> {
                 try (var update = handle.createUpdate(undoUpsertSql)) {
                     update.bind(PARAM_USER_ID, state.userId())
-                            .bind("likeId", state.like().id())
+                            .bind(PARAM_LIKE_ID, state.like().id())
                             .bind(PARAM_WHO_LIKES, state.like().whoLikes())
                             .bind(PARAM_WHO_GOT_LIKED, state.like().whoGotLiked())
                             .bind(PARAM_DIRECTION, state.like().direction().name())
-                            .bind("likeCreatedAt", state.like().createdAt())
-                            .bind("expiresAt", state.expiresAt());
-                    bindNullableString(update, "matchId", state.matchId());
+                            .bind(PARAM_LIKE_CREATED_AT, state.like().createdAt())
+                            .bind(PARAM_EXPIRES_AT, state.expiresAt());
+                    bindNullableString(update, PARAM_MATCH_ID, state.matchId());
                     update.execute();
                 }
             });
@@ -1203,13 +1207,13 @@ public final class JdbiMatchmakingStorage implements OperationalInteractionStora
                 "undo_states",
                 List.of(
                         new SqlDialectSupport.ColumnBinding(COLUMN_USER_ID, PARAM_USER_ID),
-                        new SqlDialectSupport.ColumnBinding("like_id", "likeId"),
+                        new SqlDialectSupport.ColumnBinding("like_id", PARAM_LIKE_ID),
                         new SqlDialectSupport.ColumnBinding(COLUMN_WHO_LIKES, PARAM_WHO_LIKES),
                         new SqlDialectSupport.ColumnBinding(COLUMN_WHO_GOT_LIKED, PARAM_WHO_GOT_LIKED),
                         new SqlDialectSupport.ColumnBinding(PARAM_DIRECTION, PARAM_DIRECTION),
-                        new SqlDialectSupport.ColumnBinding("like_created_at", "likeCreatedAt"),
-                        new SqlDialectSupport.ColumnBinding("match_id", "matchId"),
-                        new SqlDialectSupport.ColumnBinding("expires_at", "expiresAt")),
+                        new SqlDialectSupport.ColumnBinding("like_created_at", PARAM_LIKE_CREATED_AT),
+                        new SqlDialectSupport.ColumnBinding("match_id", PARAM_MATCH_ID),
+                        new SqlDialectSupport.ColumnBinding("expires_at", PARAM_EXPIRES_AT)),
                 List.of(COLUMN_USER_ID));
     }
 }

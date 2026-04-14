@@ -88,6 +88,7 @@ public class ChatViewModel extends BaseViewModel {
     private TaskHandle conversationsPollingHandle;
     private TaskHandle messagesPollingHandle;
     private final AtomicInteger messageLoadToken = new AtomicInteger();
+    private boolean allowSessionUserFallback = true;
     private final AtomicInteger noteLoadToken = new AtomicInteger();
     private PauseTransition profileNoteStatusDismissTransition;
 
@@ -354,7 +355,7 @@ public class ChatViewModel extends BaseViewModel {
      */
     @Nullable
     private User ensureCurrentUser() {
-        if (currentUser == null) {
+        if (currentUser == null && allowSessionUserFallback) {
             currentUser = session.getCurrentUser();
         }
         return currentUser;
@@ -363,18 +364,19 @@ public class ChatViewModel extends BaseViewModel {
     public void setCurrentUser(User user) {
         boolean switchingUsers =
                 user == null || currentUser == null || !currentUser.getId().equals(user.getId());
+        allowSessionUserFallback = user != null;
         this.currentUser = user;
         if (switchingUsers) {
+            stopConversationsPolling();
             stopMessagesPolling();
             resetVisibleChatState();
         }
-        refreshConversations();
-        if (user != null) {
-            startConversationsPolling();
-        } else {
-            stopConversationsPolling();
+        if (user == null) {
             stopMessagesPolling();
+            return;
         }
+        refreshConversations();
+        startConversationsPolling();
     }
 
     private void resetVisibleChatState() {

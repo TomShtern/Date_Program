@@ -353,6 +353,8 @@ class ProfileViewModelTest {
                 session,
                 validationService,
                 new datingapp.core.profile.LocationService(validationService),
+                new datingapp.core.profile.LocalGeocodingService(
+                        new datingapp.core.profile.LocationService(validationService)),
                 TEST_DISPATCHER,
                 new datingapp.core.workflow.ProfileActivationPolicy()));
         viewModel.loadCurrentUser();

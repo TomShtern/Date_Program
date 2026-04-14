@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.app.event.InProcessAppEventBus;
+import datingapp.app.usecase.common.UseCaseResult;
 import datingapp.app.usecase.profile.ProfileInsightsUseCases;
 import datingapp.app.usecase.profile.ProfileMutationUseCases;
 import datingapp.app.usecase.profile.ProfileNotesUseCases;
@@ -124,7 +125,7 @@ class SafetyViewModelTest {
 
     @Test
     @DisplayName("verification flow persists generated code and marks the user verified")
-    void verificationFlowPersistsAndVerifiesUser() {
+    void verificationFlowPersistsAndVerifiesUser() throws InterruptedException {
         TestStorages.Users users = new TestStorages.Users();
         TestStorages.Interactions interactions = new TestStorages.Interactions();
         TestStorages.TrustSafety trustSafetyStorage = new TestStorages.TrustSafety();
@@ -173,6 +174,15 @@ class SafetyViewModelTest {
 
         viewModel.startVerification();
 
+        assertTrue(waitUntil(
+                () -> {
+                    User startedUser = AppSession.getInstance().getCurrentUser();
+                    String status = viewModel.statusMessageProperty().get();
+                    String code = startedUser != null ? startedUser.getVerificationCode() : null;
+                    return code != null && code.length() == 6 && status != null && status.contains(code);
+                },
+                5000));
+
         User afterStart = AppSession.getInstance().getCurrentUser();
         String generatedCode = afterStart.getVerificationCode();
         assertTrue(generatedCode != null && generatedCode.length() == 6);
@@ -182,14 +192,139 @@ class SafetyViewModelTest {
         viewModel.verificationCodeProperty().set(generatedCode);
         viewModel.confirmVerification();
 
+        assertTrue(waitUntil(
+                () -> {
+                    User verifiedUser = AppSession.getInstance().getCurrentUser();
+                    String status = viewModel.statusMessageProperty().get();
+                    return verifiedUser != null
+                            && verifiedUser.isVerified()
+                            && status != null
+                            && status.contains("verified");
+                },
+                5000));
+
         assertTrue(AppSession.getInstance().getCurrentUser().isVerified());
         assertTrue(viewModel.statusMessageProperty().get().contains("verified"));
         assertFalse(viewModel.statusMessageProperty().get().contains("[SIMULATED]"));
     }
 
     @Test
+    @DisplayName("start verification does not block caller while verification work is running")
+    void startVerificationDoesNotBlockCallerWhileVerificationWorkIsRunning() throws Exception {
+        TestStorages.Users users = new TestStorages.Users();
+        TestStorages.Interactions interactions = new TestStorages.Interactions();
+        TestStorages.TrustSafety trustSafetyStorage = new TestStorages.TrustSafety();
+        TestStorages.Communications communications = new TestStorages.Communications();
+        AppConfig config = AppConfig.defaults();
+
+        User currentUser = createUser("AsyncStart", Gender.FEMALE, EnumSet.of(Gender.MALE));
+        users.save(currentUser);
+        AppSession.getInstance().setCurrentUser(currentUser);
+
+        TrustSafetyService trustSafetyService = TrustSafetyService.builder(
+                        trustSafetyStorage, interactions, users, config, communications)
+                .build();
+        CountDownLatch startStarted = new CountDownLatch(1);
+        CountDownLatch releaseStart = new CountDownLatch(1);
+        VerificationUseCases verificationUseCases =
+                new BlockingVerificationUseCases(users, trustSafetyService, startStarted, releaseStart, null, null);
+
+        viewModel = new SafetyViewModel(
+                SocialUseCases.forTrustSafetyOnly(trustSafetyService),
+                verificationUseCases,
+                null,
+                AppSession.getInstance(),
+                TEST_DISPATCHER);
+        viewModel.initialize();
+        viewModel.verificationMethodProperty().set(VerificationMethod.EMAIL);
+        viewModel.verificationContactProperty().set("async-start@example.com");
+
+        AtomicReference<Throwable> callerFailure = new AtomicReference<>();
+        Thread caller = Thread.ofPlatform().start(() -> {
+            try {
+                viewModel.startVerification();
+            } catch (Throwable throwable) {
+                callerFailure.set(throwable);
+            }
+        });
+
+        assertTrue(startStarted.await(5, TimeUnit.SECONDS));
+        caller.join(250);
+
+        assertNull(callerFailure.get());
+        assertFalse(caller.isAlive(), "startVerification() should return promptly and leave work to asyncScope");
+
+        releaseStart.countDown();
+        assertTrue(
+                waitUntil(() -> viewModel.statusMessageProperty().get().contains("Verification code generated"), 5000));
+    }
+
+    @Test
+    @DisplayName("confirm verification does not block caller while confirmation work is running")
+    void confirmVerificationDoesNotBlockCallerWhileConfirmationWorkIsRunning() throws Exception {
+        TestStorages.Users users = new TestStorages.Users();
+        TestStorages.Interactions interactions = new TestStorages.Interactions();
+        TestStorages.TrustSafety trustSafetyStorage = new TestStorages.TrustSafety();
+        TestStorages.Communications communications = new TestStorages.Communications();
+        AppConfig config = AppConfig.defaults();
+
+        User currentUser = createUser("AsyncConfirm", Gender.FEMALE, EnumSet.of(Gender.MALE));
+        currentUser.setEmail("async-confirm@example.com");
+        currentUser.startVerification(VerificationMethod.EMAIL, "123456");
+        users.save(currentUser);
+        AppSession.getInstance().setCurrentUser(currentUser);
+
+        TrustSafetyService trustSafetyService = TrustSafetyService.builder(
+                        trustSafetyStorage, interactions, users, config, communications)
+                .build();
+        CountDownLatch confirmStarted = new CountDownLatch(1);
+        CountDownLatch releaseConfirm = new CountDownLatch(1);
+        VerificationUseCases verificationUseCases =
+                new BlockingVerificationUseCases(users, trustSafetyService, null, null, confirmStarted, releaseConfirm);
+
+        viewModel = new SafetyViewModel(
+                SocialUseCases.forTrustSafetyOnly(trustSafetyService),
+                verificationUseCases,
+                null,
+                AppSession.getInstance(),
+                TEST_DISPATCHER);
+        viewModel.initialize();
+        viewModel.verificationMethodProperty().set(VerificationMethod.EMAIL);
+        viewModel.verificationContactProperty().set("async-confirm@example.com");
+        viewModel.verificationCodeProperty().set("123456");
+
+        AtomicReference<Throwable> callerFailure = new AtomicReference<>();
+        Thread caller = Thread.ofPlatform().start(() -> {
+            try {
+                viewModel.confirmVerification();
+            } catch (Throwable throwable) {
+                callerFailure.set(throwable);
+            }
+        });
+
+        assertTrue(confirmStarted.await(5, TimeUnit.SECONDS));
+        caller.join(250);
+
+        assertNull(callerFailure.get());
+        assertFalse(caller.isAlive(), "confirmVerification() should return promptly and leave work to asyncScope");
+
+        releaseConfirm.countDown();
+        assertTrue(waitUntil(
+                () -> {
+                    User verifiedUser = AppSession.getInstance().getCurrentUser();
+                    String status = viewModel.statusMessageProperty().get();
+                    return verifiedUser != null
+                            && verifiedUser.isVerified()
+                            && status != null
+                            && status.contains("verified");
+                },
+                5000));
+        assertTrue(viewModel.statusMessageProperty().get().contains("verified"));
+    }
+
+    @Test
     @DisplayName("delete account soft-deletes the current user and resets the session")
-    void deleteAccountSoftDeletesAndSignsOut() {
+    void deleteAccountSoftDeletesAndSignsOut() throws InterruptedException {
         TestStorages.Users users = new TestStorages.Users();
         TestStorages.Interactions interactions = new TestStorages.Interactions();
         TestStorages.TrustSafety trustSafetyStorage = new TestStorages.TrustSafety();
@@ -222,10 +357,70 @@ class SafetyViewModelTest {
         viewModel = new SafetyViewModel(trustSafetyService, profileUseCases, AppSession.getInstance(), TEST_DISPATCHER);
         viewModel.deleteCurrentAccount();
 
+        assertTrue(waitUntil(
+                () -> viewModel.accountDeletedProperty().get()
+                        && AppSession.getInstance().getCurrentUser() == null,
+                5000));
+
         assertTrue(viewModel.accountDeletedProperty().get());
         assertTrue(users.get(currentUser.getId()).orElseThrow().isDeleted());
         assertNull(AppSession.getInstance().getCurrentUser());
         assertFalse(viewModel.statusMessageProperty().get().contains("[SIMULATED]"));
+    }
+
+    @Test
+    @DisplayName("delete account does not block caller while deletion work is running")
+    void deleteAccountDoesNotBlockCallerWhileDeletionWorkIsRunning() throws Exception {
+        BlockingUsers users = new BlockingUsers();
+        TestStorages.Interactions interactions = new TestStorages.Interactions();
+        TestStorages.TrustSafety trustSafetyStorage = new TestStorages.TrustSafety();
+        AppConfig config = AppConfig.defaults();
+
+        User currentUser = createUser("AsyncDelete", Gender.OTHER, EnumSet.of(Gender.OTHER));
+        users.save(currentUser);
+        AppSession.getInstance().setCurrentUser(currentUser);
+
+        CountDownLatch deleteStarted = new CountDownLatch(1);
+        CountDownLatch releaseDelete = new CountDownLatch(1);
+        users.armDeleteGate(deleteStarted, releaseDelete);
+
+        ProfileMutationUseCases profileMutationUseCases = new ProfileMutationUseCases(
+                users,
+                new ValidationService(config),
+                TestAchievementService.empty(),
+                config,
+                new ProfileActivationPolicy(),
+                new InProcessAppEventBus());
+        TrustSafetyService trustSafetyService = TrustSafetyService.builder(
+                        trustSafetyStorage, interactions, users, config, new TestStorages.Communications())
+                .build();
+
+        viewModel = new SafetyViewModel(
+                SocialUseCases.forTrustSafetyOnly(trustSafetyService),
+                null,
+                profileMutationUseCases,
+                AppSession.getInstance(),
+                TEST_DISPATCHER);
+
+        AtomicReference<Throwable> callerFailure = new AtomicReference<>();
+        Thread caller = Thread.ofPlatform().start(() -> {
+            try {
+                viewModel.deleteCurrentAccount();
+            } catch (Throwable throwable) {
+                callerFailure.set(throwable);
+            }
+        });
+
+        assertTrue(deleteStarted.await(5, TimeUnit.SECONDS));
+        caller.join(250);
+
+        assertNull(callerFailure.get());
+        assertFalse(caller.isAlive(), "deleteCurrentAccount() should return promptly and leave work to asyncScope");
+
+        releaseDelete.countDown();
+        assertTrue(waitUntil(viewModel.accountDeletedProperty()::get, 5000));
+        assertTrue(users.get(currentUser.getId()).orElseThrow().isDeleted());
+        assertNull(AppSession.getInstance().getCurrentUser());
     }
 
     @Test
@@ -297,5 +492,69 @@ class SafetyViewModelTest {
                 PacePreferences.DepthPreference.DEEP_CHAT));
         user.activate();
         return user;
+    }
+
+    private static void awaitGate(CountDownLatch started, CountDownLatch release, String operationName) {
+        if (started == null || release == null) {
+            return;
+        }
+        started.countDown();
+        try {
+            assertTrue(release.await(5, TimeUnit.SECONDS), operationName + " gate was never released");
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new AssertionError("Interrupted while waiting to release " + operationName, exception);
+        }
+    }
+
+    private static final class BlockingVerificationUseCases extends VerificationUseCases {
+        private final CountDownLatch startStarted;
+        private final CountDownLatch releaseStart;
+        private final CountDownLatch confirmStarted;
+        private final CountDownLatch releaseConfirm;
+
+        private BlockingVerificationUseCases(
+                TestStorages.Users users,
+                TrustSafetyService trustSafetyService,
+                CountDownLatch startStarted,
+                CountDownLatch releaseStart,
+                CountDownLatch confirmStarted,
+                CountDownLatch releaseConfirm) {
+            super(users, trustSafetyService);
+            this.startStarted = startStarted;
+            this.releaseStart = releaseStart;
+            this.confirmStarted = confirmStarted;
+            this.releaseConfirm = releaseConfirm;
+        }
+
+        @Override
+        public UseCaseResult<StartVerificationResult> startVerification(StartVerificationCommand command) {
+            awaitGate(startStarted, releaseStart, "start verification");
+            return super.startVerification(command);
+        }
+
+        @Override
+        public UseCaseResult<ConfirmVerificationResult> confirmVerification(ConfirmVerificationCommand command) {
+            awaitGate(confirmStarted, releaseConfirm, "confirm verification");
+            return super.confirmVerification(command);
+        }
+    }
+
+    private static final class BlockingUsers extends TestStorages.Users {
+        private CountDownLatch deleteStarted;
+        private CountDownLatch releaseDelete;
+
+        private void armDeleteGate(CountDownLatch deleteStarted, CountDownLatch releaseDelete) {
+            this.deleteStarted = deleteStarted;
+            this.releaseDelete = releaseDelete;
+        }
+
+        @Override
+        public void save(User user) {
+            if (user != null && user.isDeleted() && deleteStarted != null && releaseDelete != null) {
+                awaitGate(deleteStarted, releaseDelete, "delete account");
+            }
+            super.save(user);
+        }
     }
 }

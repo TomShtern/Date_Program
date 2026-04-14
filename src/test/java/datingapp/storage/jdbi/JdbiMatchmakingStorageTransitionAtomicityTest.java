@@ -135,7 +135,7 @@ class JdbiMatchmakingStorageTransitionAtomicityTest {
         assertTrue(
                 Duration.between(undoState.expiresAt(), persisted.expiresAt())
                                 .abs()
-                                .compareTo(Duration.ofNanos(1_000))
+                                .compareTo(Duration.ofMillis(1))
                         <= 0,
                 "Persisted undo expiry should stay within database timestamp precision");
     }

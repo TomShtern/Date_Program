@@ -4,12 +4,19 @@ import datingapp.core.model.LocationModels.City;
 import datingapp.core.model.LocationModels.Country;
 import datingapp.core.model.LocationModels.Precision;
 import datingapp.core.model.LocationModels.ResolvedLocation;
+import datingapp.core.profile.GeocodingService;
+import datingapp.core.profile.LocalGeocodingService;
 import datingapp.core.profile.LocationService;
 import datingapp.ui.UiConstants;
 import datingapp.ui.UiUtils;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import javafx.animation.PauseTransition;
+import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.geometry.Insets;
 import javafx.scene.Node;
@@ -23,6 +30,7 @@ import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.VBox;
+import javafx.util.Duration;
 import javafx.util.StringConverter;
 
 /** Shared JavaFX dialog for human-friendly location selection. */
@@ -30,6 +38,13 @@ public final class LocationSelectionDialog {
 
     private static final String LOCATION_SERVICE_REQUIRED = "locationService cannot be null";
     private static final String PENDING_LOCATION_REQUIRED = "pendingLocation cannot be null";
+    private static final int SEARCH_RESULT_LIMIT = 10;
+    private static final Duration SEARCH_DEBOUNCE = Duration.millis(250);
+    private static final ExecutorService SEARCH_EXECUTOR = Executors.newSingleThreadExecutor(runnable -> {
+        Thread thread = new Thread(runnable, "location-search");
+        thread.setDaemon(true);
+        return thread;
+    });
 
     private LocationSelectionDialog() {}
 
@@ -39,7 +54,24 @@ public final class LocationSelectionDialog {
             boolean hasCurrentLocation,
             double latitude,
             double longitude) {
+        return show(
+                ownerNode,
+                locationService,
+                new LocalGeocodingService(locationService),
+                hasCurrentLocation,
+                latitude,
+                longitude);
+    }
+
+    public static Optional<ResolvedLocation> show(
+            Node ownerNode,
+            LocationService locationService,
+            GeocodingService geocodingService,
+            boolean hasCurrentLocation,
+            double latitude,
+            double longitude) {
         Objects.requireNonNull(locationService, LOCATION_SERVICE_REQUIRED);
+        Objects.requireNonNull(geocodingService, "geocodingService cannot be null");
 
         Optional<SeededSelection> seed =
                 hasCurrentLocation ? initialSelection(locationService, latitude, longitude) : Optional.empty();
@@ -60,9 +92,10 @@ public final class LocationSelectionDialog {
         VBox content = new VBox(UiConstants.SPACING_LARGE);
         content.setPadding(new Insets(UiConstants.PADDING_XLARGE));
 
-        Label helperLabel = UiUtils.createSecondaryLabel("Choose a country, then select a city or enter a ZIP code.");
+        Label helperLabel = UiUtils.createSecondaryLabel(
+                "Choose a country, then search for a city or address, or enter a ZIP code.");
         Label exampleLabel = UiUtils.createSecondaryLabel(
-                "We use city and ZIP-based labels for discovery and keep coordinates as an internal detail.");
+                "We keep coordinates as an internal detail and store the resolved label you choose.");
         Label currentLocationLabel = UiUtils.createSecondaryLabel(currentLocation
                 .map(location -> "Current location: " + location.label())
                 .orElse("Current location: not set yet"));
@@ -71,9 +104,9 @@ public final class LocationSelectionDialog {
                 locationService, seed.map(SeededSelection::country).orElseGet(locationService::getDefaultCountry));
 
         TextField citySearchField = new TextField();
-        citySearchField.setPromptText("Search city (for example, Tel Aviv)");
+        citySearchField.setPromptText("Search city or address (for example, Tel Aviv or Rothschild Boulevard)");
 
-        ListView<City> cityListView = createCityListView();
+        ListView<GeocodingService.GeocodingResult> cityListView = createCityListView();
         TextField zipField = new TextField();
         zipField.setPromptText("Israeli ZIP code (7 digits)");
 
@@ -94,7 +127,7 @@ public final class LocationSelectionDialog {
                         currentLocationLabel,
                         new Label("Country"),
                         countryCombo,
-                        new Label("City"),
+                        new Label("City or address"),
                         citySearchField,
                         cityListView,
                         new Label("ZIP code (optional fallback)"),
@@ -123,17 +156,22 @@ public final class LocationSelectionDialog {
             controls.citySearchField().setText(selectedCity.name());
             controls.cityListView()
                     .getItems()
-                    .setAll(locationService.searchCities(countryCombo.getValue().code(), selectedCity.name(), 10));
-            controls.cityListView().getSelectionModel().select(selectedCity);
-        } else {
+                    .setAll(geocodingService.search(selectedCity.name(), SEARCH_RESULT_LIMIT));
             controls.cityListView()
-                    .getItems()
-                    .setAll(locationService.getPopularCities(
-                            countryCombo.getValue().code(), 10));
+                    .getSelectionModel()
+                    .select(controls.cityListView().getItems().stream()
+                            .filter(result -> Objects.equals(
+                                    result.displayName(),
+                                    seed.orElseThrow().pendingLocation().label()))
+                            .findFirst()
+                            .orElse(null));
+            controls.zipField().setText(seed.orElseThrow().zipText());
+        } else {
+            controls.cityListView().getItems().setAll(geocodingService.search("", SEARCH_RESULT_LIMIT));
         }
 
         AtomicReference<ResolvedLocation> pendingLocation = new AtomicReference<>(seededLocation.get());
-        bindDialogInteractions(locationService, controls, seededLocation, pendingLocation);
+        bindDialogInteractions(locationService, geocodingService, controls, seededLocation, pendingLocation);
 
         confirmButton.addEventFilter(javafx.event.ActionEvent.ACTION, event -> {
             if (pendingLocation.get() == null) {
@@ -152,20 +190,24 @@ public final class LocationSelectionDialog {
 
     static void bindDialogInteractions(
             LocationService locationService,
+            GeocodingService geocodingService,
             DialogControls controls,
             AtomicReference<ResolvedLocation> seededLocation,
             AtomicReference<ResolvedLocation> pendingLocation) {
         Objects.requireNonNull(locationService, LOCATION_SERVICE_REQUIRED);
+        Objects.requireNonNull(geocodingService, "geocodingService cannot be null");
         Objects.requireNonNull(controls, "controls cannot be null");
         Objects.requireNonNull(seededLocation, "seededLocation cannot be null");
         Objects.requireNonNull(pendingLocation, PENDING_LOCATION_REQUIRED);
 
-        Runnable refreshCitySuggestions = () -> refreshCitySuggestions(locationService, controls);
+        PauseTransition searchPause = new PauseTransition(SEARCH_DEBOUNCE);
+        AtomicLong searchRequestId = new AtomicLong();
+        Runnable refreshCitySuggestions = () -> refreshCitySuggestions(geocodingService, controls, searchRequestId);
         Runnable refreshEvaluation =
                 () -> refreshEvaluation(locationService, controls, seededLocation, pendingLocation);
 
         bindCountrySelection(locationService, controls, seededLocation, refreshCitySuggestions, refreshEvaluation);
-        bindCitySearch(controls, seededLocation, refreshCitySuggestions, refreshEvaluation);
+        bindCitySearch(controls, seededLocation, refreshCitySuggestions, refreshEvaluation, searchPause);
         bindCitySelection(controls, seededLocation, refreshEvaluation);
         bindZipChanges(controls, seededLocation, refreshEvaluation);
         controls.approximateFallbackCheck()
@@ -175,16 +217,19 @@ public final class LocationSelectionDialog {
         refreshEvaluation.run();
     }
 
-    private static void refreshCitySuggestions(LocationService locationService, DialogControls controls) {
-        Country selectedCountry = controls.countryCombo().getValue();
-        if (selectedCountry == null) {
-            controls.cityListView().getItems().clear();
-            return;
-        }
-        controls.cityListView()
-                .getItems()
-                .setAll(locationService.searchCities(
-                        selectedCountry.code(), controls.citySearchField().getText(), 10));
+    private static void refreshCitySuggestions(
+            GeocodingService geocodingService, DialogControls controls, AtomicLong searchRequestId) {
+        long requestId = searchRequestId.incrementAndGet();
+        String query = controls.citySearchField().getText();
+        SEARCH_EXECUTOR.execute(() -> {
+            var results = geocodingService.search(query, SEARCH_RESULT_LIMIT);
+            Platform.runLater(() -> {
+                if (requestId != searchRequestId.get()) {
+                    return;
+                }
+                controls.cityListView().getItems().setAll(results);
+            });
+        });
     }
 
     private static void refreshEvaluation(
@@ -196,6 +241,7 @@ public final class LocationSelectionDialog {
                 locationService,
                 controls.countryCombo().getValue(),
                 Optional.ofNullable(controls.cityListView().getSelectionModel().getSelectedItem()),
+                controls.citySearchField().getText(),
                 controls.zipField().getText(),
                 controls.approximateFallbackCheck().isSelected(),
                 Optional.ofNullable(seededLocation.get()));
@@ -233,12 +279,17 @@ public final class LocationSelectionDialog {
             DialogControls controls,
             AtomicReference<ResolvedLocation> seededLocation,
             Runnable refreshCitySuggestions,
-            Runnable refreshEvaluation) {
+            Runnable refreshEvaluation,
+            PauseTransition searchPause) {
+        searchPause.setOnFinished(event -> refreshCitySuggestions.run());
         controls.citySearchField().textProperty().addListener((obs, oldVal, newVal) -> {
             seededLocation.set(null);
             if (!matchesSelectedCitySearch(controls.cityListView(), newVal)) {
                 controls.cityListView().getSelectionModel().clearSelection();
-                refreshCitySuggestions.run();
+                if (newVal != null && !newVal.isBlank()) {
+                    controls.zipField().clear();
+                }
+                searchPause.playFromStart();
             }
             refreshEvaluation.run();
         });
@@ -249,8 +300,8 @@ public final class LocationSelectionDialog {
         controls.cityListView().getSelectionModel().selectedItemProperty().addListener((obs, oldVal, newVal) -> {
             seededLocation.set(null);
             if (newVal != null) {
-                if (!Objects.equals(controls.citySearchField().getText(), newVal.name())) {
-                    controls.citySearchField().setText(newVal.name());
+                if (!Objects.equals(controls.citySearchField().getText(), newVal.displayName())) {
+                    controls.citySearchField().setText(newVal.displayName());
                 }
                 controls.zipField().clear();
             }
@@ -269,10 +320,12 @@ public final class LocationSelectionDialog {
         });
     }
 
-    private static boolean matchesSelectedCitySearch(ListView<City> cityListView, String citySearchText) {
-        City selectedCity = cityListView.getSelectionModel().getSelectedItem();
+    private static boolean matchesSelectedCitySearch(
+            ListView<GeocodingService.GeocodingResult> cityListView, String citySearchText) {
+        GeocodingService.GeocodingResult selectedCity =
+                cityListView.getSelectionModel().getSelectedItem();
         return selectedCity != null
-                && Objects.equals(selectedCity.name(), citySearchText == null ? "" : citySearchText.trim());
+                && Objects.equals(selectedCity.displayName(), citySearchText == null ? "" : citySearchText.trim());
     }
 
     static Optional<SeededSelection> initialSelection(
@@ -287,7 +340,8 @@ public final class LocationSelectionDialog {
     static SelectionEvaluation evaluateSelection(
             LocationService locationService,
             Country selectedCountry,
-            Optional<City> selectedCity,
+            Optional<GeocodingService.GeocodingResult> selectedCity,
+            String citySearchText,
             String zipText,
             boolean useApproximateFallback,
             Optional<ResolvedLocation> existingLocation) {
@@ -305,11 +359,18 @@ public final class LocationSelectionDialog {
                     "This country is coming soon. Please choose Israel for now.");
         }
         if (selectedCity.isPresent()) {
-            ResolvedLocation resolvedLocation = locationService.resolveCity(selectedCity.orElseThrow());
-            return SelectionEvaluation.selected(resolvedLocation, "Selected city: " + resolvedLocation.label(), false);
+            ResolvedLocation resolvedLocation = selectedCity.orElseThrow().toResolvedLocation();
+            return SelectionEvaluation.selected(
+                    resolvedLocation, "Selected location: " + resolvedLocation.label(), false);
         }
 
+        String normalizedSearchText = citySearchText == null ? "" : citySearchText.trim();
         String normalizedZip = zipText == null ? "" : zipText.trim();
+        if (normalizedZip.isBlank() && !normalizedSearchText.isBlank()) {
+            return SelectionEvaluation.invalid(
+                    "Choose a location from the search results.",
+                    "Choose a location from the search results before saving.");
+        }
         if (normalizedZip.isBlank()) {
             return existingLocation
                     .map(location ->
@@ -376,12 +437,12 @@ public final class LocationSelectionDialog {
         return countryCombo;
     }
 
-    private static ListView<City> createCityListView() {
-        ListView<City> cityListView = new ListView<>();
+    private static ListView<GeocodingService.GeocodingResult> createCityListView() {
+        ListView<GeocodingService.GeocodingResult> cityListView = new ListView<>();
         cityListView.setPrefHeight(180);
         cityListView.setCellFactory(list -> new ListCell<>() {
             @Override
-            protected void updateItem(City item, boolean empty) {
+            protected void updateItem(GeocodingService.GeocodingResult item, boolean empty) {
                 super.updateItem(item, empty);
                 setText(empty || item == null ? null : item.displayName());
             }
@@ -402,7 +463,7 @@ public final class LocationSelectionDialog {
     record DialogControls(
             ComboBox<Country> countryCombo,
             TextField citySearchField,
-            ListView<City> cityListView,
+            ListView<GeocodingService.GeocodingResult> cityListView,
             TextField zipField,
             CheckBox approximateFallbackCheck,
             Label previewLabel,

@@ -101,4 +101,20 @@ class LocationServiceTest {
         assertTrue(result.message().contains("approximate"));
         assertEquals(Precision.ZIP, result.resolvedLocation().orElseThrow().precision());
     }
+
+    @Test
+    @DisplayName("expanded offline city list supports newer city searches and selection resolution")
+    void expandedOfflineCityListSupportsNewerCitySearchesAndSelectionResolution() {
+        List<City> results = locationService.searchCities("IL", "eil", 10);
+
+        assertTrue(results.stream().map(City::name).anyMatch("Eilat"::equals));
+
+        LocationService.ResolveSelectionResult result = locationService.resolveSelection("IL", "Eilat", null, false);
+
+        assertTrue(result.valid());
+        assertFalse(result.approximate());
+        assertEquals(
+                "Eilat, Southern District",
+                result.resolvedLocation().orElseThrow().label());
+    }
 }

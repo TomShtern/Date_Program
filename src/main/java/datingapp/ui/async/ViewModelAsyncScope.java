@@ -229,12 +229,15 @@ public final class ViewModelAsyncScope {
 
             dispatchToUi(() -> {
                 if (!canDeliverOrRecordCallbackSuppressed(handle, taskKey, version)) {
+                    cleanupKeyedTask(taskKey, handle, policy);
                     return;
                 }
                 try {
                     onSuccess.accept(result);
                 } catch (Exception callbackError) {
                     onError(taskName, callbackError);
+                } finally {
+                    cleanupKeyedTask(taskKey, handle, policy);
                 }
             });
         } catch (RuntimeException error) {
@@ -243,15 +246,19 @@ public final class ViewModelAsyncScope {
             } else {
                 diagnostics.recordCancelledBeforeDelivery();
             }
+            cleanupKeyedTask(taskKey, handle, policy);
         } finally {
             handle.markDone();
             activeHandles.remove(handle);
-            if (taskKey != null && latestHandles.remove(taskKey, handle)) {
-                latestVersions.remove(taskKey);
-            }
-            if (policy.trackLoading() && handle.releaseLoading()) {
-                endLoading();
-            }
+        }
+    }
+
+    private void cleanupKeyedTask(String taskKey, TaskHandle handle, TaskPolicy policy) {
+        if (taskKey != null && latestHandles.remove(taskKey, handle)) {
+            latestVersions.remove(taskKey);
+        }
+        if (policy.trackLoading() && handle instanceof ScopeTaskHandle scopeHandle && scopeHandle.releaseLoading()) {
+            endLoading();
         }
     }
 

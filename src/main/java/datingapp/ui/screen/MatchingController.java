@@ -134,6 +134,7 @@ public class MatchingController extends BaseController implements Initializable 
     private double dragStartX;
     private boolean cardTransitionInProgress;
     private boolean firstCandidateRendered;
+    private long candidatePhotoRequestId;
 
     private static final double DRAG_THRESHOLD = 150;
 
@@ -253,12 +254,21 @@ public class MatchingController extends BaseController implements Initializable 
     }
 
     private void updateCandidatePhoto(String url) {
-        if (url != null && !url.isBlank()) {
-            candidatePhoto.setImage(ImageCache.getImage(url, 400, 350));
-            preloadAdjacentCandidatePhotos();
+        candidatePhotoRequestId++;
+        long requestId = candidatePhotoRequestId;
+        if (url == null || url.isBlank()) {
+            candidatePhoto.setImage(null);
             return;
         }
+
         candidatePhoto.setImage(null);
+        ImageCache.getImageAsync(url, 400, 350, image -> {
+            if (requestId != candidatePhotoRequestId) {
+                return;
+            }
+            candidatePhoto.setImage(image);
+        });
+        preloadAdjacentCandidatePhotos();
     }
 
     private void preloadAdjacentCandidatePhotos() {
@@ -279,6 +289,12 @@ public class MatchingController extends BaseController implements Initializable 
         if (photoUrl != null && !photoUrl.isBlank()) {
             ImageCache.preload(photoUrl, width, height);
         }
+    }
+
+    @Override
+    public void cleanup() {
+        candidatePhotoRequestId++;
+        super.cleanup();
     }
 
     private void updatePhotoControlsVisibility() {

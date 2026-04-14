@@ -1,6 +1,7 @@
 package datingapp.ui.viewmodel;
 
 import datingapp.app.event.AppEvent;
+import datingapp.app.usecase.common.UseCaseResult;
 import datingapp.app.usecase.common.UserContext;
 import datingapp.app.usecase.profile.ProfileMutationUseCases;
 import datingapp.app.usecase.profile.ProfileMutationUseCases.DeleteAccountCommand;
@@ -228,16 +229,14 @@ public final class SafetyViewModel extends BaseViewModel {
             return;
         }
 
-        var startResult = verificationUseCases.startVerification(new StartVerificationCommand(
-                UserContext.ui(currentUser.getId()), verificationMethod.get(), verificationContact.get()));
-        if (!startResult.success()) {
-            reportError(startResult.error().message());
-            return;
-        }
-        session.setCurrentUser(startResult.data().user());
-        syncVerificationFieldsFromSession();
-        statusMessage.set("Verification code generated. Local/dev code: "
-                + startResult.data().generatedCode());
+        VerificationMethod method = verificationMethod.get();
+        String contact = verificationContact.get();
+        asyncScope.runFireAndForget("start verification", () -> {
+            UseCaseResult<VerificationUseCases.StartVerificationResult> startResult =
+                    verificationUseCases.startVerification(
+                            new StartVerificationCommand(UserContext.ui(currentUser.getId()), method, contact));
+            asyncScope.dispatchToUi(() -> applyStartVerificationResult(startResult));
+        });
     }
 
     public void confirmVerification() {
@@ -254,16 +253,13 @@ public final class SafetyViewModel extends BaseViewModel {
             return;
         }
 
-        var confirmResult = verificationUseCases.confirmVerification(
-                new ConfirmVerificationCommand(UserContext.ui(currentUser.getId()), verificationCode.get()));
-        if (!confirmResult.success()) {
-            reportError(confirmResult.error().message());
-            return;
-        }
-        session.setCurrentUser(confirmResult.data().user());
-        verificationCode.set("");
-        syncVerificationFieldsFromSession();
-        statusMessage.set("Profile verified successfully.");
+        String code = verificationCode.get();
+        asyncScope.runFireAndForget("confirm verification", () -> {
+            UseCaseResult<VerificationUseCases.ConfirmVerificationResult> confirmResult =
+                    verificationUseCases.confirmVerification(
+                            new ConfirmVerificationCommand(UserContext.ui(currentUser.getId()), code));
+            asyncScope.dispatchToUi(() -> applyConfirmVerificationResult(confirmResult));
+        });
     }
 
     public void deleteCurrentAccount() {
@@ -281,8 +277,37 @@ public final class SafetyViewModel extends BaseViewModel {
             reportError(ACCOUNT_DELETION_UNAVAILABLE);
             return;
         }
-        var result = mutationUseCases.deleteAccount(
-                new DeleteAccountCommand(UserContext.ui(currentUser.getId()), AppEvent.DeletionReason.USER_REQUEST));
+        asyncScope.runFireAndForget("delete account", () -> {
+            UseCaseResult<Void> result = mutationUseCases.deleteAccount(new DeleteAccountCommand(
+                    UserContext.ui(currentUser.getId()), AppEvent.DeletionReason.USER_REQUEST));
+            asyncScope.dispatchToUi(() -> applyDeleteAccountResult(result));
+        });
+    }
+
+    private void applyStartVerificationResult(UseCaseResult<VerificationUseCases.StartVerificationResult> startResult) {
+        if (!startResult.success()) {
+            reportError(startResult.error().message());
+            return;
+        }
+        session.setCurrentUser(startResult.data().user());
+        syncVerificationFieldsFromSession();
+        statusMessage.set("Verification code generated. Local/dev code: "
+                + startResult.data().generatedCode());
+    }
+
+    private void applyConfirmVerificationResult(
+            UseCaseResult<VerificationUseCases.ConfirmVerificationResult> confirmResult) {
+        if (!confirmResult.success()) {
+            reportError(confirmResult.error().message());
+            return;
+        }
+        session.setCurrentUser(confirmResult.data().user());
+        verificationCode.set("");
+        syncVerificationFieldsFromSession();
+        statusMessage.set("Profile verified successfully.");
+    }
+
+    private void applyDeleteAccountResult(UseCaseResult<Void> result) {
         if (!result.success()) {
             reportError(result.error().message());
             return;
