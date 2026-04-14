@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import datingapp.core.AppClock;
 import datingapp.core.connection.ConnectionModels.Conversation;
 import datingapp.core.connection.ConnectionModels.FriendRequest;
 import datingapp.core.connection.ConnectionModels.Like;
@@ -295,7 +296,7 @@ class JdbiMatchmakingStorageTransitionAtomicityTest {
     }
 
     private Match createPersistedActiveMatchWithOldTimestamp() {
-        Instant baseline = Instant.now().minusSeconds(120);
+        Instant baseline = AppClock.now().minusSeconds(120);
         UUID firstUser = userA.toString().compareTo(userB.toString()) <= 0 ? userA : userB;
         UUID secondUser = firstUser.equals(userA) ? userB : userA;
 

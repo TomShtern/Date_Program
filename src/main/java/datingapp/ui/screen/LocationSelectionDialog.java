@@ -9,14 +9,12 @@ import datingapp.core.profile.LocalGeocodingService;
 import datingapp.core.profile.LocationService;
 import datingapp.ui.UiConstants;
 import datingapp.ui.UiUtils;
+import datingapp.ui.async.JavaFxUiThreadDispatcher;
+import datingapp.ui.viewmodel.BaseViewModel;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import javafx.animation.PauseTransition;
-import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.geometry.Insets;
 import javafx.scene.Node;
@@ -37,14 +35,10 @@ import javafx.util.StringConverter;
 public final class LocationSelectionDialog {
 
     private static final String LOCATION_SERVICE_REQUIRED = "locationService cannot be null";
+    private static final String GEOCODING_SERVICE_REQUIRED = "geocodingService cannot be null";
     private static final String PENDING_LOCATION_REQUIRED = "pendingLocation cannot be null";
     private static final int SEARCH_RESULT_LIMIT = 10;
     private static final Duration SEARCH_DEBOUNCE = Duration.millis(250);
-    private static final ExecutorService SEARCH_EXECUTOR = Executors.newSingleThreadExecutor(runnable -> {
-        Thread thread = new Thread(runnable, "location-search");
-        thread.setDaemon(true);
-        return thread;
-    });
 
     private LocationSelectionDialog() {}
 
@@ -71,7 +65,7 @@ public final class LocationSelectionDialog {
             double latitude,
             double longitude) {
         Objects.requireNonNull(locationService, LOCATION_SERVICE_REQUIRED);
-        Objects.requireNonNull(geocodingService, "geocodingService cannot be null");
+        Objects.requireNonNull(geocodingService, GEOCODING_SERVICE_REQUIRED);
 
         Optional<SeededSelection> seed =
                 hasCurrentLocation ? initialSelection(locationService, latitude, longitude) : Optional.empty();
@@ -171,21 +165,28 @@ public final class LocationSelectionDialog {
         }
 
         AtomicReference<ResolvedLocation> pendingLocation = new AtomicReference<>(seededLocation.get());
-        bindDialogInteractions(locationService, geocodingService, controls, seededLocation, pendingLocation);
+        LocationSelectionDialogViewModel dialogViewModel =
+                new LocationSelectionDialogViewModel(geocodingService, controls);
+        bindDialogInteractions(
+                locationService, geocodingService, controls, seededLocation, pendingLocation, dialogViewModel);
 
-        confirmButton.addEventFilter(javafx.event.ActionEvent.ACTION, event -> {
-            if (pendingLocation.get() == null) {
-                UiUtils.setLabelMessage(
-                        controls.errorLabel(), "Please choose a supported city or ZIP option before saving.");
-                event.consume();
+        try {
+            confirmButton.addEventFilter(javafx.event.ActionEvent.ACTION, event -> {
+                if (pendingLocation.get() == null) {
+                    UiUtils.setLabelMessage(
+                            controls.errorLabel(), "Please choose a supported city or ZIP option before saving.");
+                    event.consume();
+                }
+            });
+
+            Optional<ButtonType> result = dialog.showAndWait();
+            if (result.isPresent() && result.orElseThrow() == ButtonType.OK && pendingLocation.get() != null) {
+                return Optional.of(pendingLocation.get());
             }
-        });
-
-        Optional<ButtonType> result = dialog.showAndWait();
-        if (result.isPresent() && result.orElseThrow() == ButtonType.OK && pendingLocation.get() != null) {
-            return Optional.of(pendingLocation.get());
+            return Optional.empty();
+        } finally {
+            dialogViewModel.dispose();
         }
-        return Optional.empty();
     }
 
     static void bindDialogInteractions(
@@ -194,15 +195,31 @@ public final class LocationSelectionDialog {
             DialogControls controls,
             AtomicReference<ResolvedLocation> seededLocation,
             AtomicReference<ResolvedLocation> pendingLocation) {
+        bindDialogInteractions(
+                locationService,
+                geocodingService,
+                controls,
+                seededLocation,
+                pendingLocation,
+                new LocationSelectionDialogViewModel(geocodingService, controls));
+    }
+
+    private static void bindDialogInteractions(
+            LocationService locationService,
+            GeocodingService geocodingService,
+            DialogControls controls,
+            AtomicReference<ResolvedLocation> seededLocation,
+            AtomicReference<ResolvedLocation> pendingLocation,
+            LocationSelectionDialogViewModel dialogViewModel) {
         Objects.requireNonNull(locationService, LOCATION_SERVICE_REQUIRED);
-        Objects.requireNonNull(geocodingService, "geocodingService cannot be null");
+        Objects.requireNonNull(geocodingService, GEOCODING_SERVICE_REQUIRED);
         Objects.requireNonNull(controls, "controls cannot be null");
         Objects.requireNonNull(seededLocation, "seededLocation cannot be null");
         Objects.requireNonNull(pendingLocation, PENDING_LOCATION_REQUIRED);
+        Objects.requireNonNull(dialogViewModel, "dialogViewModel cannot be null");
 
         PauseTransition searchPause = new PauseTransition(SEARCH_DEBOUNCE);
-        AtomicLong searchRequestId = new AtomicLong();
-        Runnable refreshCitySuggestions = () -> refreshCitySuggestions(geocodingService, controls, searchRequestId);
+        Runnable refreshCitySuggestions = dialogViewModel::refreshCitySuggestions;
         Runnable refreshEvaluation =
                 () -> refreshEvaluation(locationService, controls, seededLocation, pendingLocation);
 
@@ -215,21 +232,6 @@ public final class LocationSelectionDialog {
                 .addListener((obs, oldVal, newVal) -> refreshEvaluation.run());
 
         refreshEvaluation.run();
-    }
-
-    private static void refreshCitySuggestions(
-            GeocodingService geocodingService, DialogControls controls, AtomicLong searchRequestId) {
-        long requestId = searchRequestId.incrementAndGet();
-        String query = controls.citySearchField().getText();
-        SEARCH_EXECUTOR.execute(() -> {
-            var results = geocodingService.search(query, SEARCH_RESULT_LIMIT);
-            Platform.runLater(() -> {
-                if (requestId != searchRequestId.get()) {
-                    return;
-                }
-                controls.cityListView().getItems().setAll(results);
-            });
-        });
     }
 
     private static void refreshEvaluation(
@@ -500,6 +502,62 @@ public final class LocationSelectionDialog {
 
         static SelectionEvaluation invalid(String previewText, String errorText) {
             return new SelectionEvaluation(Optional.empty(), previewText, errorText, false, false);
+        }
+    }
+
+    private static final class LocationSelectionDialogViewModel extends BaseViewModel {
+        private static final String SEARCH_TASK_KEY = "location-search";
+
+        private final GeocodingService geocodingService;
+        private final DialogControls controls;
+
+        private LocationSelectionDialogViewModel(GeocodingService geocodingService, DialogControls controls) {
+            super("location-selection-dialog", new JavaFxUiThreadDispatcher());
+            this.geocodingService = Objects.requireNonNull(geocodingService, GEOCODING_SERVICE_REQUIRED);
+            this.controls = Objects.requireNonNull(controls, "controls cannot be null");
+        }
+
+        private void refreshCitySuggestions() {
+            String query = controls.citySearchField().getText();
+            asyncScope.runLatest(
+                    SEARCH_TASK_KEY,
+                    "load location suggestions",
+                    () -> searchSuggestions(query),
+                    this::applySearchSuggestions);
+        }
+
+        private CitySearchUpdate searchSuggestions(String query) {
+            try {
+                return CitySearchUpdate.success(geocodingService.search(query, SEARCH_RESULT_LIMIT));
+            } catch (Exception exception) {
+                logger.warn("Location search failed for query '{}'", query, exception);
+                return CitySearchUpdate.failure("Could not load location suggestions. Try again.");
+            }
+        }
+
+        private void applySearchSuggestions(CitySearchUpdate update) {
+            if (update.success()) {
+                controls.cityListView().getItems().setAll(update.results());
+                return;
+            }
+            controls.cityListView().getItems().clear();
+            UiUtils.setLabelMessage(controls.errorLabel(), update.errorMessage());
+        }
+    }
+
+    private record CitySearchUpdate(
+            boolean success, java.util.List<GeocodingService.GeocodingResult> results, String errorMessage) {
+        private CitySearchUpdate {
+            results = results == null ? java.util.List.of() : java.util.List.copyOf(results);
+            errorMessage = errorMessage == null ? "" : errorMessage;
+        }
+
+        private static CitySearchUpdate success(java.util.List<GeocodingService.GeocodingResult> results) {
+            return new CitySearchUpdate(true, results, "");
+        }
+
+        private static CitySearchUpdate failure(String errorMessage) {
+            return new CitySearchUpdate(false, java.util.List.of(), errorMessage);
         }
     }
 }

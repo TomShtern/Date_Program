@@ -127,6 +127,7 @@ class OnboardingFlowTest {
     private static ProfileViewModel createProfileViewModel(
             TestStorages.Users users, AppConfig config, ProfileService profileService) {
         ValidationService validationService = new ValidationService(config);
+        LocationService locationService = new LocationService(validationService);
         return new ProfileViewModel(new ProfileViewModel.Dependencies(
                 new datingapp.ui.viewmodel.UiDataAdapters.StorageUiUserStore(users),
                 profileService,
@@ -141,8 +142,8 @@ class OnboardingFlowTest {
                 config,
                 AppSession.getInstance(),
                 validationService,
-                new LocationService(validationService),
-                new datingapp.core.profile.LocalGeocodingService(new LocationService(validationService)),
+                locationService,
+                new datingapp.core.profile.LocalGeocodingService(locationService),
                 TEST_DISPATCHER,
                 new datingapp.core.workflow.ProfileActivationPolicy()));
     }

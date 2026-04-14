@@ -15,7 +15,9 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.DisplayName;
@@ -90,12 +92,14 @@ class NominatimGeocodingServiceTest {
 
     private static final class TestServer implements AutoCloseable {
         private final HttpServer server;
+        private final ExecutorService executor;
         private final URI baseUri;
 
         private TestServer(HttpHandler handler) throws IOException {
             server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
             server.createContext("/search", handler);
-            server.setExecutor(Executors.newSingleThreadExecutor());
+            executor = Executors.newSingleThreadExecutor();
+            server.setExecutor(executor);
             server.start();
             baseUri = URI.create("http://127.0.0.1:" + server.getAddress().getPort());
         }
@@ -107,6 +111,12 @@ class NominatimGeocodingServiceTest {
         @Override
         public void close() {
             server.stop(0);
+            executor.shutdownNow();
+            try {
+                executor.awaitTermination(5, TimeUnit.SECONDS);
+            } catch (InterruptedException _) {
+                Thread.currentThread().interrupt();
+            }
         }
     }
 }

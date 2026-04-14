@@ -47,6 +47,7 @@ import org.junit.jupiter.api.Timeout;
 class SafetyViewModelTest {
 
     private static final UiThreadDispatcher TEST_DISPATCHER = datingapp.ui.JavaFxTestSupport.immediateUiDispatcher();
+    private static final String SHOW_VERIFICATION_CODE_PROPERTY = "datingapp.showVerificationCode";
 
     private SafetyViewModel viewModel;
 
@@ -62,6 +63,7 @@ class SafetyViewModelTest {
     @AfterEach
     void tearDown() {
         AppSession.getInstance().reset();
+        System.clearProperty(SHOW_VERIFICATION_CODE_PROPERTY);
     }
 
     @Test
@@ -179,14 +181,18 @@ class SafetyViewModelTest {
                     User startedUser = AppSession.getInstance().getCurrentUser();
                     String status = viewModel.statusMessageProperty().get();
                     String code = startedUser != null ? startedUser.getVerificationCode() : null;
-                    return code != null && code.length() == 6 && status != null && status.contains(code);
+                    return code != null
+                            && code.length() == 6
+                            && status != null
+                            && status.contains("Verification code generated")
+                            && status.contains("configured verification channel");
                 },
                 5000));
 
         User afterStart = AppSession.getInstance().getCurrentUser();
         String generatedCode = afterStart.getVerificationCode();
         assertTrue(generatedCode != null && generatedCode.length() == 6);
-        assertTrue(viewModel.statusMessageProperty().get().contains(generatedCode));
+        assertFalse(viewModel.statusMessageProperty().get().contains(generatedCode));
         assertFalse(viewModel.statusMessageProperty().get().contains("[SIMULATED]"));
 
         viewModel.verificationCodeProperty().set(generatedCode);
@@ -206,6 +212,49 @@ class SafetyViewModelTest {
         assertTrue(AppSession.getInstance().getCurrentUser().isVerified());
         assertTrue(viewModel.statusMessageProperty().get().contains("verified"));
         assertFalse(viewModel.statusMessageProperty().get().contains("[SIMULATED]"));
+    }
+
+    @Test
+    @DisplayName("start verification includes the generated code only when explicitly enabled")
+    void startVerificationIncludesGeneratedCodeWhenExplicitlyEnabled() throws InterruptedException {
+        System.setProperty(SHOW_VERIFICATION_CODE_PROPERTY, "true");
+
+        TestStorages.Users users = new TestStorages.Users();
+        TestStorages.Interactions interactions = new TestStorages.Interactions();
+        TestStorages.TrustSafety trustSafetyStorage = new TestStorages.TrustSafety();
+        TestStorages.Communications communications = new TestStorages.Communications();
+        AppConfig config = AppConfig.defaults();
+
+        User currentUser = createUser("DevVerify", Gender.FEMALE, EnumSet.of(Gender.MALE));
+        users.save(currentUser);
+        AppSession.getInstance().setCurrentUser(currentUser);
+
+        TrustSafetyService trustSafetyService = TrustSafetyService.builder(
+                        trustSafetyStorage, interactions, users, config, communications)
+                .build();
+        VerificationUseCases verificationUseCases = new VerificationUseCases(users, trustSafetyService);
+
+        viewModel = new SafetyViewModel(
+                SocialUseCases.forTrustSafetyOnly(trustSafetyService),
+                verificationUseCases,
+                null,
+                AppSession.getInstance(),
+                TEST_DISPATCHER);
+        viewModel.initialize();
+        viewModel.verificationMethodProperty().set(VerificationMethod.EMAIL);
+        viewModel.verificationContactProperty().set("dev-verify@example.com");
+
+        viewModel.startVerification();
+
+        assertTrue(waitUntil(
+                () -> {
+                    User startedUser = AppSession.getInstance().getCurrentUser();
+                    String status = viewModel.statusMessageProperty().get();
+                    String code = startedUser != null ? startedUser.getVerificationCode() : null;
+                    return code != null && code.length() == 6 && status != null && status.contains(code);
+                },
+                5000));
+        assertTrue(viewModel.statusMessageProperty().get().contains("Local/dev code"));
     }
 
     @Test
@@ -454,6 +503,76 @@ class SafetyViewModelTest {
         assertNull(stored.getEmail());
     }
 
+    @Test
+    @DisplayName("start verification surfaces thrown use-case failures through the error handler")
+    void startVerificationSurfacesThrownUseCaseFailures() throws InterruptedException {
+        TestStorages.Users users = new TestStorages.Users();
+        TestStorages.Interactions interactions = new TestStorages.Interactions();
+        TestStorages.TrustSafety trustSafetyStorage = new TestStorages.TrustSafety();
+        TestStorages.Communications communications = new TestStorages.Communications();
+        AppConfig config = AppConfig.defaults();
+
+        User currentUser = createUser("ThrownStart", Gender.FEMALE, EnumSet.of(Gender.MALE));
+        users.save(currentUser);
+        AppSession.getInstance().setCurrentUser(currentUser);
+
+        TrustSafetyService trustSafetyService = TrustSafetyService.builder(
+                        trustSafetyStorage, interactions, users, config, communications)
+                .build();
+        AtomicReference<String> errorMessage = new AtomicReference<>();
+
+        viewModel = new SafetyViewModel(
+                SocialUseCases.forTrustSafetyOnly(trustSafetyService),
+                new ThrowingVerificationUseCases(users, trustSafetyService, true, false),
+                null,
+                AppSession.getInstance(),
+                TEST_DISPATCHER);
+        viewModel.setErrorHandler(errorMessage::set);
+        viewModel.verificationMethodProperty().set(VerificationMethod.EMAIL);
+        viewModel.verificationContactProperty().set("thrown-start@example.com");
+
+        viewModel.startVerification();
+
+        assertTrue(waitUntil(() -> errorMessage.get() != null, 5000));
+        assertTrue(errorMessage.get().contains("Could not start verification"));
+        assertTrue(errorMessage.get().contains("synthetic start failure"));
+    }
+
+    @Test
+    @DisplayName("confirm verification surfaces thrown use-case failures through the error handler")
+    void confirmVerificationSurfacesThrownUseCaseFailures() throws InterruptedException {
+        TestStorages.Users users = new TestStorages.Users();
+        TestStorages.Interactions interactions = new TestStorages.Interactions();
+        TestStorages.TrustSafety trustSafetyStorage = new TestStorages.TrustSafety();
+        TestStorages.Communications communications = new TestStorages.Communications();
+        AppConfig config = AppConfig.defaults();
+
+        User currentUser = createUser("ThrownConfirm", Gender.FEMALE, EnumSet.of(Gender.MALE));
+        currentUser.startVerification(VerificationMethod.EMAIL, "123456");
+        users.save(currentUser);
+        AppSession.getInstance().setCurrentUser(currentUser);
+
+        TrustSafetyService trustSafetyService = TrustSafetyService.builder(
+                        trustSafetyStorage, interactions, users, config, communications)
+                .build();
+        AtomicReference<String> errorMessage = new AtomicReference<>();
+
+        viewModel = new SafetyViewModel(
+                SocialUseCases.forTrustSafetyOnly(trustSafetyService),
+                new ThrowingVerificationUseCases(users, trustSafetyService, false, true),
+                null,
+                AppSession.getInstance(),
+                TEST_DISPATCHER);
+        viewModel.setErrorHandler(errorMessage::set);
+        viewModel.verificationCodeProperty().set("123456");
+
+        viewModel.confirmVerification();
+
+        assertTrue(waitUntil(() -> errorMessage.get() != null, 5000));
+        assertTrue(errorMessage.get().contains("Could not confirm verification"));
+        assertTrue(errorMessage.get().contains("synthetic confirm failure"));
+    }
+
     private static boolean waitUntil(BooleanSupplier condition, long timeoutMillis) throws InterruptedException {
         long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMillis);
         while (System.nanoTime() < deadline) {
@@ -536,6 +655,37 @@ class SafetyViewModelTest {
         @Override
         public UseCaseResult<ConfirmVerificationResult> confirmVerification(ConfirmVerificationCommand command) {
             awaitGate(confirmStarted, releaseConfirm, "confirm verification");
+            return super.confirmVerification(command);
+        }
+    }
+
+    private static final class ThrowingVerificationUseCases extends VerificationUseCases {
+        private final boolean throwOnStart;
+        private final boolean throwOnConfirm;
+
+        private ThrowingVerificationUseCases(
+                TestStorages.Users users,
+                TrustSafetyService trustSafetyService,
+                boolean throwOnStart,
+                boolean throwOnConfirm) {
+            super(users, trustSafetyService);
+            this.throwOnStart = throwOnStart;
+            this.throwOnConfirm = throwOnConfirm;
+        }
+
+        @Override
+        public UseCaseResult<StartVerificationResult> startVerification(StartVerificationCommand command) {
+            if (throwOnStart) {
+                throw new IllegalStateException("synthetic start failure");
+            }
+            return super.startVerification(command);
+        }
+
+        @Override
+        public UseCaseResult<ConfirmVerificationResult> confirmVerification(ConfirmVerificationCommand command) {
+            if (throwOnConfirm) {
+                throw new IllegalStateException("synthetic confirm failure");
+            }
             return super.confirmVerification(command);
         }
     }

@@ -104,12 +104,12 @@ Every item below is **implemented in production code**, not stubs or placeholder
 
 ### What's NOT Done
 
-| Item                          | Status     | Impact                                                                           |
-|-------------------------------|------------|----------------------------------------------------------------------------------|
-| Geocoding (address → lat/lon) | ❌ Not done | Users must type raw coordinates — nobody does this                               |
-| Server accessible from LAN    | ❌ Not done | Currently binds to `127.0.0.1` (localhost-only)                                  |
-| Authentication (JWT/BCrypt)   | ❌ Not done | Not needed for LAN/MVP iteration, but required for real-user internet deployment |
-| Photo upload/serving          | ❌ Not done | Photos are local filesystem paths, not HTTP URLs                                 |
+| Item                          | Status     | Impact                                                                                                                                                                                |
+|-------------------------------|------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Geocoding (address → lat/lon) | ❌ Not done | Users must type raw coordinates — nobody does this                                                                                                                                    |
+| Server accessible from LAN    | ❌ Not done | Currently binds to `127.0.0.1` (localhost-only)                                                                                                                                       |
+| Authentication (JWT/BCrypt)   | ❌ Not done | Not needed for LAN/MVP iteration, but required for real-user internet deployment                                                                                                      |
+| Photo upload/serving          | ❌ Not done | Seeded users already use deterministic HTTP portrait URLs from `randomuser.me`, but user-managed photo upload/serving is still not implemented (see the seeded-user note in Phase 1). |
 
 The important takeaway is that the project is not missing a backend product. What still makes it feel incomplete is mostly a handful of high-impact experience and validation gaps: usable location entry, and a real end-to-end smoke pass.
 
@@ -346,12 +346,22 @@ This is a **small phase** — just a few targeted changes to the server configur
 | **When**   | Move JWT/BCrypt into the real-user internet phase, where it becomes mandatory                                 |
 | **Effort** | None now — this is a sequencing choice, not a missing implementation                                          |
 
+### 2.4 — Enable CORS Before Flutter Starts Calling the API
+
+|            |                                                                                                                         |
+|------------|-------------------------------------------------------------------------------------------------------------------------|
+| **What**   | Configure CORS headers for the Flutter app and any browser-based dev tooling before Phase 3 starts making HTTP requests |
+| **Why**    | Cross-origin failures are a server-integration blocker; they should be solved before the mobile/web client work begins  |
+| **When**   | Finish this in Phase 2 so Phase 3 can focus on app features instead of API access plumbing                              |
+| **Effort** | Small — server config plus one phone/browser verification pass                                                          |
+
 ### Phase 2 Exit Criteria
 
 - [ ] Server binds to LAN interface when configured to do so
 - [ ] Phone browser can reach `http://{laptop-ip}:7070/api/health`
 - [ ] localhost-only mode still works as default for safe development
 - [ ] The dev login shortcut can remain in place for the first mobile iteration
+- [ ] CORS is configured before Phase 3 starts calling the API from Flutter or browser-based tooling
 - [ ] `mvn spotless:apply verify` still passes
 
 ---
@@ -388,6 +398,8 @@ flutter doctor
 # Create the project
 flutter create dating_app
 ```
+
+**Server prerequisite from Phase 2:** enable CORS before connecting Flutter or browser-based tooling to the REST API from a different origin.
 
 ### Project Structure
 
@@ -530,15 +542,22 @@ Treat this as a menu of candidate options, not as a locked implementation decisi
 1. **Authentication** — JWT + BCrypt. Replace user-picker login with email/password.
 2. **Deployment** — Package server as Docker container, deploy to cloud VM.
 3. **Database migration** — Point `DATING_APP_DB_URL` at cloud PostgreSQL.
-4. **Photo hosting** — Upload endpoint + HTTP serving or cloud storage.
-5. **Security** — Rate limiting, CORS, security headers.
-6. **Real email** — Replace console-printed verification codes with SMTP delivery.
+4. **Database backups** — Add automated backups, restore testing, and a defined backup retention policy.
+5. **Photo hosting** — Upload endpoint + HTTP serving or cloud storage.
+6. **Security** — Rate limiting, security headers, and HTTPS/TLS certificates with automated renewal (Let's Encrypt).
+7. **Monitoring & alerting** — Add uptime checks, metrics, CPU/memory monitoring, and on-call/alert routing.
+8. **Error tracking** — Integrate server-side error tracking (for example Sentry) so failures surface quickly.
+9. **Structured logging** — Add structured logs, central aggregation, and a log-retention policy.
+10. **Real email** — Replace console-printed verification codes with SMTP delivery.
 
 ### Phase 4 Exit Criteria
 
 - [ ] App works over the internet (not just WiFi)
 - [ ] Real user authentication
 - [ ] Photo upload and display
+- [ ] HTTPS/TLS is live with certificate renewal in place
+- [ ] Database backups, restore testing, and retention policy are in place
+- [ ] Monitoring/alerting, error tracking, and structured logging are in place
 - [ ] At least one other person can install and use the app
 
 ---
@@ -554,7 +573,7 @@ Being explicit about what we're skipping and why:
 | **Web app**                              | Not needed. Three frontends (CLI, JavaFX, Flutter) cover dev/testing/production.                                                                    |
 | **Big JavaFX-only redesign**             | JavaFX is useful for validation and parity, but large redesign work that does not improve backend correctness or mobile readiness is a distraction. |
 | **WebSocket real-time chat**             | Polling works fine for now. WebSocket is an optimization, not a requirement.                                                                        |
-| **Production auth during Phases 1–2**    | Important later, but it should not block local/LAN/mobile MVP progress. It belongs in the real-user deployment phase.                               |
+| **Production auth during Phases 1–3**    | Important later, but it should not block local/LAN/mobile MVP progress. It belongs in the real-user deployment phase.                               |
 | **Push notifications**                   | Phase 4+, only when going to cloud. Polling is sufficient for LAN development.                                                                      |
 | **Microservices / splitting the server** | A single JVM on a free-tier VM handles thousands of users. Premature distribution adds complexity with no benefit at this scale.                    |
 
@@ -616,7 +635,8 @@ flutter test
 ipconfig | findstr "IPv4"
 # e.g., 192.168.1.105
 
-# 2. Start server with LAN binding (after Phase 2 changes)
+# 2. Start the standalone REST API entry point with explicit LAN binding
+mvn --% exec:java -Dexec.mainClass=datingapp.app.api.RestApiServer -Dexec.args="--port=7070 --host=0.0.0.0"
 
 # 3. On phone: open Chrome → http://192.168.1.105:7070/api/health
 # Should return: {"status":"ok"}

@@ -516,7 +516,7 @@ class MatchingViewModelTest {
                             interactions,
                             users,
                             new MatchQualityService(users, interactions, config),
-                            new datingapp.app.event.InProcessAppEventBus(),
+                            new InProcessAppEventBus(),
                             recommendationService) {
                         @Override
                         public UseCaseResult<MatchingUseCases.SwipeOutcome> processSwipe(

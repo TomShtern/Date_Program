@@ -412,11 +412,11 @@ public class MatchingViewModel extends BaseViewModel {
         asyncScope.runFireAndForget("process swipe", () -> {
             UseCaseResult<MatchingUseCases.SwipeOutcome> result = matchingUseCases.processSwipe(
                     new ProcessSwipeCommand(UserContext.ui(user.getId()), user, candidate, liked, superLike, false));
-            asyncScope.dispatchToUi(() -> applySwipeResult(result, candidate));
+            asyncScope.dispatchToUi(() -> applySwipeResult(result, user, candidate));
         });
     }
 
-    private void applySwipeResult(UseCaseResult<MatchingUseCases.SwipeOutcome> result, User candidate) {
+    private void applySwipeResult(UseCaseResult<MatchingUseCases.SwipeOutcome> result, User user, User candidate) {
         if (!result.success()) {
             logWarn("Swipe failed: {}", result.error().message());
             infoMessage.set(result.error().message());
@@ -429,7 +429,7 @@ public class MatchingViewModel extends BaseViewModel {
         startUndoCountdown();
 
         if (swipeResult.matched()) {
-            logInfo("IT'S A MATCH! {} matched with {}", currentUser.getName(), candidate.getName());
+            logInfo("IT'S A MATCH! {} matched with {}", user.getName(), candidate.getName());
             lastMatch.set(swipeResult.match());
             matchedUser.set(candidate);
         }

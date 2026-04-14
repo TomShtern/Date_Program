@@ -1213,8 +1213,7 @@ public class ProfileViewModel extends BaseViewModel {
             AppSession session,
             UiThreadDispatcher uiDispatcher,
             ProfileActivationPolicy activationPolicy) {
-        ValidationService validationService = new ValidationService(config);
-        LocationService locationService = new LocationService(validationService);
+        CommonServices commonServices = buildCommonServices(config);
         return new Dependencies(
                 userStore,
                 profileCompletionService,
@@ -1222,9 +1221,9 @@ public class ProfileViewModel extends BaseViewModel {
                 profileUseCases,
                 config,
                 session,
-                validationService,
-                locationService,
-                new LocalGeocodingService(locationService),
+                commonServices.validationService(),
+                commonServices.locationService(),
+                commonServices.geocodingService(),
                 uiDispatcher,
                 activationPolicy);
     }
@@ -1238,8 +1237,7 @@ public class ProfileViewModel extends BaseViewModel {
             AppSession session,
             UiThreadDispatcher uiDispatcher,
             ProfileActivationPolicy activationPolicy) {
-        ValidationService validationService = new ValidationService(config);
-        LocationService locationService = new LocationService(validationService);
+        CommonServices commonServices = buildCommonServices(config);
         return new Dependencies(
                 userStore,
                 profileCompletionService,
@@ -1247,12 +1245,21 @@ public class ProfileViewModel extends BaseViewModel {
                 profileUseCases,
                 config,
                 session,
-                validationService,
-                locationService,
-                new LocalGeocodingService(locationService),
+                commonServices.validationService(),
+                commonServices.locationService(),
+                commonServices.geocodingService(),
                 uiDispatcher,
                 activationPolicy);
     }
+
+    private static CommonServices buildCommonServices(AppConfig config) {
+        ValidationService validationService = new ValidationService(config);
+        LocationService locationService = new LocationService(validationService);
+        return new CommonServices(validationService, locationService, new LocalGeocodingService(locationService));
+    }
+
+    private record CommonServices(
+            ValidationService validationService, LocationService locationService, GeocodingService geocodingService) {}
 
     private record SaveOperationResult(boolean success, User savedUser, SaveOutcome outcome, Exception error) {
         private static SaveOperationResult success(User savedUser, SaveOutcome outcome) {

@@ -1,11 +1,14 @@
 package datingapp.storage.jdbi;
 
-import static org.junit.jupiter.api.Assertions.fail;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import datingapp.core.model.User;
+import datingapp.support.LivePostgresqlTestConfig;
 import java.util.List;
+import java.util.Objects;
 import org.jdbi.v3.core.Jdbi;
 import org.jdbi.v3.sqlobject.SqlObjectPlugin;
 import org.junit.jupiter.api.Test;
@@ -18,10 +21,13 @@ class FindAllDiagnosticTest {
 
     @Test
     void findAllAgainstLiveDb() {
+        LivePostgresqlTestConfig.assumeConfigured();
+        LivePostgresqlTestConfig.ConnectionInfo config = LivePostgresqlTestConfig.requireConfig();
+
         HikariConfig hikari = new HikariConfig();
-        hikari.setJdbcUrl("jdbc:postgresql://localhost:55432/datingapp");
-        hikari.setUsername("datingapp");
-        hikari.setPassword("datingapp");
+        hikari.setJdbcUrl(config.jdbcUrl());
+        hikari.setUsername(config.username());
+        hikari.setPassword(config.password());
         hikari.setMaximumPoolSize(2);
 
         try (HikariDataSource ds = new HikariDataSource(hikari)) {
@@ -32,14 +38,8 @@ class FindAllDiagnosticTest {
             JdbiUserStorage storage = new JdbiUserStorage(jdbi);
 
             List<User> users = storage.findAll();
-            System.out.println("SUCCESS: findAll returned " + users.size() + " users");
-            for (User u : users) {
-                System.out.println("  - " + u.getName() + " (" + u.getState() + ")");
-            }
-        } catch (Exception e) {
-            System.err.println("FAILED: " + e.getClass().getName() + ": " + e.getMessage());
-            e.printStackTrace();
-            fail("findAll() threw: " + e);
+            assertNotNull(users, "findAll() should return a user list");
+            assertTrue(users.stream().allMatch(Objects::nonNull), "findAll() should not return null users");
         }
     }
 }

@@ -300,6 +300,7 @@ public class ProfileController extends BaseController implements Initializable {
     private final ProfileViewModel viewModel;
     private final ProfileFormValidator formValidator;
     private long profilePhotoRequestId;
+    private long previewPhotoRequestId;
 
     public ProfileController(ProfileViewModel viewModel) {
         this.viewModel = viewModel;
@@ -968,6 +969,7 @@ public class ProfileController extends BaseController implements Initializable {
     @Override
     public void cleanup() {
         profilePhotoRequestId++;
+        previewPhotoRequestId++;
         super.cleanup();
     }
 
@@ -1447,7 +1449,12 @@ public class ProfileController extends BaseController implements Initializable {
             placeholderIcon.setIconColor(Color.web("#94a3b8"));
 
             photoContainer.getChildren().addAll(placeholderIcon, imageView);
+            previewPhotoRequestId++;
+            long requestId = previewPhotoRequestId;
             ImageCache.getImageAsync(snapshot.photoUrls().getFirst(), 360, 220, image -> {
+                if (requestId != previewPhotoRequestId) {
+                    return;
+                }
                 imageView.setImage(image);
                 imageView.setVisible(true);
                 placeholderIcon.setVisible(false);

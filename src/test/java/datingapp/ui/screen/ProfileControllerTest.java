@@ -10,6 +10,7 @@ import datingapp.core.AppConfig;
 import datingapp.core.AppSession;
 import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
+import datingapp.core.profile.LocalGeocodingService;
 import datingapp.core.profile.LocationService;
 import datingapp.core.profile.MatchPreferences.PacePreferences;
 import datingapp.core.profile.ProfileService;
@@ -493,6 +494,7 @@ class ProfileControllerTest {
     private ProfileViewModel createViewModel(
             TestStorages.Users users, AppConfig config, ProfileService profileService) {
         ValidationService validationService = new ValidationService(config);
+        LocationService locationService = new LocationService(validationService);
         return new ProfileViewModel(new ProfileViewModel.Dependencies(
                 new datingapp.ui.viewmodel.UiDataAdapters.StorageUiUserStore(users),
                 profileService,
@@ -507,8 +509,8 @@ class ProfileControllerTest {
                 config,
                 AppSession.getInstance(),
                 validationService,
-                new LocationService(validationService),
-                new datingapp.core.profile.LocalGeocodingService(new LocationService(validationService)),
+                locationService,
+                new LocalGeocodingService(locationService),
                 TEST_DISPATCHER,
                 new datingapp.core.workflow.ProfileActivationPolicy()));
     }

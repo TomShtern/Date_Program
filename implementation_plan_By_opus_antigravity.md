@@ -10,19 +10,19 @@
 
 Exhaustive check of every ViewModel in `src/main/java/datingapp/ui/viewmodel/`:
 
-| ViewModel | Use-case calls | Async discipline | Status |
-|---|---|---|---|
-| ChatViewModel | messagingUseCases, socialUseCases | All via `asyncScope.runLatest` / `runFireAndForget` / `runPolling` | ✅ |
-| SocialViewModel | socialUseCases | `refresh()` via `runLatest`, friend request/notification via `runFireAndForget` | ✅ |
-| StandoutsViewModel | matchingUseCases | `loadStandouts()` via `runLatest`, `markInteracted()` via `runFireAndForget` | ✅ |
-| PreferencesViewModel | profileMutationUseCases | `initialize()` / `savePreferences()` via `runLatest`, `updateThemeMode()` via `runFireAndForget` | ✅ |
-| ProfileViewModel | profileMutationUseCases | `save()`, photo ops — all via `runFireAndForget` | ✅ |
-| DashboardViewModel | (aggregation only) | `refresh()` via `runLatest`, daily pick via `runFireAndForget` | ✅ |
-| MatchesViewModel | matchingUseCases, socialUseCases | Production uses `AsyncExecutionMode.ASYNC` (ViewModelFactory L225); SYNC is test-only | ✅ |
-| MatchingViewModel | matchingUseCases | `refreshCandidates` ✅, notes ✅, block/report ✅ — but **`processSwipe()` and `undo()` are SYNC** | ❌ Bug 1 |
-| SafetyViewModel | verificationUseCases, profileMutationUseCases, socialUseCases | `loadBlockedUsers` ✅, `unblockUser` ✅ — but **`startVerification()`, `confirmVerification()`, `deleteCurrentAccount()` are SYNC** | ❌ Bug 1b |
-| LoginViewModel | (handled separately) | N/A | ✅ |
-| NotesViewModel | (delegates to noteDataAccess) | All via `asyncScope` | ✅ |
+| ViewModel            | Use-case calls                                                | Async discipline                                                                                                                  | Status   |
+|----------------------|---------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------|----------|
+| ChatViewModel        | messagingUseCases, socialUseCases                             | All via `asyncScope.runLatest` / `runFireAndForget` / `runPolling`                                                                | ✅        |
+| SocialViewModel      | socialUseCases                                                | `refresh()` via `runLatest`, friend request/notification via `runFireAndForget`                                                   | ✅        |
+| StandoutsViewModel   | matchingUseCases                                              | `loadStandouts()` via `runLatest`, `markInteracted()` via `runFireAndForget`                                                      | ✅        |
+| PreferencesViewModel | profileMutationUseCases                                       | `initialize()` / `savePreferences()` via `runLatest`, `updateThemeMode()` via `runFireAndForget`                                  | ✅        |
+| ProfileViewModel     | profileMutationUseCases                                       | `save()`, photo ops — all via `runFireAndForget`                                                                                  | ✅        |
+| DashboardViewModel   | (aggregation only)                                            | `refresh()` via `runLatest`, daily pick via `runFireAndForget`                                                                    | ✅        |
+| MatchesViewModel     | matchingUseCases, socialUseCases                              | Production uses `AsyncExecutionMode.ASYNC` (ViewModelFactory L225); SYNC is test-only                                             | ✅        |
+| MatchingViewModel    | matchingUseCases                                              | `refreshCandidates` ✅, notes ✅, block/report ✅ — but **`processSwipe()` and `undo()` are SYNC**                                   | ❌ Bug 1  |
+| SafetyViewModel      | verificationUseCases, profileMutationUseCases, socialUseCases | `loadBlockedUsers` ✅, `unblockUser` ✅ — but **`startVerification()`, `confirmVerification()`, `deleteCurrentAccount()` are SYNC** | ❌ Bug 1b |
+| LoginViewModel       | (handled separately)                                          | N/A                                                                                                                               | ✅        |
+| NotesViewModel       | (delegates to noteDataAccess)                                 | All via `asyncScope`                                                                                                              | ✅        |
 
 ---
 
@@ -93,6 +93,7 @@ private void applySwipeResult(UseCaseResult<SwipeOutcome> result, User candidate
         matchedUser.set(candidate);
     }
     nextCandidate();
+    swipeInProgress.set(false);
 }
 ```
 
@@ -141,11 +142,11 @@ private void applyUndoResult(UseCaseResult<?> result, User previousCandidate) {
 
 ### The three sync-on-FX-thread methods
 
-| Method | Line | What it does synchronously |
-|---|---|---|
-| `startVerification()` | L231 | `verificationUseCases.startVerification(...)` — generates code, writes user state to DB |
-| `confirmVerification()` | L257 | `verificationUseCases.confirmVerification(...)` — verifies code, updates user verification status in DB |
-| `deleteCurrentAccount()` | L284 | `mutationUseCases.deleteAccount(...)` — deletes user account from DB |
+| Method                   | Line | What it does synchronously                                                                              |
+|--------------------------|------|---------------------------------------------------------------------------------------------------------|
+| `startVerification()`    | L231 | `verificationUseCases.startVerification(...)` — generates code, writes user state to DB                 |
+| `confirmVerification()`  | L257 | `verificationUseCases.confirmVerification(...)` — verifies code, updates user verification status in DB |
+| `deleteCurrentAccount()` | L284 | `mutationUseCases.deleteAccount(...)` — deletes user account from DB                                    |
 
 ### Fix
 
@@ -236,8 +237,12 @@ public static void getImageAsync(String path, double width, double height, Consu
     if (future != null) {
         future.thenAccept(img -> Platform.runLater(() -> callback.accept(img)));
     } else {
-        // Race: was cached between check and now
-        Platform.runLater(() -> callback.accept(getImage(path, width, height)));
+        Image cachedAfterPreload;
+        synchronized (CACHE) {
+            cachedAfterPreload = CACHE.get(key);
+        }
+        Image image = cachedAfterPreload != null ? cachedAfterPreload : getDefaultAvatar(width, height);
+        Platform.runLater(() -> callback.accept(image));
     }
 }
 ```

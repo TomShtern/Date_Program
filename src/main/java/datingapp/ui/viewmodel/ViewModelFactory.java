@@ -1,12 +1,9 @@
 package datingapp.ui.viewmodel;
 
-import datingapp.app.geocoding.NominatimGeocodingService;
 import datingapp.core.AppSession;
 import datingapp.core.ServiceRegistry;
 import datingapp.core.matching.CandidateFinder;
 import datingapp.core.model.User;
-import datingapp.core.profile.FallbackGeocodingService;
-import datingapp.core.profile.LocalGeocodingService;
 import datingapp.ui.NavigationService;
 import datingapp.ui.UiPreferencesStore;
 import datingapp.ui.UiThemeService;
@@ -188,9 +185,7 @@ public class ViewModelFactory {
                         session,
                         services.getValidationService(),
                         services.getLocationService(),
-                        new FallbackGeocodingService(
-                                new LocalGeocodingService(services.getLocationService()),
-                                new NominatimGeocodingService()),
+                        services.getGeocodingService(),
                         uiDispatcher,
                         services.getActivationPolicy())));
     }

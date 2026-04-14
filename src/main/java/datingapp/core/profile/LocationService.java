@@ -151,7 +151,7 @@ public final class LocationService {
 
     public List<City> getPopularCities(String countryCode, int limit) {
         return citiesFor(countryCode).stream()
-                .sorted(Comparator.comparingInt(City::priority))
+                .sorted(Comparator.comparingInt(City::priority).thenComparing(City::name))
                 .limit(Math.max(1, limit))
                 .toList();
     }
@@ -167,7 +167,7 @@ public final class LocationService {
         String normalizedQuery = normalizeText(query);
         return citiesFor(countryCode).stream()
                 .filter(city -> matches(city, normalizedQuery))
-                .sorted(Comparator.comparingInt(City::priority))
+                .sorted(Comparator.comparingInt(City::priority).thenComparing(City::name))
                 .limit(Math.max(1, limit))
                 .toList();
     }

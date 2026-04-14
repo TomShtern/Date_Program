@@ -170,6 +170,8 @@ public class RestApiServer {
     private final ZoneId userTimeZone;
     private final RestApiIdentityPolicy identityPolicy;
     private final RestApiRequestGuards requestGuards;
+    private final String host;
+    private final boolean restrictToLoopbackClients;
     private final int port;
     private Javalin app;
 
@@ -180,6 +182,11 @@ public class RestApiServer {
 
     /** Creates a server with the given services and port. */
     public RestApiServer(ServiceRegistry services, int port) {
+        this(services, LOCALHOST_HOST, port);
+    }
+
+    /** Creates a server with the given services, bind host, and port. */
+    public RestApiServer(ServiceRegistry services, String host, int port) {
         this.matchingUseCases = services.getMatchingUseCases();
         this.messagingUseCases = services.getMessagingUseCases();
         this.profileUseCases = services.getProfileUseCases();
@@ -193,6 +200,8 @@ public class RestApiServer {
         this.identityPolicy = new RestApiIdentityPolicy();
         this.requestGuards =
                 new RestApiRequestGuards(identityPolicy, DEFAULT_RATE_LIMIT_WINDOW, DEFAULT_RATE_LIMIT_REQUESTS);
+        this.host = normalizeHost(host);
+        this.restrictToLoopbackClients = isLoopbackHost(this.host);
         this.port = port;
     }
 
@@ -209,12 +218,14 @@ public class RestApiServer {
         registerRoutes();
         registerExceptionHandlers();
 
-        app.start(LOCALHOST_HOST, port);
-        if (logger.isWarnEnabled()) {
+        app.start(host, port);
+        if (restrictToLoopbackClients && logger.isWarnEnabled()) {
             logger.warn(
                     "REST API server started on localhost-only (http://{}:{}) for local unauthenticated use only",
-                    LOCALHOST_HOST,
+                    host,
                     app.port());
+        } else if (logger.isInfoEnabled()) {
+            logger.info("REST API server started on {}:{}", host, app.port());
         }
     }
 
@@ -1154,7 +1165,22 @@ public class RestApiServer {
     }
 
     private void enforceLocalhostOnly(Context ctx) {
+        if (!restrictToLoopbackClients) {
+            return;
+        }
         requestGuards.enforceLocalhostOnly(ctx);
+    }
+
+    private static String normalizeHost(String configuredHost) {
+        return configuredHost == null || configuredHost.isBlank() ? LOCALHOST_HOST : configuredHost.trim();
+    }
+
+    private static boolean isLoopbackHost(String configuredHost) {
+        try {
+            return InetAddress.getByName(configuredHost).isLoopbackAddress();
+        } catch (Exception _) {
+            return false;
+        }
     }
 
     private void ensureActiveCandidateBrowser(User user) {
@@ -1267,8 +1293,8 @@ public class RestApiServer {
     /** Main entry point for standalone REST API server. */
     public static void main(String[] args) {
         ServiceRegistry services = ApplicationStartup.initialize();
-        int port = args.length > 0 ? Integer.parseInt(args[0]) : DEFAULT_PORT;
-        RestApiServer server = new RestApiServer(services, port);
+        StartupOptions options = parseStartupOptions(args);
+        RestApiServer server = new RestApiServer(services, options.host(), options.port());
         server.start();
 
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
@@ -1277,5 +1303,31 @@ public class RestApiServer {
         }));
     }
 
+    private static StartupOptions parseStartupOptions(String[] args) {
+        String host = LOCALHOST_HOST;
+        int port = DEFAULT_PORT;
+        for (String arg : args) {
+            if (arg == null || arg.isBlank()) {
+                continue;
+            }
+            if (arg.startsWith("--host=")) {
+                host = arg.substring("--host=".length()).trim();
+                continue;
+            }
+            if (arg.startsWith("--port=")) {
+                port = Integer.parseInt(arg.substring("--port=".length()).trim());
+                continue;
+            }
+            if (arg.chars().allMatch(Character::isDigit)) {
+                port = Integer.parseInt(arg);
+                continue;
+            }
+            throw new IllegalArgumentException("Unknown REST API server argument: " + arg);
+        }
+        return new StartupOptions(normalizeHost(host), port);
+    }
+
     private record ResolvedProfileLocation(Double latitude, Double longitude) {}
+
+    private record StartupOptions(String host, int port) {}
 }

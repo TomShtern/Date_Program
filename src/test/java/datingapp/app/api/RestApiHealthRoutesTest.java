@@ -1,5 +1,6 @@
 package datingapp.app.api;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -137,5 +138,49 @@ class RestApiHealthRoutesTest {
         assertEquals(
                 "REST API is restricted to localhost requests",
                 thrown.getCause().getMessage());
+    }
+
+    @Test
+    @DisplayName("explicit LAN binding disables the localhost-only client guard")
+    void lanBindingDisablesLocalhostOnlyClientGuard() throws Exception {
+        server = new RestApiServer(services, "0.0.0.0", 0);
+
+        Method method = RestApiServer.class.getDeclaredMethod("enforceLocalhostOnly", Context.class);
+        method.setAccessible(true);
+
+        Context ctx = (Context) Proxy.newProxyInstance(
+                Context.class.getClassLoader(), new Class<?>[] {Context.class}, (proxy, invokedMethod, args) -> {
+                    if ("ip".equals(invokedMethod.getName())) {
+                        return "203.0.113.10";
+                    }
+                    Class<?> returnType = invokedMethod.getReturnType();
+                    if (returnType.equals(boolean.class)) {
+                        return false;
+                    }
+                    if (returnType.equals(byte.class)) {
+                        return (byte) 0;
+                    }
+                    if (returnType.equals(short.class)) {
+                        return (short) 0;
+                    }
+                    if (returnType.equals(char.class)) {
+                        return '\0';
+                    }
+                    if (returnType.equals(int.class)) {
+                        return 0;
+                    }
+                    if (returnType.equals(long.class)) {
+                        return 0L;
+                    }
+                    if (returnType.equals(float.class)) {
+                        return 0.0f;
+                    }
+                    if (returnType.equals(double.class)) {
+                        return 0.0d;
+                    }
+                    return null;
+                });
+
+        assertDoesNotThrow(() -> method.invoke(server, ctx));
     }
 }

@@ -71,6 +71,10 @@ public final class ProfileViewController extends BaseController implements Initi
         profilePhotoRequestId++;
         long requestId = profilePhotoRequestId;
         profileImageView.setImage(null);
+        if (photoUrl == null || photoUrl.isEmpty()) {
+            profileImageView.setImage(ImageCache.getImage(photoUrl, 360, 240));
+            return;
+        }
         ImageCache.getImageAsync(photoUrl, 360, 240, image -> {
             if (requestId != profilePhotoRequestId) {
                 return;

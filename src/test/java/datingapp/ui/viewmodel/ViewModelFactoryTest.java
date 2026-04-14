@@ -12,6 +12,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import datingapp.core.AppSession;
 import datingapp.core.ServiceRegistry;
 import datingapp.core.model.User;
+import datingapp.core.profile.GeocodingService;
 import datingapp.core.testutil.TestServiceRegistryBuilder;
 import datingapp.core.testutil.TestUserFactory;
 import datingapp.ui.screen.ChatController;
@@ -101,6 +102,14 @@ class ViewModelFactoryTest {
 
         assertNotNull(first);
         assertSame(first, second);
+    }
+
+    @Test
+    @DisplayName("getProfileViewModel reuses the geocoding service from ServiceRegistry")
+    void getProfileViewModelReusesServiceRegistryGeocodingService() {
+        GeocodingService geocodingService = services.getGeocodingService();
+
+        assertSame(geocodingService, factory.getProfileViewModel().getGeocodingService());
     }
 
     @Test

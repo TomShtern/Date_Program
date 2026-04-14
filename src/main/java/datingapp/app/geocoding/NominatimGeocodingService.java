@@ -2,6 +2,7 @@ package datingapp.app.geocoding;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import datingapp.core.AppClock;
 import datingapp.core.model.LocationModels.Precision;
 import datingapp.core.profile.GeocodingService;
 import java.io.IOException;
@@ -41,7 +42,7 @@ public final class NominatimGeocodingService implements GeocodingService {
                 HttpClient.newHttpClient(),
                 DEFAULT_BASE_URI,
                 DEFAULT_USER_AGENT,
-                System::currentTimeMillis,
+                () -> AppClock.now().toEpochMilli(),
                 waitMillis -> {
                     try {
                         Thread.sleep(waitMillis);

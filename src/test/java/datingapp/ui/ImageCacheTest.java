@@ -176,13 +176,13 @@ class ImageCacheTest {
             fxCall.get(1, TimeUnit.SECONDS);
 
             assertTrue(server.awaitRequestStarted(), "async load should reach the blocking image server");
-            assertTrue(callbackInvoked.getCount() == 1, "callback should not run before the image finishes loading");
+            assertEquals(1, callbackInvoked.getCount(), "callback should not run before the image finishes loading");
 
             server.releaseResponse();
 
             assertTrue(callbackInvoked.await(5, TimeUnit.SECONDS), "callback should run after the image loads");
             assertNotNull(loadedImage.get());
-            assertTrue(Boolean.TRUE.equals(callbackOnFxThread.get()), "callback should run on the FX thread");
+            assertTrue(callbackOnFxThread.get(), "callback should run on the FX thread");
         }
     }
 

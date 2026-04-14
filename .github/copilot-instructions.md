@@ -8,15 +8,13 @@
 - Palantir Java Format / Spotless
 - Java by Red Hat extension
 
-make sure to leverage the tools you have as an ai coding agent together with the IDE tools and also the tools we have here on this system.
+Make sure to leverage the tools you have as an ai coding agent together with the IDE tools and also the tools we have here on this system.
 Use PowerShell-friendly commands.
 
 Deploy multiple parallel subagents for different tasks when needed, and coordinate their work through a parent agent. Use the `agent` tool to invoke subagents with specific detailed and defined instructions/tasks and context. For example, you might have one subagent focused on code analysis using ast-grep, while another handles code edits or refactoring. The parent agent can manage the overall workflow, ensuring that each subagent has the information it needs to perform its task effectively while keeping the process organized and efficient.
 The goal is to have you, the parent agent, orchestrate the work of multiple specialized subagents to achieve complex tasks that require different types of expertise or operations, such as code analysis, refactoring, testing, and documentation. Each subagent can focus on its specific area while you coordinate their efforts to ensure a cohesive and efficient workflow.
 Dont forget to use the specialized agents when appropriate, such as the executionSubagent for executing shell commands, or the runSubagent command. For read-only codebase exploration, prefer a similar available agent such as `Explore` first, and `codebase-context-gatherer` second, instead of retrying a flaky helper path.
 - If one search/exploration helper path fails because of model or environment instability, switch immediately to a similar available agent instead of retrying the same failing path.
-
-   </system_tools>
 
 # 💻 SYSTEM_TOOL_INVENTORY
 
@@ -67,8 +65,6 @@ Dont forget to use the specialized agents when appropriate, such as the executio
 - **Java** (`java`) `JDK 25.0.2 & JavaFX 25.0.2` - Java Development Kit (OpenJDK LTS).
 - **Bun** (`bun`) `v1.3.12` - All-in-one JS runtime, bundler, and test runner.
 - **Maven** (`mvn`) `v3.9.14` - Java build and dependency management.
-
-      </system_tools>
 
 
    <code_guidelines>
@@ -153,7 +149,7 @@ applyTo: '*'
 
 # Java LSP Tools — Mandatory Initialization
 
-These tools return structured results in ~20–100 tokens vs ~500–3000 tokens from `grep_search`, with ZERO FALSE POSITIVIES.
+These tools return structured results in ~20–100 tokens vs ~500–3000 tokens from `grep_search`, with ZERO FALSE POSITIVES.
 
 ## Step 1: Load Tools (REQUIRED — do this FIRST)
 Call `tool_search_tool_regex` **twice** (max 5 per call):
@@ -204,9 +200,10 @@ Workflow: **findSymbol → getFileStructure → targeted tool → read_file (spe
 # GENERAL DEVELOPMENT OBSERVATIONS & DIRECTIONS
 
 ## Patterns, Pitfalls, and Practical Guidance Learned During Development:
+- If your terminal is stuck, abort and try again.
 - Read full files only for a small number of especially important relevant files when doing so is clearly beneficial.
 - Do not add append-only "Second Pass", "Corrections", or "Additions" sections to review, audit, or analysis documents. When new findings or corrections appear, revise the relevant existing section in place so the file remains a single coherent canonical document.
--When reviewing, before opening another review loop, first aggregate what else can be checked in that same pass: related blockers, related improvements, adjacent risks, and useful notes that can save time later.
+- When reviewing, before opening another review loop, first aggregate what else can be checked in that same pass: related blockers, related improvements, adjacent risks, and useful notes that can save time later.
 - Distinguish clearly between fixes and improvements. Fixes are critical blockers and should not be postponed. Improvements are optional(but must be mentioned). If only optional improvements remain, gather them all and present them together at the end instead of opening another review cycle for each one separately.
 - When Maven test selection uses a comma-separated `-Dtest=...,...` list, prefer:
 ```powershell

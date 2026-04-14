@@ -372,7 +372,6 @@ public class ChatViewModel extends BaseViewModel {
             resetVisibleChatState();
         }
         if (user == null) {
-            stopMessagesPolling();
             return;
         }
         refreshConversations();

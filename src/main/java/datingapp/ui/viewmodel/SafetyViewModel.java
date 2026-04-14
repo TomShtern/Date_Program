@@ -1,6 +1,7 @@
 package datingapp.ui.viewmodel;
 
 import datingapp.app.event.AppEvent;
+import datingapp.app.usecase.common.UseCaseError;
 import datingapp.app.usecase.common.UseCaseResult;
 import datingapp.app.usecase.common.UserContext;
 import datingapp.app.usecase.profile.ProfileMutationUseCases;
@@ -13,6 +14,7 @@ import datingapp.app.usecase.social.SocialUseCases;
 import datingapp.app.usecase.social.SocialUseCases.ListBlockedUsersQuery;
 import datingapp.app.usecase.social.SocialUseCases.RelationshipCommand;
 import datingapp.core.AppSession;
+import datingapp.core.RuntimeEnvironment;
 import datingapp.core.matching.TrustSafetyService;
 import datingapp.core.model.User;
 import datingapp.core.model.User.VerificationMethod;
@@ -39,6 +41,8 @@ public final class SafetyViewModel extends BaseViewModel {
 
     private static final String PROFILE_VERIFICATION_UNAVAILABLE = "Profile verification is unavailable right now.";
     private static final String ACCOUNT_DELETION_UNAVAILABLE = "Account deletion is unavailable right now.";
+    private static final String SHOW_VERIFICATION_CODE_PROPERTY = "datingapp.showVerificationCode";
+    private static final String SHOW_VERIFICATION_CODE_ENV = "DATING_APP_SHOW_VERIFICATION_CODE";
 
     private final SocialUseCases socialUseCases;
     private final VerificationUseCases verificationUseCases;
@@ -232,10 +236,14 @@ public final class SafetyViewModel extends BaseViewModel {
         VerificationMethod method = verificationMethod.get();
         String contact = verificationContact.get();
         asyncScope.runFireAndForget("start verification", () -> {
-            UseCaseResult<VerificationUseCases.StartVerificationResult> startResult =
-                    verificationUseCases.startVerification(
-                            new StartVerificationCommand(UserContext.ui(currentUser.getId()), method, contact));
-            asyncScope.dispatchToUi(() -> applyStartVerificationResult(startResult));
+            try {
+                UseCaseResult<VerificationUseCases.StartVerificationResult> startResult =
+                        verificationUseCases.startVerification(
+                                new StartVerificationCommand(UserContext.ui(currentUser.getId()), method, contact));
+                asyncScope.dispatchToUi(() -> applyStartVerificationResult(startResult));
+            } catch (RuntimeException exception) {
+                reportError("Could not start verification", exception);
+            }
         });
     }
 
@@ -255,10 +263,16 @@ public final class SafetyViewModel extends BaseViewModel {
 
         String code = verificationCode.get();
         asyncScope.runFireAndForget("confirm verification", () -> {
-            UseCaseResult<VerificationUseCases.ConfirmVerificationResult> confirmResult =
-                    verificationUseCases.confirmVerification(
-                            new ConfirmVerificationCommand(UserContext.ui(currentUser.getId()), code));
-            asyncScope.dispatchToUi(() -> applyConfirmVerificationResult(confirmResult));
+            try {
+                UseCaseResult<VerificationUseCases.ConfirmVerificationResult> confirmResult =
+                        verificationUseCases.confirmVerification(
+                                new ConfirmVerificationCommand(UserContext.ui(currentUser.getId()), code));
+                asyncScope.dispatchToUi(() -> applyConfirmVerificationResult(confirmResult));
+            } catch (RuntimeException throwable) {
+                UseCaseResult<VerificationUseCases.ConfirmVerificationResult> failureResult =
+                        internalFailureResult("Could not confirm verification", throwable);
+                asyncScope.dispatchToUi(() -> applyConfirmVerificationResult(failureResult));
+            }
         });
     }
 
@@ -278,9 +292,14 @@ public final class SafetyViewModel extends BaseViewModel {
             return;
         }
         asyncScope.runFireAndForget("delete account", () -> {
-            UseCaseResult<Void> result = mutationUseCases.deleteAccount(new DeleteAccountCommand(
-                    UserContext.ui(currentUser.getId()), AppEvent.DeletionReason.USER_REQUEST));
-            asyncScope.dispatchToUi(() -> applyDeleteAccountResult(result));
+            try {
+                UseCaseResult<Void> result = mutationUseCases.deleteAccount(new DeleteAccountCommand(
+                        UserContext.ui(currentUser.getId()), AppEvent.DeletionReason.USER_REQUEST));
+                asyncScope.dispatchToUi(() -> applyDeleteAccountResult(result));
+            } catch (RuntimeException throwable) {
+                UseCaseResult<Void> failureResult = internalFailureResult("Could not delete account", throwable);
+                asyncScope.dispatchToUi(() -> applyDeleteAccountResult(failureResult));
+            }
         });
     }
 
@@ -291,8 +310,12 @@ public final class SafetyViewModel extends BaseViewModel {
         }
         session.setCurrentUser(startResult.data().user());
         syncVerificationFieldsFromSession();
-        statusMessage.set("Verification code generated. Local/dev code: "
-                + startResult.data().generatedCode());
+        if (shouldShowVerificationCode()) {
+            statusMessage.set("Verification code generated. Local/dev code: "
+                    + startResult.data().generatedCode());
+            return;
+        }
+        statusMessage.set("Verification code generated. Use your configured verification channel to continue.");
     }
 
     private void applyConfirmVerificationResult(
@@ -363,6 +386,23 @@ public final class SafetyViewModel extends BaseViewModel {
         if (message != null && !message.isBlank()) {
             notifyError(message, null);
         }
+    }
+
+    private void reportError(String message, Throwable error) {
+        if (message != null && !message.isBlank()) {
+            notifyError(message, error);
+        }
+    }
+
+    private static <T> UseCaseResult<T> internalFailureResult(String action, Throwable throwable) {
+        String detail = throwable != null ? throwable.getMessage() : null;
+        String message = detail == null || detail.isBlank() ? action : action + ": " + detail;
+        return UseCaseResult.failure(UseCaseError.internal(message));
+    }
+
+    private static boolean shouldShowVerificationCode() {
+        String configuredValue = RuntimeEnvironment.lookup(SHOW_VERIFICATION_CODE_PROPERTY, SHOW_VERIFICATION_CODE_ENV);
+        return configuredValue != null && Boolean.parseBoolean(configuredValue);
     }
 
     private record UnblockResult(List<BlockedUserEntry> entries, String message) {}

@@ -128,17 +128,8 @@ public final class ImageCache {
             }
         }
 
-        CompletableFuture<Image> inFlight = IN_FLIGHT_LOADS.get(key);
-        if (inFlight != null) {
-            attachAsyncCallback(inFlight, width, height, callback);
-            return;
-        }
-
         try {
-            PRELOAD_EXECUTOR.execute(() -> {
-                Image image = getImage(path, width, height);
-                dispatchToFx(() -> callback.accept(image));
-            });
+            attachAsyncCallback(startAsyncLoad(key, path, width, height), width, height, callback);
         } catch (RejectedExecutionException _) {
             logDebug("Dropped async image request for {} because the queue is full", path);
             dispatchToFx(() -> callback.accept(getDefaultAvatar(width, height)));
@@ -217,6 +208,58 @@ public final class ImageCache {
 
     static CompletableFuture<Image> inFlightLoad(String key) {
         return IN_FLIGHT_LOADS.get(key);
+    }
+
+    private static CompletableFuture<Image> startAsyncLoad(String key, String path, double width, double height) {
+        CompletableFuture<Image> inFlight = IN_FLIGHT_LOADS.get(key);
+        if (inFlight != null) {
+            return inFlight;
+        }
+
+        CompletableFuture<Image> newLoad = new CompletableFuture<>();
+        CompletableFuture<Image> existing = IN_FLIGHT_LOADS.putIfAbsent(key, newLoad);
+        if (existing != null) {
+            return existing;
+        }
+
+        try {
+            PRELOAD_EXECUTOR.execute(() -> completeAsyncLoad(key, newLoad, path, width, height));
+            return newLoad;
+        } catch (RejectedExecutionException exception) {
+            IN_FLIGHT_LOADS.remove(key, newLoad);
+            throw exception;
+        }
+    }
+
+    private static void completeAsyncLoad(
+            String key, CompletableFuture<Image> loadFuture, String path, double width, double height) {
+        try {
+            loadFuture.complete(loadAndCacheImage(key, path, width, height));
+        } catch (Throwable throwable) { // NOPMD - must complete the shared future on every failure path
+            loadFuture.completeExceptionally(throwable);
+        } finally {
+            IN_FLIGHT_LOADS.remove(key, loadFuture);
+            IN_FLIGHT_PRELOADS.remove(key);
+        }
+    }
+
+    private static Image loadAndCacheImage(String key, String path, double width, double height) {
+        synchronized (CACHE) {
+            Image cached = CACHE.get(key);
+            if (cached != null) {
+                return cached;
+            }
+        }
+
+        Image loaded = loadImage(path, width, height);
+        synchronized (CACHE) {
+            Image cached = CACHE.get(key);
+            if (cached != null) {
+                return cached;
+            }
+            CACHE.put(key, loaded);
+            return loaded;
+        }
     }
 
     private static void attachAsyncCallback(
@@ -349,14 +392,7 @@ public final class ImageCache {
         }
 
         try {
-            PRELOAD_EXECUTOR.execute(() -> {
-                try {
-                    getImage(path, width, height);
-                    logDebug("Preloaded image: {}", path);
-                } finally {
-                    IN_FLIGHT_PRELOADS.remove(key);
-                }
-            });
+            startAsyncLoad(key, path, width, height).thenRun(() -> logDebug("Preloaded image: {}", path));
         } catch (RejectedExecutionException _) {
             IN_FLIGHT_PRELOADS.remove(key);
             logDebug("Dropped preload request for {} because the queue is full", path);

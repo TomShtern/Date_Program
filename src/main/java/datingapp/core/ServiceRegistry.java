@@ -1,6 +1,7 @@
 package datingapp.core;
 
 import datingapp.app.event.AppEventBus;
+import datingapp.app.geocoding.NominatimGeocodingService;
 import datingapp.app.usecase.dashboard.DashboardUseCases;
 import datingapp.app.usecase.matching.MatchingUseCases;
 import datingapp.app.usecase.messaging.MessagingUseCases;
@@ -22,6 +23,9 @@ import datingapp.core.matching.TrustSafetyService;
 import datingapp.core.matching.UndoService;
 import datingapp.core.metrics.AchievementService;
 import datingapp.core.metrics.ActivityMetricsService;
+import datingapp.core.profile.FallbackGeocodingService;
+import datingapp.core.profile.GeocodingService;
+import datingapp.core.profile.LocalGeocodingService;
 import datingapp.core.profile.LocationService;
 import datingapp.core.profile.ProfileService;
 import datingapp.core.profile.ValidationService;
@@ -61,6 +65,7 @@ public final class ServiceRegistry {
     private final ProfileService profileService;
     private final ValidationService validationService;
     private final LocationService locationService;
+    private final GeocodingService geocodingService;
     private final AchievementService achievementService;
     private final ProfileMutationUseCases profileMutationUseCases;
     private final ProfileInsightsUseCases profileInsightsUseCases;
@@ -113,6 +118,10 @@ public final class ServiceRegistry {
         this.locationService = builder.locationService != null
                 ? Objects.requireNonNull(builder.locationService, "locationService cannot be null")
                 : new LocationService(this.validationService);
+        this.geocodingService = builder.geocodingService != null
+                ? Objects.requireNonNull(builder.geocodingService, "geocodingService cannot be null")
+                : new FallbackGeocodingService(
+                        new LocalGeocodingService(this.locationService), new NominatimGeocodingService());
         this.achievementService =
                 Objects.requireNonNull(builder.achievementService, "achievementService cannot be null");
         this.eventBus = Objects.requireNonNull(builder.eventBus, "eventBus cannot be null");
@@ -191,6 +200,7 @@ public final class ServiceRegistry {
         private ProfileService profileService;
         private ValidationService validationService;
         private LocationService locationService;
+        private GeocodingService geocodingService;
         private AchievementService achievementService;
         private ProfileMutationUseCases profileMutationUseCases;
         private ProfileInsightsUseCases profileInsightsUseCases;
@@ -300,6 +310,11 @@ public final class ServiceRegistry {
 
         public Builder locationService(LocationService locationService) {
             this.locationService = locationService;
+            return this;
+        }
+
+        public Builder geocodingService(GeocodingService geocodingService) {
+            this.geocodingService = geocodingService;
             return this;
         }
 
@@ -431,6 +446,10 @@ public final class ServiceRegistry {
 
     public LocationService getLocationService() {
         return locationService;
+    }
+
+    public GeocodingService getGeocodingService() {
+        return geocodingService;
     }
 
     public AchievementService getAchievementService() {
