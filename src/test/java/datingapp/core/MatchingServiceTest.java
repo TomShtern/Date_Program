@@ -246,6 +246,40 @@ class MatchingServiceTest {
         }
 
         @Test
+        @DisplayName("duplicate like stays idempotent after the daily limit is exhausted")
+        void duplicateLikeStaysIdempotentAfterTheDailyLimitIsExhausted() {
+            RecommendationService limitedRecommendationService = new RecommendationService(
+                    oneLikePerDayLimitService(interactionStorage), noDailyPickService(), noStandoutService());
+            MatchingService limitedService = MatchingService.builder()
+                    .interactionStorage(interactionStorage)
+                    .trustSafetyStorage(trustSafetyStorage)
+                    .userStorage(userStorage)
+                    .undoService(new UndoService(interactionStorage, undoStorage, AppConfig.defaults()))
+                    .dailyService(limitedRecommendationService)
+                    .candidateFinder(candidateFinder)
+                    .build();
+
+            UUID alice = UUID.randomUUID();
+            UUID bob = UUID.randomUUID();
+
+            userStorage.save(activeUser(alice, "Alice"));
+            userStorage.save(activeUser(bob, "Bob"));
+
+            MatchingService.RecordLikeOutcome first =
+                    limitedService.recordLike(Like.create(alice, bob, Like.Direction.LIKE));
+            MatchingService.RecordLikeOutcome duplicate =
+                    limitedService.recordLike(Like.create(alice, bob, Like.Direction.LIKE));
+
+            assertTrue(first.persisted(), "First like should persist");
+            assertFalse(duplicate.persisted(), "Duplicate like should remain an idempotent no-op");
+            assertFalse(duplicate.rejected(), "Duplicate like should not become a daily-limit rejection");
+            assertEquals(
+                    first.like().orElseThrow().id(),
+                    duplicate.like().orElseThrow().id(),
+                    "Duplicate like should return the existing persisted like");
+        }
+
+        @Test
         @DisplayName("Match is not duplicated on repeated mutual likes")
         void matchNotDuplicated() {
             UUID alice = UUID.randomUUID();
@@ -415,6 +449,34 @@ class MatchingServiceTest {
             var undoAfterDuplicate =
                     undoStorage.findByUserId(activeUser.getId()).orElseThrow();
             assertEquals(firstLikeId, undoAfterDuplicate.like().id());
+        }
+
+        @Test
+        @DisplayName("duplicate processSwipe stays idempotent after the daily limit is exhausted")
+        void duplicateProcessSwipeStaysIdempotentAfterTheDailyLimitIsExhausted() {
+            RecommendationService limitedRecommendationService = new RecommendationService(
+                    oneLikePerDayLimitService(interactionStorage), noDailyPickService(), noStandoutService());
+            MatchingService limitedService = MatchingService.builder()
+                    .interactionStorage(interactionStorage)
+                    .trustSafetyStorage(trustSafetyStorage)
+                    .userStorage(userStorage)
+                    .undoService(new UndoService(interactionStorage, undoStorage, AppConfig.defaults()))
+                    .dailyService(limitedRecommendationService)
+                    .candidateFinder(candidateFinder)
+                    .build();
+
+            User activeUser = activeUser(UUID.randomUUID(), "Alice");
+            User candidate = activeUser(UUID.randomUUID(), "Bob");
+            userStorage.save(activeUser);
+            userStorage.save(candidate);
+
+            MatchingService.SwipeResult first = limitedService.processSwipe(activeUser, candidate, true);
+            MatchingService.SwipeResult duplicate = limitedService.processSwipe(activeUser, candidate, true);
+
+            assertTrue(first.success());
+            assertTrue(duplicate.success(), "Duplicate swipe should stay idempotent even after the limit is reached");
+            assertEquals("Already swiped.", duplicate.message());
+            assertEquals(1, interactionStorage.countByDirection(activeUser.getId(), Like.Direction.LIKE));
         }
 
         @Test

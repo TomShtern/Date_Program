@@ -96,6 +96,7 @@ import io.javalin.json.JavalinJackson;
 import java.net.InetAddress;
 import java.time.Duration;
 import java.time.ZoneId;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -151,6 +152,9 @@ public class RestApiServer {
     private static final String PATH_TARGET_ID = "targetId";
     private static final Duration DEFAULT_RATE_LIMIT_WINDOW = Duration.ofMinutes(1);
     private static final int DEFAULT_RATE_LIMIT_REQUESTS = 240;
+    private static final int DEFAULT_CORS_MAX_AGE_SECONDS = 3600;
+    private static final String ENV_REST_ALLOWED_ORIGINS = "DATING_APP_REST_ALLOWED_ORIGINS";
+    private static final String ENV_REST_SHARED_SECRET = "DATING_APP_REST_SHARED_SECRET";
     /**
      * Pagination query-parameter names shared by match and future list endpoints.
      */
@@ -170,7 +174,9 @@ public class RestApiServer {
     private final ZoneId userTimeZone;
     private final RestApiIdentityPolicy identityPolicy;
     private final RestApiRequestGuards requestGuards;
+    private final Set<String> allowedCorsOrigins;
     private final String host;
+    private final String lanSharedSecret;
     private final boolean restrictToLoopbackClients;
     private final int port;
     private Javalin app;
@@ -187,6 +193,11 @@ public class RestApiServer {
 
     /** Creates a server with the given services, bind host, and port. */
     public RestApiServer(ServiceRegistry services, String host, int port) {
+        this(services, host, port, null, Set.of());
+    }
+
+    RestApiServer(
+            ServiceRegistry services, String host, int port, String lanSharedSecret, Set<String> allowedCorsOrigins) {
         this.matchingUseCases = services.getMatchingUseCases();
         this.messagingUseCases = services.getMessagingUseCases();
         this.profileUseCases = services.getProfileUseCases();
@@ -198,20 +209,41 @@ public class RestApiServer {
         this.locationService = services.getLocationService();
         this.userTimeZone = services.getConfig().safety().userTimeZone();
         this.identityPolicy = new RestApiIdentityPolicy();
-        this.requestGuards =
-                new RestApiRequestGuards(identityPolicy, DEFAULT_RATE_LIMIT_WINDOW, DEFAULT_RATE_LIMIT_REQUESTS);
         this.host = normalizeHost(host);
         this.restrictToLoopbackClients = isLoopbackHost(this.host);
+        this.lanSharedSecret = normalizeSharedSecret(lanSharedSecret);
+        this.allowedCorsOrigins = normalizeAllowedCorsOrigins(allowedCorsOrigins);
+        this.requestGuards = new RestApiRequestGuards(
+                identityPolicy,
+                DEFAULT_RATE_LIMIT_WINDOW,
+                DEFAULT_RATE_LIMIT_REQUESTS,
+                this.restrictToLoopbackClients ? null : this.lanSharedSecret);
         this.port = port;
     }
 
     /** Starts the HTTP server. */
     public void start() {
+        validateTransportSecurity();
         ObjectMapper mapper = createObjectMapper();
 
         app = Javalin.create(config -> {
             config.jsonMapper(createJsonMapper(mapper));
             config.http.defaultContentType = "application/json";
+            if (!allowedCorsOrigins.isEmpty()) {
+                config.bundledPlugins.enableCors(cors -> cors.addRule(rule -> {
+                    if (allowedCorsOrigins.contains("*")) {
+                        rule.anyHost();
+                    } else {
+                        String[] origins = allowedCorsOrigins.toArray(String[]::new);
+                        rule.allowHost(origins[0], java.util.Arrays.copyOfRange(origins, 1, origins.length));
+                    }
+                    rule.path = "/*";
+                    rule.maxAge = DEFAULT_CORS_MAX_AGE_SECONDS;
+                    rule.exposeHeader("Retry-After");
+                    rule.exposeHeader("X-RateLimit-Limit");
+                    rule.exposeHeader("X-RateLimit-Used");
+                }));
+            }
         });
 
         registerRequestGuards();
@@ -225,7 +257,11 @@ public class RestApiServer {
                     host,
                     app.port());
         } else if (logger.isInfoEnabled()) {
-            logger.info("REST API server started on {}:{}", host, app.port());
+            logger.info(
+                    "REST API server started on {}:{} with LAN shared-secret protection{}",
+                    host,
+                    app.port(),
+                    allowedCorsOrigins.isEmpty() ? "" : " and CORS origins " + allowedCorsOrigins);
         }
     }
 
@@ -1171,8 +1207,45 @@ public class RestApiServer {
         requestGuards.enforceLocalhostOnly(ctx);
     }
 
+    private void validateTransportSecurity() {
+        if (!restrictToLoopbackClients && lanSharedSecret == null) {
+            throw new IllegalStateException(
+                    "Non-loopback REST binding requires a LAN shared secret via --shared-secret or "
+                            + ENV_REST_SHARED_SECRET);
+        }
+    }
+
     private static String normalizeHost(String configuredHost) {
         return configuredHost == null || configuredHost.isBlank() ? LOCALHOST_HOST : configuredHost.trim();
+    }
+
+    private static String normalizeSharedSecret(String rawSharedSecret) {
+        return rawSharedSecret == null || rawSharedSecret.isBlank() ? null : rawSharedSecret.trim();
+    }
+
+    private static Set<String> normalizeAllowedCorsOrigins(Set<String> allowedCorsOrigins) {
+        LinkedHashSet<String> normalizedOrigins = new LinkedHashSet<>();
+        if (allowedCorsOrigins != null) {
+            for (String origin : allowedCorsOrigins) {
+                if (origin != null && !origin.isBlank()) {
+                    normalizedOrigins.add(origin.trim());
+                }
+            }
+        }
+        return Set.copyOf(normalizedOrigins);
+    }
+
+    private static LinkedHashSet<String> parseAllowedOrigins(String rawOrigins) {
+        LinkedHashSet<String> origins = new LinkedHashSet<>();
+        if (rawOrigins == null || rawOrigins.isBlank()) {
+            return origins;
+        }
+        for (String origin : rawOrigins.split(",")) {
+            if (origin != null && !origin.isBlank()) {
+                origins.add(origin.trim());
+            }
+        }
+        return origins;
     }
 
     private static boolean isLoopbackHost(String configuredHost) {
@@ -1294,7 +1367,8 @@ public class RestApiServer {
     public static void main(String[] args) {
         ServiceRegistry services = ApplicationStartup.initialize();
         StartupOptions options = parseStartupOptions(args);
-        RestApiServer server = new RestApiServer(services, options.host(), options.port());
+        RestApiServer server = new RestApiServer(
+                services, options.host(), options.port(), options.lanSharedSecret(), options.allowedCorsOrigins());
         server.start();
 
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
@@ -1304,6 +1378,8 @@ public class RestApiServer {
     }
 
     private static StartupOptions parseStartupOptions(String[] args) {
+        String sharedSecret = normalizeSharedSecret(System.getenv(ENV_REST_SHARED_SECRET));
+        LinkedHashSet<String> allowedOrigins = parseAllowedOrigins(System.getenv(ENV_REST_ALLOWED_ORIGINS));
         String host = LOCALHOST_HOST;
         int port = DEFAULT_PORT;
         for (String arg : args) {
@@ -1318,16 +1394,24 @@ public class RestApiServer {
                 port = Integer.parseInt(arg.substring("--port=".length()).trim());
                 continue;
             }
+            if (arg.startsWith("--shared-secret=")) {
+                sharedSecret = normalizeSharedSecret(arg.substring("--shared-secret=".length()));
+                continue;
+            }
+            if (arg.startsWith("--allowed-origins=")) {
+                allowedOrigins.addAll(parseAllowedOrigins(arg.substring("--allowed-origins=".length())));
+                continue;
+            }
             if (arg.chars().allMatch(Character::isDigit)) {
                 port = Integer.parseInt(arg);
                 continue;
             }
             throw new IllegalArgumentException("Unknown REST API server argument: " + arg);
         }
-        return new StartupOptions(normalizeHost(host), port);
+        return new StartupOptions(normalizeHost(host), port, sharedSecret, Set.copyOf(allowedOrigins));
     }
 
     private record ResolvedProfileLocation(Double latitude, Double longitude) {}
 
-    private record StartupOptions(String host, int port) {}
+    private record StartupOptions(String host, int port, String lanSharedSecret, Set<String> allowedCorsOrigins) {}
 }

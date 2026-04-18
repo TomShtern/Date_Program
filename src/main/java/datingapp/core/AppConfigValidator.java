@@ -4,6 +4,7 @@ import datingapp.core.connection.ConnectionModels.Message;
 import datingapp.core.model.ProfileNote;
 import datingapp.core.model.User;
 import datingapp.core.profile.MatchPreferences.Interest;
+import datingapp.storage.DatabaseDialect;
 import java.time.ZoneId;
 import java.util.Locale;
 import java.util.Objects;
@@ -198,6 +199,12 @@ final class AppConfigValidator {
             String databaseDialect, String databaseUrl, String databaseUsername, int queryTimeoutSeconds) {
         requireSupportedDatabaseDialect(databaseDialect);
         requireJdbcUrl(databaseUrl);
+        DatabaseDialect configuredDialect = DatabaseDialect.fromConfig(databaseDialect, databaseUrl);
+        DatabaseDialect jdbcDialect = DatabaseDialect.fromJdbcUrl(databaseUrl);
+        if (configuredDialect != jdbcDialect) {
+            throw new IllegalArgumentException(
+                    "databaseDialect " + configuredDialect + " must match JDBC URL dialect " + jdbcDialect);
+        }
         requireNonBlank("databaseUsername", databaseUsername);
         requireInRange(queryTimeoutSeconds, 1, 600, "queryTimeoutSeconds");
     }

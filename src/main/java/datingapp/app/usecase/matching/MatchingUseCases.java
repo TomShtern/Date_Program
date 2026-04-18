@@ -469,17 +469,23 @@ public class MatchingUseCases {
                 || command.direction() == null) {
             return UseCaseResult.failure(UseCaseError.validation("Context, target user and direction are required"));
         }
+        boolean existingSwipe = interactionStorage
+                .getLike(command.context().userId(), command.targetUserId())
+                .isPresent();
         if (command.enforceDailyLimit()
+                && !existingSwipe
                 && command.direction() == Like.Direction.LIKE
                 && !dailyLimitService.canLike(command.context().userId())) {
             return UseCaseResult.failure(UseCaseError.conflict("Daily like limit reached"));
         }
         if (command.enforceDailyLimit()
+                && !existingSwipe
                 && command.direction() == Like.Direction.SUPER_LIKE
                 && !dailyLimitService.canSuperLike(command.context().userId())) {
             return UseCaseResult.failure(UseCaseError.conflict("Daily super-like limit reached"));
         }
         if (command.enforceDailyLimit()
+                && !existingSwipe
                 && command.direction() == Like.Direction.PASS
                 && !dailyLimitService.canPass(command.context().userId())) {
             return UseCaseResult.failure(UseCaseError.conflict("Daily pass limit reached"));

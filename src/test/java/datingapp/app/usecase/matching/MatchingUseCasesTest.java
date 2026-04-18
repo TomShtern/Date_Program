@@ -298,6 +298,43 @@ class MatchingUseCasesTest {
     }
 
     @Test
+    @DisplayName("duplicate recordLike stays idempotent after the use-case daily limit is exhausted")
+    void duplicateRecordLikeStaysIdempotentAfterTheUseCaseDailyLimitIsExhausted() {
+        DailyLimitService restrictiveDailyLimitService = oneLikePerDayLimitService(interactionStorage);
+        RecommendationService permissiveRecommendationService =
+                new RecommendationService(alwaysAllowDailyLimitService(), dailyPickService, standoutService);
+        MatchingService permissiveMatchingService = MatchingService.builder()
+                .interactionStorage(interactionStorage)
+                .trustSafetyStorage(trustSafetyStorage)
+                .userStorage(userStorage)
+                .undoService(undoService)
+                .dailyService(permissiveRecommendationService)
+                .candidateFinder(candidateFinder)
+                .build();
+        MatchingUseCases localUseCases = new MatchingUseCases(
+                candidateFinder,
+                permissiveMatchingService,
+                restrictiveDailyLimitService,
+                dailyPickService,
+                standoutService,
+                undoService,
+                interactionStorage,
+                userStorage,
+                matchQualityService,
+                new TestEventBus(),
+                permissiveRecommendationService);
+
+        var firstLike = localUseCases.recordLike(new MatchingUseCases.RecordLikeCommand(
+                UserContext.cli(currentUser.getId()), candidate.getId(), Like.Direction.LIKE, true));
+        var duplicateLike = localUseCases.recordLike(new MatchingUseCases.RecordLikeCommand(
+                UserContext.cli(currentUser.getId()), candidate.getId(), Like.Direction.LIKE, true));
+
+        assertTrue(firstLike.success());
+        assertTrue(duplicateLike.success(), "Duplicate like should not be blocked by the use-case precheck");
+        assertEquals(firstLike.data().like().id(), duplicateLike.data().like().id());
+    }
+
+    @Test
     @DisplayName("recordLike records swipe metrics exactly once when the metrics handler is registered")
     void recordLikeRecordsSwipeMetricsExactlyOnceWhenMetricsHandlerIsRegistered() {
         ActivityMetricsService metricsService = new ActivityMetricsService(
@@ -899,6 +936,35 @@ class MatchingUseCasesTest {
             @Override
             public DailyStatus getStatus(UUID userId) {
                 return new DailyStatus(0, 999, 0, 999, 0, 999, AppClock.today(), AppClock.now());
+            }
+
+            @Override
+            public Duration getTimeUntilReset() {
+                return Duration.ZERO;
+            }
+        };
+    }
+
+    private static DailyLimitService oneLikePerDayLimitService(TestStorages.Interactions interactionStorage) {
+        return new DailyLimitService() {
+            @Override
+            public boolean canLike(UUID userId) {
+                return interactionStorage.countByDirection(userId, Like.Direction.LIKE) < 1;
+            }
+
+            @Override
+            public boolean canSuperLike(UUID userId) {
+                return true;
+            }
+
+            @Override
+            public boolean canPass(UUID userId) {
+                return true;
+            }
+
+            @Override
+            public DailyStatus getStatus(UUID userId) {
+                return new DailyStatus(0, 1, 0, 999, 0, 999, AppClock.today(), AppClock.now());
             }
 
             @Override

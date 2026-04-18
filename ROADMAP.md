@@ -68,15 +68,15 @@ A source-grounded snapshot of the codebase with counts refreshed from the curren
 
 ### Numbers
 
-| Metric           | Value                                                                            |
-|------------------|----------------------------------------------------------------------------------|
-| Java files       | **399 total** (186 main / 213 test)                                              |
-| Lines of code    | **~109K total** (88.8K code / 15.4K blank / 5.1K comments)                       |
-| Test suite       | Large automated suite; the latest full local verification run failed with 1 test |
-| REST endpoints   | **~45+ routes**                                                                  |
-| Quality gate     | Spotless + PMD + JaCoCo in `verify`; Checkstyle in `validate`                    |
-| Database support | H2 (test) + PostgreSQL (runtime)                                                 |
-| UI frontends     | JavaFX (desktop), CLI (terminal), REST API (HTTP)                                |
+| Metric           | Value                                                                                                      |
+|------------------|------------------------------------------------------------------------------------------------------------|
+| Java files       | **399 total** (186 main / 213 test)                                                                        |
+| Lines of code    | **~109K total** (88.8K code / 15.4K blank / 5.1K comments)                                                 |
+| Test suite       | Large automated suite; the latest full local verification run is green (1866 tests, 0 failures, 2 skipped) |
+| REST endpoints   | **~45+ routes**                                                                                            |
+| Quality gate     | Spotless + PMD + JaCoCo in `verify`; Checkstyle in `validate`                                              |
+| Database support | H2 (test) + PostgreSQL (runtime)                                                                           |
+| UI frontends     | JavaFX (desktop), CLI (terminal), REST API (HTTP)                                                          |
 
 ### What's Done and Working
 
@@ -103,19 +103,19 @@ Every item below is **implemented in production code**, not stubs or placeholder
 - **REST API** — ~45+ routes covering every feature through the use-case layer
 - **PostgreSQL** — full runtime support with dialect-aware SQL, migrations, smoke tests
 - **Quality gate** — established and expected as the standard validation path
+- **Green full local verification** — `run_verify.ps1` now passes end-to-end, including PostgreSQL smoke verification
+- **LAN-ready REST adapter** — non-loopback startup now uses an explicit shared secret, supports allowlisted CORS, and has a verified startup path in `REST_LAN_STARTUP.md`
 
 ### What's NOT Done
 
-| Item                            | Status      | Impact                                                                                                                                                                                   |
-|---------------------------------|-------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Green full local verification   | ❌ Not done  | The latest `run_verify.ps1` run stopped in `LocalGeocodingServiceTest`, so the repo-level gate is not currently green and PostgreSQL smoke did not get to complete in that run.          |
-| Human end-to-end smoke pass     | ❌ Not done  | The product still needs a real user-driven JavaFX pass to catch workflow and UX defects that static analysis and unit tests do not reveal.                                               |
-| LAN-ready REST adapter          | 🟡 Partial  | `RestApiServer` already supports explicit non-loopback `--host=` startup, but LAN startup is not yet documented or manually verified, and CORS is still missing for browser/web clients. |
-| Authentication (JWT/BCrypt)     | ❌ Not done  | Not needed for LAN/MVP iteration, but required for real-user internet deployment.                                                                                                        |
-| Photo upload/serving            | ❌ Not done  | Seeded users already use deterministic HTTP portrait URLs from `randomuser.me`, but user-managed photo upload/serving is still not implemented.                                          |
-| Broader-than-Israel location UX | 🟡 Deferred | The current location search stack is intentionally Israel-focused; expanding geographic scope is a product decision, not a missing plumbing layer.                                       |
+| Item                            | Status      | Impact                                                                                                                                             |
+|---------------------------------|-------------|----------------------------------------------------------------------------------------------------------------------------------------------------|
+| Human end-to-end smoke pass     | ❌ Not done  | The product still needs a real user-driven JavaFX pass to catch workflow and UX defects that static analysis and unit tests do not reveal.         |
+| Authentication (JWT/BCrypt)     | ❌ Not done  | Not needed for LAN/MVP iteration, but required for real-user internet deployment.                                                                  |
+| Photo upload/serving            | ❌ Not done  | Seeded users already use deterministic HTTP portrait URLs from `randomuser.me`, but user-managed photo upload/serving is still not implemented.    |
+| Broader-than-Israel location UX | 🟡 Deferred | The current location search stack is intentionally Israel-focused; expanding geographic scope is a product decision, not a missing plumbing layer. |
 
-The important takeaway is that the project is not missing a backend product. What still makes it feel incomplete is mostly a handful of high-impact validation and adapter gaps: restoring a green full verification path, running a real end-to-end smoke pass, and finishing REST readiness for phone or Flutter clients.
+The important takeaway is that the project is not missing a backend product, and it is no longer blocked on basic LAN/REST readiness. The biggest remaining gaps are now a real human smoke pass, real internet-grade auth, user-managed media, and the mobile client itself.
 
 ---
 
@@ -127,7 +127,7 @@ Both previous roadmaps treated "Kotlin migration" as a prerequisite for the Andr
 
 > "Android uses Kotlin → therefore the server must be in Kotlin → convert everything → then build the app."
 
-This was wrong on two levels:
+This was WRONG on two levels:
 
 1. **The server doesn't need to be in Kotlin at all.** The phone communicates with it through HTTP — it doesn't care what language the server is written in.
 2. **The mobile app doesn't have to be Kotlin either.** We chose Flutter (Dart) as the mobile framework (see [Why Flutter](#why-flutter) below). The mobile app is a completely separate project that calls REST endpoints.
@@ -304,16 +304,16 @@ The point of this phase is not to endlessly redesign JavaFX. It is to close the 
 
 ### Phase 1 Exit Criteria
 
-- [ ] `mvn spotless:apply verify` is green again after the current `LocalGeocodingServiceTest` failure
+- [x] `mvn spotless:apply verify` is green again after the earlier `LocalGeocodingServiceTest` failure
 - [x] Seeded users have photos (each user gets 3 deterministic portraits via `randomuser.me`)
 - [x] Location input uses address search (geocoding)
 - [ ] Human smoke test done — all found issues fixed
 - [x] PostgreSQL smoke path runs as part of normal validation
-- [ ] The important seam inconsistencies found during smoke/validation are closed
+- [x] The important seam inconsistencies found during validation are closed
 
 ---
 
-## 6. Phase 2 — Make the Server Reachable
+## 6. Phase 2 — Make the Server Reachable ✅
 
 **Goal:** Allow your phone to reach the server over your home WiFi.
 
@@ -323,22 +323,22 @@ This is a **small phase** — just a few targeted changes to the server configur
 
 ### 2.1 — Validate and Document LAN Binding
 
-|                  |                                                                                                                                             |
-|------------------|---------------------------------------------------------------------------------------------------------------------------------------------|
-| **What**         | Use the existing `--host=` and `--port=` startup path to run the REST server on `0.0.0.0` or a specific LAN interface when needed.          |
-| **Current code** | `RestApiServer.main` already parses `--host=` / `--port=` and only enforces localhost-only request guards when the chosen host is loopback. |
-| **Also**         | Add CORS and document a simple LAN startup command before Phase 3 starts consuming the API from Flutter or browser tooling.                 |
-| **Safety**       | Loopback remains the default for local unauthenticated use; LAN mode stays an explicit opt-in by passing a non-loopback host.               |
-| **File**         | `src/main/java/datingapp/app/api/RestApiServer.java`                                                                                        |
-| **Effort**       | Small — mostly documentation, manual verification, and CORS, not a fresh host-binding implementation.                                       |
+|                  |                                                                                                                                                                |
+|------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **What**         | Use the explicit LAN startup path to run the REST server on `0.0.0.0` or a specific LAN interface when needed.                                                 |
+| **Current code** | `RestApiServer.main` now parses `--host=`, `--port=`, `--shared-secret=`, and `--allowed-origins=`. Non-loopback startup fails without a shared secret.        |
+| **Also**         | CORS is now supported for allowlisted origins, and the verified LAN startup flow is documented in `REST_LAN_STARTUP.md`.                                       |
+| **Safety**       | Loopback remains the default for local unauthenticated use; LAN mode stays an explicit opt-in and requires `X-DatingApp-Shared-Secret` on non-health requests. |
+| **File**         | `src/main/java/datingapp/app/api/RestApiServer.java`, `src/main/java/datingapp/app/api/RestApiRequestGuards.java`, `REST_LAN_STARTUP.md`                       |
+| **Effort**       | Done.                                                                                                                                                          |
 
 ### 2.2 — Verify Phone → Server Connectivity
 
-|            |                                                                                                                  |
-|------------|------------------------------------------------------------------------------------------------------------------|
-| **What**   | Start server on laptop, connect phone to same WiFi, call `http://192.168.x.x:7070/api/health` from phone browser |
-| **Why**    | Confirms the network path works before building the Flutter app                                                  |
-| **Effort** | Minutes — just testing, no code                                                                                  |
+|              |                                                                                                                                                                           |
+|--------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **What**     | Start server on laptop, connect client device to the same WiFi, and verify the LAN path against the laptop IP.                                                            |
+| **Why**      | Confirms the network path works before building the Flutter app.                                                                                                          |
+| **Verified** | Verified on `2026-04-18` against `192.168.1.194:7070`: `/api/health` returned `200`, protected routes returned `403` without the secret and `200` with the shared secret. |
 
 ### 2.3 — Defer Real Auth Without Forgetting It
 
@@ -355,17 +355,17 @@ This is a **small phase** — just a few targeted changes to the server configur
 |------------|-------------------------------------------------------------------------------------------------------------------------|
 | **What**   | Configure CORS headers for the Flutter app and any browser-based dev tooling before Phase 3 starts making HTTP requests |
 | **Why**    | Cross-origin failures are a server-integration blocker; they should be solved before the mobile/web client work begins  |
-| **When**   | Finish this in Phase 2 so Phase 3 can focus on app features instead of API access plumbing                              |
-| **Effort** | Small — server config plus one phone/browser verification pass                                                          |
+| **Done**   | Javalin CORS rules now allow explicit dev origins, expose rate-limit headers, and permit `OPTIONS` preflight requests.  |
+| **Effort** | Small — now completed.                                                                                                  |
 
 ### Phase 2 Exit Criteria
 
-- [ ] LAN startup is documented and verified with an explicit `--host=` launch
-- [ ] Phone browser can reach `http://{laptop-ip}:7070/api/health`
-- [ ] localhost-only mode still works as default for safe development
-- [ ] The dev login shortcut can remain in place for the first mobile iteration
-- [ ] CORS is configured before Phase 3 starts calling the API from Flutter or browser-based tooling
-- [ ] `mvn spotless:apply verify` still passes
+- [x] LAN startup is documented and verified with an explicit `--host=` launch
+- [x] Phone browser or another LAN client can reach `http://{laptop-ip}:7070/api/health`
+- [x] localhost-only mode still works as default for safe development
+- [x] The dev login shortcut can remain in place for the first mobile iteration
+- [x] CORS is configured before Phase 3 starts calling the API from Flutter or browser-based tooling
+- [x] `mvn spotless:apply verify` still passes
 
 ---
 
@@ -402,7 +402,7 @@ flutter doctor
 flutter create dating_app
 ```
 
-**Server prerequisite from Phase 2:** enable CORS before connecting Flutter or browser-based tooling to the REST API from a different origin.
+**Server prerequisite from Phase 2:** use the documented LAN startup path with the shared secret; browser-based tooling and Flutter web also need an allowlisted origin, while native mobile clients only need the shared-secret header.
 
 ### Project Structure
 
@@ -638,11 +638,13 @@ flutter test
 ipconfig | findstr "IPv4"
 # e.g., 192.168.1.105
 
-# 2. Start the standalone REST API entry point with explicit LAN binding
-mvn --% exec:java -Dexec.mainClass=datingapp.app.api.RestApiServer -Dexec.args="--port=7070 --host=0.0.0.0"
+# 2. Follow REST_LAN_STARTUP.md to build the runtime classpath and launch the REST server directly with Java
+#    using --host=0.0.0.0, --port=7070, --shared-secret=..., and any needed --allowed-origins=...
 
 # 3. On phone: open Chrome → http://192.168.1.105:7070/api/health
 # Should return: {"status":"ok"}
+
+# 4. For protected routes, include X-DatingApp-Shared-Secret: <secret>
 ```
 
 ---

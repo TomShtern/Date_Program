@@ -15,11 +15,11 @@ final class RestRouteSupport {
 
     void registerRoutes() {
         // ────────────────────────────────────────────────────────────────────
-        // AUTHENTICATION NOTE: This REST API is intentionally unauthenticated.
-        // It is designed for local IPC use only (CLI tools, local admin scripts).
-        // Do NOT expose these endpoints over a public network without adding
-        // authentication middleware (e.g., app.before() with a shared secret).
-        // Mutating routes require X-User-Id; selected read routes may remain anonymous.
+        // TRANSPORT NOTE: Loopback mode remains intentionally unauthenticated for
+        // local IPC use. Non-loopback/LAN mode now requires the configured shared
+        // secret header, and browser clients additionally rely on explicit CORS
+        // allowlisting. Mutating routes still require X-User-Id; selected read
+        // routes may remain anonymous after the transport guard passes.
         // ────────────────────────────────────────────────────────────────────
         registerHealthRoutes();
         registerLocationRoutes();

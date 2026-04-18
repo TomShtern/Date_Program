@@ -305,6 +305,19 @@ class AppConfigValidatorTest {
     }
 
     @Test
+    @DisplayName("validateStorage rejects a databaseDialect that does not match the JDBC URL")
+    void validateStorageRejectsMismatchedDatabaseDialectAndJdbcUrl() {
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> AppConfigValidator.validateStorage(
+                        "POSTGRESQL", "jdbc:h2:./data/dating;MODE=PostgreSQL", "sa", 30));
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> AppConfigValidator.validateStorage(
+                        "H2", "jdbc:postgresql://localhost:5432/datingapp", "datingapp", 30));
+    }
+
+    @Test
     @DisplayName("validateStorage rejects blank database username")
     void validateStorageRejectsBlankDatabaseUsername() {
         assertThrows(

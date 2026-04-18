@@ -56,6 +56,16 @@ class LocationServiceTest {
     }
 
     @Test
+    @DisplayName("popular cities preserve the curated order within the same priority tier")
+    void popularCitiesPreserveCuratedOrderWithinTheSamePriorityTier() {
+        List<City> results = locationService.getPopularCities("IL", 3);
+
+        assertEquals(
+                List.of("Tel Aviv", "Jerusalem", "Haifa"),
+                results.stream().map(City::name).toList());
+    }
+
+    @Test
     @DisplayName("supported zip resolves to a precise location")
     void supportedZipResolvesToPreciseLocation() {
         LocationService.ZipLookupResult result = locationService.lookupZip("IL", "6701101");

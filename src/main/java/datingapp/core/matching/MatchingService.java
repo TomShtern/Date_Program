@@ -175,6 +175,9 @@ public final class MatchingService {
         if (eligibilityError.isPresent()) {
             return eligibilityError;
         }
+        if (interactionStorage.getLike(like.whoLikes(), like.whoGotLiked()).isPresent()) {
+            return Optional.empty();
+        }
         return switch (like.direction()) {
             case LIKE ->
                 dailyService.canLike(like.whoLikes()) ? Optional.empty() : Optional.of("Daily like limit reached.");
@@ -274,6 +277,10 @@ public final class MatchingService {
                 validatePersistedSwipeEligibility(currentUser.getId(), candidate.getId());
         if (persistedEligibilityError.isPresent()) {
             return SwipeResult.configError(persistedEligibilityError.orElseThrow());
+        }
+
+        if (interactionStorage.getLike(currentUser.getId(), candidate.getId()).isPresent()) {
+            return SwipeResult.alreadySwiped();
         }
 
         if (superLike && !dailyService.canSuperLike(currentUser.getId())) {

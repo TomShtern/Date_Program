@@ -18,6 +18,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.util.Set;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -182,5 +183,48 @@ class RestApiHealthRoutesTest {
                 });
 
         assertDoesNotThrow(() -> method.invoke(server, ctx));
+    }
+
+    @Test
+    @DisplayName("LAN binding fails fast without a shared secret")
+    void lanBindingFailsFastWithoutSharedSecret() {
+        server = new RestApiServer(services, "0.0.0.0", 0);
+
+        IllegalStateException exception = assertThrows(IllegalStateException.class, server::start);
+
+        assertEquals(
+                "Non-loopback REST binding requires a LAN shared secret via --shared-secret or DATING_APP_REST_SHARED_SECRET",
+                exception.getMessage());
+    }
+
+    @Test
+    @DisplayName("configured CORS origins respond to preflight requests")
+    void configuredCorsOriginsRespondToPreflightRequests() throws Exception {
+        server = new RestApiServer(services, "127.0.0.1", 0, null, Set.of("http://localhost:3000"));
+        server.start();
+
+        int port = server.getApp().port();
+        HttpResponse<String> response = HttpClient.newHttpClient()
+                .send(
+                        HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/health"))
+                                .method("OPTIONS", HttpRequest.BodyPublishers.noBody())
+                                .header("Origin", "http://localhost:3000")
+                                .header("Access-Control-Request-Method", "GET")
+                                .header(
+                                        "Access-Control-Request-Headers",
+                                        "Content-Type, X-User-Id, X-DatingApp-Shared-Secret")
+                                .build(),
+                        HttpResponse.BodyHandlers.ofString());
+
+        assertTrue(response.statusCode() == 200 || response.statusCode() == 204);
+        assertEquals(
+                "http://localhost:3000",
+                response.headers().firstValue("Access-Control-Allow-Origin").orElseThrow());
+        String allowedHeaders = response.headers()
+                .firstValue("Access-Control-Allow-Headers")
+                .orElse("")
+                .toLowerCase();
+        assertTrue(allowedHeaders.contains("x-user-id"));
+        assertTrue(allowedHeaders.contains("x-datingapp-shared-secret"));
     }
 }

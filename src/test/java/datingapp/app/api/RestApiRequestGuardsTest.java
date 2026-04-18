@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 class RestApiRequestGuardsTest {
 
     private static final String HEALTH_PATH = "/api/health";
+    private static final String LAN_SHARED_SECRET_HEADER = "X-DatingApp-Shared-Secret";
     private static final String USERS_PATH = "/api/users/abc";
     private static final String LOOPBACK_IP = "127.0.0.1";
 
@@ -63,6 +64,46 @@ class RestApiRequestGuardsTest {
         assertEquals(2, exception.status().limit());
         assertEquals(3, exception.status().used());
         assertTrue(exception.status().retryAfterSeconds() >= 1);
+    }
+
+    @Test
+    @DisplayName("LAN mode requires the configured shared secret for non-health requests")
+    void lanModeRequiresTheConfiguredSharedSecretForNonHealthRequests() {
+        RestApiRequestGuards guards = new RestApiRequestGuards(
+                new RestApiIdentityPolicy(), Duration.ofMinutes(1), 5, "dev-secret", System::nanoTime);
+
+        assertDoesNotThrow(
+                () -> guards.enforceLanSharedSecret(context(HEALTH_PATH, "GET", "203.0.113.10", Map.of(), Map.of())));
+        assertDoesNotThrow(() -> guards.enforceLanSharedSecret(context(
+                USERS_PATH,
+                "OPTIONS",
+                "203.0.113.10",
+                Map.of("Origin", "http://localhost:3000", "Access-Control-Request-Method", "GET"),
+                Map.of())));
+
+        RestApiRequestGuards.ApiForbiddenException exception = assertThrows(
+                RestApiRequestGuards.ApiForbiddenException.class,
+                () -> guards.enforceLanSharedSecret(context(USERS_PATH, "GET", "203.0.113.10", Map.of(), Map.of())));
+        assertEquals("Missing or invalid LAN shared secret", exception.getMessage());
+
+        assertDoesNotThrow(() -> guards.enforceLanSharedSecret(
+                context(USERS_PATH, "GET", "203.0.113.10", Map.of(LAN_SHARED_SECRET_HEADER, "dev-secret"), Map.of())));
+    }
+
+    @Test
+    @DisplayName("rate limiting skips CORS preflight requests")
+    void rateLimitingSkipsCorsPreflightRequests() {
+        RestApiRequestGuards guards = new RestApiRequestGuards(new RestApiIdentityPolicy(), Duration.ofMinutes(1), 1);
+        Context preflight = context(
+                USERS_PATH,
+                "OPTIONS",
+                LOOPBACK_IP,
+                Map.of("Origin", "http://localhost:3000", "Access-Control-Request-Method", "GET"),
+                Map.of());
+
+        assertDoesNotThrow(() -> guards.enforceRateLimit(preflight));
+        assertDoesNotThrow(() -> guards.enforceRateLimit(preflight));
+        assertDoesNotThrow(() -> guards.enforceRateLimit(preflight));
     }
 
     @Test

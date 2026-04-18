@@ -187,7 +187,7 @@ nav.initialize(primaryStage);
 
 - `AGENTS.md` - development standards
 - `CLAUDE.md` - coding and architecture guardrails
-- `.github/copilot-instructions.md` - Copilot repository guidance
+- `.github/copilot-instructions.md` - Copilot repository guidance (most up to date)
 - `architecture.md` - detailed architecture overview
 
 ## Agent Changelog (append-only)

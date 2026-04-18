@@ -688,16 +688,14 @@ That is the corrected basis for the top-line savings claims. Category **D-F** it
 
 | Priority | Phase                              | Impact | Risk   | Effort | Net LOC Savings |
 |----------|------------------------------------|--------|--------|--------|-----------------|
-| **P0**   | Phase 1: Dead Code                 | High   | None   | 30min  | ~250            |
-| **P1**   | Phase 2: Deduplication             | High   | Low    | 1hr    | ~200            |
+| **P0**   | Phase 1: Dead Code                 | High   | None   | 30min  | ~231            |
+| **P1**   | Phase 2: Deduplication             | High   | Low    | 1hr    | ~163            |
 | **P2**   | Phase 4: Use-Case Pattern          | High   | Medium | 2-3hr  | ~270            |
-| **P3**   | Phase 3: ViewModel Cleanup         | Medium | Low    | 1.5hr  | ~120            |
-| **P4**   | Phase 5: Core Consolidation        | Medium | Low    | 1hr    | ~80             |
-| **P5**   | Phase 6: Controller Simplification | Medium | Low    | 1hr    | ~80             |
+| **P3**   | Phase 3: ViewModel Cleanup         | Medium | Low    | 1.5hr  | ~88             |
+| **P4**   | Phase 5: Core Consolidation        | Medium | Low    | 1hr    | ~56             |
+| **P5**   | Phase 6: Controller Simplification | Medium | Low    | 1hr    | ~70             |
 | **P6**   | Phase 7: Class Inlining            | Low    | Low    | 45min  | ~200 (5 files)  |
 | **P7**   | Phase 8: Complex Rewrites          | Low    | Medium | 1hr    | ~40             |
-
----
 
 ## Part 5: Expected Outcomes
 

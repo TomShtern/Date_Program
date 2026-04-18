@@ -2,6 +2,7 @@ package datingapp.app.api;
 
 import io.javalin.Javalin;
 import io.javalin.http.Context;
+import io.javalin.http.HandlerType;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.time.Duration;
@@ -11,19 +12,37 @@ import java.util.function.LongSupplier;
 
 final class RestApiRequestGuards {
 
+    static final String HEADER_LAN_SHARED_SECRET = "X-DatingApp-Shared-Secret";
     private static final String HEALTH_ROUTE = "/api/health";
     private static final String LOCALHOST_ONLY_MESSAGE = "REST API is restricted to localhost requests";
+    private static final String INVALID_LAN_SHARED_SECRET_MESSAGE = "Missing or invalid LAN shared secret";
     private final RestApiIdentityPolicy identityPolicy;
     private final LocalRateLimiter rateLimiter;
+    private final String lanSharedSecret;
 
     RestApiRequestGuards(RestApiIdentityPolicy identityPolicy, Duration window, int maxRequests) {
-        this(identityPolicy, window, maxRequests, System::nanoTime);
+        this(identityPolicy, window, maxRequests, null, System::nanoTime);
     }
 
     RestApiRequestGuards(
             RestApiIdentityPolicy identityPolicy, Duration window, int maxRequests, LongSupplier monotonicTicker) {
+        this(identityPolicy, window, maxRequests, null, monotonicTicker);
+    }
+
+    RestApiRequestGuards(
+            RestApiIdentityPolicy identityPolicy, Duration window, int maxRequests, String lanSharedSecret) {
+        this(identityPolicy, window, maxRequests, lanSharedSecret, System::nanoTime);
+    }
+
+    RestApiRequestGuards(
+            RestApiIdentityPolicy identityPolicy,
+            Duration window,
+            int maxRequests,
+            String lanSharedSecret,
+            LongSupplier monotonicTicker) {
         this.identityPolicy = identityPolicy;
         this.rateLimiter = new LocalRateLimiter(window, maxRequests, monotonicTicker);
+        this.lanSharedSecret = normalizeSharedSecret(lanSharedSecret);
     }
 
     void registerRequestGuards(Javalin app, Consumer<Context> localhostOnlyGuard) {
@@ -32,6 +51,7 @@ final class RestApiRequestGuards {
                 return;
             }
             localhostOnlyGuard.accept(ctx);
+            enforceLanSharedSecret(ctx);
             enforceRateLimit(ctx);
             enforceMutatingRouteIdentity(ctx);
             identityPolicy.enforceScopedIdentity(ctx);
@@ -45,8 +65,24 @@ final class RestApiRequestGuards {
         throw new ApiForbiddenException(LOCALHOST_ONLY_MESSAGE);
     }
 
+    void enforceLanSharedSecret(Context ctx) {
+        if (lanSharedSecret == null || HEALTH_ROUTE.equals(ctx.path()) || ctx.method() == HandlerType.OPTIONS) {
+            return;
+        }
+        String providedSecret = ctx.header(HEADER_LAN_SHARED_SECRET);
+        if (providedSecret == null || !constantTimeEquals(lanSharedSecret, providedSecret)) {
+            throw new ApiForbiddenException(INVALID_LAN_SHARED_SECRET_MESSAGE);
+        }
+    }
+
+    private static boolean constantTimeEquals(String expected, String provided) {
+        byte[] expectedBytes = expected.getBytes(StandardCharsets.UTF_8);
+        byte[] providedBytes = provided.getBytes(StandardCharsets.UTF_8);
+        return MessageDigest.isEqual(expectedBytes, providedBytes);
+    }
+
     void enforceRateLimit(Context ctx) {
-        if (HEALTH_ROUTE.equals(ctx.path())) {
+        if (HEALTH_ROUTE.equals(ctx.path()) || ctx.method() == HandlerType.OPTIONS) {
             return;
         }
         String key = ctx.ip() + '|' + ctx.method();
@@ -77,6 +113,10 @@ final class RestApiRequestGuards {
         } catch (UnknownHostException _) {
             return false;
         }
+    }
+
+    private static String normalizeSharedSecret(String lanSharedSecret) {
+        return lanSharedSecret == null || lanSharedSecret.isBlank() ? null : lanSharedSecret.trim();
     }
 
     private static final class LocalRateLimiter {
