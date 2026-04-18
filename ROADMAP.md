@@ -1,8 +1,9 @@
 # Dating App — Roadmap V2
 
 > **Created:** 2026-04-13
-> **Role:** Intended to be the definitive roadmap moving forward.
-> **Historical references:** `ROADMAP.md` and `2026-03-29-dating-app-roadmap-design.md` remain as historical reference until archived.
+> **Updated against source:** 2026-04-18
+> **Role:** Definitive roadmap moving forward.
+> **Historical references:** Older roadmap variants are historical only and may remain under `docs/archive/`.
 > **Source of truth:** Code only (`src/main/java`, `src/test/java`, `pom.xml`).
 
 ---
@@ -36,7 +37,7 @@ The mobile app is a **completely separate project** — a new folder, new build 
 │  YOUR LAPTOP (SERVER)            │       │  YOUR PHONE (CLIENT)             │
 │                                  │       │                                  │
 │  Stays in Java. Forever.         │  HTTP │  New Flutter project.            │
-│  ~390 Java files.                │◄─────►│  ~50 Dart files.                 │
+│  ~400 Java files.                │◄─────►│  ~50 Dart files.                 │
 │  Maven build.                    │ JSON  │  Flutter/Dart build.             │
 │  Large automated test suite.     │       │  Zero shared code.               │
 │  PostgreSQL database.            │       │  Calls REST endpoints.           │
@@ -52,7 +53,7 @@ The server is the kitchen. The mobile app is a drive-through window. Same kitche
 
 | Old plan                                                           | New plan                                                                |
 |--------------------------------------------------------------------|-------------------------------------------------------------------------|
-| Phase 3: Convert ~390 Java files to Kotlin (~months of work)       | **Skip entirely**                                                       |
+| Phase 3: Convert ~400 Java files to Kotlin (~months of work)       | **Skip entirely**                                                       |
 | Phase 4: Build Android app in Kotlin (blocked by server migration) | **Build mobile app in Flutter** — starts immediately, no server changes |
 | iOS support requires a separate Swift project                      | **iOS included for free** — same Flutter codebase                       |
 | Total: 4–5 phases before phone app                                 | Total: 2–3 phases before phone app                                      |
@@ -63,19 +64,19 @@ The server is the kitchen. The mobile app is a drive-through window. Same kitche
 
 ## 2. What We Actually Have
 
-A source-grounded snapshot of the codebase with counts refreshed from the current workspace on 2026-04-13.
+A source-grounded snapshot of the codebase with counts refreshed from the current workspace on 2026-04-18.
 
 ### Numbers
 
-| Metric           | Value                                                                           |
-|------------------|---------------------------------------------------------------------------------|
-| Java files       | **390 total** (182 main / 208 test)                                             |
-| Lines of code    | **~109K total** (88.8K code / 15.4K blank / 5.1K comments)                      |
-| Test suite       | Large automated suite; the roadmap still targets a clean full verification path |
-| REST endpoints   | **~45+ routes**                                                                 |
-| Quality gate     | Spotless + PMD + JaCoCo in `verify`; Checkstyle in `validate`                   |
-| Database support | H2 (test) + PostgreSQL (runtime)                                                |
-| UI frontends     | JavaFX (desktop), CLI (terminal), REST API (HTTP)                               |
+| Metric           | Value                                                                            |
+|------------------|----------------------------------------------------------------------------------|
+| Java files       | **399 total** (186 main / 213 test)                                              |
+| Lines of code    | **~109K total** (88.8K code / 15.4K blank / 5.1K comments)                       |
+| Test suite       | Large automated suite; the latest full local verification run failed with 1 test |
+| REST endpoints   | **~45+ routes**                                                                  |
+| Quality gate     | Spotless + PMD + JaCoCo in `verify`; Checkstyle in `validate`                    |
+| Database support | H2 (test) + PostgreSQL (runtime)                                                 |
+| UI frontends     | JavaFX (desktop), CLI (terminal), REST API (HTTP)                                |
 
 ### What's Done and Working
 
@@ -98,20 +99,23 @@ Every item below is **implemented in production code**, not stubs or placeholder
 - **Stats & metrics** — swipe counts, like ratio, match rate, reciprocity, selectiveness
 - **Notifications** — match/message/transition notifications, polling delivery
 - **Profile notes** — private notes on other users
+- **Location search and geocoding** — local-first city search, ZIP handling, and Nominatim-backed address lookup wired into the profile flow
 - **REST API** — ~45+ routes covering every feature through the use-case layer
 - **PostgreSQL** — full runtime support with dialect-aware SQL, migrations, smoke tests
 - **Quality gate** — established and expected as the standard validation path
 
 ### What's NOT Done
 
-| Item                          | Status     | Impact                                                                                                                                                                                |
-|-------------------------------|------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Geocoding (address → lat/lon) | ❌ Not done | Users must type raw coordinates — nobody does this                                                                                                                                    |
-| Server accessible from LAN    | ❌ Not done | Currently binds to `127.0.0.1` (localhost-only)                                                                                                                                       |
-| Authentication (JWT/BCrypt)   | ❌ Not done | Not needed for LAN/MVP iteration, but required for real-user internet deployment                                                                                                      |
-| Photo upload/serving          | ❌ Not done | Seeded users already use deterministic HTTP portrait URLs from `randomuser.me`, but user-managed photo upload/serving is still not implemented (see the seeded-user note in Phase 1). |
+| Item                            | Status      | Impact                                                                                                                                                                                   |
+|---------------------------------|-------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Green full local verification   | ❌ Not done  | The latest `run_verify.ps1` run stopped in `LocalGeocodingServiceTest`, so the repo-level gate is not currently green and PostgreSQL smoke did not get to complete in that run.          |
+| Human end-to-end smoke pass     | ❌ Not done  | The product still needs a real user-driven JavaFX pass to catch workflow and UX defects that static analysis and unit tests do not reveal.                                               |
+| LAN-ready REST adapter          | 🟡 Partial  | `RestApiServer` already supports explicit non-loopback `--host=` startup, but LAN startup is not yet documented or manually verified, and CORS is still missing for browser/web clients. |
+| Authentication (JWT/BCrypt)     | ❌ Not done  | Not needed for LAN/MVP iteration, but required for real-user internet deployment.                                                                                                        |
+| Photo upload/serving            | ❌ Not done  | Seeded users already use deterministic HTTP portrait URLs from `randomuser.me`, but user-managed photo upload/serving is still not implemented.                                          |
+| Broader-than-Israel location UX | 🟡 Deferred | The current location search stack is intentionally Israel-focused; expanding geographic scope is a product decision, not a missing plumbing layer.                                       |
 
-The important takeaway is that the project is not missing a backend product. What still makes it feel incomplete is mostly a handful of high-impact experience and validation gaps: usable location entry, and a real end-to-end smoke pass.
+The important takeaway is that the project is not missing a backend product. What still makes it feel incomplete is mostly a handful of high-impact validation and adapter gaps: restoring a green full verification path, running a real end-to-end smoke pass, and finishing REST readiness for phone or Flutter clients.
 
 ---
 
@@ -130,7 +134,7 @@ This was wrong on two levels:
 
 |             | Rewriting the server to Kotlin                 | Building a new mobile app                 |
 |-------------|------------------------------------------------|-------------------------------------------|
-| **What**    | Rewrite ~390 existing Java files in Kotlin     | Write ~50 new files in a new project      |
+| **What**    | Rewrite ~400 existing Java files in Kotlin     | Write ~50 new files in a new project      |
 | **Needed?** | **No** — the phone never runs server code      | **Yes** — but in Dart/Flutter, not Kotlin |
 | **Scope**   | Months of mechanical conversion                | Weeks of new UI code                      |
 | **Risk**    | High — every changed file is a regression risk | None — nothing in the server changes      |
@@ -140,7 +144,7 @@ The server can stay Java forever. The mobile app uses Flutter/Dart because it of
 ### The cost of the misunderstanding
 
 If we had followed the old plan:
-- **Months** converting ~390 Java files to Kotlin — mechanical work with zero new functionality
+- **Months** converting ~400 Java files to Kotlin — mechanical work with zero new functionality
 - The Android app would have been **blocked** behind this conversion
 - Risk of introducing regressions during conversion (every changed file is a potential bug)
 - Two build systems to maintain simultaneously during the transition (mixed Java/Kotlin Maven build)
@@ -240,7 +244,7 @@ Compare to the server's `User.java` — a large domain model with builders, enum
 
 **Goal:** Make the server solid, complete, and ready for a mobile client to consume.
 
-**Status:** Mostly done. The core engine is complete and tested. Remaining work is high-impact polish, validation, and seam hardening — not missing core product features.
+**Status:** Mostly done. The core engine is complete, but the repo is not fully green at the moment. Remaining work is high-impact polish, validation, and seam hardening — not missing core product features.
 
 The point of this phase is not to endlessly redesign JavaFX. It is to close the realism and validation gaps that most directly affect mobile readiness.
 
@@ -253,16 +257,15 @@ The point of this phase is not to endlessly redesign JavaFX. It is to close the 
 | **Done** | Each seeded user gets 3 deterministic, gender-appropriate portrait photos from `randomuser.me`                      |
 | **File** | `src/main/java/datingapp/storage/DevDataSeeder.java`                                                                |
 
-### 1.2 — Dev Experience: Geocoding
+### 1.2 — Dev Experience: Location Search & Geocoding ✅
 
-|                     |                                                                                        |
-|---------------------|----------------------------------------------------------------------------------------|
-| **What**            | Replace raw lat/lon input fields with an address search box                            |
-| **Why**             | Nobody knows their coordinates by heart — location-dependent features break without it |
-| **How**             | Client-side geocoding via Nominatim (OpenStreetMap, free, no API key)                  |
-| **New files**       | `GeocodingService.java`, `NominatimGeocodingService.java`                              |
-| **Files to modify** | Profile screen FXML, `ProfileViewModel`, `ProfileController`                           |
-| **Effort**          | Medium — new service + UI changes, but purely client-side                              |
+|               |                                                                                                                                        |
+|---------------|----------------------------------------------------------------------------------------------------------------------------------------|
+| **What**      | Keep the current address and city search flow as the standard location UX instead of raw latitude/longitude entry.                     |
+| **Why**       | Location-dependent features are only usable when people can set a location through normal search and selection.                        |
+| **Done**      | The profile flow now opens `LocationSelectionDialog`, backed by `GeocodingService` with a local-first fallback and Nominatim.          |
+| **Remaining** | Validate the UX in a human smoke pass and decide whether the current Israel-focused search scope is enough for the next product phase. |
+| **Key files** | `ServiceRegistry.java`, `LocationSelectionDialog.java`, `ProfileController.java`, `ProfileViewModel.java`                              |
 
 ### 1.3 — Smoke Test by Human
 
@@ -281,14 +284,14 @@ The point of this phase is not to endlessly redesign JavaFX. It is to close the 
 | **What** | Fix real issues found during 1.3                          |
 | **How**  | Can't be defined in advance — they come from real testing |
 
-### 1.5 — PostgreSQL as Routine Validation
+### 1.5 — PostgreSQL as Routine Validation ✅
 
-|            |                                                                                         |
-|------------|-----------------------------------------------------------------------------------------|
-| **What**   | Make PostgreSQL testing a normal part of development, not an optional one-off           |
-| **Why**    | The Flutter app will talk to the PostgreSQL-backed server — this path needs to be solid |
-| **How**    | Broaden `run_postgresql_smoke.ps1` usage; reduce H2-first assumptions in storage tests  |
-| **Effort** | Incremental — shift existing tests toward PostgreSQL where they add value               |
+|               |                                                                                                                           |
+|---------------|---------------------------------------------------------------------------------------------------------------------------|
+| **What**      | Keep PostgreSQL in the normal local verification loop instead of treating it as an occasional side path.                  |
+| **Why**       | The runtime storage seam is PostgreSQL-first, so local confidence should follow the real runtime path.                    |
+| **Done**      | `run_verify.ps1` already starts local PostgreSQL, runs `mvn spotless:apply verify`, then runs `run_postgresql_smoke.ps1`. |
+| **Remaining** | Keep reducing H2-first assumptions where they hide runtime differences, and keep the local PostgreSQL path easy to run.   |
 
 ### 1.6 — Targeted Hardening & Consistency Pass
 
@@ -301,11 +304,11 @@ The point of this phase is not to endlessly redesign JavaFX. It is to close the 
 
 ### Phase 1 Exit Criteria
 
-- [x] `mvn spotless:apply verify` passes (already does)
+- [ ] `mvn spotless:apply verify` is green again after the current `LocalGeocodingServiceTest` failure
 - [x] Seeded users have photos (each user gets 3 deterministic portraits via `randomuser.me`)
-- [ ] Location input uses address search (geocoding)
+- [x] Location input uses address search (geocoding)
 - [ ] Human smoke test done — all found issues fixed
-- [ ] PostgreSQL smoke path runs as part of normal validation
+- [x] PostgreSQL smoke path runs as part of normal validation
 - [ ] The important seam inconsistencies found during smoke/validation are closed
 
 ---
@@ -318,16 +321,16 @@ The point of this phase is not to endlessly redesign JavaFX. It is to close the 
 
 This is a **small phase** — just a few targeted changes to the server configuration.
 
-### 2.1 — Bind to LAN Instead of Localhost
+### 2.1 — Validate and Document LAN Binding
 
-|                  |                                                                                                                                       |
-|------------------|---------------------------------------------------------------------------------------------------------------------------------------|
-| **What**         | Change `RestApiServer` from `127.0.0.1` to configurable binding (e.g., `0.0.0.0` or specific LAN interface)                           |
-| **Current code** | `app.start(InetAddress.getLoopbackAddress().getHostAddress(), port)` — localhost-only                                                 |
-| **Also**         | The localhost enforcement guard (`enforceLocalhostOnly`) needs to become configurable                                                 |
-| **Safety**       | When binding to LAN, keep localhost-only mode as default for dev safety. Add explicit opt-in (env var or config flag) for LAN binding |
-| **File**         | `src/main/java/datingapp/app/api/RestApiServer.java`                                                                                  |
-| **Effort**       | Small — ~20 lines changed, plus removing the localhost guard when in LAN mode                                                         |
+|                  |                                                                                                                                             |
+|------------------|---------------------------------------------------------------------------------------------------------------------------------------------|
+| **What**         | Use the existing `--host=` and `--port=` startup path to run the REST server on `0.0.0.0` or a specific LAN interface when needed.          |
+| **Current code** | `RestApiServer.main` already parses `--host=` / `--port=` and only enforces localhost-only request guards when the chosen host is loopback. |
+| **Also**         | Add CORS and document a simple LAN startup command before Phase 3 starts consuming the API from Flutter or browser tooling.                 |
+| **Safety**       | Loopback remains the default for local unauthenticated use; LAN mode stays an explicit opt-in by passing a non-loopback host.               |
+| **File**         | `src/main/java/datingapp/app/api/RestApiServer.java`                                                                                        |
+| **Effort**       | Small — mostly documentation, manual verification, and CORS, not a fresh host-binding implementation.                                       |
 
 ### 2.2 — Verify Phone → Server Connectivity
 
@@ -357,7 +360,7 @@ This is a **small phase** — just a few targeted changes to the server configur
 
 ### Phase 2 Exit Criteria
 
-- [ ] Server binds to LAN interface when configured to do so
+- [ ] LAN startup is documented and verified with an explicit `--host=` launch
 - [ ] Phone browser can reach `http://{laptop-ip}:7070/api/health`
 - [ ] localhost-only mode still works as default for safe development
 - [ ] The dev login shortcut can remain in place for the first mobile iteration
@@ -568,7 +571,7 @@ Being explicit about what we're skipping and why:
 
 | Item                                     | Why we're skipping it                                                                                                                               |
 |------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------|
-| **Java → Kotlin server migration**       | Unnecessary. The phone never runs server code. Converting ~390 files would waste months with zero new functionality. The server stays Java forever. |
+| **Java → Kotlin server migration**       | Unnecessary. The phone never runs server code. Converting ~400 files would waste months with zero new functionality. The server stays Java forever. |
 | **iOS app (separate project)**           | Not needed — Flutter builds iOS from the same codebase. A separate Swift/SwiftUI project would be redundant.                                        |
 | **Web app**                              | Not needed. Three frontends (CLI, JavaFX, Flutter) cover dev/testing/production.                                                                    |
 | **Big JavaFX-only redesign**             | JavaFX is useful for validation and parity, but large redesign work that does not improve backend correctness or mobile readiness is a distraction. |
@@ -714,7 +717,7 @@ The phone does step 1 and step 9. Steps 2–8 all run on the server, in Java —
 
 | Phase        | What                                               | Effort  | Result                                                         |
 |--------------|----------------------------------------------------|---------|----------------------------------------------------------------|
-| **Phase 1**  | Polish server, add photos, geocoding, harden seams | Weeks   | Solid local development experience and trustworthy validation  |
+| **Phase 1**  | Polish server, run a real smoke pass, harden seams | Weeks   | Solid local development experience and trustworthy validation  |
 | **Phase 2**  | Server reachable from LAN                          | Days    | Phone can talk to server over WiFi                             |
 | **Phase 3**  | Build Flutter app (v0.1 MVP)                       | Weeks   | Dating app on your Android phone; iOS later from same codebase |
 | **Phase 3+** | Polish mobile app (v0.2–v0.4)                      | Ongoing | Full-featured mobile app                                       |
@@ -724,4 +727,4 @@ The phone does step 1 and step 9. Steps 2–8 all run on the server, in Java —
 
 ---
 
-*End of Roadmap V2. Created 2026-04-13. Updated to Flutter. The mobile app is a new frontend, not a server rewrite.*
+*End of Roadmap V2. Created 2026-04-13. Refreshed against current source on 2026-04-18. The mobile app is a new frontend, not a server rewrite.*

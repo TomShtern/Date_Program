@@ -79,11 +79,11 @@ This document is optimized for a future AI coding agent or human implementer.
 
 ### Schema/migration seam
 
-| File                                                                | Why it matters                                                                                 |
-|---------------------------------------------------------------------|------------------------------------------------------------------------------------------------|
-| `src/main/java/datingapp/storage/schema/SchemaInitializer.java`     | Current fresh-install baseline; creates the modern runtime schema directly.                    |
-| `src/main/java/datingapp/storage/schema/MigrationRunner.java`       | Legacy runtime schema converges here through V14.                                              |
-| `src/test/java/datingapp/storage/schema/SchemaInitializerTest.java` | Proves baseline vs migrated behavior and several legacy repair cases.                          |
+| File                                                                | Why it matters                                                              |
+|---------------------------------------------------------------------|-----------------------------------------------------------------------------|
+| `src/main/java/datingapp/storage/schema/SchemaInitializer.java`     | Current fresh-install baseline; creates the modern runtime schema directly. |
+| `src/main/java/datingapp/storage/schema/MigrationRunner.java`       | Legacy runtime schema converges here through V14.                           |
+| `src/test/java/datingapp/storage/schema/SchemaInitializerTest.java` | Proves baseline vs migrated behavior and several legacy repair cases.       |
 
 ### Persistence contract seam
 
