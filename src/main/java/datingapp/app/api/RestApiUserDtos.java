@@ -4,9 +4,11 @@ import datingapp.core.matching.DailyPickService.DailyPick;
 import datingapp.core.matching.MatchingService;
 import datingapp.core.matching.Standout;
 import datingapp.core.model.User;
+import datingapp.core.profile.MatchPreferences.Interest;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -16,10 +18,30 @@ final class RestApiUserDtos {
 
     private RestApiUserDtos() {}
 
-    static record UserSummary(UUID id, String name, int age, String state) {
+    static record UserSummary(
+            UUID id,
+            String name,
+            int age,
+            String state,
+            String primaryPhotoUrl,
+            List<String> photoUrls,
+            String approximateLocation,
+            String summaryLine) {
         static UserSummary from(User user, ZoneId userTimeZone) {
+            return from(user, userTimeZone, null);
+        }
+
+        static UserSummary from(User user, ZoneId userTimeZone, String approximateLocation) {
             UserDtoMapper.UserFields fields = UserDtoMapper.map(user, userTimeZone, null);
-            return new UserSummary(user.getId(), user.getName(), fields.age(), fields.state());
+            return new UserSummary(
+                    user.getId(),
+                    user.getName(),
+                    fields.age(),
+                    fields.state(),
+                    personPrimaryPhotoUrl(user),
+                    user != null ? user.getPhotoUrls() : List.of(),
+                    approximateLocation,
+                    personSummaryLine(user));
         }
 
         static List<UserSummary> fromUsers(List<User> users, ZoneId userTimeZone) {
@@ -55,25 +77,61 @@ final class RestApiUserDtos {
     }
 
     static record DailyPickDto(
-            UUID userId, String userName, int userAge, LocalDate date, String reason, boolean alreadySeen) {
+            UUID userId,
+            String userName,
+            int userAge,
+            LocalDate date,
+            String reason,
+            boolean alreadySeen,
+            String primaryPhotoUrl,
+            List<String> photoUrls,
+            String approximateLocation,
+            String summaryLine) {
         static DailyPickDto from(DailyPick dailyPick, ZoneId userTimeZone) {
+            return from(dailyPick, userTimeZone, null);
+        }
+
+        static DailyPickDto from(DailyPick dailyPick, ZoneId userTimeZone, String approximateLocation) {
+            User user = dailyPick.user();
             return new DailyPickDto(
-                    dailyPick.user().getId(),
-                    dailyPick.user().getName(),
-                    UserDtoMapper.age(dailyPick.user(), userTimeZone),
+                    user.getId(),
+                    user.getName(),
+                    UserDtoMapper.age(user, userTimeZone),
                     dailyPick.date(),
                     dailyPick.reason(),
-                    dailyPick.alreadySeen());
+                    dailyPick.alreadySeen(),
+                    personPrimaryPhotoUrl(user),
+                    user.getPhotoUrls(),
+                    approximateLocation,
+                    personSummaryLine(user));
         }
     }
 
-    static record PendingLikerDto(UUID userId, String name, int age, Instant likedAt) {
+    static record PendingLikerDto(
+            UUID userId,
+            String name,
+            int age,
+            Instant likedAt,
+            String primaryPhotoUrl,
+            List<String> photoUrls,
+            String approximateLocation,
+            String summaryLine) {
         static PendingLikerDto from(MatchingService.PendingLiker pendingLiker, ZoneId userTimeZone) {
+            return from(pendingLiker, userTimeZone, null);
+        }
+
+        static PendingLikerDto from(
+                MatchingService.PendingLiker pendingLiker, ZoneId userTimeZone, String approximateLocation) {
+            User user = pendingLiker.user();
             return new PendingLikerDto(
-                    pendingLiker.user().getId(),
-                    pendingLiker.user().getName(),
-                    UserDtoMapper.age(pendingLiker.user(), userTimeZone),
-                    pendingLiker.likedAt());
+                    user.getId(),
+                    user.getName(),
+                    UserDtoMapper.age(user, userTimeZone),
+                    pendingLiker.likedAt(),
+                    personPrimaryPhotoUrl(user),
+                    user.getPhotoUrls(),
+                    approximateLocation,
+                    personSummaryLine(user));
         }
     }
 
@@ -86,8 +144,17 @@ final class RestApiUserDtos {
             int score,
             String reason,
             Instant createdAt,
-            Instant interactedAt) {
+            Instant interactedAt,
+            String primaryPhotoUrl,
+            List<String> photoUrls,
+            String approximateLocation,
+            String summaryLine) {
         static StandoutDto from(Standout standout, Map<UUID, User> usersById, ZoneId userTimeZone) {
+            return from(standout, usersById, userTimeZone, null);
+        }
+
+        static StandoutDto from(
+                Standout standout, Map<UUID, User> usersById, ZoneId userTimeZone, String approximateLocation) {
             User user = usersById.get(standout.standoutUserId());
             return new StandoutDto(
                     standout.id(),
@@ -98,7 +165,11 @@ final class RestApiUserDtos {
                     standout.score(),
                     standout.reason(),
                     standout.createdAt(),
-                    standout.interactedAt());
+                    standout.interactedAt(),
+                    personPrimaryPhotoUrl(user),
+                    user != null ? user.getPhotoUrls() : List.of(),
+                    approximateLocation,
+                    personSummaryLine(user));
         }
     }
 
@@ -128,5 +199,30 @@ final class RestApiUserDtos {
                     fields.state(),
                     activated);
         }
+    }
+
+    static String personPrimaryPhotoUrl(User user) {
+        if (user == null) {
+            return null;
+        }
+        return user.getPhotoUrls().stream()
+                .filter(User::isRealPhotoUrl)
+                .findFirst()
+                .orElse(null);
+    }
+
+    static String personSummaryLine(User user) {
+        if (user == null) {
+            return null;
+        }
+        if (user.getBio() != null && !user.getBio().isBlank()) {
+            return user.getBio();
+        }
+        List<String> interests = user.getInterests().stream()
+                .sorted(Comparator.comparing(Enum::name))
+                .limit(3)
+                .map(Interest::getDisplayName)
+                .toList();
+        return interests.isEmpty() ? null : String.join(", ", interests);
     }
 }

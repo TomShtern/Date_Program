@@ -21,7 +21,9 @@ import datingapp.core.matching.Standout;
 import datingapp.core.model.Match;
 import datingapp.core.model.Match.MatchArchiveReason;
 import datingapp.core.model.User;
+import datingapp.core.model.User.Gender;
 import datingapp.core.model.User.UserState;
+import datingapp.core.profile.MatchPreferences.Dealbreakers;
 import datingapp.core.profile.MatchPreferences.Interest;
 import datingapp.core.profile.MatchPreferences.Lifestyle;
 import datingapp.core.storage.OperationalCommunicationStorage;
@@ -34,6 +36,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -81,13 +84,19 @@ class RestApiPhaseTwoRoutesTest {
                 Notification.Type.NEW_MESSAGE,
                 "New Message",
                 "Bob sent a message.",
-                Map.of("senderId", bobId.toString()));
+                Map.of(
+                        "conversationId", Match.generateId(aliceId, bobId),
+                        "senderId", bobId.toString(),
+                        "messageId", UUID.randomUUID().toString()));
         Notification secondNotification = Notification.create(
                 aliceId,
                 Notification.Type.MATCH_FOUND,
                 "New Match!",
                 "You matched with Bob.",
-                Map.of("otherUserId", bobId.toString()));
+                Map.of(
+                        "matchId", Match.generateId(aliceId, bobId),
+                        "conversationId", Match.generateId(aliceId, bobId),
+                        "otherUserId", bobId.toString()));
         communicationStorage.saveNotification(firstNotification);
         communicationStorage.saveNotification(secondNotification);
         services.getAchievementService().checkAndUnlock(aliceId);
@@ -106,6 +115,20 @@ class RestApiPhaseTwoRoutesTest {
         assertEquals(200, notificationsResponse.statusCode());
         JsonNode notificationsJson = MAPPER.readTree(notificationsResponse.body());
         assertEquals(2, notificationsJson.size());
+        for (JsonNode notificationJson : notificationsJson) {
+            JsonNode data = notificationJson.get("data");
+            assertTrue(data.isObject());
+            if ("NEW_MESSAGE".equals(notificationJson.get("type").asText())) {
+                assertFalse(data.get("conversationId").asText().isBlank());
+                assertFalse(data.get("senderId").asText().isBlank());
+                assertFalse(data.get("messageId").asText().isBlank());
+            }
+            if ("MATCH_FOUND".equals(notificationJson.get("type").asText())) {
+                assertEquals(
+                        data.get("matchId").asText(), data.get("conversationId").asText());
+                assertFalse(data.get("otherUserId").asText().isBlank());
+            }
+        }
 
         HttpResponse<String> unreadOnlyResponse = client.send(
                 HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/users/" + aliceId
@@ -218,9 +241,13 @@ class RestApiPhaseTwoRoutesTest {
         assertEquals(200, pendingLikersResponse.statusCode());
         JsonNode pendingLikersJson = MAPPER.readTree(pendingLikersResponse.body());
         assertEquals(1, pendingLikersJson.get("pendingLikers").size());
+        JsonNode pendingLikerJson = pendingLikersJson.get("pendingLikers").get(0);
+        assertEquals(carolId.toString(), pendingLikerJson.get("userId").asText());
         assertEquals(
-                carolId.toString(),
-                pendingLikersJson.get("pendingLikers").get(0).get("userId").asText());
+                "https://example.com/carol.jpg",
+                pendingLikerJson.get("primaryPhotoUrl").asText());
+        assertTrue(pendingLikerJson.get("photoUrls").isArray());
+        assertFalse(pendingLikerJson.get("summaryLine").isNull());
 
         HttpResponse<String> standoutsResponse = client.send(
                 HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/users/" + aliceId + "/standouts"))
@@ -230,9 +257,13 @@ class RestApiPhaseTwoRoutesTest {
         assertEquals(200, standoutsResponse.statusCode());
         JsonNode standoutsJson = MAPPER.readTree(standoutsResponse.body());
         assertEquals(1, standoutsJson.get("standouts").size());
+        JsonNode standoutJson = standoutsJson.get("standouts").get(0);
+        assertEquals(danaId.toString(), standoutJson.get("standoutUserId").asText());
         assertEquals(
-                danaId.toString(),
-                standoutsJson.get("standouts").get(0).get("standoutUserId").asText());
+                "https://example.com/dana.jpg",
+                standoutJson.get("primaryPhotoUrl").asText());
+        assertTrue(standoutJson.get("photoUrls").isArray());
+        assertFalse(standoutJson.get("approximateLocation").isNull());
 
         HttpResponse<String> matchQualityResponse = client.send(
                 HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/users/" + aliceId
@@ -253,6 +284,125 @@ class RestApiPhaseTwoRoutesTest {
         assertEquals(200, undoResponse.statusCode());
         JsonNode undoJson = MAPPER.readTree(undoResponse.body());
         assertTrue(undoJson.get("success").asBoolean());
+    }
+
+    @Test
+    @DisplayName("profile edit snapshot mirrors editable profile state and read-only identity")
+    void profileEditSnapshotMirrorsEditableProfileStateAndReadOnlyIdentity() throws Exception {
+        TestStorages.Users userStorage = new TestStorages.Users();
+        TestStorages.Communications communicationStorage = new TestStorages.Communications();
+        TestStorages.Interactions interactionStorage = new TestStorages.Interactions(communicationStorage);
+        SeededStandoutStorage standoutStorage = new SeededStandoutStorage();
+        ServiceRegistry services =
+                createServices(userStorage, interactionStorage, communicationStorage, standoutStorage);
+
+        UUID aliceId = UUID.randomUUID();
+        User alice = activeUser(aliceId, "Alice Snapshot");
+        alice.setBio("Runner, coffee person, and weekend hiker.");
+        alice.setGender(Gender.FEMALE);
+        alice.setInterestedIn(EnumSet.of(Gender.MALE));
+        alice.setLocation(32.0853, 34.7818);
+        alice.setMaxDistanceKm(25, 500);
+        alice.setAgeRange(27, 38, 18, 100);
+        alice.setHeightCm(168);
+        alice.setSmoking(Lifestyle.Smoking.NEVER);
+        alice.setDrinking(Lifestyle.Drinking.SOCIALLY);
+        alice.setWantsKids(Lifestyle.WantsKids.OPEN);
+        alice.setLookingFor(Lifestyle.LookingFor.LONG_TERM);
+        alice.setEducation(Lifestyle.Education.BACHELORS);
+        alice.setInterests(EnumSet.of(Interest.COFFEE, Interest.HIKING, Interest.TRAVEL));
+        alice.setDealbreakers(Dealbreakers.builder()
+                .acceptSmoking(Lifestyle.Smoking.NEVER)
+                .acceptLookingFor(Lifestyle.LookingFor.LONG_TERM, Lifestyle.LookingFor.MARRIAGE)
+                .maxAgeDifference(6)
+                .build());
+        alice.setPhotoUrls(List.of("https://example.com/alice-1.jpg", "https://example.com/alice-2.jpg"));
+        alice.startVerification(User.VerificationMethod.EMAIL, "123456");
+        alice.markVerified();
+        userStorage.save(alice);
+
+        server = new RestApiServer(services, 0);
+        server.start();
+        int port = server.getApp().port();
+
+        HttpResponse<String> response = HttpClient.newHttpClient()
+                .send(
+                        HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/users/" + aliceId
+                                        + "/profile-edit-snapshot"))
+                                .GET()
+                                .build(),
+                        HttpResponse.BodyHandlers.ofString());
+
+        assertEquals(200, response.statusCode(), response.body());
+        JsonNode snapshotJson = MAPPER.readTree(response.body());
+        assertEquals(aliceId.toString(), snapshotJson.get("userId").asText());
+        JsonNode editable = snapshotJson.get("editable");
+        assertEquals(
+                "Runner, coffee person, and weekend hiker.", editable.get("bio").asText());
+        assertEquals("FEMALE", editable.get("gender").asText());
+        assertEquals("MALE", editable.get("interestedIn").get(0).asText());
+        assertEquals(25, editable.get("maxDistanceKm").asInt());
+        assertEquals(27, editable.get("minAge").asInt());
+        assertEquals(38, editable.get("maxAge").asInt());
+        assertEquals(168, editable.get("heightCm").asInt());
+        assertTrue(editable.get("interests").isArray());
+        assertTrue(editable.get("dealbreakers").get("acceptableSmoking").isArray());
+        assertEquals(6, editable.get("dealbreakers").get("maxAgeDifference").asInt());
+        assertTrue(List.of("CITY", "ZIP")
+                .contains(editable.get("location").get("precision").asText()));
+        assertEquals("IL", editable.get("location").get("countryCode").asText());
+
+        JsonNode readOnly = snapshotJson.get("readOnly");
+        assertEquals("Alice Snapshot", readOnly.get("name").asText());
+        assertEquals("ACTIVE", readOnly.get("state").asText());
+        assertEquals(
+                "https://example.com/alice-1.jpg",
+                readOnly.get("photoUrls").get(0).asText());
+        assertTrue(readOnly.get("verified").asBoolean());
+        assertEquals("EMAIL", readOnly.get("verificationMethod").asText());
+        assertFalse(readOnly.get("verifiedAt").isNull());
+    }
+
+    @Test
+    @DisplayName("presentation context explains why a target profile is shown")
+    void presentationContextExplainsWhyTargetProfileIsShown() throws Exception {
+        TestStorages.Users userStorage = new TestStorages.Users();
+        TestStorages.Communications communicationStorage = new TestStorages.Communications();
+        TestStorages.Interactions interactionStorage = new TestStorages.Interactions(communicationStorage);
+        SeededStandoutStorage standoutStorage = new SeededStandoutStorage();
+        ServiceRegistry services =
+                createServices(userStorage, interactionStorage, communicationStorage, standoutStorage);
+
+        UUID viewerId = UUID.randomUUID();
+        UUID targetId = UUID.randomUUID();
+        User viewer = activeUser(viewerId, "Viewer Context");
+        User target = activeUser(targetId, "Target Context");
+        target.setLookingFor(Lifestyle.LookingFor.LONG_TERM);
+        userStorage.save(viewer);
+        userStorage.save(target);
+
+        server = new RestApiServer(services, 0);
+        server.start();
+        int port = server.getApp().port();
+
+        HttpResponse<String> response = HttpClient.newHttpClient()
+                .send(
+                        HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/users/" + viewerId
+                                        + "/presentation-context/" + targetId))
+                                .GET()
+                                .build(),
+                        HttpResponse.BodyHandlers.ofString());
+
+        assertEquals(200, response.statusCode(), response.body());
+        JsonNode contextJson = MAPPER.readTree(response.body());
+        assertEquals(viewerId.toString(), contextJson.get("viewerUserId").asText());
+        assertEquals(targetId.toString(), contextJson.get("targetUserId").asText());
+        assertFalse(contextJson.get("summary").asText().isBlank());
+        assertTrue(contextJson.get("reasonTags").isArray());
+        assertTrue(contextJson.get("reasonTags").size() >= 1);
+        assertTrue(contextJson.get("details").isArray());
+        assertTrue(contextJson.get("details").size() >= 1);
+        assertFalse(contextJson.get("generatedAt").isNull());
     }
 
     @Test
@@ -814,6 +964,14 @@ class RestApiPhaseTwoRoutesTest {
         return User.StorageBuilder.create(id, name, AppClock.now())
                 .state(UserState.ACTIVE)
                 .birthDate(LocalDate.of(1998, 1, 1))
+                .bio("Coffee, hiking, and weekend plans")
+                .gender(Gender.FEMALE)
+                .interestedIn(EnumSet.of(Gender.MALE))
+                .location(32.0853, 34.7818)
+                .hasLocationSet(true)
+                .maxDistanceKm(100)
+                .photoUrls(List.of("https://example.com/" + name.toLowerCase().split(" ")[0] + ".jpg"))
+                .interests(EnumSet.of(Interest.COFFEE, Interest.HIKING, Interest.TRAVEL))
                 .build();
     }
 

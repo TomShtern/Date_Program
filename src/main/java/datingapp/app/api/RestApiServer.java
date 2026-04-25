@@ -26,6 +26,8 @@ import datingapp.app.api.RestApiDtos.NotificationDto;
 import datingapp.app.api.RestApiDtos.PagedMatchResponse;
 import datingapp.app.api.RestApiDtos.PassResponse;
 import datingapp.app.api.RestApiDtos.PendingLikersResponse;
+import datingapp.app.api.RestApiDtos.PresentationContextDto;
+import datingapp.app.api.RestApiDtos.ProfileEditSnapshotDto;
 import datingapp.app.api.RestApiDtos.ProfileUpdateRequest;
 import datingapp.app.api.RestApiDtos.ReportResponse;
 import datingapp.app.api.RestApiDtos.SendMessageRequest;
@@ -309,6 +311,34 @@ public class RestApiServer {
             return;
         }
         ctx.json(UserDetail.from(user.get(), userTimeZone, locationLabel(user.get())));
+    }
+
+    void getProfileEditSnapshot(Context ctx) {
+        UUID id = parseUuid(ctx.pathParam("id"));
+        Optional<User> user = loadExistingUser(ctx, id);
+        if (user.isEmpty()) {
+            return;
+        }
+        var locationSeed = user.get().hasLocation()
+                ? locationService
+                        .seedSelection(user.get().getLat(), user.get().getLon())
+                        .orElse(null)
+                : null;
+        ctx.json(ProfileEditSnapshotDto.from(user.get(), locationSeed));
+    }
+
+    void getPresentationContext(Context ctx) {
+        UUID viewerId = parseUuid(ctx.pathParam("viewerId"));
+        UUID targetId = parseUuid(ctx.pathParam(PATH_TARGET_ID));
+        Optional<User> viewer = loadExistingUser(ctx, viewerId);
+        Optional<User> target = loadExistingUser(ctx, targetId);
+        if (viewer.isEmpty() || target.isEmpty()) {
+            return;
+        }
+        if (viewer.get().equals(target.get())) {
+            throw new IllegalArgumentException("targetId must refer to another user");
+        }
+        ctx.json(PresentationContextDto.from(viewer.get(), target.get(), locationLabel(target.get()), userTimeZone));
     }
 
     void listLocationCountries(Context ctx) {
@@ -600,7 +630,8 @@ public class RestApiServer {
             return;
         }
         ctx.json(new PendingLikersResponse(result.get().stream()
-                .map(pendingLiker -> PendingLikerDto.from(pendingLiker, userTimeZone))
+                .map(pendingLiker ->
+                        PendingLikerDto.from(pendingLiker, userTimeZone, locationLabel(pendingLiker.user())))
                 .toList()));
     }
 
@@ -620,7 +651,11 @@ public class RestApiServer {
         var standoutResult = result.data();
         ctx.json(new StandoutsResponse(
                 standoutResult.result().standouts().stream()
-                        .map(standout -> StandoutDto.from(standout, standoutResult.usersById(), userTimeZone))
+                        .map(standout -> {
+                            User standoutUser = standoutResult.usersById().get(standout.standoutUserId());
+                            return StandoutDto.from(
+                                    standout, standoutResult.usersById(), userTimeZone, locationLabel(standoutUser));
+                        })
                         .toList(),
                 standoutResult.result().totalCandidates(),
                 standoutResult.result().fromCache(),
@@ -1176,11 +1211,23 @@ public class RestApiServer {
         if (result.isEmpty()) {
             return Optional.empty();
         }
-        return Optional.of(BrowseCandidatesResponse.from(result.get(), userTimeZone));
+        MatchingUseCases.BrowseCandidatesResult browseResult = result.get();
+        return Optional.of(new BrowseCandidatesResponse(
+                browseResult.candidates().stream()
+                        .map(candidate -> UserSummary.from(candidate, userTimeZone, locationLabel(candidate)))
+                        .toList(),
+                browseResult
+                        .dailyPick()
+                        .map(dailyPick -> RestApiUserDtos.DailyPickDto.from(
+                                dailyPick, userTimeZone, locationLabel(dailyPick.user())))
+                        .orElse(null),
+                browseResult.dailyPickViewed(),
+                browseResult.locationMissing()));
     }
 
     private MatchSummary toMatchSummary(Match match, UUID currentUserId, Map<UUID, User> usersById) {
-        return MatchSummary.from(match, currentUserId, usersById);
+        UUID otherUserId = match.getOtherUser(currentUserId);
+        return MatchSummary.from(match, currentUserId, usersById, locationLabel(usersById.get(otherUserId)));
     }
 
     private ConversationSummary toConversationSummary(

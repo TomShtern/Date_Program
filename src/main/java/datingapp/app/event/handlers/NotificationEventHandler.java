@@ -2,6 +2,7 @@ package datingapp.app.event.handlers;
 
 import datingapp.app.event.AppEvent;
 import datingapp.app.event.AppEventBus;
+import datingapp.core.connection.ConnectionModels.Conversation;
 import datingapp.core.connection.ConnectionModels.Notification;
 import datingapp.core.storage.CommunicationStorage;
 import java.util.Map;
@@ -18,6 +19,7 @@ public final class NotificationEventHandler {
     private static final Logger logger = LoggerFactory.getLogger(NotificationEventHandler.class);
 
     private static final String DATA_MATCH_ID = "matchId";
+    private static final String DATA_CONVERSATION_ID = "conversationId";
     private static final String DATA_OTHER_USER_ID = "otherUserId";
     private static final String DATA_SENDER_ID = "senderId";
     private static final String DATA_MESSAGE_ID = "messageId";
@@ -54,7 +56,13 @@ public final class NotificationEventHandler {
                         Notification.Type.GRACEFUL_EXIT,
                         "Relationship Ended",
                         "The other user has gracefully moved on from this relationship.",
-                        Map.of("initiatorId", event.initiatorId().toString()));
+                        Map.of(
+                                "initiatorId",
+                                event.initiatorId().toString(),
+                                DATA_MATCH_ID,
+                                event.matchId(),
+                                DATA_CONVERSATION_ID,
+                                event.matchId()));
                 communicationStorage.saveNotification(notification);
             }
             case FRIEND_ZONE_REQUESTED -> {
@@ -63,7 +71,17 @@ public final class NotificationEventHandler {
                         Notification.Type.FRIEND_REQUEST_ACCEPTED,
                         "Friend Request Accepted",
                         "Your match with the other user has successfully transitioned to the Friend Zone.",
-                        Map.of("responderId", event.targetId().toString()));
+                        Map.of(
+                                DATA_REQUEST_ID,
+                                event.matchId(),
+                                "responderId",
+                                event.targetId().toString(),
+                                DATA_ACCEPTER_USER_ID,
+                                event.targetId().toString(),
+                                DATA_MATCH_ID,
+                                event.matchId(),
+                                DATA_CONVERSATION_ID,
+                                event.matchId()));
                 communicationStorage.saveNotification(notification);
             }
             case MATCHED, UNMATCHED, ACTIVE -> {
@@ -84,6 +102,8 @@ public final class NotificationEventHandler {
                 Map.of(
                         DATA_MATCH_ID,
                         event.matchId(),
+                        DATA_CONVERSATION_ID,
+                        event.matchId(),
                         DATA_OTHER_USER_ID,
                         event.userB().toString())));
         saveNotification(Notification.create(
@@ -93,6 +113,8 @@ public final class NotificationEventHandler {
                 "You have a new match!",
                 Map.of(
                         DATA_MATCH_ID,
+                        event.matchId(),
+                        DATA_CONVERSATION_ID,
                         event.matchId(),
                         DATA_OTHER_USER_ID,
                         event.userA().toString())));
@@ -105,6 +127,7 @@ public final class NotificationEventHandler {
                 "New Message",
                 "Someone sent you a new message.",
                 Map.of(
+                        DATA_CONVERSATION_ID, Conversation.generateId(event.senderId(), event.recipientId()),
                         DATA_SENDER_ID, event.senderId().toString(),
                         DATA_MESSAGE_ID, event.messageId().toString())));
     }
@@ -118,7 +141,8 @@ public final class NotificationEventHandler {
                 Map.of(
                         DATA_REQUEST_ID, event.requestId().toString(),
                         DATA_ACCEPTER_USER_ID, event.toUserId().toString(),
-                        DATA_MATCH_ID, event.matchId())));
+                        DATA_MATCH_ID, event.matchId(),
+                        DATA_CONVERSATION_ID, event.matchId())));
     }
 
     void onAccountDeleted(AppEvent.AccountDeleted event) {

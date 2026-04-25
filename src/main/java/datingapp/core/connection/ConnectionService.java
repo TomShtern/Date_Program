@@ -403,7 +403,10 @@ public class ConnectionService {
                 Notification.Type.FRIEND_REQUEST,
                 "New Friend Request",
                 "Someone wants to move your match to the Friend Zone.",
-                Map.of("fromUserId", fromUserId.toString()));
+                Map.of(
+                        "requestId", request.id().toString(),
+                        "fromUserId", fromUserId.toString(),
+                        "matchId", matchId));
 
         try {
             communicationStorage.saveFriendRequestWithNotification(request, notification);

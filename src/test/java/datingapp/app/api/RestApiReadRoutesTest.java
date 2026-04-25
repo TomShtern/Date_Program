@@ -223,9 +223,16 @@ class RestApiReadRoutesTest {
         assertEquals(200, browseResponse.statusCode());
         JsonNode browseJson = MAPPER.readTree(browseResponse.body());
         assertEquals(1, browseJson.get(CANDIDATES_KEY).size());
+        JsonNode candidateJson = browseJson.get(CANDIDATES_KEY).get(0);
+        assertEquals(candidateId.toString(), candidateJson.get("id").asText());
         assertEquals(
-                candidateId.toString(),
-                browseJson.get(CANDIDATES_KEY).get(0).get("id").asText());
+                "https://example.com/candidate.jpg",
+                candidateJson.get("primaryPhotoUrl").asText());
+        assertEquals(
+                "https://example.com/candidate.jpg",
+                candidateJson.get("photoUrls").get(0).asText());
+        assertFalse(candidateJson.get("approximateLocation").isNull());
+        assertFalse(candidateJson.get("summaryLine").isNull());
         assertTrue(browseJson.get(LOCATION_MISSING_KEY).isBoolean());
         assertFalse(browseJson.get(LOCATION_MISSING_KEY).asBoolean());
 
@@ -410,6 +417,7 @@ class RestApiReadRoutesTest {
         UUID candidateId = UUID.randomUUID();
         User noLocation = User.StorageBuilder.create(noLocationId, "NoLocation", AppClock.now())
                 .state(UserState.ACTIVE)
+                .bio("Coffee and weekend hikes")
                 .birthDate(LocalDate.of(1998, 1, 1))
                 .gender(Gender.FEMALE)
                 .interestedIn(EnumSet.of(Gender.MALE))
@@ -694,6 +702,7 @@ class RestApiReadRoutesTest {
     private static User activeUser(UUID id, String name, Gender gender, EnumSet<Gender> interestedIn) {
         return User.StorageBuilder.create(id, name, AppClock.now())
                 .state(UserState.ACTIVE)
+                .bio("Coffee and weekend hikes")
                 .birthDate(LocalDate.of(1998, 1, 1))
                 .gender(gender)
                 .interestedIn(interestedIn)

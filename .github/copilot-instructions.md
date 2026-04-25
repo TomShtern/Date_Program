@@ -1,6 +1,9 @@
+# Dating App - Java Backend - Copilot Instructions
+this whole project is only the backend. the frontend for this backend is a different flutter(android) project.
+
 ## Environment defaults
 - Windows 11
-- PowerShell 7.6
+- PowerShell 7.6.1
 - VS Code Insiders
 - Java 25.0.2 with preview enabled
 - JavaFX 25.0.2

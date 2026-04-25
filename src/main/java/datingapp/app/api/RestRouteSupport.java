@@ -37,6 +37,8 @@ final class RestRouteSupport {
     private void registerUserRoutes() {
         app.get("/api/users", server::listUsers);
         app.get("/api/users/{id}", server::getUser);
+        app.get("/api/users/{id}/profile-edit-snapshot", server::getProfileEditSnapshot);
+        app.get("/api/users/{viewerId}/presentation-context/{targetId}", server::getPresentationContext);
         app.get("/api/users/{id}/browse", server::browseCandidates);
         app.put("/api/users/{id}/profile", server::updateProfile);
         app.get("/api/users/{id}/candidates", server::getCandidates);
