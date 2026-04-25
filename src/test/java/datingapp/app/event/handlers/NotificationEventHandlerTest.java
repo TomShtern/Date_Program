@@ -39,6 +39,7 @@ class NotificationEventHandlerTest {
     void gracefulExitCreatesNotification() {
         UUID initiatorId = UUID.randomUUID();
         UUID targetId = UUID.randomUUID();
+        String conversationId = Conversation.generateId(initiatorId, targetId);
 
         bus.publish(new AppEvent.RelationshipTransitioned(
                 "match-" + UUID.randomUUID(),
@@ -54,12 +55,15 @@ class NotificationEventHandlerTest {
         assertEquals(Notification.Type.GRACEFUL_EXIT, n.type());
         assertEquals("Relationship Ended", n.title());
         assertEquals(initiatorId.toString(), n.data().get("initiatorId"));
+        assertEquals(conversationId, n.data().get("matchId"));
+        assertEquals(conversationId, n.data().get("conversationId"));
     }
 
     @Test
     void friendZoneAcceptanceCreatesNotification() {
         UUID initiatorId = UUID.randomUUID();
         UUID targetId = UUID.randomUUID();
+        String conversationId = Conversation.generateId(initiatorId, targetId);
 
         bus.publish(new AppEvent.RelationshipTransitioned(
                 "match-" + UUID.randomUUID(),
@@ -75,6 +79,9 @@ class NotificationEventHandlerTest {
         assertEquals(Notification.Type.FRIEND_REQUEST_ACCEPTED, n.type());
         assertEquals("Friend Request Accepted", n.title());
         assertEquals(targetId.toString(), n.data().get("responderId"));
+        assertEquals(conversationId, n.data().get("requestId"));
+        assertEquals(conversationId, n.data().get("matchId"));
+        assertEquals(conversationId, n.data().get("conversationId"));
     }
 
     @Test
@@ -95,6 +102,7 @@ class NotificationEventHandlerTest {
         UUID userA = UUID.randomUUID();
         UUID userB = UUID.randomUUID();
         String matchId = "match-" + UUID.randomUUID();
+        String conversationId = Conversation.generateId(userA, userB);
 
         bus.publish(new AppEvent.MatchCreated(matchId, userA, userB, Instant.now()));
 
@@ -103,8 +111,10 @@ class NotificationEventHandlerTest {
         Notification second = savedNotifications.get(1);
         assertEquals(Notification.Type.MATCH_FOUND, first.type());
         assertEquals(Notification.Type.MATCH_FOUND, second.type());
-        assertEquals(matchId, first.data().get("matchId"));
-        assertEquals(matchId, second.data().get("matchId"));
+        assertEquals(conversationId, first.data().get("matchId"));
+        assertEquals(conversationId, first.data().get("conversationId"));
+        assertEquals(conversationId, second.data().get("matchId"));
+        assertEquals(conversationId, second.data().get("conversationId"));
     }
 
     @Test
@@ -129,6 +139,7 @@ class NotificationEventHandlerTest {
         UUID accepterId = UUID.randomUUID();
         UUID requestId = UUID.randomUUID();
         String matchId = "match-" + UUID.randomUUID();
+        String conversationId = Conversation.generateId(requesterId, accepterId);
 
         bus.publish(new AppEvent.FriendRequestAccepted(requestId, requesterId, accepterId, matchId, Instant.now()));
 
@@ -140,7 +151,8 @@ class NotificationEventHandlerTest {
         assertEquals("Your friend request was accepted.", notification.message());
         assertEquals(requestId.toString(), notification.data().get("requestId"));
         assertEquals(accepterId.toString(), notification.data().get("accepterUserId"));
-        assertEquals(matchId, notification.data().get("matchId"));
+        assertEquals(conversationId, notification.data().get("matchId"));
+        assertEquals(conversationId, notification.data().get("conversationId"));
     }
 
     @Test

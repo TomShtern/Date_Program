@@ -258,7 +258,16 @@ Rules to confirm:
 - Can `primaryPhotoUrl` be null or absent?
 - Is `photoUrls` always an array?
 - Should frontend prefer `primaryPhotoUrl` over the first `photoUrls` item?
+- Is `primaryPhotoUrl` guaranteed to appear in `photoUrls` when it is non-null?
+- Can `primaryPhotoUrl` be independent of `photoUrls`, or is it always selected from that array?
+- Can `photoUrls` be empty while `primaryPhotoUrl` is set?
 - Are reason fields display-ready, or should they be treated as internal/debug data?
+
+Backend rule now confirmed for the Stage B implementation: `photoUrls` is always present as an array, and
+`primaryPhotoUrl` is always either `null` or selected from that same `photoUrls` array. The frontend should treat
+`primaryPhotoUrl` as the authoritative primary display image when both fields exist; `photoUrls[0]` is only the first
+gallery item and may be a placeholder or otherwise not the first real profile image. `photoUrls` may be empty only when
+`primaryPhotoUrl` is `null`; it must not be empty while `primaryPhotoUrl` is set.
 
 ### 2. Match Quality
 

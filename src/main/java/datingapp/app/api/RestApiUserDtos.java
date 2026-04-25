@@ -39,7 +39,7 @@ final class RestApiUserDtos {
                     fields.age(),
                     fields.state(),
                     personPrimaryPhotoUrl(user),
-                    user != null ? user.getPhotoUrls() : List.of(),
+                    personPhotoUrls(user),
                     approximateLocation,
                     personSummaryLine(user));
         }
@@ -71,7 +71,7 @@ final class RestApiUserDtos {
                     fields.interestedIn(),
                     fields.approximateLocation(),
                     fields.maxDistanceKm(),
-                    user.getPhotoUrls(),
+                    personPhotoUrls(user),
                     fields.state());
         }
     }
@@ -101,7 +101,7 @@ final class RestApiUserDtos {
                     dailyPick.reason(),
                     dailyPick.alreadySeen(),
                     personPrimaryPhotoUrl(user),
-                    user.getPhotoUrls(),
+                    personPhotoUrls(user),
                     approximateLocation,
                     personSummaryLine(user));
         }
@@ -129,7 +129,7 @@ final class RestApiUserDtos {
                     UserDtoMapper.age(user, userTimeZone),
                     pendingLiker.likedAt(),
                     personPrimaryPhotoUrl(user),
-                    user.getPhotoUrls(),
+                    personPhotoUrls(user),
                     approximateLocation,
                     personSummaryLine(user));
         }
@@ -167,7 +167,7 @@ final class RestApiUserDtos {
                     standout.createdAt(),
                     standout.interactedAt(),
                     personPrimaryPhotoUrl(user),
-                    user != null ? user.getPhotoUrls() : List.of(),
+                    personPhotoUrls(user),
                     approximateLocation,
                     personSummaryLine(user));
         }
@@ -209,6 +209,10 @@ final class RestApiUserDtos {
                 .filter(User::isRealPhotoUrl)
                 .findFirst()
                 .orElse(null);
+    }
+
+    static List<String> personPhotoUrls(User user) {
+        return user == null ? List.of() : List.copyOf(user.getPhotoUrls());
     }
 
     static String personSummaryLine(User user) {

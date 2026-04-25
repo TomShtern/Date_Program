@@ -16,7 +16,8 @@ Stage B implementation status as of 2026-04-25:
 - `GET /api/users/{id}/profile-edit-snapshot` is implemented.
 - `GET /api/users/{viewerId}/presentation-context/{targetId}` is implemented.
 - Notification event payloads now include the stabilized data keys for match, message, friend-request, friend-request-accepted, and graceful-exit notifications. Legacy `responderId` remains present on the older friend-zone transition notification for compatibility.
-- No Stage A endpoint path, response field name, enum, or wrapper shape was intentionally changed. The profile snapshot location `precision` may be `CITY` or `ZIP` depending on the stored coordinates, as already allowed by the enum rules below.
+- These four items are implemented in backend code; they are not separately confirmed as deployed to a shared environment in this document: person-summary enrichment, `GET /api/users/{id}/profile-edit-snapshot`, `GET /api/users/{viewerId}/presentation-context/{targetId}`, and notification event stabilization.
+- No Stage A endpoint path, response field name, enum, or wrapper shape was intentionally changed. The profile snapshot location `precision` may be `ADDRESS`, `CITY`, or `ZIP` depending on the stored coordinates, as already allowed by the enum rules below.
 
 Reviewed sources:
 
@@ -113,7 +114,7 @@ Current conversation summary shape:
 
 ## 2. Person summary media and context
 
-1. Status: Will add
+1. Status: Implemented (backend completed)
 2. Exact endpoint path and method:
    - `GET /api/users/{id}/browse`
    - `GET /api/users/{id}/matches`
@@ -181,6 +182,9 @@ Target additive fields on `matches`, `pending-likers`, and `standouts` are the s
 6. Nullability and enum rules:
    - `photoUrls` will always be present and will always be an array.
    - `primaryPhotoUrl` will always be present and may be `null`.
+   - When `primaryPhotoUrl` is non-null, it is selected from `photoUrls` and is guaranteed to appear in that array.
+   - `primaryPhotoUrl` is the authoritative primary display image when both fields exist; do not infer the primary image from `photoUrls[0]`.
+   - `photoUrls` may be empty only when `primaryPhotoUrl` is `null`.
    - `approximateLocation` will always be present and may be `null`.
    - `summaryLine` will always be present and may be `null`.
    - `state` remains the current `User.UserState` string when that field already exists on the row.
@@ -248,7 +252,7 @@ Target additive fields on `matches`, `pending-likers`, and `standouts` are the s
 
 ## 4. Presentation context
 
-1. Status: Will add
+1. Status: Implemented (backend completed)
 2. Exact endpoint path and method: `GET /api/users/{viewerId}/presentation-context/{targetId}`
 3. Example request JSON, if there is a request body: No request body.
 4. Example response JSON:
@@ -303,7 +307,7 @@ Target additive fields on `matches`, `pending-likers`, and `standouts` are the s
 
 ## 5. Profile edit read model
 
-1. Status: Will add
+1. Status: Implemented (backend completed)
 2. Exact endpoint path and method: `GET /api/users/{id}/profile-edit-snapshot`
 3. Example request JSON, if there is a request body: No request body.
 4. Example response JSON:
@@ -393,7 +397,7 @@ Target additive fields on `matches`, `pending-likers`, and `standouts` are the s
 
 ## 6. Notification schema
 
-1. Status: Will add
+1. Status: Implemented (backend completed)
 2. Exact endpoint path and method: `GET /api/users/{id}/notifications`
 3. Example request JSON, if there is a request body: No request body.
 4. Example response JSON:
