@@ -1,10 +1,12 @@
 package datingapp.support;
 
 import datingapp.core.RuntimeEnvironment;
+import datingapp.storage.schema.MigrationRunner;
 import java.net.URI;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.Optional;
 import org.junit.jupiter.api.Assumptions;
 
@@ -44,6 +46,12 @@ public final class LivePostgresqlTestConfig {
     public static Connection openConnection() throws SQLException {
         ConnectionInfo config = requireConfig();
         return DriverManager.getConnection(config.jdbcUrl(), config.username(), config.password());
+    }
+
+    public static void initializeSchema(Connection connection) throws SQLException {
+        try (Statement stmt = connection.createStatement()) {
+            MigrationRunner.runAllPending(stmt);
+        }
     }
 
     private static Optional<ConnectionInfo> load() {

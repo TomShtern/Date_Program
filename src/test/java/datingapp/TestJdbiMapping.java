@@ -20,6 +20,7 @@ class TestJdbiMapping {
     void test() throws Exception {
         LivePostgresqlTestConfig.assumeConfigured();
         try (Connection conn = LivePostgresqlTestConfig.openConnection()) {
+            LivePostgresqlTestConfig.initializeSchema(conn);
             Jdbi jdbi = Jdbi.create(conn).installPlugin(new SqlObjectPlugin());
             JdbiTypeCodecs.registerInstantCodec(jdbi);
             jdbi.registerArgument(new JdbiTypeCodecs.EnumSetSqlCodec.EnumSetArgumentFactory());

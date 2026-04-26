@@ -13,11 +13,13 @@ class CheckDbTest {
     @Test
     void testCheckDb() throws Exception {
         LivePostgresqlTestConfig.assumeConfigured();
-        try (Connection conn = LivePostgresqlTestConfig.openConnection();
-                Statement stmt = conn.createStatement();
-                ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM users")) {
-            assertTrue(rs.next(), "Expected the COUNT(*) query to return a row");
-            assertTrue(rs.getInt(1) >= 0, "User count should never be negative");
+        try (Connection conn = LivePostgresqlTestConfig.openConnection()) {
+            LivePostgresqlTestConfig.initializeSchema(conn);
+            try (Statement stmt = conn.createStatement();
+                    ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM users")) {
+                assertTrue(rs.next(), "Expected the COUNT(*) query to return a row");
+                assertTrue(rs.getInt(1) >= 0, "User count should never be negative");
+            }
         }
     }
 }

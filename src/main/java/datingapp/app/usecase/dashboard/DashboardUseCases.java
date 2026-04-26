@@ -174,7 +174,8 @@ public final class DashboardUseCases {
         }
         return status.hasUnlimitedLikes()
                 ? "Likes: ∞"
-                : "Likes: " + status.likesUsed() + "/" + (status.likesUsed() + status.likesRemaining());
+                : "Likes: " + status.likesUsed() + "/"
+                        + (status.likesUsed() + status.likesRemaining()); // NOPMD UselessParentheses
     }
 
     private String computeProfileNudge(User user) {
