@@ -120,9 +120,9 @@ class RestApiReadRoutesTest {
                         .GET()
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
-        assertEquals(403, forbiddenUserResponse.statusCode());
+        assertEquals(200, forbiddenUserResponse.statusCode());
         JsonNode forbiddenUserJson = MAPPER.readTree(forbiddenUserResponse.body());
-        assertEquals("FORBIDDEN", forbiddenUserJson.get("code").asText());
+        assertEquals(ALICE_NAME, forbiddenUserJson.get("name").asText());
 
         HttpResponse<String> candidatesResponse = client.send(
                 HttpRequest.newBuilder(URI.create(BASE_URL + port + USERS_PATH + aliceId + CANDIDATES_SEGMENT))
@@ -163,6 +163,69 @@ class RestApiReadRoutesTest {
                 assertThrows(InvocationTargetException.class, () -> method.invoke(server, ctx.context));
         assertInstanceOf(NotFoundResponse.class, thrown.getCause());
         assertEquals("User not found", thrown.getCause().getMessage());
+    }
+
+    @Test
+    @DisplayName("other-user profile reads reject symmetrically blocked viewers")
+    void otherUserProfileReadsRejectSymmetricallyBlockedViewers() throws Exception {
+        TestStorages.Users userStorage = new TestStorages.Users();
+        TestStorages.Communications communicationStorage = new TestStorages.Communications();
+        TestStorages.Interactions interactionStorage = new TestStorages.Interactions(communicationStorage);
+        TestStorages.TrustSafety trustSafetyStorage = new TestStorages.TrustSafety();
+        ServiceRegistry services = RestApiTestFixture.builder(userStorage, interactionStorage, communicationStorage)
+                .trustSafetyStorage(trustSafetyStorage)
+                .build();
+
+        UUID viewerId = UUID.randomUUID();
+        UUID targetId = UUID.randomUUID();
+        userStorage.save(activeUser(viewerId, "Viewer", Gender.MALE, EnumSet.of(Gender.FEMALE)));
+        userStorage.save(activeUser(targetId, "Target", Gender.FEMALE, EnumSet.of(Gender.MALE)));
+        trustSafetyStorage.save(ConnectionModels.Block.create(targetId, viewerId));
+
+        server = new RestApiServer(services, 0);
+        server.start();
+        int port = server.getApp().port();
+
+        HttpResponse<String> response = HttpClient.newHttpClient()
+                .send(
+                        HttpRequest.newBuilder(URI.create(BASE_URL + port + USERS_PATH + targetId))
+                                .header(USER_ID_HEADER, viewerId.toString())
+                                .GET()
+                                .build(),
+                        HttpResponse.BodyHandlers.ofString());
+
+        assertEquals(403, response.statusCode(), response.body());
+    }
+
+    @Test
+    @DisplayName("other-user profile reads reject inactive targets")
+    void otherUserProfileReadsRejectInactiveTargets() throws Exception {
+        TestStorages.Users userStorage = new TestStorages.Users();
+        TestStorages.Communications communicationStorage = new TestStorages.Communications();
+        TestStorages.Interactions interactionStorage = new TestStorages.Interactions(communicationStorage);
+        ServiceRegistry services = createServices(userStorage, interactionStorage, communicationStorage);
+
+        UUID viewerId = UUID.randomUUID();
+        UUID targetId = UUID.randomUUID();
+        User viewer = activeUser(viewerId, "Viewer", Gender.MALE, EnumSet.of(Gender.FEMALE));
+        User target = activeUser(targetId, "Paused", Gender.FEMALE, EnumSet.of(Gender.MALE));
+        target.pause();
+        userStorage.save(viewer);
+        userStorage.save(target);
+
+        server = new RestApiServer(services, 0);
+        server.start();
+        int port = server.getApp().port();
+
+        HttpResponse<String> response = HttpClient.newHttpClient()
+                .send(
+                        HttpRequest.newBuilder(URI.create(BASE_URL + port + USERS_PATH + targetId))
+                                .header(USER_ID_HEADER, viewerId.toString())
+                                .GET()
+                                .build(),
+                        HttpResponse.BodyHandlers.ofString());
+
+        assertEquals(409, response.statusCode(), response.body());
     }
 
     @Test
@@ -632,6 +695,74 @@ class RestApiReadRoutesTest {
                         HttpResponse.BodyHandlers.ofString());
 
         assertEquals(403, response.statusCode(), response.body());
+    }
+
+    @Test
+    @DisplayName(
+            "conversation message reads return an empty array for valid messageable matches with no stored conversation")
+    void conversationMessageReadsReturnEmptyArrayForValidMessageableMatchesWithNoStoredConversation() throws Exception {
+        TestStorages.Users userStorage = new TestStorages.Users();
+        TestStorages.Communications communicationStorage = new TestStorages.Communications();
+        TestStorages.Interactions interactionStorage = new TestStorages.Interactions(communicationStorage);
+        ServiceRegistry services = createServices(userStorage, interactionStorage, communicationStorage);
+
+        UUID aliceId = UUID.randomUUID();
+        UUID bobId = UUID.randomUUID();
+        userStorage.save(activeUser(aliceId, "Alice", Gender.FEMALE, EnumSet.of(Gender.MALE)));
+        userStorage.save(activeUser(bobId, "Bob", Gender.MALE, EnumSet.of(Gender.FEMALE)));
+        interactionStorage.save(Match.create(aliceId, bobId));
+
+        server = new RestApiServer(services, 0);
+        server.start();
+        int port = server.getApp().port();
+        String conversationId = ConnectionModels.Conversation.generateId(aliceId, bobId);
+
+        HttpResponse<String> response = HttpClient.newHttpClient()
+                .send(
+                        HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/conversations/"
+                                        + conversationId + "/messages"))
+                                .header(USER_ID_HEADER, aliceId.toString())
+                                .GET()
+                                .build(),
+                        HttpResponse.BodyHandlers.ofString());
+
+        assertEquals(200, response.statusCode(), response.body());
+        JsonNode messagesJson = MAPPER.readTree(response.body());
+        assertTrue(messagesJson.isArray());
+        assertEquals(0, messagesJson.size());
+    }
+
+    @Test
+    @DisplayName("conversation message reads reject non-messageable matches without a stored conversation")
+    void conversationMessageReadsRejectNonMessageableMatchesWithoutStoredConversation() throws Exception {
+        TestStorages.Users userStorage = new TestStorages.Users();
+        TestStorages.Communications communicationStorage = new TestStorages.Communications();
+        TestStorages.Interactions interactionStorage = new TestStorages.Interactions(communicationStorage);
+        ServiceRegistry services = createServices(userStorage, interactionStorage, communicationStorage);
+
+        UUID aliceId = UUID.randomUUID();
+        UUID bobId = UUID.randomUUID();
+        userStorage.save(activeUser(aliceId, "Alice", Gender.FEMALE, EnumSet.of(Gender.MALE)));
+        userStorage.save(activeUser(bobId, "Bob", Gender.MALE, EnumSet.of(Gender.FEMALE)));
+        Match unmatched = Match.create(aliceId, bobId);
+        unmatched.unmatch(aliceId);
+        interactionStorage.save(unmatched);
+
+        server = new RestApiServer(services, 0);
+        server.start();
+        int port = server.getApp().port();
+        String conversationId = ConnectionModels.Conversation.generateId(aliceId, bobId);
+
+        HttpResponse<String> response = HttpClient.newHttpClient()
+                .send(
+                        HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/conversations/"
+                                        + conversationId + "/messages"))
+                                .header(USER_ID_HEADER, aliceId.toString())
+                                .GET()
+                                .build(),
+                        HttpResponse.BodyHandlers.ofString());
+
+        assertEquals(409, response.statusCode(), response.body());
     }
 
     private static ServiceRegistry createServices(

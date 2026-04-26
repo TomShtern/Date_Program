@@ -197,13 +197,32 @@ class MessagingUseCasesTest {
     }
 
     @Test
-    @DisplayName("loadConversation maps a missing conversation to NOT_FOUND")
-    void loadConversationMapsMissingConversationToNotFound() {
+    @DisplayName("loadConversation returns an empty thread for messageable pairs without a stored conversation")
+    void loadConversationReturnsEmptyThreadForMessageablePairsWithoutStoredConversation() {
+        var result = useCases.loadConversation(
+                new LoadConversationQuery(UserContext.cli(sender.getId()), recipient.getId(), 50, 0, false));
+
+        assertTrue(result.success());
+        assertTrue(result.data().messages().isEmpty());
+        assertTrue(result.data().canMessage());
+        assertEquals(
+                Conversation.generateId(sender.getId(), recipient.getId()),
+                result.data().conversationId());
+    }
+
+    @Test
+    @DisplayName("loadConversation maps non-messageable pairs without a conversation to CONFLICT")
+    void loadConversationMapsNonMessageablePairsWithoutConversationToConflict() {
+        Match unmatched = Match.create(sender.getId(), recipient.getId());
+        unmatched.unmatch(sender.getId());
+        interactionStorage.save(unmatched);
+
         var result = useCases.loadConversation(
                 new LoadConversationQuery(UserContext.cli(sender.getId()), recipient.getId(), 50, 0, false));
 
         assertFalse(result.success());
-        assertEquals(UseCaseError.Code.NOT_FOUND, result.error().code());
+        assertEquals(UseCaseError.Code.CONFLICT, result.error().code());
+        assertEquals("Cannot message: no active match", result.error().message());
     }
 
     @Test

@@ -87,6 +87,7 @@ import datingapp.app.usecase.social.SocialUseCases.RespondFriendRequestCommand;
 import datingapp.core.ServiceRegistry;
 import datingapp.core.connection.ConnectionModels.Conversation;
 import datingapp.core.connection.ConnectionService;
+import datingapp.core.matching.TrustSafetyService;
 import datingapp.core.model.Match;
 import datingapp.core.model.User;
 import datingapp.core.model.User.UserState;
@@ -172,6 +173,7 @@ public class RestApiServer {
     private final ProfileNotesUseCases profileNotesUseCases;
     private final VerificationUseCases verificationUseCases;
     private final SocialUseCases socialUseCases;
+    private final TrustSafetyService trustSafetyService;
     private final LocationService locationService;
     private final ZoneId userTimeZone;
     private final RestApiIdentityPolicy identityPolicy;
@@ -208,6 +210,7 @@ public class RestApiServer {
         this.profileNotesUseCases = services.getProfileNotesUseCases();
         this.verificationUseCases = services.getVerificationUseCases();
         this.socialUseCases = services.getSocialUseCases();
+        this.trustSafetyService = services.getTrustSafetyService();
         this.locationService = services.getLocationService();
         this.userTimeZone = services.getConfig().safety().userTimeZone();
         this.identityPolicy = new RestApiIdentityPolicy();
@@ -306,7 +309,7 @@ public class RestApiServer {
 
     void getUser(Context ctx) {
         UUID id = parseUuid(ctx.pathParam("id"));
-        Optional<User> user = loadExistingUser(ctx, id);
+        Optional<User> user = loadReadableUserProfile(ctx, id);
         if (user.isEmpty()) {
             return;
         }
@@ -1167,6 +1170,35 @@ public class RestApiServer {
             return Optional.empty();
         }
         return Optional.of(result.data());
+    }
+
+    private Optional<User> loadReadableUserProfile(Context ctx, UUID targetUserId) {
+        Optional<User> target = loadExistingUser(ctx, targetUserId);
+        if (target.isEmpty()) {
+            return Optional.empty();
+        }
+
+        Optional<UUID> viewerId = resolveActingUserId(ctx);
+        if (viewerId.isEmpty() || viewerId.get().equals(targetUserId)) {
+            return target;
+        }
+
+        Optional<User> viewer = loadExistingUser(ctx, viewerId.get());
+        if (viewer.isEmpty()) {
+            return Optional.empty();
+        }
+
+        ensureViewerCanReadUserProfile(viewer.get(), target.get());
+        return target;
+    }
+
+    private void ensureViewerCanReadUserProfile(User viewer, User target) {
+        if (trustSafetyService.isBlocked(viewer.getId(), target.getId())) {
+            throw new RestApiRequestGuards.ApiForbiddenException("Blocked users cannot view each other's profiles");
+        }
+        if (target.getState() != UserState.ACTIVE) {
+            throw new IllegalStateException("Target user is not visible");
+        }
     }
 
     private boolean ensureUsersExist(Context ctx, UUID... userIds) {

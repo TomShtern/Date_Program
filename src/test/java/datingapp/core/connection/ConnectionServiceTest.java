@@ -64,21 +64,31 @@ class ConnectionServiceTest {
     }
 
     @Test
-    @DisplayName("getMessages(UUID, UUID, limit, offset) rejects invalid paging and unauthorized access")
-    void getMessagesByUserPairRejectsInvalidPagingAndUnauthorizedAccess() {
+    @DisplayName("getMessages(UUID, UUID, limit, offset) rejects invalid paging and non-messageable pairs")
+    void getMessagesByUserPairRejectsInvalidPagingAndNonMessageablePairs() {
         SendResult first = service.sendMessage(sender.getId(), recipient.getId(), "Hello");
         assertTrue(first.success());
 
         MessageLoadResult invalidLimit = service.getMessages(sender.getId(), recipient.getId(), 0, 0);
         MessageLoadResult invalidOffset = service.getMessages(sender.getId(), recipient.getId(), 1, -1);
-        MessageLoadResult unauthorized = service.getMessages(outsider.getId(), recipient.getId(), 1, 0);
+        MessageLoadResult nonMessageable = service.getMessages(outsider.getId(), recipient.getId(), 1, 0);
 
         assertFalse(invalidLimit.success());
         assertEquals("Invalid limit", invalidLimit.errorMessage());
         assertFalse(invalidOffset.success());
         assertEquals("Invalid offset", invalidOffset.errorMessage());
-        assertFalse(unauthorized.success());
-        assertEquals("Conversation not found or unauthorized", unauthorized.errorMessage());
+        assertFalse(nonMessageable.success());
+        assertEquals("Cannot message: no active match", nonMessageable.errorMessage());
+    }
+
+    @Test
+    @DisplayName(
+            "getMessages(UUID, UUID, limit, offset) returns an empty thread for messageable pairs without a conversation row")
+    void getMessagesByUserPairReturnsEmptyThreadWhenMessageablePairHasNoConversationRow() {
+        MessageLoadResult result = service.getMessages(sender.getId(), recipient.getId(), 10, 0);
+
+        assertTrue(result.success());
+        assertTrue(result.messages().isEmpty());
     }
 
     @Test

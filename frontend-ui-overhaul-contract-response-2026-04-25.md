@@ -13,8 +13,10 @@ Stage A response plus Stage B implementation status. The Stage A contract is bas
 Stage B implementation status as of 2026-04-25:
 
 - Person-summary enrichment is implemented on browse, matches, pending-likers, standouts, and daily pick.
+- `GET /api/users/{targetId}` now accepts the viewer's `X-User-Id` for other-user profile reads and returns the existing `UserDetail` payload when the target is readable.
 - `GET /api/users/{id}/profile-edit-snapshot` is implemented.
 - `GET /api/users/{viewerId}/presentation-context/{targetId}` is implemented.
+- `GET /api/conversations/{conversationId}/messages` now returns `200 []` for a valid messageable pair even when no stored conversation row exists yet.
 - Notification event payloads now include the stabilized data keys for match, message, friend-request, friend-request-accepted, and graceful-exit notifications. Legacy `responderId` remains present on the older friend-zone transition notification for compatibility.
 - These four items are implemented in backend code; they are not separately confirmed as deployed to a shared environment in this document: person-summary enrichment, `GET /api/users/{id}/profile-edit-snapshot`, `GET /api/users/{viewerId}/presentation-context/{targetId}`, and notification event stabilization.
 - No Stage A endpoint path, response field name, enum, or wrapper shape was intentionally changed. The profile snapshot location `precision` may be `ADDRESS`, `CITY`, or `ZIP` depending on the stored coordinates, as already allowed by the enum rules below.
@@ -37,6 +39,7 @@ Reviewed sources:
 - `src/main/java/datingapp/core/profile/MatchPreferences.java`
 - `src/main/java/datingapp/core/connection/ConnectionModels.java`
 - `src/main/java/datingapp/core/connection/ConnectionService.java`
+- `src/main/java/datingapp/core/matching/TrustSafetyService.java`
 - `src/main/java/datingapp/core/matching/MatchQualityService.java`
 
 Conventions used below:
@@ -94,6 +97,12 @@ Current conversation summary shape:
 ]
 ```
 
+Current empty-thread read shape for a valid messageable pair with no stored conversation row yet:
+
+```json
+[]
+```
+
 5. Guaranteed fields:
    - `POST /like/{targetId}` always returns `isMatch` and `message`.
    - When `isMatch` is `true`, `match` is present and contains `matchId`, `otherUserId`, `otherUserName`, `state`, and `createdAt`.
@@ -103,14 +112,20 @@ Current conversation summary shape:
    - In `LikeResponse`, `match` is `null` when `isMatch` is `false`.
    - In match summaries, `state` is the current `Match.MatchState` string: `ACTIVE`, `FRIENDS`, `UNMATCHED`, `GRACEFUL_EXIT`, or `BLOCKED`.
    - In conversation summaries, `lastMessageAt` may be `null` if the conversation record exists before any message is saved.
+  - `GET /api/conversations/{conversationId}/messages` returns a raw JSON array of `MessageDto` rows and may legally return an empty array.
 7. Identity notes, especially matchId, conversationId, userId, target ids:
    - `matchId` and `conversationId` are the same deterministic normalized pair id: `<lower-uuid>_<higher-uuid>`.
    - There is no separate conversation UUID namespace today.
    - `GET /api/users/{id}/conversations` returns the conversation id under field name `id`, not `conversationId`.
    - The frontend may safely use `matchId` anywhere a `conversationId` is required.
+  - `GET /api/conversations/{matchId}/messages` returns `200 []` when the pair is still messageable but no message has been stored yet.
    - `POST /api/conversations/{matchId}/messages` is valid even before the thread appears in `GET /api/users/{id}/conversations`; the first successful message creates the stored conversation record if the match is still messageable.
    - For `/api/conversations/{conversationId}/*`, the acting user must be one of the two UUIDs encoded in that id.
-8. Availability: already live.
+  - Message-read failure rules are now:
+    - `400` for missing `X-User-Id`, invalid conversation id format, invalid `limit`, or invalid `offset`
+    - `403` when the acting user is not one of the two users encoded in `{conversationId}`
+    - `409` when the id is well-formed and the acting user is a participant, but the pair is blocked, unmatched, or otherwise not messageable
+8. Availability: already live as of 2026-04-25.
 
 ## 2. Person summary media and context
 
@@ -247,8 +262,8 @@ Target additive fields on `matches`, `pending-likers`, and `standouts` are the s
    - `matchId` must belong to the `{id}` user or the route returns `403`.
    - The route returns `404` when the match id is not found.
    - The current response does not include `conversationId`; use item 1's contract because `conversationId == matchId`.
-   - Current backend behavior does not reject by match state. If the stored match still exists, the route can return quality for `ACTIVE`, `FRIENDS`, `UNMATCHED`, `GRACEFUL_EXIT`, or `BLOCKED` matches.
-8. Availability: already live.
+    - Current backend behavior does not reject by match state. If the stored match still exists, the route can return quality for `ACTIVE`, `FRIENDS`, `UNMATCHED`, `GRACEFUL_EXIT`, or `BLOCKED` matches.
+8. Availability: already live as of 2026-04-25.
 
 ## 4. Presentation context
 
@@ -304,6 +319,53 @@ Target additive fields on `matches`, `pending-likers`, and `standouts` are the s
    - This route does not take `matchId` or `conversationId`.
    - The intended contract is `404` if the target user is not currently visible/explainable for the viewer because the user does not exist, is deleted, is blocked, or is outside the current eligible surface.
 8. Availability: target date 2026-05-08.
+
+## 4A. Other-user profile read
+
+1. Status: Exists now
+2. Exact endpoint path and method: `GET /api/users/{targetId}`
+3. Example request JSON, if there is a request body: No request body. When the caller is reading another user's profile, send the viewer/current user in `X-User-Id`.
+4. Example response JSON:
+
+```json
+{
+  "id": "33333333-3333-3333-3333-333333333333",
+  "name": "Maya",
+  "age": 29,
+  "bio": "Designer, coffee walks, weekend hikes",
+  "gender": "FEMALE",
+  "interestedIn": ["MALE"],
+  "approximateLocation": "Tel Aviv",
+  "maxDistanceKm": 25,
+  "photoUrls": [
+   "/photos/maya-1.jpg",
+   "/photos/maya-2.jpg"
+  ],
+  "state": "ACTIVE"
+}
+```
+
+5. Guaranteed fields:
+  - The response shape is the existing `UserDetail` payload: `id`, `name`, `age`, `bio`, `gender`, `interestedIn`, `approximateLocation`, `maxDistanceKm`, `photoUrls`, and `state`.
+  - No wrapper object is added.
+  - This route intentionally returns the same profile fields the current other-user profile UI already needs.
+  - Recommendation/explanation metadata is not bundled into this response; keep using `GET /api/users/{viewerId}/presentation-context/{targetId}` for that.
+6. Nullability and enum rules:
+  - `photoUrls` is always present and is always an array.
+  - `approximateLocation` is present and may be `null`.
+  - `bio` is present and may be an empty string.
+  - `gender` and `interestedIn` use the current `User` enum strings.
+  - `state` uses the current `User.UserState` string.
+7. Identity notes, authorization rules, and failure cases:
+  - `{targetId}` is the profile being read.
+  - `X-User-Id`, when present, is always the viewer/current user. The frontend must not spoof the target id into that header.
+  - If `X-User-Id` is omitted, the route still behaves like the legacy direct read route.
+  - If `X-User-Id` matches `{targetId}`, the route returns `200` with the same `UserDetail` payload. There is no separate self-profile failure for this route.
+  - `404` when `{targetId}` does not exist.
+  - `403` when the viewer and target are symmetrically blocked.
+  - `409` when the target exists but is not currently visible because the target user is not `ACTIVE` (`PAUSED`, `BANNED`, or `INCOMPLETE`).
+   - Important current live rule: there is no separate backend rejection for a broader "not visible but still active and unblocked" case. Today, if the target exists, is `ACTIVE`, and is not symmetrically blocked, the backend treats the profile as readable.
+8. Availability: already live as of 2026-04-25(night-time).
 
 ## 5. Profile edit read model
 

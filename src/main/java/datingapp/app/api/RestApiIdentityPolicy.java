@@ -2,6 +2,7 @@ package datingapp.app.api;
 
 import datingapp.app.api.RestApiRequestGuards.ApiForbiddenException;
 import io.javalin.http.Context;
+import io.javalin.http.HandlerType;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -9,6 +10,7 @@ final class RestApiIdentityPolicy {
 
     private static final String HEADER_ACTING_USER_ID = "X-User-Id";
     private static final String CONVERSATION_ROUTE_PREFIX = "/api/conversations/";
+    private static final String USER_ROUTE_PREFIX = "/api/users/";
     private static final String USER_ROUTE_MESSAGE = "Acting user does not match requested user route";
     private static final String CONVERSATION_MESSAGE = "User is not part of this conversation";
 
@@ -42,6 +44,9 @@ final class RestApiIdentityPolicy {
         if (!ctx.pathParamMap().containsKey(paramName)) {
             return;
         }
+        if (isDirectUserReadRoute(ctx, paramName)) {
+            return;
+        }
         Optional<UUID> actingUserId = resolveActingUserId(ctx);
         if (actingUserId.isEmpty()) {
             return;
@@ -50,6 +55,14 @@ final class RestApiIdentityPolicy {
         if (!routeUserId.equals(actingUserId.get())) {
             throw new ApiForbiddenException(USER_ROUTE_MESSAGE);
         }
+    }
+
+    private boolean isDirectUserReadRoute(Context ctx, String paramName) {
+        if (!"id".equals(paramName) || ctx.method() != HandlerType.GET) {
+            return false;
+        }
+        String path = ctx.path();
+        return path.startsWith(USER_ROUTE_PREFIX) && path.indexOf('/', USER_ROUTE_PREFIX.length()) < 0;
     }
 
     ConversationParticipants parseConversationParticipants(String conversationId) {

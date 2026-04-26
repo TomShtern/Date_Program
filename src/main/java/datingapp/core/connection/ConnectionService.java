@@ -132,7 +132,10 @@ public class ConnectionService {
         String conversationId = Conversation.generateId(userId, otherUserId);
         Optional<Conversation> convoOpt = findAuthorizedConversation(userId, conversationId);
         if (convoOpt.isEmpty()) {
-            return MessageLoadResult.failure("Conversation not found or unauthorized");
+            if (!canMessage(userId, otherUserId)) {
+                return MessageLoadResult.failure(NO_ACTIVE_MATCH);
+            }
+            return MessageLoadResult.success(List.of());
         }
 
         return MessageLoadResult.success(communicationStorage.getMessages(conversationId, limit, offset));

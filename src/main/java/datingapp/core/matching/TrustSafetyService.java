@@ -658,6 +658,12 @@ public final class TrustSafetyService {
                 .toList();
     }
 
+    public boolean isBlocked(UUID userA, UUID userB) {
+        Objects.requireNonNull(userA, "userA cannot be null");
+        Objects.requireNonNull(userB, "userB cannot be null");
+        return trustSafetyStorage.isBlocked(userA, userB);
+    }
+
     /** Result of a report action, including moderation outcome. */
     public static record ReportResult(boolean success, boolean userWasBanned, String errorMessage) {
 

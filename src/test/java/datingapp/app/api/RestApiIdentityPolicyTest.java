@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import io.javalin.http.Context;
+import io.javalin.http.HandlerType;
 import java.lang.reflect.Proxy;
 import java.util.HashMap;
 import java.util.Map;
@@ -39,7 +40,7 @@ class RestApiIdentityPolicyTest {
         UUID actingUserId = UUID.randomUUID();
 
         Context mismatchedId = context(
-                "/api/users/other",
+                "/api/users/other/profile",
                 Map.of(USER_ID_HEADER, actingUserId.toString()),
                 Map.of("id", UUID.randomUUID().toString()));
         Context mismatchedAuthorId = context(
@@ -52,6 +53,20 @@ class RestApiIdentityPolicyTest {
         assertThrows(
                 RestApiRequestGuards.ApiForbiddenException.class,
                 () -> policy.enforceScopedIdentity(mismatchedAuthorId));
+    }
+
+    @Test
+    @DisplayName("enforceScopedIdentity allows viewer headers on direct user read routes")
+    void enforceScopedIdentityAllowsViewerHeadersOnDirectUserReadRoutes() {
+        RestApiIdentityPolicy policy = new RestApiIdentityPolicy();
+        UUID actingUserId = UUID.randomUUID();
+
+        Context otherUserRead = context(
+                "/api/users/" + UUID.randomUUID(),
+                Map.of(USER_ID_HEADER, actingUserId.toString()),
+                Map.of("id", UUID.randomUUID().toString()));
+
+        assertDoesNotThrow(() -> policy.enforceScopedIdentity(otherUserRead));
     }
 
     @Test
@@ -83,6 +98,7 @@ class RestApiIdentityPolicyTest {
                 new Class<?>[] {Context.class},
                 (proxy, invokedMethod, args) -> switch (invokedMethod.getName()) {
                     case "path" -> path;
+                    case "method" -> HandlerType.GET;
                     case "header" -> headerCopy.get(args[0].toString());
                     case "pathParamMap" -> pathParamCopy;
                     case "pathParam" -> pathParamCopy.get(args[0].toString());

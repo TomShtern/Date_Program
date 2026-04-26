@@ -292,11 +292,14 @@ class MessagingServiceTest {
         }
 
         @Test
-        @DisplayName("should return failure for no conversation")
-        void returnFailureForNoConversation() {
+        @DisplayName("should return an empty thread for messageable pairs without a conversation row")
+        void returnsEmptyThreadForMessageablePairWithoutConversationRow() {
+            Match match = Match.create(userA, userB);
+            matchStorage.save(match);
+
             var result = messagingService.getMessages(userA, userB, 10, 0);
-            assertFalse(result.success());
-            assertEquals("Conversation not found or unauthorized", result.errorMessage());
+            assertTrue(result.success());
+            assertTrue(result.messages().isEmpty());
         }
 
         @Test
