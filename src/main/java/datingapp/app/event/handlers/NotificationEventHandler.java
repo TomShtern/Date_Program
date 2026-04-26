@@ -138,6 +138,9 @@ public final class NotificationEventHandler {
     }
 
     private static Map<String, String> contextWith(String pairId, String... extraKeyValues) {
+        if (extraKeyValues.length % 2 != 0) {
+            throw new IllegalArgumentException("extraKeyValues must contain key/value pairs");
+        }
         LinkedHashMap<String, String> data = new LinkedHashMap<>();
         data.put(DATA_MATCH_ID, pairId);
         data.put(DATA_CONVERSATION_ID, pairId);

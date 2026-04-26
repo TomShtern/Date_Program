@@ -219,8 +219,8 @@ public final class JdbiUserStorage implements OperationalUserStorage {
                     .list();
             hydrateUsers(handle, users);
             for (User user : users) {
-                result.put(user.getId(), user);
-                cacheUser(user.getId(), user);
+                result.put(user.getId(), copyUser(user));
+                cacheUser(user.getId(), copyUser(user));
             }
         });
         return result;

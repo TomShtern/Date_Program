@@ -250,6 +250,8 @@ public interface CommunicationStorage {
     }
 
     default MarkNotificationReadResult markNotificationAsReadChecked(UUID userId, UUID notificationId) {
+        // Non-atomic default: check-then-act is not safe under concurrent modification.
+        // Transactional implementations should override this method with an atomic check-and-update.
         Objects.requireNonNull(userId, "userId cannot be null");
         Objects.requireNonNull(notificationId, "notificationId cannot be null");
         Optional<Notification> notification = getNotification(notificationId);
