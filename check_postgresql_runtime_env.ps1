@@ -152,7 +152,12 @@ foreach ($commandName in $requiredCommands) {
 }
 
 if ($missingCommands.Count -gt 0) {
-    Exit-OrThrow -ExitCode 1 -Message ("Missing required PostgreSQL CLI tools: " + ($missingCommands -join ', '))
+    $hint = @(
+        "[ENV] Missing required PostgreSQL CLI tools: " + ($missingCommands -join ', ')
+        "  Hint: Install PostgreSQL client tools and ensure they are on PATH."
+        "  Hint: On Windows, add the PostgreSQL bin directory to your system PATH."
+    ) -join "`n"
+    Exit-OrThrow -ExitCode 1 -Message $hint
 }
 
 $dotEnvValues = Parse-DotEnv -Path $DotEnvPath
@@ -177,16 +182,26 @@ $pgIsReadyExitCode = $LASTEXITCODE
 
 if ($pgIsReadyExitCode -ne 0) {
     if ($pgIsReadyExitCode -in 1, 2, 3) {
-        Exit-OrThrow -ExitCode 2 -Message ("PostgreSQL is not reachable at {0}:{1}. Run .\\start_local_postgres.ps1, then retry this preflight." -f $effectiveSettings.Host, $effectiveSettings.Port)
+        $hint = @(
+            ("[CONNECTIVITY] PostgreSQL is not reachable at {0}:{1}." -f $effectiveSettings.Host, $effectiveSettings.Port)
+            "  Hint: Run .\start_local_postgres.ps1 to start the local server, then retry this preflight."
+            "  Hint: Check if port $($effectiveSettings.Port) is blocked by a firewall or already used by another service."
+        ) -join "`n"
+        Exit-OrThrow -ExitCode 2 -Message $hint
     }
 
-    Exit-OrThrow -ExitCode 2 -Message ("pg_isready failed with exit code {0}." -f $pgIsReadyExitCode)
+    Exit-OrThrow -ExitCode 2 -Message ("[CONNECTIVITY] pg_isready failed with exit code {0}." -f $pgIsReadyExitCode)
 }
 
 Write-CheckLine -Icon '✅' -Message ("PostgreSQL is accepting connections at {0}:{1}." -f $effectiveSettings.Host, $effectiveSettings.Port)
 
 if ([string]::IsNullOrWhiteSpace($effectiveSettings.Password)) {
-    Exit-OrThrow -ExitCode 3 -Message 'Database password is not configured. Set DATING_APP_DB_PASSWORD in .env or the process environment.'
+    $hint = @(
+        '[AUTH] Database password is not configured.'
+        '  Hint: Set DATING_APP_DB_PASSWORD in .env or the process environment.'
+        '  Hint: Copy .env.example to .env and fill in the password value.'
+    ) -join "`n"
+    Exit-OrThrow -ExitCode 3 -Message $hint
 }
 
 $env:PGPASSWORD = $effectiveSettings.Password
@@ -202,7 +217,7 @@ try {
     $psqlExitCode = $LASTEXITCODE
 
     if ($psqlExitCode -ne 0) {
-        Exit-OrThrow -ExitCode 4 -Message ("psql connection check failed with exit code {0}. {1}" -f $psqlExitCode, $connectionOutput.Trim())
+        Exit-OrThrow -ExitCode 4 -Message ("[AUTH] psql connection check failed with exit code {0}. {1}" -f $psqlExitCode, $connectionOutput.Trim())
     }
 
     $trimmedOutput = $connectionOutput.Trim()

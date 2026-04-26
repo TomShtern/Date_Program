@@ -398,7 +398,8 @@ public final class MatchingService {
         Set<UUID> blocked = trustSafetyStorage.getBlockedUserIds(currentUserId);
         Set<UUID> matched = interactionStorage.getMatchedCounterpartIds(currentUserId);
 
-        Set<UUID> excluded = new HashSet<>(alreadyInteracted);
+        Set<UUID> excluded = new HashSet<>(alreadyInteracted.size() + blocked.size() + matched.size());
+        excluded.addAll(alreadyInteracted);
         excluded.addAll(blocked);
         excluded.addAll(matched);
 

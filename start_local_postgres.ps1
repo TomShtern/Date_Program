@@ -16,7 +16,12 @@ if ($StartupTimeoutSeconds -lt 1) {
 
 # If no credential provided, create one with default dev credentials
 if ($null -eq $Credential) {
-    $securePassword = ConvertTo-SecureString -String 'datingapp' -AsPlainText -Force
+    $securePassword = New-Object System.Security.SecureString
+    foreach ($character in 'datingapp'.ToCharArray()) {
+        $securePassword.AppendChar($character)
+    }
+
+    $securePassword.MakeReadOnly()
     $Credential = New-Object PSCredential($Superuser, $securePassword)
 }
 
@@ -28,13 +33,26 @@ $pgCtlStdOutFile = Join-Path $BaseDir 'pg_ctl-start.stdout.log'
 $pgCtlStdErrFile = Join-Path $BaseDir 'pg_ctl-start.stderr.log'
 $pgVersionFile = Join-Path $dataDir 'PG_VERSION'
 $validatedDatabase = $Database.Trim()
+$databaseNamePattern = '^[A-Za-z_][A-Za-z0-9_]*' + [char]36
 $plainPassword = $Credential.GetNetworkCredential().Password
 $quotedSuperuser = '"' + ($Superuser -replace '"', '""') + '"'
 $quotedDatabase = '"' + ($validatedDatabase -replace '"', '""') + '"'
 
-if ($validatedDatabase -notmatch '^[A-Za-z_][A-Za-z0-9_]*$') {
-    throw ('Database name must match ^[A-Za-z_][A-Za-z0-9_]*$: ' + $Database)
+function Assert-ValidDatabaseName {
+    param(
+        [string]$DatabaseName,
+        [string]$Pattern
+    )
+
+    if ([regex]::IsMatch($DatabaseName, $Pattern)) {
+        return
+    }
+
+    $invalidDatabaseMessage = '[CONFIG] Invalid database name ''' + $DatabaseName + '''. Allowed pattern: ' + $Pattern + '. Use letters or underscores first, then letters, digits, or underscores only.'
+    throw $invalidDatabaseMessage
 }
+
+Assert-ValidDatabaseName -DatabaseName $validatedDatabase -Pattern $databaseNamePattern
 
 New-Item -ItemType Directory -Force -Path $BaseDir | Out-Null
 
@@ -53,7 +71,7 @@ function Test-PostgresReady {
         return $false
     }
 
-    throw "pg_isready failed with exit code $probeExitCode."
+    throw "[STARTUP] pg_isready failed with exit code $probeExitCode."
 }
 
 function Wait-ForPostgresReady {
@@ -76,14 +94,14 @@ function Wait-ForPostgresReady {
     return $false
 }
 
-function Get-ConfigValueFromLines {
+function Get-ConfigValueFromLineCollection {
     param(
-        [System.Collections.Generic.List[string]]$Lines,
+        [System.Collections.Generic.List[string]]$LineCollection,
         [string]$Name
     )
 
     $pattern = '^\s*' + [regex]::Escape($Name) + '\s*=\s*(?<value>.+?)\s*$'
-    foreach ($line in $Lines) {
+    foreach ($line in $LineCollection) {
         if ($line -match $pattern) {
             return $Matches['value'].Trim()
         }
@@ -92,31 +110,31 @@ function Get-ConfigValueFromLines {
     return $null
 }
 
-function Set-ConfigValueInLines {
+function Write-ConfigValueInLineCollection {
     param(
-        [System.Collections.Generic.List[string]]$Lines,
+        [System.Collections.Generic.List[string]]$LineCollection,
         [string]$Name,
         [string]$Value
     )
 
     $pattern = '^\s*' + [regex]::Escape($Name) + '\s*='
     $newLine = "$Name = $Value"
-    for ($index = 0; $index -lt $Lines.Count; $index++) {
-        if ($Lines[$index] -match $pattern) {
-            if ($Lines[$index] -eq $newLine) {
+    for ($index = 0; $index -lt $LineCollection.Count; $index++) {
+        if ($LineCollection[$index] -match $pattern) {
+            if ($LineCollection[$index] -eq $newLine) {
                 return $false
             }
 
-            $Lines[$index] = $newLine
+            $LineCollection[$index] = $newLine
             return $true
         }
     }
 
-    $Lines.Add($newLine)
+    $LineCollection.Add($newLine)
     return $true
 }
 
-function Merge-SharedPreloadLibraries {
+function Merge-SharedPreloadLibraryCollection {
     param([AllowNull()][string]$RawValue)
 
     $libraries = New-Object System.Collections.Generic.List[string]
@@ -141,25 +159,25 @@ function Merge-SharedPreloadLibraries {
     return "'" + ($libraries -join ', ') + "'"
 }
 
-function Ensure-LocalObservabilityConfig {
+function Write-LocalObservabilityConfig {
     param([string]$ConfigPath)
 
-    $lines = New-Object System.Collections.Generic.List[string]
+    $lineCollection = New-Object System.Collections.Generic.List[string]
     if (Test-Path $ConfigPath) {
-        $lines.AddRange([string[]](Get-Content -Path $ConfigPath))
+        $lineCollection.AddRange([string[]](Get-Content -Path $ConfigPath))
     }
 
-    $sharedPreloadLibraries = Merge-SharedPreloadLibraries -RawValue (Get-ConfigValueFromLines -Lines $lines -Name 'shared_preload_libraries')
+    $sharedPreloadLibraries = Merge-SharedPreloadLibraryCollection -RawValue (Get-ConfigValueFromLineCollection -LineCollection $lineCollection -Name 'shared_preload_libraries')
     $changed = $false
-    if (Set-ConfigValueInLines -Lines $lines -Name 'shared_preload_libraries' -Value $sharedPreloadLibraries) {
+    if (Write-ConfigValueInLineCollection -LineCollection $lineCollection -Name 'shared_preload_libraries' -Value $sharedPreloadLibraries) {
         $changed = $true
     }
-    if (Set-ConfigValueInLines -Lines $lines -Name 'compute_query_id' -Value 'on') {
+    if (Write-ConfigValueInLineCollection -LineCollection $lineCollection -Name 'compute_query_id' -Value 'on') {
         $changed = $true
     }
 
     if ($changed) {
-        Set-Content -Path $ConfigPath -Value $lines
+        Set-Content -Path $ConfigPath -Value $lineCollection
     }
 
     return $changed
@@ -171,12 +189,12 @@ if (-not (Test-Path $pgVersionFile)) {
     & initdb -D $dataDir -U $Superuser --auth-local=scram-sha-256 --auth-host=scram-sha-256 --pwfile=$passwordFile --encoding=UTF8 | Out-String | Write-Output
 }
 
-$observabilityConfigChanged = Ensure-LocalObservabilityConfig -ConfigPath $postgresAutoConfigFile
+$observabilityConfigChanged = Write-LocalObservabilityConfig -ConfigPath $postgresAutoConfigFile
 
 if ($serverWasRunning -and $observabilityConfigChanged) {
     & pg_ctl -D $dataDir stop -m fast | Out-String | Write-Output
     if ($LASTEXITCODE -ne 0) {
-        throw "pg_ctl stop failed with exit code $LASTEXITCODE while applying PostgreSQL observability settings."
+        throw "[STARTUP] pg_ctl stop failed with exit code $LASTEXITCODE while applying PostgreSQL observability settings."
     }
 }
 
@@ -204,14 +222,14 @@ if (-not (Test-PostgresReady -ProbePort $Port)) {
         }
 
         if ($null -eq $startExitCode) {
-            throw 'pg_ctl start did not finish and PostgreSQL never became ready.'
+            throw '[STARTUP] pg_ctl start did not finish and PostgreSQL never became ready.'
         }
 
         if ([string]::IsNullOrWhiteSpace($pgCtlErrorOutput)) {
-            throw "pg_ctl start failed with exit code $startExitCode."
+            throw "[STARTUP] pg_ctl start failed with exit code $startExitCode."
         }
 
-        throw "pg_ctl start failed with exit code $startExitCode. $pgCtlErrorOutput"
+        throw "[STARTUP] pg_ctl start failed with exit code $startExitCode. $pgCtlErrorOutput"
     }
 
     if ($pgCtlExited) {
@@ -227,20 +245,20 @@ try {
     $psqlExitCode = $LASTEXITCODE
 
     if ($psqlExitCode -ne 0) {
-        throw "psql failed with exit code $psqlExitCode while checking whether the database exists."
+        throw "[DATABASE] psql failed with exit code $psqlExitCode while checking whether the database exists."
     }
 
     $databaseExists = $databaseExistsOutput.Trim()
     if ($databaseExists -ne '1') {
         & createdb -h localhost -p $Port -U $Superuser $validatedDatabase | Out-String | Write-Output
         if ($LASTEXITCODE -ne 0) {
-            throw "createdb failed with exit code $LASTEXITCODE."
+            throw "[DATABASE] createdb failed with exit code $LASTEXITCODE."
         }
     }
 
     & psql "host=localhost port=$Port dbname=$validatedDatabase user=$Superuser connect_timeout=5" -w -X -v ON_ERROR_STOP=1 -c "CREATE EXTENSION IF NOT EXISTS pg_stat_statements" | Out-String | Write-Output
     if ($LASTEXITCODE -ne 0) {
-        throw "psql failed with exit code $LASTEXITCODE while enabling pg_stat_statements."
+        throw "[DATABASE] psql failed with exit code $LASTEXITCODE while enabling pg_stat_statements."
     }
 
     $roleDefaultsSql = @"
@@ -251,7 +269,7 @@ ALTER ROLE $quotedSuperuser IN DATABASE $quotedDatabase SET idle_in_transaction_
 "@
     & psql "host=localhost port=$Port dbname=$validatedDatabase user=$Superuser connect_timeout=5" -w -X -v ON_ERROR_STOP=1 -c $roleDefaultsSql | Out-String | Write-Output
     if ($LASTEXITCODE -ne 0) {
-        throw "psql failed with exit code $LASTEXITCODE while applying local role defaults."
+        throw "[DATABASE] psql failed with exit code $LASTEXITCODE while applying local role defaults."
     }
 }
 finally {

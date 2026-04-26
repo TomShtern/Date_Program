@@ -342,17 +342,13 @@ public class SocialUseCases {
             return dependencyFailure(COMMUNICATION_STORAGE_NOT_CONFIGURED);
         }
         try {
-            Notification notification = communicationStorage
-                    .getNotification(command.notificationId())
-                    .orElse(null);
-            if (notification == null) {
-                return UseCaseResult.failure(UseCaseError.notFound("Notification not found"));
-            }
-            if (!notification.userId().equals(command.context().userId())) {
-                return UseCaseResult.failure(UseCaseError.forbidden("Notification does not belong to current user"));
-            }
-            communicationStorage.markNotificationAsRead(command.context().userId(), command.notificationId());
-            return UseCaseResult.success(null);
+            return switch (communicationStorage.markNotificationAsReadChecked(
+                    command.context().userId(), command.notificationId())) {
+                case UPDATED -> UseCaseResult.success(null);
+                case NOT_FOUND -> UseCaseResult.failure(UseCaseError.notFound("Notification not found"));
+                case NOT_OWNED ->
+                    UseCaseResult.failure(UseCaseError.forbidden("Notification does not belong to current user"));
+            };
         } catch (Exception e) {
             return internalFailure("mark notification as read", e);
         }

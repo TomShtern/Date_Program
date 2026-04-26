@@ -100,8 +100,14 @@ public class ConnectionService {
         boolean createdConversation = false;
         if (communicationStorage.getConversation(conversationId).isEmpty()) {
             Conversation newConvo = Conversation.create(senderId, recipientId);
-            communicationStorage.saveConversation(newConvo);
-            createdConversation = true;
+            try {
+                communicationStorage.saveConversation(newConvo);
+                createdConversation = true;
+            } catch (RuntimeException saveConflict) {
+                if (communicationStorage.getConversation(conversationId).isEmpty()) {
+                    throw saveConflict;
+                }
+            }
         }
 
         Message message = Message.create(conversationId, senderId, content);
@@ -109,7 +115,7 @@ public class ConnectionService {
             communicationStorage.saveMessageAndUpdateConversationLastMessageAt(message);
         } catch (RuntimeException e) {
             if (createdConversation) {
-                communicationStorage.deleteConversationWithMessages(conversationId);
+                communicationStorage.deleteConversation(conversationId);
             }
             throw e;
         }
@@ -184,17 +190,21 @@ public class ConnectionService {
             return List.of();
         }
 
-        List<UUID> otherUserIds =
-                conversations.stream().map(c -> c.getOtherUser(userId)).toList();
-        Map<UUID, User> otherUsers = userStorage.findByIds(new HashSet<>(otherUserIds));
-        Set<String> conversationIds =
-                conversations.stream().map(Conversation::getId).collect(java.util.stream.Collectors.toSet());
+        int size = conversations.size();
+        Set<UUID> otherUserIds = new HashSet<>(size);
+        Set<String> conversationIds = new HashSet<>(size);
+        for (Conversation convo : conversations) {
+            otherUserIds.add(convo.getOtherUser(userId));
+            conversationIds.add(convo.getId());
+        }
+
+        Map<UUID, User> otherUsers = userStorage.findByIds(otherUserIds);
         Map<String, Optional<Message>> latestMessages =
                 communicationStorage.getLatestMessagesByConversationIds(conversationIds);
         Map<String, Integer> unreadCounts =
                 communicationStorage.countUnreadMessagesByConversationIds(userId, conversationIds);
 
-        List<ConversationPreview> previews = new ArrayList<>();
+        List<ConversationPreview> previews = new ArrayList<>(size);
         for (Conversation convo : conversations) {
             UUID otherUserId = convo.getOtherUser(userId);
             User otherUser = otherUsers.get(otherUserId);
@@ -209,6 +219,27 @@ public class ConnectionService {
         }
 
         return previews;
+    }
+
+    public List<ConversationSummaryEntry> getConversationsWithMessageCounts(UUID userId, int limit, int offset) {
+        List<ConversationPreview> previews = getConversations(userId, limit, offset);
+        if (previews.isEmpty()) {
+            return List.of();
+        }
+
+        Set<String> ids = new HashSet<>(previews.size());
+        for (ConversationPreview preview : previews) {
+            ids.add(preview.conversation().getId());
+        }
+        Map<String, Integer> messageCounts = communicationStorage.countMessagesByConversationIds(ids);
+
+        List<ConversationSummaryEntry> entries = new ArrayList<>(previews.size());
+        for (ConversationPreview preview : previews) {
+            String convoId = preview.conversation().getId();
+            int count = messageCounts.getOrDefault(convoId, 0);
+            entries.add(new ConversationSummaryEntry(preview, count));
+        }
+        return entries;
     }
 
     public Optional<ConversationPreview> getConversationPreview(UUID userId, String conversationId) {
@@ -684,6 +715,15 @@ public class ConnectionService {
             Objects.requireNonNull(lastMessage, "lastMessage cannot be null");
             if (unreadCount < 0) {
                 throw new IllegalArgumentException("unreadCount cannot be negative");
+            }
+        }
+    }
+
+    public static record ConversationSummaryEntry(ConversationPreview preview, int messageCount) {
+        public ConversationSummaryEntry {
+            Objects.requireNonNull(preview, "preview cannot be null");
+            if (messageCount < 0) {
+                throw new IllegalArgumentException("messageCount cannot be negative");
             }
         }
     }

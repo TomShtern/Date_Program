@@ -10,6 +10,7 @@ import datingapp.core.connection.ConnectionModels.Conversation;
 import datingapp.core.connection.ConnectionModels.Message;
 import datingapp.core.connection.ConnectionService;
 import datingapp.core.connection.ConnectionService.ConversationPreview;
+import datingapp.core.connection.ConnectionService.ConversationSummaryEntry;
 import datingapp.core.model.Match.MatchArchiveReason;
 import datingapp.core.profile.ValidationService;
 import java.util.List;
@@ -56,6 +57,24 @@ public class MessagingUseCases {
             return UseCaseResult.success(new ConversationListResult(previews, totalUnread));
         } catch (Exception e) {
             return internalFailure("list conversations", e);
+        }
+    }
+
+    public UseCaseResult<ConversationListWithCountsResult> listConversationsWithMessageCounts(
+            ListConversationsQuery query) {
+        if (query == null || query.context() == null) {
+            return validationFailure(CONTEXT_REQUIRED);
+        }
+        int limit = normalizeLimit(query.limit());
+        int offset = normalizeOffset(query.offset());
+        try {
+            List<ConversationSummaryEntry> entries = connectionService.getConversationsWithMessageCounts(
+                    query.context().userId(), limit, offset);
+            int totalUnread =
+                    entries.stream().mapToInt(e -> e.preview().unreadCount()).sum();
+            return UseCaseResult.success(new ConversationListWithCountsResult(entries, totalUnread));
+        } catch (Exception e) {
+            return internalFailure("list conversations with message counts", e);
         }
     }
 
@@ -276,6 +295,9 @@ public class MessagingUseCases {
     public static record ListConversationsQuery(UserContext context, int limit, int offset) {}
 
     public static record ConversationListResult(List<ConversationPreview> conversations, int totalUnreadCount) {}
+
+    public static record ConversationListWithCountsResult(
+            List<ConversationSummaryEntry> entries, int totalUnreadCount) {}
 
     public static record OpenConversationCommand(UserContext context, UUID otherUserId) {}
 

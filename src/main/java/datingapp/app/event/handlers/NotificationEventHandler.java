@@ -5,15 +5,12 @@ import datingapp.app.event.AppEventBus;
 import datingapp.core.connection.ConnectionModels.Conversation;
 import datingapp.core.connection.ConnectionModels.Notification;
 import datingapp.core.storage.CommunicationStorage;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/**
- * Listens for relationship transition events and creates user-facing notifications.
- * Handles graceful-exit and friend-zone-acceptance notifications.
- */
 public final class NotificationEventHandler {
 
     private static final Logger logger = LoggerFactory.getLogger(NotificationEventHandler.class);
@@ -32,7 +29,6 @@ public final class NotificationEventHandler {
         this.communicationStorage = Objects.requireNonNull(communicationStorage, "communicationStorage");
     }
 
-    /** Subscribes this handler to the given event bus with BEST_EFFORT policy. */
     public void register(AppEventBus eventBus) {
         eventBus.subscribe(
                 AppEvent.RelationshipTransitioned.class,
@@ -49,77 +45,54 @@ public final class NotificationEventHandler {
     }
 
     void onRelationshipTransitioned(AppEvent.RelationshipTransitioned event) {
-        String conversationId = Conversation.generateId(event.initiatorId(), event.targetId());
-        switch (event.toState()) {
-            case GRACEFUL_EXIT -> {
-                Notification notification = Notification.create(
-                        event.targetId(),
-                        Notification.Type.GRACEFUL_EXIT,
-                        "Relationship Ended",
-                        "The other user has gracefully moved on from this relationship.",
-                        Map.of(
-                                "initiatorId",
-                                event.initiatorId().toString(),
-                                DATA_MATCH_ID,
-                                conversationId,
-                                DATA_CONVERSATION_ID,
-                                conversationId));
-                communicationStorage.saveNotification(notification);
-            }
-            case FRIEND_ZONE_REQUESTED -> {
-                Notification notification = Notification.create(
-                        event.initiatorId(),
-                        Notification.Type.FRIEND_REQUEST_ACCEPTED,
-                        "Friend Request Accepted",
-                        "Your match with the other user has successfully transitioned to the Friend Zone.",
-                        Map.of(
-                                DATA_REQUEST_ID,
-                                conversationId,
-                                "responderId",
-                                event.targetId().toString(),
-                                DATA_ACCEPTER_USER_ID,
-                                event.targetId().toString(),
-                                DATA_MATCH_ID,
-                                conversationId,
-                                DATA_CONVERSATION_ID,
-                                conversationId));
-                communicationStorage.saveNotification(notification);
-            }
-            case MATCHED, UNMATCHED, ACTIVE -> {
-                // No notification needed for other transitions
-            }
-            default -> {
-                // Defensive default for future enum additions.
-            }
+        String pairId = Conversation.generateId(event.initiatorId(), event.targetId());
+        Notification notification =
+                switch (event.toState()) {
+                    case GRACEFUL_EXIT ->
+                        Notification.create(
+                                event.targetId(),
+                                Notification.Type.GRACEFUL_EXIT,
+                                "Relationship Ended",
+                                "The other user has gracefully moved on from this relationship.",
+                                contextWith(
+                                        pairId,
+                                        "initiatorId",
+                                        event.initiatorId().toString()));
+                    case FRIEND_ZONE_REQUESTED ->
+                        Notification.create(
+                                event.initiatorId(),
+                                Notification.Type.FRIEND_REQUEST_ACCEPTED,
+                                "Friend Request Accepted",
+                                "Your match with the other user has successfully transitioned to the Friend Zone.",
+                                contextWith(
+                                        pairId,
+                                        DATA_REQUEST_ID,
+                                        pairId,
+                                        "responderId",
+                                        event.targetId().toString(),
+                                        DATA_ACCEPTER_USER_ID,
+                                        event.targetId().toString()));
+                    default -> null;
+                };
+        if (notification != null) {
+            communicationStorage.saveNotification(notification);
         }
     }
 
     void onMatchCreated(AppEvent.MatchCreated event) {
-        String conversationId = Conversation.generateId(event.userA(), event.userB());
+        String pairId = Conversation.generateId(event.userA(), event.userB());
         saveNotification(Notification.create(
                 event.userA(),
                 Notification.Type.MATCH_FOUND,
                 "New Match!",
                 "You have a new match!",
-                Map.of(
-                        DATA_MATCH_ID,
-                        conversationId,
-                        DATA_CONVERSATION_ID,
-                        conversationId,
-                        DATA_OTHER_USER_ID,
-                        event.userB().toString())));
+                contextWith(pairId, DATA_OTHER_USER_ID, event.userB().toString())));
         saveNotification(Notification.create(
                 event.userB(),
                 Notification.Type.MATCH_FOUND,
                 "New Match!",
                 "You have a new match!",
-                Map.of(
-                        DATA_MATCH_ID,
-                        conversationId,
-                        DATA_CONVERSATION_ID,
-                        conversationId,
-                        DATA_OTHER_USER_ID,
-                        event.userA().toString())));
+                contextWith(pairId, DATA_OTHER_USER_ID, event.userA().toString())));
     }
 
     void onMessageSent(AppEvent.MessageSent event) {
@@ -128,28 +101,27 @@ public final class NotificationEventHandler {
                 Notification.Type.NEW_MESSAGE,
                 "New Message",
                 "Someone sent you a new message.",
-                Map.of(
-                        DATA_CONVERSATION_ID, Conversation.generateId(event.senderId(), event.recipientId()),
-                        DATA_SENDER_ID, event.senderId().toString(),
-                        DATA_MESSAGE_ID, event.messageId().toString())));
+                contextWith(
+                        Conversation.generateId(event.senderId(), event.recipientId()),
+                        DATA_SENDER_ID,
+                        event.senderId().toString(),
+                        DATA_MESSAGE_ID,
+                        event.messageId().toString())));
     }
 
     void onFriendRequestAccepted(AppEvent.FriendRequestAccepted event) {
-        String conversationId = Conversation.generateId(event.fromUserId(), event.toUserId());
+        String pairId = Conversation.generateId(event.fromUserId(), event.toUserId());
         saveNotification(Notification.create(
                 event.fromUserId(),
                 Notification.Type.FRIEND_REQUEST_ACCEPTED,
                 "Friend Request Accepted",
                 "Your friend request was accepted.",
-                Map.of(
+                contextWith(
+                        pairId,
                         DATA_REQUEST_ID,
                         event.requestId().toString(),
                         DATA_ACCEPTER_USER_ID,
-                        event.toUserId().toString(),
-                        DATA_MATCH_ID,
-                        conversationId,
-                        DATA_CONVERSATION_ID,
-                        conversationId)));
+                        event.toUserId().toString())));
     }
 
     void onAccountDeleted(AppEvent.AccountDeleted event) {
@@ -163,5 +135,15 @@ public final class NotificationEventHandler {
 
     private void saveNotification(Notification notification) {
         communicationStorage.saveNotification(notification);
+    }
+
+    private static Map<String, String> contextWith(String pairId, String... extraKeyValues) {
+        LinkedHashMap<String, String> data = new LinkedHashMap<>();
+        data.put(DATA_MATCH_ID, pairId);
+        data.put(DATA_CONVERSATION_ID, pairId);
+        for (int i = 0; i < extraKeyValues.length; i += 2) {
+            data.put(extraKeyValues[i], extraKeyValues[i + 1]);
+        }
+        return Map.copyOf(data);
     }
 }

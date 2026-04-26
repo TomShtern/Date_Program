@@ -23,7 +23,7 @@ if ($LASTEXITCODE -ne 0) {
 
 & pg_ctl -D $dataDir stop -m fast | Out-String | Write-Output
 if ($LASTEXITCODE -ne 0) {
-    throw "pg_ctl stop failed with exit code $LASTEXITCODE."
+    throw "[STARTUP] pg_ctl stop failed with exit code $LASTEXITCODE."
 }
 
 $global:LASTEXITCODE = 0

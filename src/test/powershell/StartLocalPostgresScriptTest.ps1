@@ -150,8 +150,9 @@ function Assert-StartScriptRejectsUnsafeDatabaseName {
             throw 'Expected start_local_postgres.ps1 to reject an unsafe database name.'
         }
 
-        if ($output -notmatch 'Database name must match') {
-            throw 'Expected start_local_postgres.ps1 to report the database-name validation failure.'
+        $allowedPattern = '^[A-Za-z_][A-Za-z0-9_]*' + [char]36
+        if ($output -notmatch [regex]::Escape($allowedPattern)) {
+            throw "Expected start_local_postgres.ps1 to report the allowed database-name pattern '$allowedPattern'."
         }
 
         if ((Get-CountValue -Path $sandbox.PgIsReadyCountFile) -ne 0) {

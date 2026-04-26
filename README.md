@@ -98,8 +98,14 @@ mvn -Ptest-output-verbose test
 # Full local verification (Maven quality gate + PostgreSQL smoke)
 .\run_verify.ps1
 
+# Focused PostgreSQL smoke test only
+.\run_postgresql_smoke.ps1
+
 # Maven quality gate only
 mvn spotless:apply verify
+
+# All scripts tag failures with category prefixes ([STARTUP], [MAVEN], [CONNECTIVITY], etc.)
+# See CI_AND_POSTGRESQL_GUIDE.md for the full error-category reference.
 ```
 <!-- ChangeStamp: 9|2026-04-09 22:05:00|agent:github_copilot|scope:postgres-startup-ux|Added PostgreSQL preflight/start commands so the local VS Code connection workflow is harder to miss|README.md -->
 

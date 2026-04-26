@@ -91,18 +91,24 @@ public class ProfileUseCases {
                 return UseCaseResult.success(Map.of());
             }
 
-            List<UUID> requestedIds =
-                    query.userIds().stream().filter(Objects::nonNull).toList();
-            if (requestedIds.isEmpty()) {
+            Set<UUID> deduplicatedIds = new java.util.HashSet<>(query.userIds().size());
+            for (UUID id : query.userIds()) {
+                if (id != null) {
+                    deduplicatedIds.add(id);
+                }
+            }
+            if (deduplicatedIds.isEmpty()) {
                 return UseCaseResult.success(Map.of());
             }
 
-            Map<UUID, User> usersById = userStorage.findByIds(Set.copyOf(requestedIds));
+            Map<UUID, User> usersById = userStorage.findByIds(deduplicatedIds);
             LinkedHashMap<UUID, User> stableUsers = new LinkedHashMap<>();
-            for (UUID userId : requestedIds) {
-                User user = usersById.get(userId);
-                if (user != null) {
-                    stableUsers.put(userId, user);
+            for (UUID userId : query.userIds()) {
+                if (userId != null) {
+                    User user = usersById.get(userId);
+                    if (user != null) {
+                        stableUsers.put(userId, user);
+                    }
                 }
             }
             return UseCaseResult.success(Collections.unmodifiableMap(stableUsers));

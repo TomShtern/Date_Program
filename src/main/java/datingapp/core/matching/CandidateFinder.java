@@ -15,8 +15,10 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
@@ -164,6 +166,7 @@ public class CandidateFinder implements LoggingSupport {
     public List<User> findCandidates(User seeker, List<User> allActive, Set<UUID> alreadyInteracted) {
         Set<Gender> seekerInterestedIn = seeker.getInterestedIn();
         Set<UUID> recentlyUnmatchedCounterpartIds = recentlyUnmatchedCounterpartIds(seeker.getId());
+        Map<UUID, Double> distanceCache = new HashMap<>();
         logDebug(
                 "Finding candidates for {} (state={}, gender={}, interestedIn={}, age={}, minAge={}, maxAge={})",
                 userRef(seeker),
@@ -184,9 +187,9 @@ public class CandidateFinder implements LoggingSupport {
                 .filter(candidate -> notInRecentUnmatchCooldown(candidate, recentlyUnmatchedCounterpartIds))
                 .filter(candidate -> matchesGenderPreferences(seeker, candidate, seekerInterestedIn))
                 .filter(candidate -> matchesAgePreferences(seeker, candidate))
-                .filter(candidate -> isWithinDistanceWithLogging(seeker, candidate))
+                .filter(candidate -> isWithinDistanceCached(seeker, candidate, distanceCache))
                 .filter(candidate -> passesDealbreakers(seeker, candidate))
-                .sorted(Comparator.comparingDouble(c -> distanceTo(seeker, c)))
+                .sorted(Comparator.comparingDouble(c -> distanceCache.getOrDefault(c.getId(), Double.MAX_VALUE)))
                 .toList();
 
         if (candidates.isEmpty()) {
@@ -335,17 +338,23 @@ public class CandidateFinder implements LoggingSupport {
         return ageMatch;
     }
 
-    private boolean isWithinDistanceWithLogging(User seeker, User candidate) {
-        boolean inDistance = isWithinDistance(seeker, candidate);
-        if (!inDistance && logger.isDebugEnabled()) {
-            double dist = distanceTo(seeker, candidate);
-            logDebug(
-                    "Rejecting {}: TOO FAR - distance={}km, max={}km",
-                    userRef(candidate),
-                    String.format("%.1f", dist),
-                    seeker.getMaxDistanceKm());
+    private boolean isWithinDistanceCached(User seeker, User candidate, Map<UUID, Double> distanceCache) {
+        if (!hasLocation(seeker) || !hasLocation(candidate)) {
+            return true;
         }
-        return inDistance;
+        double distance = GeoUtils.distanceKm(seeker.getLat(), seeker.getLon(), candidate.getLat(), candidate.getLon());
+        distanceCache.put(candidate.getId(), distance);
+        if (distance > seeker.getMaxDistanceKm()) {
+            if (logger.isDebugEnabled()) {
+                logDebug(
+                        "Rejecting {}: TOO FAR - distance={}km, max={}km",
+                        userRef(candidate),
+                        String.format("%.1f", distance),
+                        seeker.getMaxDistanceKm());
+            }
+            return false;
+        }
+        return true;
     }
 
     private boolean passesDealbreakers(User seeker, User candidate) {
@@ -405,28 +414,6 @@ public class CandidateFinder implements LoggingSupport {
         return candidateInSeekerRange && seekerInCandidateRange;
     }
 
-    /** Checks if the candidate is within the seeker's max distance preference. */
-    private boolean isWithinDistance(User seeker, User candidate) {
-        if (!hasLocation(seeker) || !hasLocation(candidate)) {
-            logDebug(
-                    "Skipping distance filter for {} ({}): missing location (seekerLatLon={}, candidateLatLon={}).",
-                    userRef(candidate),
-                    formatLatLon(seeker),
-                    formatLatLon(candidate));
-            return true;
-        }
-        double distance = distanceTo(seeker, candidate);
-        return distance <= seeker.getMaxDistanceKm();
-    }
-
-    /** Calculates distance between two users. */
-    private double distanceTo(User a, User b) {
-        if (!hasLocation(a) || !hasLocation(b)) {
-            return Double.MAX_VALUE;
-        }
-        return GeoUtils.distanceKm(a.getLat(), a.getLon(), b.getLat(), b.getLon());
-    }
-
     private boolean hasLocation(User user) {
         return user.hasLocationSet();
     }
@@ -453,13 +440,6 @@ public class CandidateFinder implements LoggingSupport {
             return match.getUserA();
         }
         return null;
-    }
-
-    private String formatLatLon(User user) {
-        if (!hasLocation(user)) {
-            return "missing";
-        }
-        return String.format("%.1f, %.1f", user.getLat(), user.getLon());
     }
 
     private String userRef(User user) {

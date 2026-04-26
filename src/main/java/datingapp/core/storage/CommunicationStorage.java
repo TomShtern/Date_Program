@@ -69,8 +69,11 @@ public interface CommunicationStorage {
      *
      * <p>
      * The default implementation preserves backward compatibility by calling the two existing methods
-     * sequentially. Transactional implementations should override this method so a failure in either step
-     * leaves no partial observable state.
+     * sequentially. Transactional implementations <b>must</b> override this method so a failure in either step
+     * leaves no partial observable state. Implementations that support concurrent writes should ensure the
+     * conversation row is not left with a {@code last_message_at} that points to a non-existent message.
+     *
+     * @see OperationalCommunicationStorage
      */
     default void saveMessageAndUpdateConversationLastMessageAt(Message message) {
         saveMessage(message);
@@ -181,8 +184,11 @@ public interface CommunicationStorage {
      *
      * <p>
      * The default implementation preserves backward compatibility by calling the two existing methods
-     * sequentially. Transactional implementations should override this method so a failure in either step
-     * leaves no partial observable state.
+     * sequentially. Transactional implementations <b>must</b> override this method so a failure in either step
+     * leaves no partial observable state. Callers that know no messages exist should prefer
+     * {@link #deleteConversation(String)} instead.
+     *
+     * @see OperationalCommunicationStorage
      */
     default void deleteConversationWithMessages(String conversationId) {
         deleteConversation(conversationId);
@@ -236,6 +242,26 @@ public interface CommunicationStorage {
     int markAllNotificationsAsRead(UUID userId);
 
     void markNotificationAsRead(UUID userId, UUID id);
+
+    enum MarkNotificationReadResult {
+        UPDATED,
+        NOT_FOUND,
+        NOT_OWNED
+    }
+
+    default MarkNotificationReadResult markNotificationAsReadChecked(UUID userId, UUID notificationId) {
+        Objects.requireNonNull(userId, "userId cannot be null");
+        Objects.requireNonNull(notificationId, "notificationId cannot be null");
+        Optional<Notification> notification = getNotification(notificationId);
+        if (notification.isEmpty()) {
+            return MarkNotificationReadResult.NOT_FOUND;
+        }
+        if (!notification.get().userId().equals(userId)) {
+            return MarkNotificationReadResult.NOT_OWNED;
+        }
+        markNotificationAsRead(userId, notificationId);
+        return MarkNotificationReadResult.UPDATED;
+    }
 
     List<Notification> getNotificationsForUser(UUID userId, boolean unreadOnly);
 

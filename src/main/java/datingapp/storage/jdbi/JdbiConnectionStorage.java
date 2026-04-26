@@ -8,6 +8,7 @@ import datingapp.core.connection.ConnectionModels.Message;
 import datingapp.core.connection.ConnectionModels.Notification;
 import datingapp.core.connection.ConnectionModels.Notification.Type;
 import datingapp.core.model.Match.MatchArchiveReason;
+import datingapp.core.storage.CommunicationStorage;
 import datingapp.core.storage.OperationalCommunicationStorage;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -369,6 +370,25 @@ public final class JdbiConnectionStorage implements OperationalCommunicationStor
     }
 
     @Override
+    public CommunicationStorage.MarkNotificationReadResult markNotificationAsReadChecked(
+            UUID userId, UUID notificationId) {
+        Objects.requireNonNull(userId, ERR_USER_ID_NULL);
+        Objects.requireNonNull(notificationId, "notificationId cannot be null");
+        return jdbi.inTransaction(handle -> {
+            var dao = handle.attach(SocialDao.class);
+            var ownerOpt = dao.getNotificationOwnerId(notificationId);
+            if (ownerOpt.isEmpty()) {
+                return CommunicationStorage.MarkNotificationReadResult.NOT_FOUND;
+            }
+            if (!ownerOpt.get().equals(userId)) {
+                return CommunicationStorage.MarkNotificationReadResult.NOT_OWNED;
+            }
+            dao.markNotificationAsRead(userId, notificationId);
+            return CommunicationStorage.MarkNotificationReadResult.UPDATED;
+        });
+    }
+
+    @Override
     public List<Notification> getNotificationsForUser(UUID userId, boolean unreadOnly) {
         return socialDao.getNotificationsForUser(userId, unreadOnly);
     }
@@ -700,11 +720,12 @@ public final class JdbiConnectionStorage implements OperationalCommunicationStor
             return unreadOnly ? getUnreadNotificationsForUser(userId) : getAllNotificationsForUser(userId);
         }
 
-        @SqlQuery("""
-                SELECT id, user_id, type, title, message, created_at, is_read, data_json
-                FROM notifications WHERE id = :id
-                """)
+        @SqlQuery("SELECT id, user_id, type, title, message, created_at, is_read, data_json "
+                + "FROM notifications WHERE id = :id")
         Optional<Notification> getNotification(@Bind("id") UUID id);
+
+        @SqlQuery("SELECT user_id FROM notifications WHERE id = :id")
+        Optional<UUID> getNotificationOwnerId(@Bind("id") UUID id);
 
         @SqlUpdate("DELETE FROM notifications WHERE user_id = :userId")
         int deleteNotificationsForUser(@Bind("userId") UUID userId);

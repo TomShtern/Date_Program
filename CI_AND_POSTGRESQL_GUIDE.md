@@ -194,19 +194,56 @@ The helper scripts and `.env.example` are aligned to these defaults.
 
 This script:
 
+- validates the database name parameter
 - initializes the local PostgreSQL data directory if needed
 - starts PostgreSQL with a localhost-only listener
 - waits for readiness with `pg_isready`
 - creates the target database if it does not yet exist
+- enables `pg_stat_statements` extension
+- applies local role defaults (search_path, statement_timeout, lock_timeout, idle_in_transaction_session_timeout)
 
 It accepts parameters for:
 
-- `Port`
-- `BaseDir`
-- `Superuser`
-- `Credential`
-- `Database`
-- `StartupTimeoutSeconds`
+- `Port` (default: `55432`)
+- `BaseDir` (default: `data\local-postgresql` under repo root)
+- `Superuser` (default: `datingapp`)
+- `Credential` (default: auto-generated from username/password `datingapp`)
+- `Database` (default: `datingapp`)
+- `StartupTimeoutSeconds` (default: `10`)
+
+Failure messages are tagged with `[CONFIG]`, `[STARTUP]`, or `[DATABASE]` prefixes.
+
+### `check_postgresql_runtime_env.ps1`
+
+This script is the PostgreSQL environment preflight checker.
+
+It:
+
+- verifies that `pg_ctl`, `pg_isready`, `psql`, `createdb`, and `initdb` are on PATH
+- reads `.env` for overrides if present
+- resolves effective connection settings (host, port, database, username, password, dialect) from env vars and `.env`
+- checks PostgreSQL connectivity with `pg_isready`
+- verifies authentication with a `psql` login probe
+- exits with clear category-tagged error messages
+
+It accepts parameters for:
+
+- `ServerHost` (default: `localhost`)
+- `Port` (default: `55432`)
+- `Username` (default: `datingapp`)
+- `Database` (default: `datingapp`)
+- `DotEnvPath` (default: `.env` under repo root)
+- `ThrowOnFailure` (switch: throw instead of `exit`)
+
+Exit codes:
+
+| Code | Category | Meaning |
+|---|---|---|
+| 0 | — | Preflight passed |
+| 1 | `[ENV]` | Missing PostgreSQL CLI tools |
+| 2 | `[CONNECTIVITY]` | PostgreSQL not reachable |
+| 3 | `[AUTH]` | Password not configured |
+| 4 | `[AUTH]` | psql login failed |
 
 ### `stop_local_postgres.ps1`
 
@@ -215,6 +252,8 @@ This script:
 - checks whether the repo-local PostgreSQL instance exists and is running
 - stops it with `pg_ctl -m fast`
 - exits cleanly if nothing is running
+
+Failure messages are tagged with `[STARTUP]`.
 
 ### `run_postgresql_smoke.ps1`
 
@@ -227,6 +266,8 @@ It now:
 - sets the PostgreSQL runtime environment variables for the Maven smoke process
 - restores or clears those environment variables safely afterward
 - runs Maven in batch mode with color disabled for cleaner logs
+
+Failure messages are tagged with `[STARTUP]` (server failed to start) or `[MAVEN-SMOKE]` (test failed). Each failure includes a `Hint:` line with the next diagnostic step.
 
 This script is the right choice when you want a focused PostgreSQL runtime verification without running the entire local verification flow.
 
@@ -247,6 +288,8 @@ The script also prints simple elapsed-time summaries for:
 
 - the Maven quality gate
 - PostgreSQL smoke verification
+
+Failure messages are tagged with `[STARTUP]`, `[MAVEN]`, or `[MAVEN-SMOKE]` prefixes. Each failure includes a `Hint:` line pointing to the next diagnostic step.
 
 ### Environment/config notes
 
@@ -271,6 +314,23 @@ If local PostgreSQL verification fails, check:
 2. whether port `55432` is already in use
 3. whether the repo-local data directory exists and is writable
 4. whether `.env` or OS env vars override the expected local PostgreSQL settings
+
+### Error categories in local scripts
+
+All local PowerShell scripts now tag their failure messages with a category prefix so you can quickly identify the failure domain:
+
+| Prefix | Meaning | Typical cause |
+|---|---|---|
+| `[ENV]` | PostgreSQL CLI tools not found on PATH | Missing PostgreSQL client install or PATH not configured |
+| `[CONFIG]` | Invalid parameter or configuration | Bad database name, missing .env values |
+| `[STARTUP]` | PostgreSQL server failed to start or stop | Port conflict, corrupt data directory, pg_ctl error |
+| `[CONNECTIVITY]` | Server not reachable via `pg_isready` | Server not started, wrong host/port, firewall |
+| `[AUTH]` | Authentication or password failure | Missing `DATING_APP_DB_PASSWORD`, wrong credentials |
+| `[DATABASE]` | Database/extension creation failed | psql or createdb error during setup |
+| `[MAVEN]` | Maven quality gate failure | Spotless, Checkstyle, PMD, JaCoCo, or test failures |
+| `[MAVEN-SMOKE]` | PostgreSQL smoke test failure | `PostgresqlRuntimeSmokeTest` failed against live DB |
+
+Each `[MAVEN-SMOKE]` and `[STARTUP]` message includes a `Hint:` line pointing to the next diagnostic step.
 
 ### Practical division of responsibility
 

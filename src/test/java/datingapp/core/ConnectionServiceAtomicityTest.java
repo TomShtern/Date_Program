@@ -109,6 +109,54 @@ class ConnectionServiceAtomicityTest {
         assertEquals(first, conversation.getUserB());
     }
 
+    @Test
+    @DisplayName("sendMessage succeeds when a concurrent request already created the conversation")
+    void sendMessageSucceedsWhenConcurrentRequestAlreadyCreatedConversation() {
+        UUID senderId = UUID.randomUUID();
+        UUID recipientId = UUID.randomUUID();
+
+        TestStorages.Users users = new TestStorages.Users();
+        users.save(TestUserFactory.createActiveUser(senderId, "Sender"));
+        users.save(TestUserFactory.createActiveUser(recipientId, "Recipient"));
+
+        TestStorages.Interactions interactions = new TestStorages.Interactions();
+        interactions.save(Match.create(senderId, recipientId));
+
+        Conversation preExisting = Conversation.create(senderId, recipientId);
+        ConcurrentCreateCommunications communications = new ConcurrentCreateCommunications(preExisting);
+        ConnectionService service = new ConnectionService(AppConfig.defaults(), communications, interactions, users);
+
+        ConnectionService.SendResult result = service.sendMessage(senderId, recipientId, "Hello");
+
+        assertTrue(result.success());
+        assertTrue(communications.getConversation(preExisting.getId()).isPresent());
+        assertEquals(1, communications.countMessages(preExisting.getId()));
+    }
+
+    private static final class ConcurrentCreateCommunications extends TestStorages.Communications {
+        private final String targetConversationId;
+        private boolean firstGetReturned = false;
+
+        ConcurrentCreateCommunications(Conversation preExisting) {
+            super.saveConversation(preExisting);
+            this.targetConversationId = preExisting.getId();
+        }
+
+        @Override
+        public java.util.Optional<Conversation> getConversation(String conversationId) {
+            if (conversationId.equals(targetConversationId) && !firstGetReturned) {
+                firstGetReturned = true;
+                return java.util.Optional.empty();
+            }
+            return super.getConversation(conversationId);
+        }
+
+        @Override
+        public void saveConversation(Conversation conversation) {
+            throw new RuntimeException("simulated duplicate-key conflict on concurrent insert");
+        }
+    }
+
     private static final class FailingMessageCommunications extends TestStorages.Communications {
         @Override
         public void saveMessageAndUpdateConversationLastMessageAt(

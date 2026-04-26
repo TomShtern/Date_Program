@@ -197,19 +197,33 @@ public final class JdbiUserStorage implements OperationalUserStorage {
             return Map.of();
         }
 
-        return jdbi.withHandle(handle -> {
+        java.util.HashMap<UUID, User> result = new java.util.HashMap<>();
+        Set<UUID> uncachedIds = new java.util.HashSet<>();
+        for (UUID id : ids) {
+            Optional<User> cached = getCachedUser(id);
+            if (cached.isPresent()) {
+                result.put(id, copyUser(cached.get()));
+            } else {
+                uncachedIds.add(id);
+            }
+        }
+
+        if (uncachedIds.isEmpty()) {
+            return result;
+        }
+
+        jdbi.useHandle(handle -> {
             List<User> users = handle.createQuery("SELECT * FROM users WHERE id IN (<userIds>) AND deleted_at IS NULL")
-                    .bindList("userIds", new ArrayList<>(ids))
+                    .bindList("userIds", new ArrayList<>(uncachedIds))
                     .map(new Mapper())
                     .list();
             hydrateUsers(handle, users);
-
-            java.util.HashMap<UUID, User> result = new java.util.HashMap<>();
             for (User user : users) {
                 result.put(user.getId(), user);
+                cacheUser(user.getId(), user);
             }
-            return result;
         });
+        return result;
     }
 
     @Override

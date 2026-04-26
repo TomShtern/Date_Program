@@ -51,7 +51,12 @@ if ($null -eq $Credential) {
 $startExitCode = $LASTEXITCODE
 
 if ($startExitCode -ne 0) {
-    Exit-OrThrow -ExitCode $startExitCode -Message "Local PostgreSQL startup failed with exit code $startExitCode."
+    $hint = @(
+        "[STARTUP] Local PostgreSQL startup failed (exit code $startExitCode)."
+        "  Hint: Run .\check_postgresql_runtime_env.ps1 to verify your PostgreSQL environment."
+        "  Hint: Check if port $Port is already in use or if pg_ctl is on PATH."
+    ) -join "`n"
+    Exit-OrThrow -ExitCode $startExitCode -Message $hint
 }
 
 $plainPassword = $Credential.GetNetworkCredential().Password
@@ -96,5 +101,10 @@ finally {
 }
 
 if ($mavenExitCode -ne 0) {
-    Exit-OrThrow -ExitCode $mavenExitCode -Message "PostgreSQL smoke Maven run failed with exit code $mavenExitCode."
+    $hint = @(
+        "[MAVEN-SMOKE] PostgreSQL smoke Maven run failed (exit code $mavenExitCode)."
+        "  Hint: The local PostgreSQL server is still running. Inspect the Maven output above for test failures."
+        "  Hint: If PostgresqlRuntimeSmokeTest failed, check DATING_APP_DB_URL/USERNAME/PASSWORD env vars."
+    ) -join "`n"
+    Exit-OrThrow -ExitCode $mavenExitCode -Message $hint
 }

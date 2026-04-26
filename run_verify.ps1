@@ -14,7 +14,8 @@ try {
     $overallExitCode = $LASTEXITCODE
 
     if ($overallExitCode -ne 0) {
-        Write-Host "Local PostgreSQL startup failed with exit code $overallExitCode."
+        Write-Host "[STARTUP] Local PostgreSQL startup failed with exit code $overallExitCode."
+        Write-Host "  Hint: Run .\check_postgresql_runtime_env.ps1 to diagnose the environment."
     }
     else {
         Write-Host 'Running Maven quality gate: mvn spotless:apply verify'
@@ -23,7 +24,8 @@ try {
         $verifyStopwatch.Stop()
 
         if ($overallExitCode -ne 0) {
-            Write-Host "Maven quality gate failed with exit code $overallExitCode after $($verifyStopwatch.Elapsed)."
+            Write-Host "[MAVEN] Maven quality gate failed with exit code $overallExitCode after $($verifyStopwatch.Elapsed)."
+            Write-Host "  Hint: Fix formatting/checkstyle/test failures above, then re-run .\run_verify.ps1."
         }
         else {
             Write-Host 'Running PostgreSQL smoke verification: run_postgresql_smoke.ps1'
@@ -37,7 +39,8 @@ try {
             catch {
                 $overallExitCode = if ($LASTEXITCODE -ne 0) { $LASTEXITCODE } else { 1 }
                 $smokeStopwatch.Stop()
-                Write-Host "PostgreSQL smoke verification failed with exit code $overallExitCode after $($smokeStopwatch.Elapsed)."
+                Write-Host "[MAVEN-SMOKE] PostgreSQL smoke verification failed with exit code $overallExitCode after $($smokeStopwatch.Elapsed)."
+                Write-Host "  Hint: The server is still running. Check PostgresqlRuntimeSmokeTest output for details."
                 Write-Host $_.Exception.Message
             }
         }
