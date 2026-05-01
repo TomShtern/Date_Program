@@ -25,6 +25,8 @@ import org.junit.jupiter.api.Test;
 @DisplayName("REST API daily limit enforcement")
 class RestApiDailyLimitTest {
 
+    private static final String AUTHORIZATION_HEADER = "Authorization";
+
     private RestApiServer server;
 
     @AfterEach
@@ -82,7 +84,9 @@ class RestApiDailyLimitTest {
         HttpResponse<String> response = client.send(
                 HttpRequest.newBuilder(URI.create(
                                 "http://localhost:" + port + "/api/users/" + aliceId + "/like/" + otherUserId))
-                        .header("X-User-Id", aliceId.toString())
+                        .header(
+                                AUTHORIZATION_HEADER,
+                                RestApiTestFixture.bearerToken(services, aliceId, aliceId + "@example.com"))
                         .POST(HttpRequest.BodyPublishers.noBody())
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
@@ -137,7 +141,9 @@ class RestApiDailyLimitTest {
         HttpResponse<String> response = client.send(
                 HttpRequest.newBuilder(URI.create(
                                 "http://localhost:" + port + "/api/users/" + aliceId + "/pass/" + otherUserId))
-                        .header("X-User-Id", aliceId.toString())
+                        .header(
+                                AUTHORIZATION_HEADER,
+                                RestApiTestFixture.bearerToken(services, aliceId, aliceId + "@example.com"))
                         .POST(HttpRequest.BodyPublishers.noBody())
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
@@ -182,7 +188,9 @@ class RestApiDailyLimitTest {
             HttpResponse<String> response = client.send(
                     HttpRequest.newBuilder(URI.create(
                                     "http://localhost:" + port + "/api/users/" + aliceId + "/like/" + targetId))
-                            .header("X-User-Id", aliceId.toString())
+                            .header(
+                                    AUTHORIZATION_HEADER,
+                                    RestApiTestFixture.bearerToken(services, aliceId, aliceId + "@example.com"))
                             .POST(HttpRequest.BodyPublishers.noBody())
                             .build(),
                     HttpResponse.BodyHandlers.ofString());

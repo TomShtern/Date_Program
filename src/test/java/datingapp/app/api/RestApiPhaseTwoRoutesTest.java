@@ -50,6 +50,7 @@ import org.junit.jupiter.api.Test;
 class RestApiPhaseTwoRoutesTest {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
+    private static final String AUTHORIZATION_HEADER = "Authorization";
 
     private RestApiServer server;
 
@@ -109,6 +110,7 @@ class RestApiPhaseTwoRoutesTest {
         HttpResponse<String> notificationsResponse = client.send(
                 HttpRequest.newBuilder(
                                 URI.create("http://localhost:" + port + "/api/users/" + aliceId + "/notifications"))
+                        .header(AUTHORIZATION_HEADER, bearerToken(services, aliceId))
                         .GET()
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
@@ -133,6 +135,7 @@ class RestApiPhaseTwoRoutesTest {
         HttpResponse<String> unreadOnlyResponse = client.send(
                 HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/users/" + aliceId
                                 + "/notifications?unreadOnly=true"))
+                        .header(AUTHORIZATION_HEADER, bearerToken(services, aliceId))
                         .GET()
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
@@ -142,7 +145,7 @@ class RestApiPhaseTwoRoutesTest {
         HttpResponse<String> readSingleResponse = client.send(
                 HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/users/" + aliceId
                                 + "/notifications/" + firstNotification.id() + "/read"))
-                        .header("X-User-Id", aliceId.toString())
+                        .header(AUTHORIZATION_HEADER, bearerToken(services, aliceId))
                         .POST(HttpRequest.BodyPublishers.noBody())
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
@@ -151,7 +154,7 @@ class RestApiPhaseTwoRoutesTest {
         HttpResponse<String> forbiddenReadResponse = client.send(
                 HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/users/" + bobId + "/notifications/"
                                 + secondNotification.id() + "/read"))
-                        .header("X-User-Id", bobId.toString())
+                        .header(AUTHORIZATION_HEADER, bearerToken(services, bobId))
                         .POST(HttpRequest.BodyPublishers.noBody())
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
@@ -160,7 +163,7 @@ class RestApiPhaseTwoRoutesTest {
         HttpResponse<String> readAllResponse = client.send(
                 HttpRequest.newBuilder(URI.create(
                                 "http://localhost:" + port + "/api/users/" + aliceId + "/notifications/read-all"))
-                        .header("X-User-Id", aliceId.toString())
+                        .header(AUTHORIZATION_HEADER, bearerToken(services, aliceId))
                         .POST(HttpRequest.BodyPublishers.noBody())
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
@@ -170,6 +173,7 @@ class RestApiPhaseTwoRoutesTest {
 
         HttpResponse<String> statsResponse = client.send(
                 HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/users/" + aliceId + "/stats"))
+                        .header(AUTHORIZATION_HEADER, bearerToken(services, aliceId))
                         .GET()
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
@@ -180,6 +184,7 @@ class RestApiPhaseTwoRoutesTest {
         HttpResponse<String> achievementsResponse = client.send(
                 HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/users/" + aliceId
                                 + "/achievements?checkForNew=true"))
+                        .header(AUTHORIZATION_HEADER, bearerToken(services, aliceId))
                         .GET()
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
@@ -235,6 +240,7 @@ class RestApiPhaseTwoRoutesTest {
         HttpResponse<String> pendingLikersResponse = client.send(
                 HttpRequest.newBuilder(
                                 URI.create("http://localhost:" + port + "/api/users/" + aliceId + "/pending-likers"))
+                        .header(AUTHORIZATION_HEADER, bearerToken(services, aliceId))
                         .GET()
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
@@ -251,6 +257,7 @@ class RestApiPhaseTwoRoutesTest {
 
         HttpResponse<String> standoutsResponse = client.send(
                 HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/users/" + aliceId + "/standouts"))
+                        .header(AUTHORIZATION_HEADER, bearerToken(services, aliceId))
                         .GET()
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
@@ -268,6 +275,7 @@ class RestApiPhaseTwoRoutesTest {
         HttpResponse<String> matchQualityResponse = client.send(
                 HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/users/" + aliceId
                                 + "/match-quality/" + aliceBobMatch.getId()))
+                        .header(AUTHORIZATION_HEADER, bearerToken(services, aliceId))
                         .GET()
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
@@ -277,7 +285,7 @@ class RestApiPhaseTwoRoutesTest {
 
         HttpResponse<String> undoResponse = client.send(
                 HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/users/" + aliceId + "/undo"))
-                        .header("X-User-Id", aliceId.toString())
+                        .header(AUTHORIZATION_HEADER, bearerToken(services, aliceId))
                         .POST(HttpRequest.BodyPublishers.noBody())
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
@@ -329,6 +337,7 @@ class RestApiPhaseTwoRoutesTest {
                 .send(
                         HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/users/" + aliceId
                                         + "/profile-edit-snapshot"))
+                                .header(AUTHORIZATION_HEADER, bearerToken(services, aliceId))
                                 .GET()
                                 .build(),
                         HttpResponse.BodyHandlers.ofString());
@@ -389,6 +398,7 @@ class RestApiPhaseTwoRoutesTest {
                 .send(
                         HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/users/" + viewerId
                                         + "/presentation-context/" + targetId))
+                                .header(AUTHORIZATION_HEADER, bearerToken(services, viewerId))
                                 .GET()
                                 .build(),
                         HttpResponse.BodyHandlers.ofString());
@@ -431,7 +441,7 @@ class RestApiPhaseTwoRoutesTest {
 
         HttpResponse<String> updateProfileResponse = client.send(
                 HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/users/" + aliceId + "/profile"))
-                        .header("X-User-Id", aliceId.toString())
+                        .header(AUTHORIZATION_HEADER, bearerToken(services, aliceId))
                         .header("Content-Type", "application/json")
                         .PUT(HttpRequest.BodyPublishers.ofString("""
                                 {
@@ -464,7 +474,7 @@ class RestApiPhaseTwoRoutesTest {
                 HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/conversations/"
                                 + datingapp.core.connection.ConnectionModels.Conversation.generateId(aliceId, bobId)
                                 + "/messages"))
-                        .header("X-User-Id", aliceId.toString())
+                        .header(AUTHORIZATION_HEADER, bearerToken(services, aliceId))
                         .header("Content-Type", "application/json")
                         .POST(HttpRequest.BodyPublishers.ofString(
                                 "{\"senderId\":\"" + aliceId + "\",\"content\":\"Hello Bob\"}"))
@@ -478,7 +488,7 @@ class RestApiPhaseTwoRoutesTest {
         HttpResponse<String> deleteMessageResponse = client.send(
                 HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/conversations/" + conversationId
                                 + "/messages/" + messageId))
-                        .header("X-User-Id", aliceId.toString())
+                        .header(AUTHORIZATION_HEADER, bearerToken(services, aliceId))
                         .DELETE()
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
@@ -487,7 +497,7 @@ class RestApiPhaseTwoRoutesTest {
         HttpResponse<String> archiveConversationResponse = client.send(
                 HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/users/" + aliceId
                                 + "/conversations/" + conversationId + "/archive"))
-                        .header("X-User-Id", aliceId.toString())
+                        .header(AUTHORIZATION_HEADER, bearerToken(services, aliceId))
                         .header("Content-Type", "application/json")
                         .POST(HttpRequest.BodyPublishers.ofString("{\"reason\":\"UNMATCH\"}"))
                         .build(),
@@ -503,7 +513,7 @@ class RestApiPhaseTwoRoutesTest {
         HttpResponse<String> deleteConversationResponse = client.send(
                 HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/users/" + aliceId
                                 + "/conversations/" + conversationId))
-                        .header("X-User-Id", aliceId.toString())
+                        .header(AUTHORIZATION_HEADER, bearerToken(services, aliceId))
                         .DELETE()
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
@@ -513,7 +523,7 @@ class RestApiPhaseTwoRoutesTest {
         HttpResponse<String> archiveMatchResponse = client.send(
                 HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/users/" + aliceId + "/matches/"
                                 + Match.generateId(aliceId, bobId) + "/archive"))
-                        .header("X-User-Id", aliceId.toString())
+                        .header(AUTHORIZATION_HEADER, bearerToken(services, aliceId))
                         .POST(HttpRequest.BodyPublishers.noBody())
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
@@ -549,7 +559,7 @@ class RestApiPhaseTwoRoutesTest {
 
         HttpResponse<String> updateProfileResponse = client.send(
                 HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/users/" + aliceId + "/profile"))
-                        .header("X-User-Id", bobId.toString())
+                        .header(AUTHORIZATION_HEADER, bearerToken(services, bobId))
                         .header("Content-Type", "application/json")
                         .PUT(HttpRequest.BodyPublishers.ofString("""
                                 {
@@ -578,7 +588,7 @@ class RestApiPhaseTwoRoutesTest {
     }
 
     @Test
-    @DisplayName("mutating conversation routes require X-User-Id and do not accept query fallback")
+    @DisplayName("mutating conversation routes require bearer auth and do not accept query fallback")
     void mutatingConversationRoutesRequireHeaderAndDoNotAcceptQueryFallback() throws Exception {
         TestStorages.Users userStorage = new TestStorages.Users();
         TestStorages.Communications communicationStorage = new TestStorages.Communications();
@@ -607,7 +617,7 @@ class RestApiPhaseTwoRoutesTest {
                                 "{\"senderId\":\"" + aliceId + "\",\"content\":\"Hello Bob\"}"))
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
-        assertEquals(400, missingHeaderResponse.statusCode(), missingHeaderResponse.body());
+        assertEquals(401, missingHeaderResponse.statusCode(), missingHeaderResponse.body());
     }
 
     @Test
@@ -637,7 +647,7 @@ class RestApiPhaseTwoRoutesTest {
         HttpResponse<String> likeResponse = client.send(
                 HttpRequest.newBuilder(
                                 URI.create("http://localhost:" + port + "/api/users/" + aliceId + "/like/" + bobId))
-                        .header("X-User-Id", aliceId.toString())
+                        .header(AUTHORIZATION_HEADER, bearerToken(services, aliceId))
                         .POST(HttpRequest.BodyPublishers.noBody())
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
@@ -646,7 +656,7 @@ class RestApiPhaseTwoRoutesTest {
         HttpResponse<String> passResponse = client.send(
                 HttpRequest.newBuilder(
                                 URI.create("http://localhost:" + port + "/api/users/" + aliceId + "/pass/" + bobId))
-                        .header("X-User-Id", aliceId.toString())
+                        .header(AUTHORIZATION_HEADER, bearerToken(services, aliceId))
                         .POST(HttpRequest.BodyPublishers.noBody())
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
@@ -655,6 +665,7 @@ class RestApiPhaseTwoRoutesTest {
         HttpResponse<String> conversationsResponse = client.send(
                 HttpRequest.newBuilder(
                                 URI.create("http://localhost:" + port + "/api/users/" + aliceId + "/conversations"))
+                        .header(AUTHORIZATION_HEADER, bearerToken(services, aliceId))
                         .GET()
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
@@ -663,7 +674,7 @@ class RestApiPhaseTwoRoutesTest {
         HttpResponse<String> sendMessageResponse = client.send(
                 HttpRequest.newBuilder(URI.create(
                                 "http://localhost:" + port + "/api/conversations/" + conversationId + "/messages"))
-                        .header("X-User-Id", aliceId.toString())
+                        .header(AUTHORIZATION_HEADER, bearerToken(services, aliceId))
                         .header("Content-Type", "application/json")
                         .POST(HttpRequest.BodyPublishers.ofString(
                                 "{\"senderId\":\"" + aliceId + "\",\"content\":\"Hello Bob\"}"))
@@ -697,7 +708,7 @@ class RestApiPhaseTwoRoutesTest {
 
         HttpResponse<String> updateProfileResponse = client.send(
                 HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/users/" + aliceId + "/profile"))
-                        .header("X-User-Id", aliceId.toString())
+                        .header(AUTHORIZATION_HEADER, bearerToken(services, aliceId))
                         .header("Content-Type", "application/json")
                         .PUT(HttpRequest.BodyPublishers.ofString("""
                                 {
@@ -723,7 +734,7 @@ class RestApiPhaseTwoRoutesTest {
         HttpResponse<String> firstLikeResponse = client.send(
                 HttpRequest.newBuilder(
                                 URI.create("http://localhost:" + port + "/api/users/" + aliceId + "/like/" + bobId))
-                        .header("X-User-Id", aliceId.toString())
+                        .header(AUTHORIZATION_HEADER, bearerToken(services, aliceId))
                         .POST(HttpRequest.BodyPublishers.noBody())
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
@@ -732,7 +743,7 @@ class RestApiPhaseTwoRoutesTest {
         HttpResponse<String> secondLikeResponse = client.send(
                 HttpRequest.newBuilder(
                                 URI.create("http://localhost:" + port + "/api/users/" + bobId + "/like/" + aliceId))
-                        .header("X-User-Id", bobId.toString())
+                        .header(AUTHORIZATION_HEADER, bearerToken(services, bobId))
                         .POST(HttpRequest.BodyPublishers.noBody())
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
@@ -744,7 +755,7 @@ class RestApiPhaseTwoRoutesTest {
         HttpResponse<String> sendMessageResponse = client.send(
                 HttpRequest.newBuilder(URI.create(
                                 "http://localhost:" + port + "/api/conversations/" + conversationId + "/messages"))
-                        .header("X-User-Id", aliceId.toString())
+                        .header(AUTHORIZATION_HEADER, bearerToken(services, aliceId))
                         .header("Content-Type", "application/json")
                         .POST(HttpRequest.BodyPublishers.ofString(
                                 "{\"senderId\":\"" + aliceId + "\",\"content\":\"Hello from the happy path\"}"))
@@ -755,7 +766,7 @@ class RestApiPhaseTwoRoutesTest {
         HttpResponse<String> gracefulExitResponse = client.send(
                 HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/users/" + aliceId
                                 + "/relationships/" + bobId + "/graceful-exit"))
-                        .header("X-User-Id", aliceId.toString())
+                        .header(AUTHORIZATION_HEADER, bearerToken(services, aliceId))
                         .POST(HttpRequest.BodyPublishers.noBody())
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
@@ -794,7 +805,7 @@ class RestApiPhaseTwoRoutesTest {
         HttpResponse<String> passResponse = client.send(
                 HttpRequest.newBuilder(
                                 URI.create("http://localhost:" + port + "/api/users/" + aliceId + "/pass/" + bobId))
-                        .header("X-User-Id", aliceId.toString())
+                        .header(AUTHORIZATION_HEADER, bearerToken(services, aliceId))
                         .POST(HttpRequest.BodyPublishers.noBody())
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
@@ -834,7 +845,7 @@ class RestApiPhaseTwoRoutesTest {
         HttpResponse<String> sendMessageResponse = client.send(
                 HttpRequest.newBuilder(URI.create(
                                 "http://localhost:" + port + "/api/conversations/" + conversationId + "/messages"))
-                        .header("X-User-Id", aliceId.toString())
+                        .header(AUTHORIZATION_HEADER, bearerToken(services, aliceId))
                         .header("Content-Type", "application/json")
                         .POST(HttpRequest.BodyPublishers.ofString(
                                 "{\"senderId\":\"" + aliceId + "\",\"content\":\"Before block\"}"))
@@ -845,7 +856,7 @@ class RestApiPhaseTwoRoutesTest {
         HttpResponse<String> reportResponse = client.send(
                 HttpRequest.newBuilder(
                                 URI.create("http://localhost:" + port + "/api/users/" + aliceId + "/report/" + bobId))
-                        .header("X-User-Id", aliceId.toString())
+                        .header(AUTHORIZATION_HEADER, bearerToken(services, aliceId))
                         .header("Content-Type", "application/json")
                         .POST(HttpRequest.BodyPublishers.ofString(
                                 "{\"reason\":\"HARASSMENT\",\"description\":\"Unsafe behavior\",\"blockUser\":true}"))
@@ -859,7 +870,7 @@ class RestApiPhaseTwoRoutesTest {
         HttpResponse<String> blockedMessageResponse = client.send(
                 HttpRequest.newBuilder(URI.create(
                                 "http://localhost:" + port + "/api/conversations/" + conversationId + "/messages"))
-                        .header("X-User-Id", aliceId.toString())
+                        .header(AUTHORIZATION_HEADER, bearerToken(services, aliceId))
                         .header("Content-Type", "application/json")
                         .POST(HttpRequest.BodyPublishers.ofString(
                                 "{\"senderId\":\"" + aliceId + "\",\"content\":\"This should fail\"}"))
@@ -925,7 +936,7 @@ class RestApiPhaseTwoRoutesTest {
 
         HttpResponse<String> updateProfileResponse = client.send(
                 HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/users/" + aliceId + "/profile"))
-                        .header("X-User-Id", aliceId.toString())
+                        .header(AUTHORIZATION_HEADER, bearerToken(services, aliceId))
                         .header("Content-Type", "application/json")
                         .PUT(HttpRequest.BodyPublishers.ofString("""
                                 {
@@ -973,6 +984,10 @@ class RestApiPhaseTwoRoutesTest {
                 .photoUrls(List.of("https://example.com/" + name.toLowerCase().split(" ")[0] + ".jpg"))
                 .interests(EnumSet.of(Interest.COFFEE, Interest.HIKING, Interest.TRAVEL))
                 .build();
+    }
+
+    private static String bearerToken(ServiceRegistry services, UUID userId) {
+        return RestApiTestFixture.bearerToken(services, userId, userId + "@example.com");
     }
 
     private static void replaceMatchingUseCases(RestApiServer server, MatchingUseCases matchingUseCases) {

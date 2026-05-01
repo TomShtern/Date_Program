@@ -12,6 +12,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.UnaryOperator;
 
 final class RestApiUserDtos {
     private static final String UNKNOWN_USER = "Unknown";
@@ -28,18 +29,23 @@ final class RestApiUserDtos {
             String approximateLocation,
             String summaryLine) {
         static UserSummary from(User user, ZoneId userTimeZone) {
-            return from(user, userTimeZone, null);
+            return from(user, userTimeZone, null, UnaryOperator.identity());
         }
 
         static UserSummary from(User user, ZoneId userTimeZone, String approximateLocation) {
+            return from(user, userTimeZone, approximateLocation, UnaryOperator.identity());
+        }
+
+        static UserSummary from(
+                User user, ZoneId userTimeZone, String approximateLocation, UnaryOperator<String> photoUrlResolver) {
             UserDtoMapper.UserFields fields = UserDtoMapper.map(user, userTimeZone, null);
             return new UserSummary(
                     user.getId(),
                     user.getName(),
                     fields.age(),
                     fields.state(),
-                    personPrimaryPhotoUrl(user),
-                    personPhotoUrls(user),
+                    personPrimaryPhotoUrl(user, photoUrlResolver),
+                    personPhotoUrls(user, photoUrlResolver),
                     approximateLocation,
                     personSummaryLine(user));
         }
@@ -59,8 +65,14 @@ final class RestApiUserDtos {
             String approximateLocation,
             int maxDistanceKm,
             List<String> photoUrls,
+            String primaryPhotoUrl,
             String state) {
         static UserDetail from(User user, ZoneId userTimeZone, String approximateLocation) {
+            return from(user, userTimeZone, approximateLocation, UnaryOperator.identity());
+        }
+
+        static UserDetail from(
+                User user, ZoneId userTimeZone, String approximateLocation, UnaryOperator<String> photoUrlResolver) {
             UserDtoMapper.UserFields fields = UserDtoMapper.map(user, userTimeZone, approximateLocation);
             return new UserDetail(
                     user.getId(),
@@ -71,7 +83,8 @@ final class RestApiUserDtos {
                     fields.interestedIn(),
                     fields.approximateLocation(),
                     fields.maxDistanceKm(),
-                    personPhotoUrls(user),
+                    personPhotoUrls(user, photoUrlResolver),
+                    personPrimaryPhotoUrl(user, photoUrlResolver),
                     fields.state());
         }
     }
@@ -88,10 +101,18 @@ final class RestApiUserDtos {
             String approximateLocation,
             String summaryLine) {
         static DailyPickDto from(DailyPick dailyPick, ZoneId userTimeZone) {
-            return from(dailyPick, userTimeZone, null);
+            return from(dailyPick, userTimeZone, null, UnaryOperator.identity());
         }
 
         static DailyPickDto from(DailyPick dailyPick, ZoneId userTimeZone, String approximateLocation) {
+            return from(dailyPick, userTimeZone, approximateLocation, UnaryOperator.identity());
+        }
+
+        static DailyPickDto from(
+                DailyPick dailyPick,
+                ZoneId userTimeZone,
+                String approximateLocation,
+                UnaryOperator<String> photoUrlResolver) {
             User user = dailyPick.user();
             return new DailyPickDto(
                     user.getId(),
@@ -100,8 +121,8 @@ final class RestApiUserDtos {
                     dailyPick.date(),
                     dailyPick.reason(),
                     dailyPick.alreadySeen(),
-                    personPrimaryPhotoUrl(user),
-                    personPhotoUrls(user),
+                    personPrimaryPhotoUrl(user, photoUrlResolver),
+                    personPhotoUrls(user, photoUrlResolver),
                     approximateLocation,
                     personSummaryLine(user));
         }
@@ -117,19 +138,27 @@ final class RestApiUserDtos {
             String approximateLocation,
             String summaryLine) {
         static PendingLikerDto from(MatchingService.PendingLiker pendingLiker, ZoneId userTimeZone) {
-            return from(pendingLiker, userTimeZone, null);
+            return from(pendingLiker, userTimeZone, null, UnaryOperator.identity());
         }
 
         static PendingLikerDto from(
                 MatchingService.PendingLiker pendingLiker, ZoneId userTimeZone, String approximateLocation) {
+            return from(pendingLiker, userTimeZone, approximateLocation, UnaryOperator.identity());
+        }
+
+        static PendingLikerDto from(
+                MatchingService.PendingLiker pendingLiker,
+                ZoneId userTimeZone,
+                String approximateLocation,
+                UnaryOperator<String> photoUrlResolver) {
             User user = pendingLiker.user();
             return new PendingLikerDto(
                     user.getId(),
                     user.getName(),
                     UserDtoMapper.age(user, userTimeZone),
                     pendingLiker.likedAt(),
-                    personPrimaryPhotoUrl(user),
-                    personPhotoUrls(user),
+                    personPrimaryPhotoUrl(user, photoUrlResolver),
+                    personPhotoUrls(user, photoUrlResolver),
                     approximateLocation,
                     personSummaryLine(user));
         }
@@ -150,11 +179,20 @@ final class RestApiUserDtos {
             String approximateLocation,
             String summaryLine) {
         static StandoutDto from(Standout standout, Map<UUID, User> usersById, ZoneId userTimeZone) {
-            return from(standout, usersById, userTimeZone, null);
+            return from(standout, usersById, userTimeZone, null, UnaryOperator.identity());
         }
 
         static StandoutDto from(
                 Standout standout, Map<UUID, User> usersById, ZoneId userTimeZone, String approximateLocation) {
+            return from(standout, usersById, userTimeZone, approximateLocation, UnaryOperator.identity());
+        }
+
+        static StandoutDto from(
+                Standout standout,
+                Map<UUID, User> usersById,
+                ZoneId userTimeZone,
+                String approximateLocation,
+                UnaryOperator<String> photoUrlResolver) {
             User user = usersById.get(standout.standoutUserId());
             return new StandoutDto(
                     standout.id(),
@@ -166,8 +204,8 @@ final class RestApiUserDtos {
                     standout.reason(),
                     standout.createdAt(),
                     standout.interactedAt(),
-                    personPrimaryPhotoUrl(user),
-                    personPhotoUrls(user),
+                    personPrimaryPhotoUrl(user, photoUrlResolver),
+                    personPhotoUrls(user, photoUrlResolver),
                     approximateLocation,
                     personSummaryLine(user));
         }
@@ -202,17 +240,24 @@ final class RestApiUserDtos {
     }
 
     static String personPrimaryPhotoUrl(User user) {
+        return personPrimaryPhotoUrl(user, UnaryOperator.identity());
+    }
+
+    static String personPrimaryPhotoUrl(User user, UnaryOperator<String> photoUrlResolver) {
         if (user == null) {
             return null;
         }
         return user.getPhotoUrls().stream()
                 .filter(User::isRealPhotoUrl)
                 .findFirst()
+                .map(photoUrlResolver)
                 .orElse(null);
     }
 
-    static List<String> personPhotoUrls(User user) {
-        return user == null ? List.of() : List.copyOf(user.getPhotoUrls());
+    static List<String> personPhotoUrls(User user, UnaryOperator<String> photoUrlResolver) {
+        return user == null
+                ? List.of()
+                : user.getPhotoUrls().stream().map(photoUrlResolver).toList();
     }
 
     static String personSummaryLine(User user) {

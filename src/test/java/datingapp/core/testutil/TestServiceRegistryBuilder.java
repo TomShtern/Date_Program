@@ -3,6 +3,9 @@ package datingapp.core.testutil;
 import datingapp.app.event.AppEventBus;
 import datingapp.app.event.InProcessAppEventBus;
 import datingapp.app.testutil.TestEventBus;
+import datingapp.app.usecase.auth.AuthTokenService;
+import datingapp.app.usecase.auth.AuthUseCases;
+import datingapp.app.usecase.auth.JwtAuthTokenService;
 import datingapp.app.usecase.profile.ProfileInsightsUseCases;
 import datingapp.app.usecase.profile.ProfileMutationUseCases;
 import datingapp.app.usecase.profile.ProfileNotesUseCases;
@@ -107,6 +110,9 @@ public final class TestServiceRegistryBuilder {
         LocationService locationService = new LocationService(validationService);
         AchievementService achievementService =
                 new DefaultAchievementService(config, analytics, interactions, trustSafety, users, profileService);
+        TestStorages.Auth authStorage = new TestStorages.Auth();
+        AuthTokenService authTokenService = new JwtAuthTokenService(config.auth());
+        AuthUseCases authUseCases = new AuthUseCases(config, users, authStorage, authTokenService);
 
         ServiceRegistry registry = ServiceRegistry.builder()
                 .config(config)
@@ -131,6 +137,7 @@ public final class TestServiceRegistryBuilder {
                 .validationService(validationService)
                 .locationService(locationService)
                 .eventBus(eventBus)
+                .authUseCases(authUseCases)
                 .build();
 
         return new RegistryWithStorages(registry, users, interactions, communications, trustSafety, analytics);

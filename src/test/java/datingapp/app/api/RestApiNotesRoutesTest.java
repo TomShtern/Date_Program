@@ -27,6 +27,7 @@ import org.junit.jupiter.api.Test;
 class RestApiNotesRoutesTest {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
+    private static final String AUTHORIZATION_HEADER = "Authorization";
 
     private RestApiServer server;
 
@@ -60,7 +61,9 @@ class RestApiNotesRoutesTest {
 
         HttpResponse<String> putResponse = client.send(
                 HttpRequest.newBuilder(URI.create(baseUri))
-                        .header("X-User-Id", authorId.toString())
+                        .header(
+                                AUTHORIZATION_HEADER,
+                                RestApiTestFixture.bearerToken(services, authorId, authorId + "@example.com"))
                         .PUT(HttpRequest.BodyPublishers.ofString("{\"content\":\"Met at coffee shop\"}"))
                         .header("Content-Type", "application/json")
                         .build(),
@@ -70,13 +73,22 @@ class RestApiNotesRoutesTest {
         assertEquals("Met at coffee shop", putJson.get("content").asText());
 
         HttpResponse<String> getResponse = client.send(
-                HttpRequest.newBuilder(URI.create(baseUri)).GET().build(), HttpResponse.BodyHandlers.ofString());
+                HttpRequest.newBuilder(URI.create(baseUri))
+                        .header(
+                                AUTHORIZATION_HEADER,
+                                RestApiTestFixture.bearerToken(services, authorId, authorId + "@example.com"))
+                        .GET()
+                        .build(),
+                HttpResponse.BodyHandlers.ofString());
         assertEquals(200, getResponse.statusCode());
         JsonNode getJson = MAPPER.readTree(getResponse.body());
         assertEquals(subjectId.toString(), getJson.get("subjectId").asText());
 
         HttpResponse<String> listResponse = client.send(
                 HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/users/" + authorId + "/notes"))
+                        .header(
+                                AUTHORIZATION_HEADER,
+                                RestApiTestFixture.bearerToken(services, authorId, authorId + "@example.com"))
                         .GET()
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
@@ -87,14 +99,22 @@ class RestApiNotesRoutesTest {
 
         HttpResponse<String> deleteResponse = client.send(
                 HttpRequest.newBuilder(URI.create(baseUri))
-                        .header("X-User-Id", authorId.toString())
+                        .header(
+                                AUTHORIZATION_HEADER,
+                                RestApiTestFixture.bearerToken(services, authorId, authorId + "@example.com"))
                         .DELETE()
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
         assertEquals(204, deleteResponse.statusCode());
 
         HttpResponse<String> missingResponse = client.send(
-                HttpRequest.newBuilder(URI.create(baseUri)).GET().build(), HttpResponse.BodyHandlers.ofString());
+                HttpRequest.newBuilder(URI.create(baseUri))
+                        .header(
+                                AUTHORIZATION_HEADER,
+                                RestApiTestFixture.bearerToken(services, authorId, authorId + "@example.com"))
+                        .GET()
+                        .build(),
+                HttpResponse.BodyHandlers.ofString());
         assertEquals(404, missingResponse.statusCode());
     }
 

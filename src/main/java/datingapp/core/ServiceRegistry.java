@@ -2,6 +2,7 @@ package datingapp.core;
 
 import datingapp.app.event.AppEventBus;
 import datingapp.app.geocoding.NominatimGeocodingService;
+import datingapp.app.usecase.auth.AuthUseCases;
 import datingapp.app.usecase.dashboard.DashboardUseCases;
 import datingapp.app.usecase.matching.MatchingUseCases;
 import datingapp.app.usecase.messaging.MessagingUseCases;
@@ -82,6 +83,7 @@ public final class ServiceRegistry {
     private final ProfileUseCases profileUseCases;
     private final VerificationUseCases verificationUseCases;
     private final SocialUseCases socialUseCases;
+    private final AuthUseCases authUseCases;
 
     public static Builder builder() {
         return new Builder();
@@ -177,6 +179,7 @@ public final class ServiceRegistry {
         this.verificationUseCases = new VerificationUseCases(this.userStorage, this.trustSafetyService);
         this.socialUseCases = new SocialUseCases(
                 this.connectionService, this.trustSafetyService, this.communicationStorage, this.eventBus);
+        this.authUseCases = Objects.requireNonNull(builder.authUseCases, "authUseCases cannot be null");
     }
 
     public static final class Builder {
@@ -210,6 +213,7 @@ public final class ServiceRegistry {
         private AppEventBus eventBus;
         private ProfileActivationPolicy activationPolicy = new ProfileActivationPolicy();
         private RelationshipWorkflowPolicy workflowPolicy = new RelationshipWorkflowPolicy();
+        private AuthUseCases authUseCases;
 
         private Builder() {}
 
@@ -363,6 +367,11 @@ public final class ServiceRegistry {
             return this;
         }
 
+        public Builder authUseCases(AuthUseCases authUseCases) {
+            this.authUseCases = authUseCases;
+            return this;
+        }
+
         public ServiceRegistry build() {
             return new ServiceRegistry(this);
         }
@@ -490,6 +499,10 @@ public final class ServiceRegistry {
 
     public SocialUseCases getSocialUseCases() {
         return socialUseCases;
+    }
+
+    public AuthUseCases getAuthUseCases() {
+        return authUseCases;
     }
 
     public AppEventBus getEventBus() {

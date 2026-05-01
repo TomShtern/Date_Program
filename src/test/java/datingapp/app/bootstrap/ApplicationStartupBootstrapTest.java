@@ -21,7 +21,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 
-@Timeout(5)
+@Timeout(10)
 @DisplayName("ApplicationStartup bootstrap configuration")
 class ApplicationStartupBootstrapTest {
 

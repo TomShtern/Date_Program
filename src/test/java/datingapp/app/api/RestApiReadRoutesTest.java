@@ -47,7 +47,7 @@ class RestApiReadRoutesTest {
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final String BASE_URL = "http://localhost:";
     private static final String USERS_PATH = "/api/users/";
-    private static final String USER_ID_HEADER = "X-User-Id";
+    private static final String AUTHORIZATION_HEADER = "Authorization";
     private static final String CANDIDATES_SEGMENT = "/candidates";
     private static final String BROWSE_SEGMENT = "/browse";
     private static final String CANDIDATES_KEY = "candidates";
@@ -116,7 +116,9 @@ class RestApiReadRoutesTest {
 
         HttpResponse<String> forbiddenUserResponse = client.send(
                 HttpRequest.newBuilder(URI.create(BASE_URL + port + USERS_PATH + aliceId))
-                        .header(USER_ID_HEADER, bobId.toString())
+                        .header(
+                                AUTHORIZATION_HEADER,
+                                RestApiTestFixture.bearerToken(services, bobId, bobId + "@example.com"))
                         .GET()
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
@@ -126,6 +128,9 @@ class RestApiReadRoutesTest {
 
         HttpResponse<String> candidatesResponse = client.send(
                 HttpRequest.newBuilder(URI.create(BASE_URL + port + USERS_PATH + aliceId + CANDIDATES_SEGMENT))
+                        .header(
+                                AUTHORIZATION_HEADER,
+                                RestApiTestFixture.bearerToken(services, aliceId, alice.getEmail()))
                         .GET()
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
@@ -136,6 +141,9 @@ class RestApiReadRoutesTest {
 
         HttpResponse<String> matchesResponse = client.send(
                 HttpRequest.newBuilder(URI.create(BASE_URL + port + USERS_PATH + aliceId + "/matches"))
+                        .header(
+                                AUTHORIZATION_HEADER,
+                                RestApiTestFixture.bearerToken(services, aliceId, alice.getEmail()))
                         .GET()
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
@@ -189,7 +197,9 @@ class RestApiReadRoutesTest {
         HttpResponse<String> response = HttpClient.newHttpClient()
                 .send(
                         HttpRequest.newBuilder(URI.create(BASE_URL + port + USERS_PATH + targetId))
-                                .header(USER_ID_HEADER, viewerId.toString())
+                                .header(
+                                        AUTHORIZATION_HEADER,
+                                        RestApiTestFixture.bearerToken(services, viewerId, viewerId + "@example.com"))
                                 .GET()
                                 .build(),
                         HttpResponse.BodyHandlers.ofString());
@@ -220,7 +230,9 @@ class RestApiReadRoutesTest {
         HttpResponse<String> response = HttpClient.newHttpClient()
                 .send(
                         HttpRequest.newBuilder(URI.create(BASE_URL + port + USERS_PATH + targetId))
-                                .header(USER_ID_HEADER, viewerId.toString())
+                                .header(
+                                        AUTHORIZATION_HEADER,
+                                        RestApiTestFixture.bearerToken(services, viewerId, viewer.getEmail()))
                                 .GET()
                                 .build(),
                         HttpResponse.BodyHandlers.ofString());
@@ -280,6 +292,9 @@ class RestApiReadRoutesTest {
 
         HttpResponse<String> browseResponse = client.send(
                 HttpRequest.newBuilder(URI.create(BASE_URL + port + USERS_PATH + activeId + BROWSE_SEGMENT))
+                        .header(
+                                AUTHORIZATION_HEADER,
+                                RestApiTestFixture.bearerToken(services, activeId, active.getEmail()))
                         .GET()
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
@@ -301,6 +316,9 @@ class RestApiReadRoutesTest {
 
         HttpResponse<String> inactiveCandidatesResponse = client.send(
                 HttpRequest.newBuilder(URI.create(BASE_URL + port + USERS_PATH + inactiveId + CANDIDATES_SEGMENT))
+                        .header(
+                                AUTHORIZATION_HEADER,
+                                RestApiTestFixture.bearerToken(services, inactiveId, inactive.getEmail()))
                         .GET()
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
@@ -339,11 +357,17 @@ class RestApiReadRoutesTest {
 
         HttpResponse<String> browseResponse = client.send(
                 HttpRequest.newBuilder(URI.create(BASE_URL + port + USERS_PATH + seekerId + BROWSE_SEGMENT))
+                        .header(
+                                AUTHORIZATION_HEADER,
+                                RestApiTestFixture.bearerToken(services, seekerId, seeker.getEmail()))
                         .GET()
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
         HttpResponse<String> candidatesResponse = client.send(
                 HttpRequest.newBuilder(URI.create(BASE_URL + port + USERS_PATH + seekerId + CANDIDATES_SEGMENT))
+                        .header(
+                                AUTHORIZATION_HEADER,
+                                RestApiTestFixture.bearerToken(services, seekerId, seeker.getEmail()))
                         .GET()
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
@@ -409,6 +433,9 @@ class RestApiReadRoutesTest {
 
         HttpResponse<String> browseResponse = client.send(
                 HttpRequest.newBuilder(URI.create(BASE_URL + port + USERS_PATH + seekerId + BROWSE_SEGMENT))
+                        .header(
+                                AUTHORIZATION_HEADER,
+                                RestApiTestFixture.bearerToken(services, seekerId, seeker.getEmail()))
                         .GET()
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
@@ -452,6 +479,9 @@ class RestApiReadRoutesTest {
 
         HttpResponse<String> browseResponse = client.send(
                 HttpRequest.newBuilder(URI.create(BASE_URL + port + USERS_PATH + seekerId + BROWSE_SEGMENT))
+                        .header(
+                                AUTHORIZATION_HEADER,
+                                RestApiTestFixture.bearerToken(services, seekerId, seeker.getEmail()))
                         .GET()
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
@@ -482,6 +512,7 @@ class RestApiReadRoutesTest {
                 .state(UserState.ACTIVE)
                 .bio("Coffee and weekend hikes")
                 .birthDate(LocalDate.of(1998, 1, 1))
+                .email("nolocation@example.com")
                 .gender(Gender.FEMALE)
                 .interestedIn(EnumSet.of(Gender.MALE))
                 .build();
@@ -497,6 +528,9 @@ class RestApiReadRoutesTest {
 
         HttpResponse<String> browseResponse = client.send(
                 HttpRequest.newBuilder(URI.create(BASE_URL + port + USERS_PATH + noLocationId + BROWSE_SEGMENT))
+                        .header(
+                                AUTHORIZATION_HEADER,
+                                RestApiTestFixture.bearerToken(services, noLocationId, noLocation.getEmail()))
                         .GET()
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
@@ -524,6 +558,7 @@ class RestApiReadRoutesTest {
         User noLocation = User.StorageBuilder.create(noLocationId, "NoLocation", AppClock.now())
                 .state(UserState.ACTIVE)
                 .birthDate(LocalDate.of(1998, 1, 1))
+                .email("nolocation@example.com")
                 .gender(Gender.FEMALE)
                 .interestedIn(EnumSet.of(Gender.MALE))
                 .build();
@@ -539,6 +574,9 @@ class RestApiReadRoutesTest {
 
         HttpResponse<String> candidatesResponse = client.send(
                 HttpRequest.newBuilder(URI.create(BASE_URL + port + USERS_PATH + noLocationId + CANDIDATES_SEGMENT))
+                        .header(
+                                AUTHORIZATION_HEADER,
+                                RestApiTestFixture.bearerToken(services, noLocationId, noLocation.getEmail()))
                         .GET()
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
@@ -587,6 +625,9 @@ class RestApiReadRoutesTest {
 
         HttpResponse<String> candidatesResponse = client.send(
                 HttpRequest.newBuilder(URI.create(BASE_URL + port + USERS_PATH + seekerId + CANDIDATES_SEGMENT))
+                        .header(
+                                AUTHORIZATION_HEADER,
+                                RestApiTestFixture.bearerToken(services, seekerId, seeker.getEmail()))
                         .GET()
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
@@ -624,7 +665,9 @@ class RestApiReadRoutesTest {
 
         HttpResponse<String> deleteResponse = client.send(
                 HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/users/" + userId))
-                        .header("X-User-Id", userId.toString())
+                        .header(
+                                AUTHORIZATION_HEADER,
+                                RestApiTestFixture.bearerToken(services, userId, userId + "@example.com"))
                         .DELETE()
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
@@ -633,8 +676,8 @@ class RestApiReadRoutesTest {
     }
 
     @Test
-    @DisplayName("conversation message reads require an acting user header")
-    void conversationMessageReadsRequireActingUserHeader() throws Exception {
+    @DisplayName("conversation message reads require a bearer token")
+    void conversationMessageReadsRequireBearerToken() throws Exception {
         TestStorages.Users userStorage = new TestStorages.Users();
         TestStorages.Communications communicationStorage = new TestStorages.Communications();
         TestStorages.Interactions interactionStorage = new TestStorages.Interactions(communicationStorage);
@@ -660,7 +703,7 @@ class RestApiReadRoutesTest {
                                 .build(),
                         HttpResponse.BodyHandlers.ofString());
 
-        assertEquals(400, response.statusCode(), response.body());
+        assertEquals(401, response.statusCode(), response.body());
     }
 
     @Test
@@ -689,7 +732,9 @@ class RestApiReadRoutesTest {
                 .send(
                         HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/conversations/"
                                         + conversationId + "/messages"))
-                                .header("X-User-Id", malloryId.toString())
+                                .header(
+                                        AUTHORIZATION_HEADER,
+                                        RestApiTestFixture.bearerToken(services, malloryId, malloryId + "@example.com"))
                                 .GET()
                                 .build(),
                         HttpResponse.BodyHandlers.ofString());
@@ -721,7 +766,9 @@ class RestApiReadRoutesTest {
                 .send(
                         HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/conversations/"
                                         + conversationId + "/messages"))
-                                .header(USER_ID_HEADER, aliceId.toString())
+                                .header(
+                                        AUTHORIZATION_HEADER,
+                                        RestApiTestFixture.bearerToken(services, aliceId, aliceId + "@example.com"))
                                 .GET()
                                 .build(),
                         HttpResponse.BodyHandlers.ofString());
@@ -757,7 +804,9 @@ class RestApiReadRoutesTest {
                 .send(
                         HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/conversations/"
                                         + conversationId + "/messages"))
-                                .header(USER_ID_HEADER, aliceId.toString())
+                                .header(
+                                        AUTHORIZATION_HEADER,
+                                        RestApiTestFixture.bearerToken(services, aliceId, aliceId + "@example.com"))
                                 .GET()
                                 .build(),
                         HttpResponse.BodyHandlers.ofString());
@@ -835,6 +884,7 @@ class RestApiReadRoutesTest {
                 .state(UserState.ACTIVE)
                 .bio("Coffee and weekend hikes")
                 .birthDate(LocalDate.of(1998, 1, 1))
+                .email(name.toLowerCase() + "@example.com")
                 .gender(gender)
                 .interestedIn(interestedIn)
                 .location(40.7128, -74.0060)

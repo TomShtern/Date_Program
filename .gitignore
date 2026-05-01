@@ -133,6 +133,10 @@ cUserstom7sAppDataLocalTempclaude-*
 # Agent Skills
 .agent/
 2026-02-01-static-nested-types-claude.txt
+
+# Verification script output artifacts
+verify*.out
+verify*.err
 /.ai/mcp/mcp.json
 /.output.txt
 .claude/settings.local.json

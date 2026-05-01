@@ -33,7 +33,7 @@ class RestApiVerificationRoutesTest {
     private static final String USERS_PATH = "/api/users/";
     private static final String START_PATH = "/verification/start";
     private static final String CONFIRM_PATH = "/verification/confirm";
-    private static final String USER_ID_HEADER = "X-User-Id";
+    private static final String AUTHORIZATION_HEADER = "Authorization";
     private static final String CONTENT_TYPE_HEADER = "Content-Type";
     private static final String APPLICATION_JSON = "application/json";
 
@@ -56,7 +56,8 @@ class RestApiVerificationRoutesTest {
         ServiceRegistry services = createServices(userStorage, interactionStorage, communicationStorage);
 
         UUID userId = UUID.randomUUID();
-        userStorage.save(activeUser(userId, "Verifier"));
+        User user = activeUser(userId, "Verifier");
+        userStorage.save(user);
 
         server = new RestApiServer(services, 0);
         server.start();
@@ -65,7 +66,9 @@ class RestApiVerificationRoutesTest {
 
         HttpResponse<String> startResponse = client.send(
                 HttpRequest.newBuilder(URI.create(BASE_URL + port + USERS_PATH + userId + START_PATH))
-                        .header(USER_ID_HEADER, userId.toString())
+                        .header(
+                                AUTHORIZATION_HEADER,
+                                RestApiTestFixture.bearerToken(services, user.getId(), user.getEmail()))
                         .header(CONTENT_TYPE_HEADER, APPLICATION_JSON)
                         .POST(HttpRequest.BodyPublishers.ofString(
                                 "{\"method\":\"EMAIL\",\"contact\":\"verified@example.com\"}"))
@@ -81,7 +84,9 @@ class RestApiVerificationRoutesTest {
 
         HttpResponse<String> confirmResponse = client.send(
                 HttpRequest.newBuilder(URI.create(BASE_URL + port + USERS_PATH + userId + CONFIRM_PATH))
-                        .header(USER_ID_HEADER, userId.toString())
+                        .header(
+                                AUTHORIZATION_HEADER,
+                                RestApiTestFixture.bearerToken(services, user.getId(), user.getEmail()))
                         .header(CONTENT_TYPE_HEADER, APPLICATION_JSON)
                         .POST(HttpRequest.BodyPublishers.ofString(
                                 "{\"verificationCode\":\"" + verificationCode + "\"}"))
@@ -103,7 +108,8 @@ class RestApiVerificationRoutesTest {
         ServiceRegistry services = createServices(userStorage, interactionStorage, communicationStorage);
 
         UUID userId = UUID.randomUUID();
-        userStorage.save(activeUser(userId, "Verifier"));
+        User user = activeUser(userId, "Verifier");
+        userStorage.save(user);
 
         server = new RestApiServer(services, 0);
         server.start();
@@ -112,7 +118,9 @@ class RestApiVerificationRoutesTest {
 
         HttpResponse<String> invalidMethodResponse = client.send(
                 HttpRequest.newBuilder(URI.create(BASE_URL + port + USERS_PATH + userId + START_PATH))
-                        .header(USER_ID_HEADER, userId.toString())
+                        .header(
+                                AUTHORIZATION_HEADER,
+                                RestApiTestFixture.bearerToken(services, user.getId(), user.getEmail()))
                         .header(CONTENT_TYPE_HEADER, APPLICATION_JSON)
                         .POST(HttpRequest.BodyPublishers.ofString(
                                 "{\"method\":\"NOT_A_METHOD\",\"contact\":\"verified@example.com\"}"))
@@ -122,7 +130,9 @@ class RestApiVerificationRoutesTest {
 
         HttpResponse<String> blankContactResponse = client.send(
                 HttpRequest.newBuilder(URI.create(BASE_URL + port + USERS_PATH + userId + START_PATH))
-                        .header(USER_ID_HEADER, userId.toString())
+                        .header(
+                                AUTHORIZATION_HEADER,
+                                RestApiTestFixture.bearerToken(services, user.getId(), user.getEmail()))
                         .header(CONTENT_TYPE_HEADER, APPLICATION_JSON)
                         .POST(HttpRequest.BodyPublishers.ofString("{\"method\":\"PHONE\",\"contact\":\"   \"}"))
                         .build(),
@@ -131,7 +141,9 @@ class RestApiVerificationRoutesTest {
 
         HttpResponse<String> startResponse = client.send(
                 HttpRequest.newBuilder(URI.create(BASE_URL + port + USERS_PATH + userId + START_PATH))
-                        .header(USER_ID_HEADER, userId.toString())
+                        .header(
+                                AUTHORIZATION_HEADER,
+                                RestApiTestFixture.bearerToken(services, user.getId(), user.getEmail()))
                         .header(CONTENT_TYPE_HEADER, APPLICATION_JSON)
                         .POST(HttpRequest.BodyPublishers.ofString(
                                 "{\"method\":\"EMAIL\",\"contact\":\"verified@example.com\"}"))
@@ -141,7 +153,9 @@ class RestApiVerificationRoutesTest {
 
         HttpResponse<String> invalidCodeResponse = client.send(
                 HttpRequest.newBuilder(URI.create(BASE_URL + port + USERS_PATH + userId + CONFIRM_PATH))
-                        .header(USER_ID_HEADER, userId.toString())
+                        .header(
+                                AUTHORIZATION_HEADER,
+                                RestApiTestFixture.bearerToken(services, user.getId(), user.getEmail()))
                         .header(CONTENT_TYPE_HEADER, APPLICATION_JSON)
                         .POST(HttpRequest.BodyPublishers.ofString("{\"verificationCode\":\"000000\"}"))
                         .build(),
@@ -161,6 +175,7 @@ class RestApiVerificationRoutesTest {
         return User.StorageBuilder.create(id, name, AppClock.now())
                 .state(User.UserState.ACTIVE)
                 .birthDate(LocalDate.of(1998, 1, 1))
+                .email(name.toLowerCase() + "@example.com")
                 .gender(Gender.OTHER)
                 .interestedIn(EnumSet.of(Gender.OTHER))
                 .location(40.7128, -74.0060)

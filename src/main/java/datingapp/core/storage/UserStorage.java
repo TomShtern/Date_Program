@@ -166,6 +166,15 @@ public interface UserStorage {
         return result;
     }
 
+    default Optional<User> findByEmail(String normalizedEmail) {
+        if (normalizedEmail == null || normalizedEmail.isBlank()) {
+            return Optional.empty();
+        }
+        return findAll().stream()
+                .filter(user -> normalizedEmail.equals(user.getEmail()))
+                .findFirst();
+    }
+
     private static PageData<User> pageUsers(List<User> users, int offset, int limit) {
         Objects.requireNonNull(users, "users cannot be null");
         if (offset < 0) {

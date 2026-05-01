@@ -138,6 +138,10 @@ public class ConnectionService {
             return MessageLoadResult.success(List.of());
         }
 
+        if (!convoOpt.get().isVisibleTo(userId)) {
+            return MessageLoadResult.success(List.of());
+        }
+
         return MessageLoadResult.success(communicationStorage.getMessages(conversationId, limit, offset));
     }
 

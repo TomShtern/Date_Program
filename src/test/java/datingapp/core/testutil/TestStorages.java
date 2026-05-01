@@ -24,6 +24,7 @@ import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
 import datingapp.core.model.User.UserState;
 import datingapp.core.storage.AnalyticsStorage;
+import datingapp.core.storage.AuthStorage;
 import datingapp.core.storage.OperationalCommunicationStorage;
 import datingapp.core.storage.OperationalInteractionStorage;
 import datingapp.core.storage.OperationalUserStorage;
@@ -206,6 +207,46 @@ public final class TestStorages {
 
         public Instant getLastPurgeCutoff() {
             return lastPurgeCutoff;
+        }
+    }
+
+    public static final class Auth implements AuthStorage {
+        private final Map<UUID, String> passwordHashesByUserId = new HashMap<>();
+        private final Map<String, RefreshTokenRecord> refreshTokensByHash = new HashMap<>();
+
+        @Override
+        public Optional<String> findPasswordHash(UUID userId) {
+            return Optional.ofNullable(passwordHashesByUserId.get(userId));
+        }
+
+        @Override
+        public void savePasswordHash(UUID userId, String passwordHash, Instant createdAt, Instant updatedAt) {
+            passwordHashesByUserId.put(userId, passwordHash);
+        }
+
+        @Override
+        public Optional<RefreshTokenRecord> findRefreshTokenByHash(String tokenHash) {
+            return Optional.ofNullable(refreshTokensByHash.get(tokenHash));
+        }
+
+        @Override
+        public void insertRefreshToken(RefreshTokenRecord refreshToken) {
+            refreshTokensByHash.put(refreshToken.tokenHash(), refreshToken);
+        }
+
+        @Override
+        public void revokeRefreshToken(UUID tokenId, Instant revokedAt, UUID replacedByTokenId) {
+            refreshTokensByHash.replaceAll(
+                    (ignored, existing) -> existing.tokenId().equals(tokenId)
+                            ? new RefreshTokenRecord(
+                                    existing.tokenId(),
+                                    existing.userId(),
+                                    existing.tokenHash(),
+                                    existing.issuedAt(),
+                                    existing.expiresAt(),
+                                    revokedAt,
+                                    replacedByTokenId)
+                            : existing);
         }
     }
 

@@ -70,7 +70,14 @@ class RestApiConversationBatchCountTest {
         URI uri = URI.create("http://localhost:" + port + "/api/users/" + userA + "/conversations");
 
         HttpResponse<String> response = HttpClient.newHttpClient()
-                .send(HttpRequest.newBuilder(uri).GET().build(), HttpResponse.BodyHandlers.ofString());
+                .send(
+                        HttpRequest.newBuilder(uri)
+                                .header(
+                                        "Authorization",
+                                        RestApiTestFixture.bearerToken(services, userA, userA + "@example.com"))
+                                .GET()
+                                .build(),
+                        HttpResponse.BodyHandlers.ofString());
 
         assertEquals(200, response.statusCode());
         java.util.List<?> conversations = MAPPER.readValue(response.body(), java.util.List.class);

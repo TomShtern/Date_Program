@@ -209,6 +209,29 @@ final class AppConfigValidator {
         requireInRange(queryTimeoutSeconds, 1, 600, "queryTimeoutSeconds");
     }
 
+    static void validateAuth(
+            String tokenIssuer,
+            String jwtSecret,
+            int accessTokenTtlSeconds,
+            int refreshTokenTtlDays,
+            int minPasswordLength) {
+        requireNonBlank("tokenIssuer", tokenIssuer);
+        requireNonBlank("jwtSecret", jwtSecret);
+        requireInRange(accessTokenTtlSeconds, 60, 86_400, "accessTokenTtlSeconds");
+        requireInRange(refreshTokenTtlDays, 1, 365, "refreshTokenTtlDays");
+        requireInRange(minPasswordLength, 8, 512, "minPasswordLength");
+    }
+
+    static void validateMedia(String photoStorageRoot, String photoPublicBaseUrl, long maxPhotoUploadBytes) {
+        requireNonBlank("photoStorageRoot", photoStorageRoot);
+        requirePositive("maxPhotoUploadBytes", maxPhotoUploadBytes);
+        if (photoPublicBaseUrl != null
+                && !photoPublicBaseUrl.isBlank()
+                && !(photoPublicBaseUrl.startsWith("http://") || photoPublicBaseUrl.startsWith("https://"))) {
+            throw new IllegalArgumentException("photoPublicBaseUrl must start with http:// or https:// when provided");
+        }
+    }
+
     static void validatePoolSizing(int maxPoolSize, int minIdle) {
         requireInRange(maxPoolSize, 1, 200, "maxPoolSize");
         requireInRange(minIdle, 0, 200, "minIdle");
@@ -326,6 +349,12 @@ final class AppConfigValidator {
     private static void requireInRange(int value, int min, int max, String field) {
         if (value < min || value > max) {
             throw new IllegalArgumentException(field + " must be between " + min + " and " + max);
+        }
+    }
+
+    private static void requirePositive(String name, long value) {
+        if (value <= 0) {
+            throw new IllegalArgumentException(name + " must be positive");
         }
     }
 }

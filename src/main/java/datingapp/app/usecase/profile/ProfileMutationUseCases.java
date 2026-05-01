@@ -387,6 +387,8 @@ public final class ProfileMutationUseCases {
         if (user.getState() == User.UserState.ACTIVE) {
             user.pause();
         }
+        user.setEmail(null);
+        user.setPhone(null);
     }
 
     private static void sanitizeProfileText(User user) {

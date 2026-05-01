@@ -16,6 +16,11 @@ final class RestApiRequestGuards {
 
     static final String HEADER_LAN_SHARED_SECRET = "X-DatingApp-Shared-Secret";
     private static final String HEALTH_ROUTE = "/api/health";
+    private static final String AUTH_ROUTE_PREFIX = "/api/auth/";
+    private static final String AUTH_ME_ROUTE = "/api/auth/me";
+    private static final String CONVERSATION_ROUTE_PREFIX = "/api/conversations/";
+    private static final String LOCATION_RESOLVE_ROUTE = "/api/location/resolve";
+    private static final String USERS_ROUTE_PREFIX = "/api/users/";
     private static final String LOCALHOST_ONLY_MESSAGE = "REST API is restricted to localhost requests";
     private static final String INVALID_LAN_SHARED_SECRET_MESSAGE = "Missing or invalid LAN shared secret";
     private final RestApiIdentityPolicy identityPolicy;
@@ -103,10 +108,37 @@ final class RestApiRequestGuards {
     }
 
     boolean requiresActingUserIdentity(Context ctx) {
+        if (ctx.method() == HandlerType.OPTIONS) {
+            return false;
+        }
+        String path = ctx.path();
+        if (HEALTH_ROUTE.equals(path) || LOCATION_RESOLVE_ROUTE.equals(path)) {
+            return false;
+        }
+        if (path.startsWith(AUTH_ROUTE_PREFIX)) {
+            return AUTH_ME_ROUTE.equals(path);
+        }
+        if (path.startsWith(CONVERSATION_ROUTE_PREFIX)) {
+            return true;
+        }
+        if (path.startsWith(USERS_ROUTE_PREFIX)) {
+            return ctx.method() != HandlerType.GET || !isAnonymousUserReadRoute(path);
+        }
         return switch (ctx.method()) {
-            case POST, PUT, DELETE -> !HEALTH_ROUTE.equals(ctx.path()) && !"/api/location/resolve".equals(ctx.path());
+            case POST, PUT, DELETE -> true;
             default -> false;
         };
+    }
+
+    private boolean isAnonymousUserReadRoute(String path) {
+        if ("/api/users".equals(path)) {
+            return true;
+        }
+        if (!path.startsWith(USERS_ROUTE_PREFIX)) {
+            return false;
+        }
+        String remainingPath = path.substring(USERS_ROUTE_PREFIX.length());
+        return !remainingPath.isBlank() && remainingPath.indexOf('/') < 0;
     }
 
     private boolean isLoopbackAddress(String host) {
@@ -169,6 +201,12 @@ final class RestApiRequestGuards {
 
     static final class ApiForbiddenException extends RuntimeException {
         ApiForbiddenException(String message) {
+            super(message);
+        }
+    }
+
+    static final class ApiUnauthorizedException extends RuntimeException {
+        ApiUnauthorizedException(String message) {
             super(message);
         }
     }

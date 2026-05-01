@@ -39,7 +39,7 @@ class RestApiRelationshipRoutesTest {
     private static final String REPORT_SEGMENT = "/report/";
     private static final String CONVERSATIONS_PATH = "/api/conversations/";
     private static final String MESSAGES_SEGMENT = "/messages";
-    private static final String USER_ID_HEADER = "X-User-Id";
+    private static final String AUTHORIZATION_HEADER = "Authorization";
     private static final String CONTENT_TYPE_HEADER = "Content-Type";
     private static final String APPLICATION_JSON = "application/json";
     private static final String FRIEND_REQUESTS_KEY = "friendRequests";
@@ -79,7 +79,7 @@ class RestApiRelationshipRoutesTest {
         HttpResponse<String> requestResponse = client.send(
                 HttpRequest.newBuilder(
                                 URI.create(BASE_URL + port + USERS_PATH + userA + FRIEND_REQUESTS_SEGMENT + userB))
-                        .header(USER_ID_HEADER, userA.toString())
+                        .header(AUTHORIZATION_HEADER, bearerToken(services, userA))
                         .POST(HttpRequest.BodyPublishers.noBody())
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
@@ -90,7 +90,7 @@ class RestApiRelationshipRoutesTest {
         HttpResponse<String> acceptResponse = client.send(
                 HttpRequest.newBuilder(URI.create(
                                 BASE_URL + port + USERS_PATH + userB + FRIEND_REQUESTS_SEGMENT + requestId + "/accept"))
-                        .header(USER_ID_HEADER, userB.toString())
+                        .header(AUTHORIZATION_HEADER, bearerToken(services, userB))
                         .POST(HttpRequest.BodyPublishers.noBody())
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
@@ -108,7 +108,7 @@ class RestApiRelationshipRoutesTest {
         HttpResponse<String> secondRequest = client.send(
                 HttpRequest.newBuilder(
                                 URI.create(BASE_URL + port + USERS_PATH + userA + FRIEND_REQUESTS_SEGMENT + userC))
-                        .header(USER_ID_HEADER, userA.toString())
+                        .header(AUTHORIZATION_HEADER, bearerToken(services, userA))
                         .POST(HttpRequest.BodyPublishers.noBody())
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
@@ -118,7 +118,7 @@ class RestApiRelationshipRoutesTest {
         HttpResponse<String> declineResponse = client.send(
                 HttpRequest.newBuilder(URI.create(BASE_URL + port + USERS_PATH + userC + FRIEND_REQUESTS_SEGMENT
                                 + secondRequestId + "/decline"))
-                        .header(USER_ID_HEADER, userC.toString())
+                        .header(AUTHORIZATION_HEADER, bearerToken(services, userC))
                         .POST(HttpRequest.BodyPublishers.noBody())
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
@@ -152,6 +152,7 @@ class RestApiRelationshipRoutesTest {
 
         HttpResponse<String> listResponse = client.send(
                 HttpRequest.newBuilder(URI.create(BASE_URL + port + USERS_PATH + userB + "/friend-requests"))
+                        .header(AUTHORIZATION_HEADER, bearerToken(services, userB))
                         .GET()
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
@@ -193,7 +194,7 @@ class RestApiRelationshipRoutesTest {
         HttpResponse<String> gracefulExitResponse = client.send(
                 HttpRequest.newBuilder(URI.create(BASE_URL + port + USERS_PATH + userA + RELATIONSHIPS_SEGMENT + userB
                                 + "/graceful-exit"))
-                        .header(USER_ID_HEADER, userA.toString())
+                        .header(AUTHORIZATION_HEADER, bearerToken(services, userA))
                         .POST(HttpRequest.BodyPublishers.noBody())
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
@@ -213,7 +214,7 @@ class RestApiRelationshipRoutesTest {
         HttpResponse<String> unmatchResponse = client.send(
                 HttpRequest.newBuilder(URI.create(
                                 BASE_URL + port + USERS_PATH + userA + RELATIONSHIPS_SEGMENT + userB + "/unmatch"))
-                        .header(USER_ID_HEADER, userA.toString())
+                        .header(AUTHORIZATION_HEADER, bearerToken(services, userA))
                         .POST(HttpRequest.BodyPublishers.noBody())
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
@@ -227,7 +228,7 @@ class RestApiRelationshipRoutesTest {
 
         HttpResponse<String> blockResponse = client.send(
                 HttpRequest.newBuilder(URI.create(BASE_URL + port + USERS_PATH + userA + BLOCK_SEGMENT + userB))
-                        .header(USER_ID_HEADER, userA.toString())
+                        .header(AUTHORIZATION_HEADER, bearerToken(services, userA))
                         .POST(HttpRequest.BodyPublishers.noBody())
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
@@ -236,7 +237,7 @@ class RestApiRelationshipRoutesTest {
 
         HttpResponse<String> reportResponse = client.send(
                 HttpRequest.newBuilder(URI.create(BASE_URL + port + USERS_PATH + userA + REPORT_SEGMENT + userB))
-                        .header(USER_ID_HEADER, userA.toString())
+                        .header(AUTHORIZATION_HEADER, bearerToken(services, userA))
                         .header(CONTENT_TYPE_HEADER, APPLICATION_JSON)
                         .POST(
                                 HttpRequest.BodyPublishers.ofString(
@@ -271,7 +272,7 @@ class RestApiRelationshipRoutesTest {
 
         HttpResponse<String> blockResponse = client.send(
                 HttpRequest.newBuilder(URI.create(BASE_URL + port + USERS_PATH + userA + BLOCK_SEGMENT + userB))
-                        .header(USER_ID_HEADER, userA.toString())
+                        .header(AUTHORIZATION_HEADER, bearerToken(services, userA))
                         .POST(HttpRequest.BodyPublishers.noBody())
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
@@ -279,7 +280,7 @@ class RestApiRelationshipRoutesTest {
 
         HttpResponse<String> blockedUsersResponse = client.send(
                 HttpRequest.newBuilder(URI.create(BASE_URL + port + USERS_PATH + userA + "/blocked-users"))
-                        .header(USER_ID_HEADER, userA.toString())
+                        .header(AUTHORIZATION_HEADER, bearerToken(services, userA))
                         .GET()
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
@@ -299,7 +300,7 @@ class RestApiRelationshipRoutesTest {
 
         HttpResponse<String> unblockResponse = client.send(
                 HttpRequest.newBuilder(URI.create(BASE_URL + port + USERS_PATH + userA + BLOCK_SEGMENT + userB))
-                        .header(USER_ID_HEADER, userA.toString())
+                        .header(AUTHORIZATION_HEADER, bearerToken(services, userA))
                         .DELETE()
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
@@ -332,7 +333,7 @@ class RestApiRelationshipRoutesTest {
 
         HttpResponse<String> forbiddenResponse = client.send(
                 HttpRequest.newBuilder(URI.create(BASE_URL + port + USERS_PATH + userA + BLOCK_SEGMENT + userB))
-                        .header(USER_ID_HEADER, outsider.toString())
+                        .header(AUTHORIZATION_HEADER, bearerToken(services, outsider))
                         .DELETE()
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
@@ -341,7 +342,7 @@ class RestApiRelationshipRoutesTest {
         HttpResponse<String> missingTargetResponse = client.send(
                 HttpRequest.newBuilder(
                                 URI.create(BASE_URL + port + USERS_PATH + userA + BLOCK_SEGMENT + UUID.randomUUID()))
-                        .header(USER_ID_HEADER, userA.toString())
+                        .header(AUTHORIZATION_HEADER, bearerToken(services, userA))
                         .DELETE()
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
@@ -373,7 +374,7 @@ class RestApiRelationshipRoutesTest {
         HttpResponse<String> unmatchResponse = client.send(
                 HttpRequest.newBuilder(URI.create(
                                 BASE_URL + port + USERS_PATH + userA + RELATIONSHIPS_SEGMENT + userB + "/unmatch"))
-                        .header(USER_ID_HEADER, userA.toString())
+                        .header(AUTHORIZATION_HEADER, bearerToken(services, userA))
                         .POST(HttpRequest.BodyPublishers.noBody())
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
@@ -414,7 +415,7 @@ class RestApiRelationshipRoutesTest {
         HttpResponse<String> firstUnmatchResponse = client.send(
                 HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/users/" + userA + "/relationships/"
                                 + userB + "/unmatch"))
-                        .header("X-User-Id", userA.toString())
+                        .header(AUTHORIZATION_HEADER, bearerToken(services, userA))
                         .POST(HttpRequest.BodyPublishers.noBody())
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
@@ -479,12 +480,12 @@ class RestApiRelationshipRoutesTest {
                         .GET()
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
-        assertEquals(400, anonymousResponse.statusCode(), anonymousResponse.body());
+        assertEquals(401, anonymousResponse.statusCode(), anonymousResponse.body());
 
         HttpResponse<String> participantResponse = client.send(
                 HttpRequest.newBuilder(URI.create(
                                 BASE_URL + port + CONVERSATIONS_PATH + conversation.getId() + MESSAGES_SEGMENT))
-                        .header(USER_ID_HEADER, userA.toString())
+                        .header(AUTHORIZATION_HEADER, bearerToken(services, userA))
                         .GET()
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
@@ -493,7 +494,7 @@ class RestApiRelationshipRoutesTest {
         HttpResponse<String> forbiddenResponse = client.send(
                 HttpRequest.newBuilder(URI.create(
                                 BASE_URL + port + CONVERSATIONS_PATH + conversation.getId() + MESSAGES_SEGMENT))
-                        .header(USER_ID_HEADER, outsiderId.toString())
+                        .header(AUTHORIZATION_HEADER, bearerToken(services, outsiderId))
                         .GET()
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
@@ -527,7 +528,7 @@ class RestApiRelationshipRoutesTest {
         HttpResponse<String> sendMessageResponse = client.send(
                 HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/conversations/"
                                 + conversation.getId() + "/messages"))
-                        .header("X-User-Id", outsiderId.toString())
+                        .header(AUTHORIZATION_HEADER, bearerToken(services, outsiderId))
                         .header("Content-Type", "application/json")
                         .POST(HttpRequest.BodyPublishers.ofString(
                                 "{\"senderId\":\"" + outsiderId + "\",\"content\":\"hello\"}"))
@@ -545,6 +546,111 @@ class RestApiRelationshipRoutesTest {
     private static void connectionStorageSeedFriendRequest(
             TestStorages.Communications communicationStorage, UUID fromUserId, UUID toUserId) {
         communicationStorage.saveFriendRequest(ConnectionModels.FriendRequest.create(fromUserId, toUserId));
+    }
+
+    @Test
+    @DisplayName("blocked user does not appear in active matches list")
+    void blockedUserExcludedFromMatchesAfterBlock() throws Exception {
+        TestStorages.Users userStorage = new TestStorages.Users();
+        TestStorages.Communications communicationStorage = new TestStorages.Communications();
+        TestStorages.Interactions interactionStorage = new TestStorages.Interactions(communicationStorage);
+        TestStorages.TrustSafety trustSafetyStorage = new TestStorages.TrustSafety();
+        ServiceRegistry services =
+                createServices(userStorage, interactionStorage, communicationStorage, trustSafetyStorage);
+
+        UUID aliceId = UUID.randomUUID();
+        UUID bobId = UUID.randomUUID();
+        userStorage.save(activeUser(aliceId, "Alice"));
+        userStorage.save(activeUser(bobId, "Bob"));
+        interactionStorage.save(Match.create(aliceId, bobId));
+
+        server = new RestApiServer(services, 0);
+        server.start();
+        int port = server.getApp().port();
+        HttpClient client = HttpClient.newHttpClient();
+
+        HttpResponse<String> matchesBeforeBlock = client.send(
+                HttpRequest.newBuilder(URI.create(BASE_URL + port + USERS_PATH + aliceId + "/matches"))
+                        .header(AUTHORIZATION_HEADER, bearerToken(services, aliceId))
+                        .GET()
+                        .build(),
+                HttpResponse.BodyHandlers.ofString());
+        assertEquals(200, matchesBeforeBlock.statusCode(), matchesBeforeBlock.body());
+        JsonNode matchesBeforeJson = MAPPER.readTree(matchesBeforeBlock.body());
+        assertEquals(1, matchesBeforeJson.get("matches").size());
+
+        HttpResponse<String> blockResponse = client.send(
+                HttpRequest.newBuilder(URI.create(BASE_URL + port + USERS_PATH + aliceId + BLOCK_SEGMENT + bobId))
+                        .header(AUTHORIZATION_HEADER, bearerToken(services, aliceId))
+                        .POST(HttpRequest.BodyPublishers.noBody())
+                        .build(),
+                HttpResponse.BodyHandlers.ofString());
+        assertEquals(200, blockResponse.statusCode(), blockResponse.body());
+
+        HttpResponse<String> matchesAfterBlock = client.send(
+                HttpRequest.newBuilder(URI.create(BASE_URL + port + USERS_PATH + aliceId + "/matches"))
+                        .header(AUTHORIZATION_HEADER, bearerToken(services, aliceId))
+                        .GET()
+                        .build(),
+                HttpResponse.BodyHandlers.ofString());
+        assertEquals(200, matchesAfterBlock.statusCode(), matchesAfterBlock.body());
+        JsonNode matchesAfterJson = MAPPER.readTree(matchesAfterBlock.body());
+        assertEquals(0, matchesAfterJson.get("matches").size());
+    }
+
+    @Test
+    @DisplayName("stored conversation read returns empty for blocker after block")
+    void storedConversationReadReturnsEmptyForBlockerAfterBlock() throws Exception {
+        TestStorages.Users userStorage = new TestStorages.Users();
+        TestStorages.Communications communicationStorage = new TestStorages.Communications();
+        TestStorages.Interactions interactionStorage = new TestStorages.Interactions(communicationStorage);
+        TestStorages.TrustSafety trustSafetyStorage = new TestStorages.TrustSafety();
+        ServiceRegistry services =
+                createServices(userStorage, interactionStorage, communicationStorage, trustSafetyStorage);
+
+        UUID aliceId = UUID.randomUUID();
+        UUID bobId = UUID.randomUUID();
+        userStorage.save(activeUser(aliceId, "Alice"));
+        userStorage.save(activeUser(bobId, "Bob"));
+        interactionStorage.save(Match.create(aliceId, bobId));
+        ConnectionModels.Conversation conversation = ConnectionModels.Conversation.create(aliceId, bobId);
+        communicationStorage.saveConversation(conversation);
+        communicationStorage.saveMessage(ConnectionModels.Message.create(conversation.getId(), bobId, "Hello Alice"));
+
+        server = new RestApiServer(services, 0);
+        server.start();
+        int port = server.getApp().port();
+        HttpClient client = HttpClient.newHttpClient();
+
+        HttpResponse<String> messagesBeforeBlock = client.send(
+                HttpRequest.newBuilder(URI.create(
+                                BASE_URL + port + CONVERSATIONS_PATH + conversation.getId() + MESSAGES_SEGMENT))
+                        .header(AUTHORIZATION_HEADER, bearerToken(services, aliceId))
+                        .GET()
+                        .build(),
+                HttpResponse.BodyHandlers.ofString());
+        assertEquals(200, messagesBeforeBlock.statusCode(), messagesBeforeBlock.body());
+        JsonNode messagesBeforeJson = MAPPER.readTree(messagesBeforeBlock.body());
+        assertEquals(1, messagesBeforeJson.size());
+
+        HttpResponse<String> blockResponse = client.send(
+                HttpRequest.newBuilder(URI.create(BASE_URL + port + USERS_PATH + aliceId + BLOCK_SEGMENT + bobId))
+                        .header(AUTHORIZATION_HEADER, bearerToken(services, aliceId))
+                        .POST(HttpRequest.BodyPublishers.noBody())
+                        .build(),
+                HttpResponse.BodyHandlers.ofString());
+        assertEquals(200, blockResponse.statusCode(), blockResponse.body());
+
+        HttpResponse<String> messagesAfterBlock = client.send(
+                HttpRequest.newBuilder(URI.create(
+                                BASE_URL + port + CONVERSATIONS_PATH + conversation.getId() + MESSAGES_SEGMENT))
+                        .header(AUTHORIZATION_HEADER, bearerToken(services, aliceId))
+                        .GET()
+                        .build(),
+                HttpResponse.BodyHandlers.ofString());
+        assertEquals(200, messagesAfterBlock.statusCode(), messagesAfterBlock.body());
+        JsonNode messagesAfterJson = MAPPER.readTree(messagesAfterBlock.body());
+        assertEquals(0, messagesAfterJson.size());
     }
 
     @Test
@@ -570,7 +676,7 @@ class RestApiRelationshipRoutesTest {
         HttpResponse<String> invalidEnumResponse = client.send(
                 HttpRequest.newBuilder(
                                 URI.create("http://localhost:" + port + "/api/users/" + userA + "/report/" + userB))
-                        .header("X-User-Id", userA.toString())
+                        .header(AUTHORIZATION_HEADER, bearerToken(services, userA))
                         .header("Content-Type", "application/json")
                         .POST(HttpRequest.BodyPublishers.ofString(
                                 "{\"reason\":\"NOT_A_REASON\",\"description\":\"bad\",\"blockUser\":false}"))
@@ -581,7 +687,7 @@ class RestApiRelationshipRoutesTest {
         HttpResponse<String> malformedBodyResponse = client.send(
                 HttpRequest.newBuilder(
                                 URI.create("http://localhost:" + port + "/api/users/" + userA + "/report/" + userB))
-                        .header("X-User-Id", userA.toString())
+                        .header(AUTHORIZATION_HEADER, bearerToken(services, userA))
                         .header("Content-Type", "application/json")
                         .POST(HttpRequest.BodyPublishers.ofString("{"))
                         .build(),
@@ -611,6 +717,12 @@ class RestApiRelationshipRoutesTest {
         return User.StorageBuilder.create(id, name, AppClock.now())
                 .state(UserState.ACTIVE)
                 .birthDate(LocalDate.of(1998, 1, 1))
+                .email(name.toLowerCase() + "@example.com")
                 .build();
+    }
+
+    private static String bearerToken(ServiceRegistry services, UUID userId) {
+        String email = services.getUserStorage().get(userId).map(User::getEmail).orElse(userId + "@example.com");
+        return RestApiTestFixture.bearerToken(services, userId, email);
     }
 }

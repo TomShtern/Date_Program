@@ -5,6 +5,8 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import datingapp.app.api.RestApiDtos.AchievementSnapshotDto;
 import datingapp.app.api.RestApiDtos.ArchiveConversationRequest;
+import datingapp.app.api.RestApiDtos.AuthResponse;
+import datingapp.app.api.RestApiDtos.AuthUserDto;
 import datingapp.app.api.RestApiDtos.BlockedUsersResponse;
 import datingapp.app.api.RestApiDtos.BrowseCandidatesResponse;
 import datingapp.app.api.RestApiDtos.ConfirmVerificationRequest;
@@ -17,6 +19,7 @@ import datingapp.app.api.RestApiDtos.LocationCityDto;
 import datingapp.app.api.RestApiDtos.LocationCountryDto;
 import datingapp.app.api.RestApiDtos.LocationResolveRequest;
 import datingapp.app.api.RestApiDtos.LocationResolveResponse;
+import datingapp.app.api.RestApiDtos.LoginRequest;
 import datingapp.app.api.RestApiDtos.MarkAllNotificationsReadResponse;
 import datingapp.app.api.RestApiDtos.MatchQualityDto;
 import datingapp.app.api.RestApiDtos.MatchSummary;
@@ -26,11 +29,17 @@ import datingapp.app.api.RestApiDtos.NotificationDto;
 import datingapp.app.api.RestApiDtos.PagedMatchResponse;
 import datingapp.app.api.RestApiDtos.PassResponse;
 import datingapp.app.api.RestApiDtos.PendingLikersResponse;
+import datingapp.app.api.RestApiDtos.PhotoMutationResponse;
+import datingapp.app.api.RestApiDtos.PhotoOrderRequest;
+import datingapp.app.api.RestApiDtos.PhotoRef;
+import datingapp.app.api.RestApiDtos.PhotoUploadResponse;
 import datingapp.app.api.RestApiDtos.PresentationContextDto;
 import datingapp.app.api.RestApiDtos.ProfileEditSnapshotDto;
 import datingapp.app.api.RestApiDtos.ProfileUpdateRequest;
+import datingapp.app.api.RestApiDtos.RefreshTokenRequest;
 import datingapp.app.api.RestApiDtos.ReportResponse;
 import datingapp.app.api.RestApiDtos.SendMessageRequest;
+import datingapp.app.api.RestApiDtos.SignupRequest;
 import datingapp.app.api.RestApiDtos.StandoutsResponse;
 import datingapp.app.api.RestApiDtos.StartVerificationRequest;
 import datingapp.app.api.RestApiDtos.StartVerificationResponse;
@@ -44,6 +53,7 @@ import datingapp.app.api.RestApiUserDtos.UserDetail;
 import datingapp.app.api.RestApiUserDtos.UserSummary;
 import datingapp.app.bootstrap.ApplicationStartup;
 import datingapp.app.event.AppEvent;
+import datingapp.app.usecase.auth.AuthUseCases;
 import datingapp.app.usecase.common.UseCaseResult;
 import datingapp.app.usecase.common.UserContext;
 import datingapp.app.usecase.matching.MatchingUseCases;
@@ -92,19 +102,23 @@ import datingapp.core.model.Match;
 import datingapp.core.model.User;
 import datingapp.core.model.User.UserState;
 import datingapp.core.profile.LocationService;
+import datingapp.core.storage.UserStorage;
 import io.javalin.Javalin;
 import io.javalin.http.Context;
 import io.javalin.http.NotFoundResponse;
 import io.javalin.json.JavalinJackson;
+import java.io.IOException;
 import java.net.InetAddress;
 import java.time.Duration;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -145,6 +159,7 @@ public class RestApiServer {
     private static final String CONFLICT = "CONFLICT";
     private static final String INTERNAL_ERROR = "INTERNAL_ERROR";
     private static final String FORBIDDEN = "FORBIDDEN";
+    private static final String UNAUTHORIZED = "UNAUTHORIZED";
     private static final String TOO_MANY_REQUESTS = "TOO_MANY_REQUESTS";
     private static final String PATH_AUTHOR_ID = "authorId";
     private static final String PATH_CONVERSATION_ID = "conversationId";
@@ -158,12 +173,16 @@ public class RestApiServer {
     private static final int DEFAULT_CORS_MAX_AGE_SECONDS = 3600;
     private static final String ENV_REST_ALLOWED_ORIGINS = "DATING_APP_REST_ALLOWED_ORIGINS";
     private static final String ENV_REST_SHARED_SECRET = "DATING_APP_REST_SHARED_SECRET";
+    private static final Pattern STATIC_PHOTO_FILE_NAME_PATTERN = Pattern.compile("^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$");
     /**
      * Pagination query-parameter names shared by match and future list endpoints.
      */
     private static final String PARAM_LIMIT = "limit";
 
     private static final String PARAM_OFFSET = "offset";
+
+    private RestApiPhotoStorage photoStorage;
+    private final UserStorage userStorage;
 
     private final MatchingUseCases matchingUseCases;
     private final MessagingUseCases messagingUseCases;
@@ -173,6 +192,7 @@ public class RestApiServer {
     private final ProfileNotesUseCases profileNotesUseCases;
     private final VerificationUseCases verificationUseCases;
     private final SocialUseCases socialUseCases;
+    private final AuthUseCases authUseCases;
     private final TrustSafetyService trustSafetyService;
     private final LocationService locationService;
     private final ZoneId userTimeZone;
@@ -210,10 +230,11 @@ public class RestApiServer {
         this.profileNotesUseCases = services.getProfileNotesUseCases();
         this.verificationUseCases = services.getVerificationUseCases();
         this.socialUseCases = services.getSocialUseCases();
+        this.authUseCases = services.getAuthUseCases();
         this.trustSafetyService = services.getTrustSafetyService();
         this.locationService = services.getLocationService();
         this.userTimeZone = services.getConfig().safety().userTimeZone();
-        this.identityPolicy = new RestApiIdentityPolicy();
+        this.identityPolicy = new RestApiIdentityPolicy(this.authUseCases);
         this.host = normalizeHost(host);
         this.restrictToLoopbackClients = isLoopbackHost(this.host);
         this.lanSharedSecret = normalizeSharedSecret(lanSharedSecret);
@@ -224,6 +245,8 @@ public class RestApiServer {
                 DEFAULT_RATE_LIMIT_REQUESTS,
                 this.restrictToLoopbackClients ? null : this.lanSharedSecret);
         this.port = port;
+        this.photoStorage = new RestApiPhotoStorage(services.getConfig());
+        this.userStorage = services.getUserStorage();
     }
 
     /** Starts the HTTP server. */
@@ -254,6 +277,7 @@ public class RestApiServer {
         registerRequestGuards();
         registerRoutes();
         registerExceptionHandlers();
+        registerStaticPhotoRoute();
 
         app.start(host, port);
         if (restrictToLoopbackClients && logger.isWarnEnabled()) {
@@ -289,8 +313,91 @@ public class RestApiServer {
         new RestRouteSupport(app, this).registerRoutes();
     }
 
+    private void registerStaticPhotoRoute() {
+        app.get("/photos/*", ctx -> {
+            String routePath = ctx.path();
+            int slashAfterPhotos = routePath.indexOf('/', 1);
+            if (slashAfterPhotos < 0) {
+                ctx.status(404);
+                return;
+            }
+            String userIdStr = routePath.substring(
+                    slashAfterPhotos + 1,
+                    routePath.indexOf('/', slashAfterPhotos + 1) < 0
+                            ? routePath.length()
+                            : routePath.indexOf('/', slashAfterPhotos + 1));
+            int fileNameStart = routePath.indexOf('/', slashAfterPhotos + 1);
+            if (fileNameStart < 0) {
+                ctx.status(404);
+                return;
+            }
+            String fileName = routePath.substring(fileNameStart + 1);
+            if (!isSafeStaticPhotoFileName(fileName)) {
+                ctx.status(404);
+                return;
+            }
+            UUID userId;
+            try {
+                userId = UUID.fromString(userIdStr);
+            } catch (IllegalArgumentException e) {
+                ctx.status(404);
+                return;
+            }
+            var content = photoStorage.loadPhoto(userId, fileName);
+            if (content.isEmpty()) {
+                ctx.status(404);
+                return;
+            }
+            ctx.contentType(content.get().contentType()).result(content.get().bytes());
+        });
+    }
+
     private void registerRequestGuards() {
         requestGuards.registerRequestGuards(app, this::enforceLocalhostOnly);
+    }
+
+    private static boolean isSafeStaticPhotoFileName(String fileName) {
+        if (fileName == null || fileName.isBlank()) {
+            return false;
+        }
+        if (fileName.contains("..")
+                || fileName.contains("/")
+                || fileName.contains("\\")
+                || fileName.indexOf('\0') >= 0) {
+            return false;
+        }
+        return STATIC_PHOTO_FILE_NAME_PATTERN.matcher(fileName).matches();
+    }
+
+    // ── Auth Handlers ───────────────────────────────────────────────────
+
+    void signup(Context ctx) {
+        SignupRequest request = ctx.bodyAsClass(SignupRequest.class);
+        AuthUseCases.AuthSession session = authUseCases.signup(
+                new AuthUseCases.SignupCommand(request.email(), request.password(), request.dateOfBirth()));
+        ctx.status(201).json(AuthResponse.from(session));
+    }
+
+    void login(Context ctx) {
+        LoginRequest request = ctx.bodyAsClass(LoginRequest.class);
+        AuthUseCases.AuthSession session =
+                authUseCases.login(new AuthUseCases.LoginCommand(request.email(), request.password()));
+        ctx.json(AuthResponse.from(session));
+    }
+
+    void refresh(Context ctx) {
+        RefreshTokenRequest request = ctx.bodyAsClass(RefreshTokenRequest.class);
+        ctx.json(AuthResponse.from(authUseCases.refresh(request.refreshToken())));
+    }
+
+    void logout(Context ctx) {
+        RefreshTokenRequest request = ctx.bodyAsClass(RefreshTokenRequest.class);
+        authUseCases.logout(request.refreshToken());
+        ctx.status(204);
+    }
+
+    void me(Context ctx) {
+        ctx.json(AuthUserDto.from(authUseCases.requireAuthenticatedUser(requireActingUserId(ctx))));
     }
 
     // ── User Handlers ───────────────────────────────────────────────────
@@ -313,7 +420,11 @@ public class RestApiServer {
         if (user.isEmpty()) {
             return;
         }
-        ctx.json(UserDetail.from(user.get(), userTimeZone, locationLabel(user.get())));
+        ctx.json(UserDetail.from(
+                user.get(),
+                userTimeZone,
+                locationLabel(user.get()),
+                storedPath -> photoStorage.toPublicUrl(ctx, storedPath)));
     }
 
     void getProfileEditSnapshot(Context ctx) {
@@ -459,6 +570,101 @@ public class RestApiServer {
             return;
         }
         ctx.status(204);
+    }
+
+    // ── Photo Handlers ──────────────────────────────────────────────────
+
+    void uploadPhoto(Context ctx) throws IOException {
+        UUID userId = parseUuid(ctx.pathParam("id"));
+        Optional<User> userOpt = loadExistingUser(ctx, userId);
+        if (userOpt.isEmpty()) {
+            return;
+        }
+        User user = userOpt.get();
+        requirePhotoEligibleUser(user);
+        RestApiPhotoStorage.ManagedPhoto photo = photoStorage.storePhoto(userId, ctx.uploadedFile("photo"));
+        String storedPath = photo.storedPath();
+        user.addPhotoUrl(storedPath);
+        saveUserPhotoUrls(user);
+        List<String> publicUrls = photoStorage.toPublicUrls(ctx, user.getPhotoUrls());
+        String primaryPublicUrl = photoStorage.primaryPublicUrl(ctx, user.getPhotoUrls());
+        String publicUrl = photoStorage.toPublicUrl(ctx, storedPath);
+        ctx.status(201)
+                .json(new PhotoUploadResponse(new PhotoRef(photo.id(), publicUrl), primaryPublicUrl, publicUrls));
+    }
+
+    void deletePhoto(Context ctx) throws IOException {
+        UUID userId = parseUuid(ctx.pathParam("id"));
+        String photoId = ctx.pathParam("photoId");
+        Optional<User> userOpt = loadExistingUser(ctx, userId);
+        if (userOpt.isEmpty()) {
+            return;
+        }
+        User user = userOpt.get();
+        requirePhotoEligibleUser(user);
+        List<String> currentPaths = new ArrayList<>(user.getPhotoUrls());
+        String targetPath = null;
+        for (String path : currentPaths) {
+            if (photoStorage.photoIdFromStoredPath(path).filter(photoId::equals).isPresent()) {
+                targetPath = path;
+                break;
+            }
+        }
+        if (targetPath == null) {
+            ctx.status(404).json(new ErrorResponse("NOT_FOUND", "Photo not found"));
+            return;
+        }
+        photoStorage.deleteManagedPhoto(targetPath);
+        currentPaths.remove(targetPath);
+        user.setPhotoUrls(currentPaths);
+        saveUserPhotoUrls(user);
+        List<String> publicUrls = photoStorage.toPublicUrls(ctx, user.getPhotoUrls());
+        String primaryPublicUrl = photoStorage.primaryPublicUrl(ctx, user.getPhotoUrls());
+        ctx.json(new PhotoMutationResponse(primaryPublicUrl, publicUrls));
+    }
+
+    void reorderPhotos(Context ctx) {
+        UUID userId = parseUuid(ctx.pathParam("id"));
+        Optional<User> userOpt = loadExistingUser(ctx, userId);
+        if (userOpt.isEmpty()) {
+            return;
+        }
+        User user = userOpt.get();
+        requirePhotoEligibleUser(user);
+        PhotoOrderRequest request = ctx.bodyAsClass(PhotoOrderRequest.class);
+        if (request.photoIds() == null) {
+            throw new IllegalArgumentException("photoIds is required");
+        }
+        var knownIds = photoStorage.photoIdsByStoredPath(user.getPhotoUrls());
+        List<String> reorderedPaths = new ArrayList<>();
+        for (String pid : request.photoIds()) {
+            String path = knownIds.get(pid);
+            if (path == null) {
+                throw new IllegalArgumentException("Unknown photo id: " + pid);
+            }
+            reorderedPaths.add(path);
+        }
+        if (reorderedPaths.size() != user.getPhotoUrls().size()) {
+            throw new IllegalArgumentException("photoIds must include all existing photos");
+        }
+        user.setPhotoUrls(reorderedPaths);
+        saveUserPhotoUrls(user);
+        List<String> publicUrls = photoStorage.toPublicUrls(ctx, user.getPhotoUrls());
+        String primaryPublicUrl = photoStorage.primaryPublicUrl(ctx, user.getPhotoUrls());
+        ctx.json(new PhotoMutationResponse(primaryPublicUrl, publicUrls));
+    }
+
+    private void requirePhotoEligibleUser(User user) {
+        if (user.getDeletedAt() != null) {
+            throw new IllegalStateException("Account has been deleted and cannot upload photos");
+        }
+        if (user.getState() == UserState.BANNED) {
+            throw new IllegalStateException("Account is banned and cannot upload photos");
+        }
+    }
+
+    private void saveUserPhotoUrls(User user) {
+        userStorage.save(user);
     }
 
     void getCandidates(Context ctx) {
@@ -1063,19 +1269,18 @@ public class RestApiServer {
     void sendMessage(Context ctx) {
         String conversationId = ctx.pathParam(PATH_CONVERSATION_ID);
         SendMessageRequest request = ctx.bodyAsClass(SendMessageRequest.class);
+        UUID actingUserId = requireActingUserId(ctx);
 
         if (request.senderId() == null || request.content() == null) {
             throw new IllegalArgumentException("senderId and content are required");
         }
 
-        resolveActingUserId(ctx).ifPresent(actingUserId -> {
-            if (!actingUserId.equals(request.senderId())) {
-                throw new RestApiRequestGuards.ApiForbiddenException("Acting user does not match message sender");
-            }
-        });
-        UUID recipientId = extractRecipientFromConversation(conversationId, request.senderId());
+        if (!actingUserId.equals(request.senderId())) {
+            throw new RestApiRequestGuards.ApiForbiddenException("Acting user does not match message sender");
+        }
+        UUID recipientId = extractRecipientFromConversation(conversationId, actingUserId);
         var result = messagingUseCases.sendMessage(
-                new SendMessageCommand(UserContext.api(request.senderId()), recipientId, request.content()));
+                new SendMessageCommand(UserContext.api(actingUserId), recipientId, request.content()));
 
         if (result.success()) {
             ctx.status(201);
@@ -1407,6 +1612,16 @@ public class RestApiServer {
         app.exception(RestApiRequestGuards.ApiForbiddenException.class, (e, ctx) -> {
             ctx.status(403);
             ctx.json(new ErrorResponse(FORBIDDEN, e.getMessage()));
+        });
+
+        app.exception(RestApiRequestGuards.ApiUnauthorizedException.class, (e, ctx) -> {
+            ctx.status(401);
+            ctx.json(new ErrorResponse(UNAUTHORIZED, e.getMessage()));
+        });
+
+        app.exception(AuthUseCases.UnauthorizedException.class, (e, ctx) -> {
+            ctx.status(401);
+            ctx.json(new ErrorResponse(UNAUTHORIZED, e.getMessage()));
         });
 
         app.exception(RestApiRequestGuards.ApiTooManyRequestsException.class, (e, ctx) -> {

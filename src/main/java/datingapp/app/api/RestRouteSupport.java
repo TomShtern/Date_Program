@@ -22,8 +22,10 @@ final class RestRouteSupport {
         // routes may remain anonymous after the transport guard passes.
         // ────────────────────────────────────────────────────────────────────
         registerHealthRoutes();
+        registerAuthRoutes();
         registerLocationRoutes();
         registerUserRoutes();
+        registerPhotoRoutes();
         registerMatchingRoutes();
         registerSocialRoutes();
         registerMessagingRoutes();
@@ -32,6 +34,14 @@ final class RestRouteSupport {
 
     private void registerHealthRoutes() {
         app.get("/api/health", ctx -> ctx.json(new RestApiDtos.HealthResponse("ok", System.currentTimeMillis())));
+    }
+
+    private void registerAuthRoutes() {
+        app.post("/api/auth/signup", server::signup);
+        app.post("/api/auth/login", server::login);
+        app.post("/api/auth/refresh", server::refresh);
+        app.post("/api/auth/logout", server::logout);
+        app.get("/api/auth/me", server::me);
     }
 
     private void registerUserRoutes() {
@@ -43,6 +53,12 @@ final class RestRouteSupport {
         app.put("/api/users/{id}/profile", server::updateProfile);
         app.get("/api/users/{id}/candidates", server::getCandidates);
         app.delete("/api/users/{id}", server::deleteUser);
+    }
+
+    private void registerPhotoRoutes() {
+        app.post("/api/users/{id}/photos", server::uploadPhoto);
+        app.delete("/api/users/{id}/photos/{photoId}", server::deletePhoto);
+        app.put("/api/users/{id}/photos/order", server::reorderPhotos);
     }
 
     private void registerLocationRoutes() {

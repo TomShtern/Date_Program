@@ -3,6 +3,7 @@ package datingapp.storage.jdbi;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.core.AppClock;
@@ -90,9 +91,32 @@ class JdbiAccountCleanupStorageTest {
         accountCleanupStorage = new JdbiAccountCleanupStorage(jdbi);
 
         deletedUser = TestUserFactory.createActiveUser(UUID.randomUUID(), "Cleanup Alice");
+        deletedUser.setEmail("alice-cleanup@example.com");
+        deletedUser.setPhone("+15550001111");
         survivingUser = TestUserFactory.createActiveUser(UUID.randomUUID(), "Cleanup Bob");
         userStorage.save(deletedUser);
         userStorage.save(survivingUser);
+
+        jdbi.useHandle(handle -> handle.createUpdate("""
+                INSERT INTO user_credentials (user_id, password_hash, created_at, updated_at)
+                VALUES (:userId, :hash, :now, :now)
+                """)
+                .bind("userId", deletedUser.getId())
+                .bind("hash", "$2a$12$fakehash")
+                .bind("now", Timestamp.from(AppClock.now()))
+                .execute());
+
+        jdbi.useHandle(handle -> handle.createUpdate("""
+                INSERT INTO auth_refresh_tokens (
+                    token_id, user_id, token_hash, issued_at, expires_at, revoked_at, replaced_by_token_id
+                ) VALUES (:tokenId, :userId, :hash, :now, :expiresAt, NULL, NULL)
+                """)
+                .bind("tokenId", UUID.randomUUID())
+                .bind("userId", deletedUser.getId())
+                .bind("hash", "faketokenhash")
+                .bind("now", Timestamp.from(AppClock.now()))
+                .bind("expiresAt", Timestamp.from(AppClock.now().plusSeconds(3600)))
+                .execute());
 
         like = Like.create(deletedUser.getId(), survivingUser.getId(), Like.Direction.LIKE);
         var likeWriteResult = interactionStorage.saveLikeAndMaybeCreateMatch(like);
@@ -246,6 +270,11 @@ class JdbiAccountCleanupStorageTest {
                 "SELECT deleted_at FROM reports WHERE reporter_id = :reporterId AND reported_user_id = :reportedUserId",
                 deletedUser.getId(),
                 survivingUser.getId()));
+
+        assertNull(rawEmail(deletedUser.getId()));
+        assertNull(rawPhone(deletedUser.getId()));
+        assertEquals(0, countCredentials(deletedUser.getId()));
+        assertEquals(0, countActiveRefreshTokens(deletedUser.getId()));
     }
 
     private Instant rawDeletedAt(String sql, UUID id) {
@@ -306,6 +335,38 @@ class JdbiAccountCleanupStorageTest {
                 .bind("whoLikes", whoLikes)
                 .bind("whoGotLiked", whoGotLiked)
                 .mapTo(Instant.class)
+                .one());
+    }
+
+    private String rawEmail(UUID userId) {
+        return jdbi.withHandle(handle -> handle.createQuery("SELECT email FROM users WHERE id = :id")
+                .bind("id", userId)
+                .mapTo(String.class)
+                .findOne()
+                .orElse(null));
+    }
+
+    private String rawPhone(UUID userId) {
+        return jdbi.withHandle(handle -> handle.createQuery("SELECT phone FROM users WHERE id = :id")
+                .bind("id", userId)
+                .mapTo(String.class)
+                .findOne()
+                .orElse(null));
+    }
+
+    private int countCredentials(UUID userId) {
+        return jdbi.withHandle(
+                handle -> handle.createQuery("SELECT COUNT(*) FROM user_credentials WHERE user_id = :userId")
+                        .bind("userId", userId)
+                        .mapTo(int.class)
+                        .one());
+    }
+
+    private int countActiveRefreshTokens(UUID userId) {
+        return jdbi.withHandle(handle -> handle.createQuery(
+                        "SELECT COUNT(*) FROM auth_refresh_tokens WHERE user_id = :userId AND revoked_at IS NULL")
+                .bind("userId", userId)
+                .mapTo(int.class)
                 .one());
     }
 }

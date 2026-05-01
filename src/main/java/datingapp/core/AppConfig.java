@@ -3,13 +3,14 @@ package datingapp.core;
 import datingapp.core.connection.ConnectionModels.Message;
 import datingapp.core.model.ProfileNote;
 import datingapp.core.model.User;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.time.ZoneId;
 import java.util.Locale;
 import java.util.Objects;
 
 /**
- * Application configuration grouped by concern into five sub-records.
+ * Application configuration grouped by concern into six sub-records.
  *
  * <p>Use {@link #defaults()} for the default configuration, or {@link #builder()} for a custom one.
  */
@@ -18,9 +19,12 @@ public record AppConfig(
         ValidationConfig validation,
         AlgorithmConfig algorithm,
         StorageConfig storage,
-        SafetyConfig safety) {
+        SafetyConfig safety,
+        MediaConfig media,
+        AuthConfig auth) {
 
     public static final int DEFAULT_REMATCH_COOLDOWN_HOURS = 168;
+    public static final String DEVELOPMENT_ONLY_JWT_SECRET_PLACEHOLDER = "development-only-jwt-secret-change-me-please";
 
     // ========================================================================
     // Sub-record: MatchingConfig
@@ -182,6 +186,36 @@ public record AppConfig(
     }
 
     // ========================================================================
+    // Sub-record: MediaConfig
+    // ========================================================================
+
+    public static record MediaConfig(String photoStorageRoot, String photoPublicBaseUrl, long maxPhotoUploadBytes) {
+        public MediaConfig {
+            AppConfigValidator.validateMedia(photoStorageRoot, photoPublicBaseUrl, maxPhotoUploadBytes);
+            photoStorageRoot = Path.of(photoStorageRoot.trim()).normalize().toString();
+            photoPublicBaseUrl = photoPublicBaseUrl == null ? "" : photoPublicBaseUrl.trim();
+        }
+    }
+
+    // ========================================================================
+    // Sub-record: AuthConfig
+    // ========================================================================
+
+    public static record AuthConfig(
+            String tokenIssuer,
+            String jwtSecret,
+            int accessTokenTtlSeconds,
+            int refreshTokenTtlDays,
+            int minPasswordLength) {
+        public AuthConfig {
+            AppConfigValidator.validateAuth(
+                    tokenIssuer, jwtSecret, accessTokenTtlSeconds, refreshTokenTtlDays, minPasswordLength);
+            tokenIssuer = tokenIssuer.trim();
+            jwtSecret = jwtSecret.trim();
+        }
+    }
+
+    // ========================================================================
     // Sub-record: SafetyConfig
     // ========================================================================
 
@@ -232,6 +266,8 @@ public record AppConfig(
         Objects.requireNonNull(algorithm, "algorithm cannot be null");
         Objects.requireNonNull(storage, "storage cannot be null");
         Objects.requireNonNull(safety, "safety cannot be null");
+        Objects.requireNonNull(media, "media cannot be null");
+        Objects.requireNonNull(auth, "auth cannot be null");
     }
 
     // ========================================================================
@@ -343,6 +379,10 @@ public record AppConfig(
         private int idleTimeoutSeconds = 600;
         private int maxLifetimeSeconds = 1800;
         private int keepaliveTimeSeconds = 0;
+        // MediaConfig fields
+        private String photoStorageRoot = Path.of("data", "photos").toString();
+        private String photoPublicBaseUrl = "";
+        private long maxPhotoUploadBytes = 5L * 1024 * 1024;
         // SafetyConfig fields
         private int autoBanThreshold = 3;
         private ZoneId userTimeZone = ZoneId.systemDefault();
@@ -360,6 +400,12 @@ public record AppConfig(
         private int lifestyleFieldTarget = 5;
         private int cleanupRetentionDays = 30;
         private int softDeleteRetentionDays = 90;
+        // AuthConfig fields
+        private String tokenIssuer = "dating-app-phone-alpha";
+        private String jwtSecret = DEVELOPMENT_ONLY_JWT_SECRET_PLACEHOLDER;
+        private int accessTokenTtlSeconds = 900;
+        private int refreshTokenTtlDays = 30;
+        private int minPasswordLength = 12;
 
         public Builder autoBanThreshold(int v) {
             this.autoBanThreshold = v;
@@ -463,6 +509,46 @@ public record AppConfig(
 
         public Builder databaseUsername(String v) {
             this.databaseUsername = v;
+            return this;
+        }
+
+        public Builder photoStorageRoot(String v) {
+            this.photoStorageRoot = v;
+            return this;
+        }
+
+        public Builder photoPublicBaseUrl(String v) {
+            this.photoPublicBaseUrl = v;
+            return this;
+        }
+
+        public Builder maxPhotoUploadBytes(long v) {
+            this.maxPhotoUploadBytes = v;
+            return this;
+        }
+
+        public Builder tokenIssuer(String v) {
+            this.tokenIssuer = v;
+            return this;
+        }
+
+        public Builder jwtSecret(String v) {
+            this.jwtSecret = v;
+            return this;
+        }
+
+        public Builder accessTokenTtlSeconds(int v) {
+            this.accessTokenTtlSeconds = v;
+            return this;
+        }
+
+        public Builder refreshTokenTtlDays(int v) {
+            this.refreshTokenTtlDays = v;
+            return this;
+        }
+
+        public Builder minPasswordLength(int v) {
+            this.minPasswordLength = v;
             return this;
         }
 
@@ -777,7 +863,9 @@ public record AppConfig(
                     buildValidationConfig(),
                     buildAlgorithmConfig(),
                     buildStorageConfig(),
-                    buildSafetyConfig());
+                    buildSafetyConfig(),
+                    buildMediaConfig(),
+                    buildAuthConfig());
         }
 
         private MatchingConfig buildMatchingConfig() {
@@ -881,6 +969,15 @@ public record AppConfig(
                     lifestyleFieldTarget,
                     cleanupRetentionDays,
                     softDeleteRetentionDays);
+        }
+
+        private MediaConfig buildMediaConfig() {
+            return new MediaConfig(photoStorageRoot, photoPublicBaseUrl, maxPhotoUploadBytes);
+        }
+
+        private AuthConfig buildAuthConfig() {
+            return new AuthConfig(
+                    tokenIssuer, jwtSecret, accessTokenTtlSeconds, refreshTokenTtlDays, minPasswordLength);
         }
     }
 }

@@ -5,6 +5,9 @@ import datingapp.app.event.InProcessAppEventBus;
 import datingapp.app.event.handlers.AchievementEventHandler;
 import datingapp.app.event.handlers.MetricsEventHandler;
 import datingapp.app.event.handlers.NotificationEventHandler;
+import datingapp.app.usecase.auth.AuthTokenService;
+import datingapp.app.usecase.auth.AuthUseCases;
+import datingapp.app.usecase.auth.JwtAuthTokenService;
 import datingapp.core.AppConfig;
 import datingapp.core.ServiceRegistry;
 import datingapp.core.connection.ConnectionService;
@@ -33,6 +36,7 @@ import datingapp.core.profile.ProfileService;
 import datingapp.core.profile.ValidationService;
 import datingapp.core.storage.AccountCleanupStorage;
 import datingapp.core.storage.AnalyticsStorage;
+import datingapp.core.storage.AuthStorage;
 import datingapp.core.storage.OperationalCommunicationStorage;
 import datingapp.core.storage.OperationalInteractionStorage;
 import datingapp.core.storage.OperationalUserStorage;
@@ -40,6 +44,7 @@ import datingapp.core.storage.TrustSafetyStorage;
 import datingapp.core.workflow.ProfileActivationPolicy;
 import datingapp.core.workflow.RelationshipWorkflowPolicy;
 import datingapp.storage.jdbi.JdbiAccountCleanupStorage;
+import datingapp.storage.jdbi.JdbiAuthStorage;
 import datingapp.storage.jdbi.JdbiConnectionStorage;
 import datingapp.storage.jdbi.JdbiMatchmakingStorage;
 import datingapp.storage.jdbi.JdbiMetricsStorage;
@@ -130,6 +135,7 @@ public final class StorageFactory {
         JdbiMetricsStorage metricsStorage = new JdbiMetricsStorage(jdbi, dialect);
         TrustSafetyStorage trustSafetyStorage = jdbi.onDemand(JdbiTrustSafetyStorage.class);
         AccountCleanupStorage accountCleanupStorage = new JdbiAccountCleanupStorage(jdbi);
+        AuthStorage authStorage = new JdbiAuthStorage(jdbi);
 
         return new PersistenceComponents(
                 userStorage,
@@ -138,6 +144,7 @@ public final class StorageFactory {
                 metricsStorage,
                 trustSafetyStorage,
                 accountCleanupStorage,
+                authStorage,
                 matchmakingStorage.undoStorage(),
                 metricsStorage);
     }
@@ -208,6 +215,9 @@ public final class StorageFactory {
 
         ValidationService validationService = new ValidationService(config);
         LocationService locationService = new LocationService(validationService);
+        AuthTokenService authTokenService = new JwtAuthTokenService(config.auth());
+        AuthUseCases authUseCases =
+                new AuthUseCases(config, persistence.userStorage(), persistence.authStorage(), authTokenService);
         AppEventBus eventBus = new InProcessAppEventBus();
 
         return new DomainServices(
@@ -227,6 +237,7 @@ public final class StorageFactory {
                 trustSafetyService,
                 validationService,
                 locationService,
+                authUseCases,
                 eventBus);
     }
 
@@ -262,6 +273,7 @@ public final class StorageFactory {
                 .validationService(domain.validationService())
                 .locationService(domain.locationService())
                 .eventBus(domain.eventBus())
+                .authUseCases(domain.authUseCases())
                 .activationPolicy(new ProfileActivationPolicy())
                 .workflowPolicy(new RelationshipWorkflowPolicy())
                 .build();
@@ -274,6 +286,7 @@ public final class StorageFactory {
             AnalyticsStorage analyticsStorage,
             TrustSafetyStorage trustSafetyStorage,
             AccountCleanupStorage accountCleanupStorage,
+            AuthStorage authStorage,
             Undo.Storage undoStorage,
             Standout.Storage standoutStorage) {}
 
@@ -294,6 +307,7 @@ public final class StorageFactory {
             TrustSafetyService trustSafetyService,
             ValidationService validationService,
             LocationService locationService,
+            AuthUseCases authUseCases,
             AppEventBus eventBus) {}
 
     /**

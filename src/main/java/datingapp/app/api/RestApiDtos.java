@@ -2,6 +2,7 @@ package datingapp.app.api;
 
 import datingapp.app.api.RestApiUserDtos.DailyPickDto;
 import datingapp.app.api.RestApiUserDtos.UserSummary;
+import datingapp.app.usecase.auth.AuthUseCases;
 import datingapp.app.usecase.matching.MatchingUseCases.MatchQualitySnapshot;
 import datingapp.app.usecase.matching.MatchingUseCases.UndoOutcome;
 import datingapp.app.usecase.profile.VerificationUseCases;
@@ -52,6 +53,33 @@ final class RestApiDtos {
 
     /** Error response. */
     static record ErrorResponse(String code, String message) {}
+
+    /** Request body for signup. */
+    static record SignupRequest(String email, String password, LocalDate dateOfBirth) {}
+
+    /** Request body for login. */
+    static record LoginRequest(String email, String password) {}
+
+    /** Request body for refresh/logout token flows. */
+    static record RefreshTokenRequest(String refreshToken) {}
+
+    /** Authenticated user DTO. */
+    static record AuthUserDto(UUID id, String email, String displayName, String profileCompletionState) {
+        static AuthUserDto from(AuthUseCases.AuthUser user) {
+            return new AuthUserDto(user.id(), user.email(), user.displayName(), user.profileCompletionState());
+        }
+    }
+
+    /** Auth session response. */
+    static record AuthResponse(String accessToken, String refreshToken, int expiresInSeconds, AuthUserDto user) {
+        static AuthResponse from(AuthUseCases.AuthSession session) {
+            return new AuthResponse(
+                    session.accessToken(),
+                    session.refreshToken(),
+                    session.expiresInSeconds(),
+                    AuthUserDto.from(session.user()));
+        }
+    }
 
     /** Country DTO for location metadata responses. */
     static record LocationCountryDto(
@@ -629,4 +657,18 @@ final class RestApiDtos {
 
     /** Request body for reporting a user. */
     static record ReportUserRequest(Report.Reason reason, String description, boolean blockUser) {}
+
+    // ── Photo DTOs ──────────────────────────────────────────────────────
+
+    /** A single uploaded photo reference returned after upload. */
+    static record PhotoRef(String id, String url) {}
+
+    /** Response body returned after a successful photo upload. */
+    static record PhotoUploadResponse(PhotoRef photo, String primaryPhotoUrl, List<String> photoUrls) {}
+
+    /** Response body returned after a photo delete or photo reorder. */
+    static record PhotoMutationResponse(String primaryPhotoUrl, List<String> photoUrls) {}
+
+    /** Request body for reordering a user's photos. */
+    static record PhotoOrderRequest(List<String> photoIds) {}
 }

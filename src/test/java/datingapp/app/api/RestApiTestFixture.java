@@ -4,6 +4,11 @@ import datingapp.app.event.InProcessAppEventBus;
 import datingapp.app.event.handlers.AchievementEventHandler;
 import datingapp.app.event.handlers.MetricsEventHandler;
 import datingapp.app.event.handlers.NotificationEventHandler;
+import datingapp.app.usecase.auth.AuthTokenService;
+import datingapp.app.usecase.auth.AuthUseCases;
+import datingapp.app.usecase.auth.AuthUseCases.AuthIdentity;
+import datingapp.app.usecase.auth.JwtAuthTokenService;
+import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
 import datingapp.core.ServiceRegistry;
 import datingapp.core.connection.ConnectionService;
@@ -27,6 +32,7 @@ import datingapp.core.metrics.AchievementService;
 import datingapp.core.metrics.ActivityMetricsService;
 import datingapp.core.metrics.DefaultAchievementService;
 import datingapp.core.metrics.SwipeState.Undo;
+import datingapp.core.model.User;
 import datingapp.core.profile.LocationService;
 import datingapp.core.profile.ProfileService;
 import datingapp.core.profile.ValidationService;
@@ -48,6 +54,17 @@ import java.util.UUID;
 final class RestApiTestFixture {
 
     private RestApiTestFixture() {}
+
+    static String bearerToken(ServiceRegistry services, User user) {
+        return bearerToken(services, user.getId(), user.getEmail());
+    }
+
+    static String bearerToken(ServiceRegistry services, UUID userId, String email) {
+        String resolvedEmail = email == null || email.isBlank() ? userId + "@example.com" : email;
+        String accessToken = new JwtAuthTokenService(services.getConfig().auth())
+                .issueAccessToken(new AuthIdentity(userId, resolvedEmail), AppClock.now());
+        return "Bearer " + accessToken;
+    }
 
     static Builder builder(
             OperationalUserStorage userStorage,
@@ -140,6 +157,9 @@ final class RestApiTestFixture {
                     new MatchQualityService(userStorage, interactionStorage, config, compatibilityCalculator);
             ValidationService validationService = new ValidationService(config);
             LocationService locationService = new LocationService(validationService);
+            TestStorages.Auth authStorage = new TestStorages.Auth();
+            AuthTokenService authTokenService = new JwtAuthTokenService(config.auth());
+            AuthUseCases authUseCases = new AuthUseCases(config, userStorage, authStorage, authTokenService);
             AchievementService achievementService = new DefaultAchievementService(
                     config, analyticsStorage, interactionStorage, trustSafetyStorage, userStorage, profileService);
 
@@ -170,6 +190,7 @@ final class RestApiTestFixture {
                     .validationService(validationService)
                     .locationService(locationService)
                     .eventBus(eventBus)
+                    .authUseCases(authUseCases)
                     .build();
         }
     }

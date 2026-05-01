@@ -56,6 +56,8 @@ public final class ApplicationStartup {
 
     private static final String CONFIG_FILE = "config/app-config.json";
     private static final String ENV_PREFIX = "DATING_APP_";
+    private static final String APP_ENV_ENV_VAR = ENV_PREFIX + "ENV";
+    private static final String PRODUCTION_ENV = "production";
     private static final String CONFIG_OVERRIDE_PROPERTY = "datingapp.config";
     private static final String CONFIG_OVERRIDE_ENV = ENV_PREFIX + "CONFIG";
     private static final String SEED_DATA_ENV_VAR = ENV_PREFIX + "SEED_DATA";
@@ -198,8 +200,11 @@ public final class ApplicationStartup {
             logInfo("Config file not found at {}, using defaults", configPath);
         }
 
-        applyEnvironmentOverrides(builder);
-        return builder.build();
+        UnaryOperator<String> envLookup = environmentLookup();
+        applyEnvironmentOverrides(builder, envLookup);
+        AppConfig config = builder.build();
+        enforceProductionJwtSecretGuard(config, envLookup);
+        return config;
     }
 
     public static AppConfig fromJson(String json) {
@@ -210,7 +215,24 @@ public final class ApplicationStartup {
         AppConfig.Builder builder = AppConfig.builder();
         applyJsonConfig(builder, json);
         applyEnvironmentOverrides(builder, envLookup);
-        return builder.build();
+        AppConfig config = builder.build();
+        enforceProductionJwtSecretGuard(config, envLookup);
+        return config;
+    }
+
+    private static void enforceProductionJwtSecretGuard(AppConfig config, UnaryOperator<String> envLookup) {
+        String appEnv = envLookup.apply(APP_ENV_ENV_VAR);
+        if (appEnv == null || !PRODUCTION_ENV.equalsIgnoreCase(appEnv.trim())) {
+            return;
+        }
+
+        String jwtSecret = config.auth().jwtSecret();
+        if (jwtSecret == null
+                || jwtSecret.isBlank()
+                || AppConfig.DEVELOPMENT_ONLY_JWT_SECRET_PLACEHOLDER.equals(jwtSecret.trim())) {
+            throw new IllegalStateException("In production (" + APP_ENV_ENV_VAR
+                    + "=production), set a non-placeholder JWT secret via DATING_APP_AUTH_JWT_SECRET");
+        }
     }
 
     /**
@@ -284,10 +306,6 @@ public final class ApplicationStartup {
      * intentional: only variables that are useful to configure at the deployment
      * level are exposed.
      */
-    private static void applyEnvironmentOverrides(AppConfig.Builder builder) {
-        applyEnvironmentOverrides(builder, environmentLookup());
-    }
-
     static void applyEnvironmentOverrides(AppConfig.Builder builder, UnaryOperator<String> envLookup) {
         applyEnvInt(envLookup, "DAILY_LIKE_LIMIT", builder::dailyLikeLimit);
         applyEnvInt(envLookup, "DAILY_SUPER_LIKE_LIMIT", builder::dailySuperLikeLimit);
@@ -308,9 +326,17 @@ public final class ApplicationStartup {
         applyEnvInt(envLookup, "CLEANUP_RETENTION_DAYS", builder::cleanupRetentionDays);
         applyEnvInt(envLookup, "MIN_AGE", builder::minAge);
         applyEnvInt(envLookup, "MAX_AGE", builder::maxAge);
+        applyEnvInt(envLookup, "AUTH_ACCESS_TOKEN_TTL_SECONDS", builder::accessTokenTtlSeconds);
+        applyEnvInt(envLookup, "AUTH_REFRESH_TOKEN_TTL_DAYS", builder::refreshTokenTtlDays);
+        applyEnvInt(envLookup, "AUTH_MIN_PASSWORD_LENGTH", builder::minPasswordLength);
         applyEnvString(envLookup, "DB_DIALECT", builder::databaseDialect);
         applyEnvString(envLookup, "DB_URL", builder::databaseUrl);
         applyEnvString(envLookup, "DB_USERNAME", builder::databaseUsername);
+        applyEnvString(envLookup, "PHOTO_STORAGE_ROOT", builder::photoStorageRoot);
+        applyEnvString(envLookup, "PHOTO_PUBLIC_BASE_URL", builder::photoPublicBaseUrl);
+        applyEnvLong(envLookup, "MAX_PHOTO_UPLOAD_BYTES", builder::maxPhotoUploadBytes);
+        applyEnvString(envLookup, "AUTH_TOKEN_ISSUER", builder::tokenIssuer);
+        applyEnvString(envLookup, "AUTH_JWT_SECRET", builder::jwtSecret);
 
         String tz = envLookup.apply(ENV_PREFIX + "USER_TIME_ZONE");
         if (tz != null && !tz.isBlank()) {
@@ -336,6 +362,18 @@ public final class ApplicationStartup {
                 setter.accept(Integer.parseInt(value));
             } catch (NumberFormatException ex) {
                 throw new IllegalStateException("Invalid integer in env var " + ENV_PREFIX + suffix + ": " + value, ex);
+            }
+        }
+    }
+
+    private static void applyEnvLong(
+            UnaryOperator<String> envLookup, String suffix, java.util.function.LongConsumer setter) {
+        String value = envLookup.apply(ENV_PREFIX + suffix);
+        if (value != null && !value.isBlank()) {
+            try {
+                setter.accept(Long.parseLong(value));
+            } catch (NumberFormatException ex) {
+                throw new IllegalStateException("Invalid long in env var " + ENV_PREFIX + suffix + ": " + value, ex);
             }
         }
     }

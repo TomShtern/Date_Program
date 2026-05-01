@@ -63,6 +63,10 @@ public final class JdbiAccountCleanupStorage implements AccountCleanupStorage {
                 // ── State ──
                 deleteUndoStates(handle, user.getId());
 
+                // ── Auth state ──
+                deleteUserCredentials(handle, user.getId());
+                revokeUserRefreshTokens(handle, user.getId(), deletedAt);
+
                 // ── Finally mark user as deleted ──
                 softDeleteUser(handle, user.getId(), deletedAt);
             });
@@ -76,7 +80,9 @@ public final class JdbiAccountCleanupStorage implements AccountCleanupStorage {
             UPDATE users
             SET state = :state,
                 updated_at = :deletedAt,
-                deleted_at = :deletedAt
+                deleted_at = :deletedAt,
+                email = NULL,
+                phone = NULL
             WHERE id = :userId AND deleted_at IS NULL
             """)) {
             update.bind(USER_ID_BIND, userId)
@@ -218,6 +224,22 @@ public final class JdbiAccountCleanupStorage implements AccountCleanupStorage {
     private static void deleteUndoStates(Handle handle, UUID userId) {
         try (var update = handle.createUpdate("DELETE FROM undo_states WHERE user_id = :userId")) {
             update.bind(USER_ID_BIND, userId).execute();
+        }
+    }
+
+    private static void deleteUserCredentials(Handle handle, UUID userId) {
+        try (var update = handle.createUpdate("DELETE FROM user_credentials WHERE user_id = :userId")) {
+            update.bind(USER_ID_BIND, userId).execute();
+        }
+    }
+
+    private static void revokeUserRefreshTokens(Handle handle, UUID userId, Instant deletedAt) {
+        try (var update = handle.createUpdate("""
+            UPDATE auth_refresh_tokens
+            SET revoked_at = :deletedAt
+            WHERE user_id = :userId AND revoked_at IS NULL
+            """)) {
+            update.bind(USER_ID_BIND, userId).bind(DELETED_AT_BIND, deletedAt).execute();
         }
     }
 

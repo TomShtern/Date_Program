@@ -11,6 +11,7 @@ import datingapp.core.AppConfig;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.function.UnaryOperator;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -289,6 +290,34 @@ class ConfigLoaderTest {
         void handlesEmptyJson() {
             AppConfig config = ApplicationStartup.fromJson("{}");
             assertNotNull(config);
+        }
+
+        @Test
+        @DisplayName("Should fail fast in production when JWT secret remains the development placeholder")
+        void failsFastInProductionWhenJwtSecretIsDefaultPlaceholder() {
+            UnaryOperator<String> envLookup = name -> switch (name) {
+                case "DATING_APP_ENV" -> "production";
+                default -> null;
+            };
+
+            IllegalStateException error =
+                    assertThrows(IllegalStateException.class, () -> ApplicationStartup.fromJson("{}", envLookup));
+
+            assertTrue(error.getMessage().contains("DATING_APP_AUTH_JWT_SECRET"));
+        }
+
+        @Test
+        @DisplayName("Should allow production config when JWT secret is provided via environment override")
+        void allowsProductionWhenJwtSecretProvidedViaEnvironmentOverride() {
+            UnaryOperator<String> envLookup = name -> switch (name) {
+                case "DATING_APP_ENV" -> "production";
+                case "DATING_APP_AUTH_JWT_SECRET" -> "prod-secret-123456789";
+                default -> null;
+            };
+
+            AppConfig config = ApplicationStartup.fromJson("{}", envLookup);
+
+            assertEquals("prod-secret-123456789", config.auth().jwtSecret());
         }
     }
 

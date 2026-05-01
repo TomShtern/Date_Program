@@ -45,6 +45,7 @@ public final class SchemaInitializer {
     public static void createAllTables(Statement stmt) throws SQLException {
         // Core tables (order matters — users first due to FK references)
         createUsersTable(stmt);
+        createAuthSchema(stmt);
         createLikesTable(stmt);
         createMatchesTable(stmt);
         createSwipeSessionsTable(stmt);
@@ -186,6 +187,41 @@ public final class SchemaInitializer {
                     CONSTRAINT uk_users_phone UNIQUE (phone)
                 )
                 """);
+    }
+
+    static void createAuthSchema(Statement stmt) throws SQLException {
+        stmt.execute("""
+                CREATE TABLE IF NOT EXISTS user_credentials (
+                    user_id UUID PRIMARY KEY,
+                    password_hash VARCHAR(200) NOT NULL,
+                    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+                    updated_at TIMESTAMP WITH TIME ZONE NOT NULL,
+                    CONSTRAINT fk_user_credentials_user FOREIGN KEY (user_id)
+                        REFERENCES users(id) ON DELETE CASCADE,
+                    CONSTRAINT ck_user_credentials_password_hash_nonblank CHECK (TRIM(password_hash) <> '')
+                )
+                """);
+        stmt.execute("""
+                CREATE TABLE IF NOT EXISTS auth_refresh_tokens (
+                    token_id UUID PRIMARY KEY,
+                    user_id UUID NOT NULL,
+                    token_hash VARCHAR(128) NOT NULL,
+                    issued_at TIMESTAMP WITH TIME ZONE NOT NULL,
+                    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+                    revoked_at TIMESTAMP WITH TIME ZONE,
+                    replaced_by_token_id UUID,
+                    CONSTRAINT fk_auth_refresh_tokens_user FOREIGN KEY (user_id)
+                        REFERENCES users(id) ON DELETE CASCADE,
+                    CONSTRAINT fk_auth_refresh_tokens_replaced_by FOREIGN KEY (replaced_by_token_id)
+                        REFERENCES auth_refresh_tokens(token_id) ON DELETE SET NULL,
+                    CONSTRAINT uk_auth_refresh_tokens_hash UNIQUE (token_hash),
+                    CONSTRAINT ck_auth_refresh_tokens_hash_nonblank CHECK (TRIM(token_hash) <> ''),
+                    CONSTRAINT ck_auth_refresh_tokens_expiry CHECK (expires_at > issued_at)
+                )
+                """);
+        stmt.execute("CREATE INDEX IF NOT EXISTS idx_auth_refresh_tokens_user_id ON auth_refresh_tokens(user_id)");
+        stmt.execute(
+                "CREATE INDEX IF NOT EXISTS idx_auth_refresh_tokens_expires_at ON auth_refresh_tokens(expires_at)");
     }
 
     static void createLikesTable(Statement stmt) throws SQLException {

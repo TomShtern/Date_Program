@@ -186,7 +186,11 @@ public final class MigrationRunner {
             new VersionedMigration(
                     18,
                     "Normalize and enforce unique email/phone verification contacts in users",
-                    MigrationRunner::applyV18));
+                    MigrationRunner::applyV18),
+            new VersionedMigration(
+                    19,
+                    "Add user credential and refresh-token tables for REST authentication",
+                    MigrationRunner::applyV19));
 
     // ═══════════════════════════════════════════════════════════════
     // Public entry point
@@ -670,6 +674,10 @@ public final class MigrationRunner {
                     stmt, SQL_TABLE_USERS, "ck_users_phone_trimmed", "phone IS NULL OR phone = TRIM(phone)");
             addUniqueConstraintIfMissing(stmt, SQL_TABLE_USERS, "uk_users_phone", "phone");
         }
+    }
+
+    private static void applyV19(Statement stmt) throws SQLException {
+        SchemaInitializer.createAuthSchema(stmt);
     }
 
     private static void rebuildConversationActivityIndexes(Statement stmt) throws SQLException {

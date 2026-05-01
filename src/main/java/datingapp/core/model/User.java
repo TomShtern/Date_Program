@@ -19,6 +19,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Predicate;
+import java.util.regex.Pattern;
 
 /**
  * Represents a user in the dating app. Mutable entity - state can change over
@@ -28,6 +29,8 @@ public class User {
 
     public static final int MAX_PHOTOS = 6;
     private static final String PLACEHOLDER_PHOTO_URL = "placeholder://default-avatar";
+    private static final Pattern MANAGED_PHOTO_PATH_PATTERN =
+            Pattern.compile("^/photos/[0-9a-fA-F-]{36}/[A-Za-z0-9][A-Za-z0-9._-]{0,127}$");
     private static final Set<Gender> MATCHABLE_GENDERS =
             Collections.unmodifiableSet(EnumSet.of(Gender.MALE, Gender.FEMALE, Gender.OTHER));
     private static final List<RequiredProfileField> REQUIRED_PROFILE_FIELDS = List.of(
@@ -887,7 +890,17 @@ public class User {
         if (allowPlaceholder && PLACEHOLDER_PHOTO_URL.equals(trimmed)) {
             return trimmed;
         }
+        if (isManagedPhotoPath(trimmed)) {
+            return trimmed;
+        }
         return ValidationService.normalizePhotoUrl(trimmed);
+    }
+
+    private static boolean isManagedPhotoPath(String photoUrl) {
+        if (photoUrl.contains("..") || photoUrl.contains("\\")) {
+            return false;
+        }
+        return MANAGED_PHOTO_PATH_PATTERN.matcher(photoUrl).matches();
     }
 
     @Override
