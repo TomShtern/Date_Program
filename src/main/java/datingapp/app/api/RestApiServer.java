@@ -29,6 +29,7 @@ import datingapp.app.api.RestApiDtos.NotificationDto;
 import datingapp.app.api.RestApiDtos.PagedMatchResponse;
 import datingapp.app.api.RestApiDtos.PassResponse;
 import datingapp.app.api.RestApiDtos.PendingLikersResponse;
+import datingapp.app.api.RestApiDtos.PhotoListResponse;
 import datingapp.app.api.RestApiDtos.PhotoMutationResponse;
 import datingapp.app.api.RestApiDtos.PhotoOrderRequest;
 import datingapp.app.api.RestApiDtos.PhotoRef;
@@ -605,7 +606,10 @@ public class RestApiServer {
         List<String> currentPaths = new ArrayList<>(user.getPhotoUrls());
         String targetPath = null;
         for (String path : currentPaths) {
-            if (photoStorage.photoIdFromStoredPath(path).filter(photoId::equals).isPresent()) {
+            if (!User.isRealPhotoUrl(path)) {
+                continue;
+            }
+            if (photoStorage.deriveStablePhotoId(path).equals(photoId)) {
                 targetPath = path;
                 break;
             }
@@ -614,7 +618,9 @@ public class RestApiServer {
             ctx.status(404).json(new ErrorResponse("NOT_FOUND", "Photo not found"));
             return;
         }
-        photoStorage.deleteManagedPhoto(targetPath);
+        if (photoStorage.photoIdFromStoredPath(targetPath).isPresent()) {
+            photoStorage.deleteManagedPhoto(targetPath);
+        }
         currentPaths.remove(targetPath);
         user.setPhotoUrls(currentPaths);
         saveUserPhotoUrls(user);
@@ -635,7 +641,9 @@ public class RestApiServer {
         if (request.photoIds() == null) {
             throw new IllegalArgumentException("photoIds is required");
         }
-        var knownIds = photoStorage.photoIdsByStoredPath(user.getPhotoUrls());
+        List<String> realPhotoPaths =
+                user.getPhotoUrls().stream().filter(User::isRealPhotoUrl).toList();
+        var knownIds = photoStorage.photoIdsByStoredPath(realPhotoPaths);
         List<String> reorderedPaths = new ArrayList<>();
         for (String pid : request.photoIds()) {
             String path = knownIds.get(pid);
@@ -644,7 +652,7 @@ public class RestApiServer {
             }
             reorderedPaths.add(path);
         }
-        if (reorderedPaths.size() != user.getPhotoUrls().size()) {
+        if (reorderedPaths.size() != realPhotoPaths.size()) {
             throw new IllegalArgumentException("photoIds must include all existing photos");
         }
         user.setPhotoUrls(reorderedPaths);
@@ -652,6 +660,26 @@ public class RestApiServer {
         List<String> publicUrls = photoStorage.toPublicUrls(ctx, user.getPhotoUrls());
         String primaryPublicUrl = photoStorage.primaryPublicUrl(ctx, user.getPhotoUrls());
         ctx.json(new PhotoMutationResponse(primaryPublicUrl, publicUrls));
+    }
+
+    void listPhotos(Context ctx) {
+        UUID userId = parseUuid(ctx.pathParam("id"));
+        Optional<User> userOpt = loadExistingUser(ctx, userId);
+        if (userOpt.isEmpty()) {
+            return;
+        }
+        User user = userOpt.get();
+        requirePhotoEligibleUser(user);
+        List<String> realPhotoPaths =
+                user.getPhotoUrls().stream().filter(User::isRealPhotoUrl).toList();
+        List<PhotoRef> photos = new ArrayList<>();
+        for (String path : realPhotoPaths) {
+            String photoId = photoStorage.deriveStablePhotoId(path);
+            String publicUrl = photoStorage.toPublicUrl(ctx, path);
+            photos.add(new PhotoRef(photoId, publicUrl));
+        }
+        String primaryUrl = realPhotoPaths.isEmpty() ? null : photoStorage.toPublicUrl(ctx, realPhotoPaths.getFirst());
+        ctx.json(new PhotoListResponse(primaryUrl, photos));
     }
 
     private void requirePhotoEligibleUser(User user) {

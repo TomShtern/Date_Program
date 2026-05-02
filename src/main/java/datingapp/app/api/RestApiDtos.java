@@ -671,4 +671,7 @@ final class RestApiDtos {
 
     /** Request body for reordering a user's photos. */
     static record PhotoOrderRequest(List<String> photoIds) {}
+
+    /** Response body returned when listing a user's photos. */
+    static record PhotoListResponse(String primaryUrl, List<PhotoRef> photos) {}
 }

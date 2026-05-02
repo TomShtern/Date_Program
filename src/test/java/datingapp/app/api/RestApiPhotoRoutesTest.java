@@ -3,6 +3,7 @@ package datingapp.app.api;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -285,6 +286,274 @@ class RestApiPhotoRoutesTest {
                         .build(),
                 HttpResponse.BodyHandlers.ofByteArray());
         assertEquals(404, separatorResponse.statusCode());
+    }
+
+    @Test
+    @DisplayName("list photos returns managed photos with IDs and URLs")
+    void listPhotosReturnsManagedPhotosWithIdsAndUrls() throws Exception {
+        TestStorages.Users userStorage = new TestStorages.Users();
+        TestStorages.Communications communicationStorage = new TestStorages.Communications();
+        TestStorages.Interactions interactionStorage = new TestStorages.Interactions(communicationStorage);
+        User alice = activeUser(UUID.randomUUID(), "Alice", "alice@example.com");
+        userStorage.save(alice);
+
+        ServiceRegistry services = RestApiTestFixture.builder(userStorage, interactionStorage, communicationStorage)
+                .config(photoConfig())
+                .build();
+
+        server = new RestApiServer(services, 0);
+        server.start();
+        int port = server.getApp().port();
+
+        JsonNode firstUpload = MAPPER.readTree(
+                uploadPhoto(services, port, alice.getId(), alice.getEmail(), pngBytes(0xAA3300), "one.png")
+                        .body());
+        JsonNode secondUpload = MAPPER.readTree(
+                uploadPhoto(services, port, alice.getId(), alice.getEmail(), pngBytes(0x0033AA), "two.png")
+                        .body());
+
+        String firstPhotoId = firstUpload.get("photo").get("id").asText();
+        String firstPhotoUrl = firstUpload.get("photo").get("url").asText();
+        String secondPhotoId = secondUpload.get("photo").get("id").asText();
+        String secondPhotoUrl = secondUpload.get("photo").get("url").asText();
+
+        HttpResponse<String> listResponse = authorizedGet(
+                services, port, "/api/users/" + alice.getId() + "/photos", alice.getId(), alice.getEmail());
+        assertEquals(200, listResponse.statusCode(), listResponse.body());
+
+        JsonNode listJson = MAPPER.readTree(listResponse.body());
+        assertEquals(firstPhotoUrl, listJson.get("primaryUrl").asText());
+        assertEquals(2, listJson.get("photos").size());
+        assertEquals(firstPhotoId, listJson.get("photos").get(0).get("id").asText());
+        assertEquals(firstPhotoUrl, listJson.get("photos").get(0).get("url").asText());
+        assertEquals(secondPhotoId, listJson.get("photos").get(1).get("id").asText());
+        assertEquals(secondPhotoUrl, listJson.get("photos").get(1).get("url").asText());
+    }
+
+    @Test
+    @DisplayName("list photos returns external photos with stable IDs and delete round-trips")
+    void listPhotosReturnsExternalPhotosWithStableIdsAndDeleteRoundTrips() throws Exception {
+        TestStorages.Users userStorage = new TestStorages.Users();
+        TestStorages.Communications communicationStorage = new TestStorages.Communications();
+        TestStorages.Interactions interactionStorage = new TestStorages.Interactions(communicationStorage);
+        User alice = activeUser(UUID.randomUUID(), "Alice", "alice@example.com");
+        String externalUrl = "https://randomuser.me/api/portraits/women/44.jpg";
+        alice.setPhotoUrls(List.of(externalUrl));
+        userStorage.save(alice);
+
+        ServiceRegistry services = RestApiTestFixture.builder(userStorage, interactionStorage, communicationStorage)
+                .config(photoConfig())
+                .build();
+
+        server = new RestApiServer(services, 0);
+        server.start();
+        int port = server.getApp().port();
+
+        HttpResponse<String> listResponse = authorizedGet(
+                services, port, "/api/users/" + alice.getId() + "/photos", alice.getId(), alice.getEmail());
+        assertEquals(200, listResponse.statusCode(), listResponse.body());
+
+        JsonNode listJson = MAPPER.readTree(listResponse.body());
+        assertEquals(externalUrl, listJson.get("primaryUrl").asText());
+        assertEquals(1, listJson.get("photos").size());
+        String derivedId = listJson.get("photos").get(0).get("id").asText();
+        assertNotNull(derivedId);
+        assertFalse(derivedId.isBlank());
+        assertEquals(externalUrl, listJson.get("photos").get(0).get("url").asText());
+
+        HttpResponse<String> secondListResponse = authorizedGet(
+                services, port, "/api/users/" + alice.getId() + "/photos", alice.getId(), alice.getEmail());
+        JsonNode secondListJson = MAPPER.readTree(secondListResponse.body());
+        assertEquals(
+                derivedId,
+                secondListJson.get("photos").get(0).get("id").asText(),
+                "derived ID must be stable across requests");
+
+        HttpResponse<String> deleteResponse = request(
+                port,
+                "/api/users/" + alice.getId() + "/photos/" + derivedId,
+                "DELETE",
+                RestApiTestFixture.bearerToken(services, alice),
+                null,
+                null);
+        assertEquals(200, deleteResponse.statusCode(), deleteResponse.body());
+
+        User updatedUser = userStorage.get(alice.getId()).orElseThrow();
+        assertEquals(0, updatedUser.getPhotoUrls().size());
+    }
+
+    @Test
+    @DisplayName("list photos requires authentication and matching identity")
+    void listPhotosRequiresAuthAndMatchingIdentity() throws Exception {
+        TestStorages.Users userStorage = new TestStorages.Users();
+        TestStorages.Communications communicationStorage = new TestStorages.Communications();
+        TestStorages.Interactions interactionStorage = new TestStorages.Interactions(communicationStorage);
+        User alice = activeUser(UUID.randomUUID(), "Alice", "alice@example.com");
+        User bob = activeUser(UUID.randomUUID(), "Bob", "bob@example.com");
+        userStorage.save(alice);
+        userStorage.save(bob);
+
+        ServiceRegistry services = RestApiTestFixture.builder(userStorage, interactionStorage, communicationStorage)
+                .config(photoConfig())
+                .build();
+
+        server = new RestApiServer(services, 0);
+        server.start();
+        int port = server.getApp().port();
+
+        HttpResponse<String> noTokenResponse =
+                request(port, "/api/users/" + alice.getId() + "/photos", "GET", null, null, null);
+        assertEquals(401, noTokenResponse.statusCode(), noTokenResponse.body());
+
+        HttpResponse<String> wrongUserResponse = request(
+                port,
+                "/api/users/" + alice.getId() + "/photos",
+                "GET",
+                RestApiTestFixture.bearerToken(services, bob),
+                null,
+                null);
+        assertEquals(403, wrongUserResponse.statusCode(), wrongUserResponse.body());
+    }
+
+    @Test
+    @DisplayName("list photos returns empty response for user with no photos")
+    void listPhotosReturnsEmptyResponseForUserWithNoPhotos() throws Exception {
+        TestStorages.Users userStorage = new TestStorages.Users();
+        TestStorages.Communications communicationStorage = new TestStorages.Communications();
+        TestStorages.Interactions interactionStorage = new TestStorages.Interactions(communicationStorage);
+        User alice = activeUser(UUID.randomUUID(), "Alice", "alice@example.com");
+        userStorage.save(alice);
+
+        ServiceRegistry services = RestApiTestFixture.builder(userStorage, interactionStorage, communicationStorage)
+                .config(photoConfig())
+                .build();
+
+        server = new RestApiServer(services, 0);
+        server.start();
+        int port = server.getApp().port();
+
+        HttpResponse<String> listResponse = authorizedGet(
+                services, port, "/api/users/" + alice.getId() + "/photos", alice.getId(), alice.getEmail());
+        assertEquals(200, listResponse.statusCode(), listResponse.body());
+
+        JsonNode listJson = MAPPER.readTree(listResponse.body());
+        assertTrue(listJson.get("primaryUrl").isNull());
+        assertEquals(0, listJson.get("photos").size());
+    }
+
+    @Test
+    @DisplayName("list photos filters placeholder photos")
+    void listPhotosFiltersPlaceholderPhotos() throws Exception {
+        TestStorages.Users userStorage = new TestStorages.Users();
+        TestStorages.Communications communicationStorage = new TestStorages.Communications();
+        TestStorages.Interactions interactionStorage = new TestStorages.Interactions(communicationStorage);
+        User alice = activeUser(UUID.randomUUID(), "Alice", "alice@example.com");
+        alice.setPhotoUrls(List.of("placeholder://default-avatar"));
+        userStorage.save(alice);
+
+        ServiceRegistry services = RestApiTestFixture.builder(userStorage, interactionStorage, communicationStorage)
+                .config(photoConfig())
+                .build();
+
+        server = new RestApiServer(services, 0);
+        server.start();
+        int port = server.getApp().port();
+
+        HttpResponse<String> listResponse = authorizedGet(
+                services, port, "/api/users/" + alice.getId() + "/photos", alice.getId(), alice.getEmail());
+        assertEquals(200, listResponse.statusCode(), listResponse.body());
+
+        JsonNode listJson = MAPPER.readTree(listResponse.body());
+        assertTrue(listJson.get("primaryUrl").isNull());
+        assertEquals(0, listJson.get("photos").size());
+    }
+
+    @Test
+    @DisplayName("list photos blocks deleted and banned users")
+    void listPhotosBlocksDeletedAndBannedUsers() throws Exception {
+        TestStorages.Users userStorage = new TestStorages.Users();
+        TestStorages.Communications communicationStorage = new TestStorages.Communications();
+        TestStorages.Interactions interactionStorage = new TestStorages.Interactions(communicationStorage);
+        User deletedUser = activeUser(UUID.randomUUID(), "Deleted", "deleted@example.com");
+        deletedUser.markDeleted(AppClock.now());
+        User bannedUser = activeUser(UUID.randomUUID(), "Banned", "banned@example.com");
+        bannedUser.ban();
+        userStorage.save(deletedUser);
+        userStorage.save(bannedUser);
+
+        ServiceRegistry services = RestApiTestFixture.builder(userStorage, interactionStorage, communicationStorage)
+                .config(photoConfig())
+                .build();
+
+        server = new RestApiServer(services, 0);
+        server.start();
+        int port = server.getApp().port();
+
+        HttpResponse<String> deletedListResponse = request(
+                port,
+                "/api/users/" + deletedUser.getId() + "/photos",
+                "GET",
+                RestApiTestFixture.bearerToken(services, deletedUser),
+                null,
+                null);
+        assertEquals(401, deletedListResponse.statusCode(), deletedListResponse.body());
+
+        HttpResponse<String> bannedListResponse = request(
+                port,
+                "/api/users/" + bannedUser.getId() + "/photos",
+                "GET",
+                RestApiTestFixture.bearerToken(services, bannedUser),
+                null,
+                null);
+        assertEquals(401, bannedListResponse.statusCode(), bannedListResponse.body());
+    }
+
+    @Test
+    @DisplayName("reorder works with mixed managed and external photo IDs")
+    void reorderWorksWithMixedManagedAndExternalIds() throws Exception {
+        TestStorages.Users userStorage = new TestStorages.Users();
+        TestStorages.Communications communicationStorage = new TestStorages.Communications();
+        TestStorages.Interactions interactionStorage = new TestStorages.Interactions(communicationStorage);
+        User alice = activeUser(UUID.randomUUID(), "Alice", "alice@example.com");
+        String externalUrl = "https://randomuser.me/api/portraits/women/44.jpg";
+        alice.setPhotoUrls(List.of(externalUrl));
+        userStorage.save(alice);
+
+        ServiceRegistry services = RestApiTestFixture.builder(userStorage, interactionStorage, communicationStorage)
+                .config(photoConfig())
+                .build();
+
+        server = new RestApiServer(services, 0);
+        server.start();
+        int port = server.getApp().port();
+
+        JsonNode uploadJson = MAPPER.readTree(
+                uploadPhoto(services, port, alice.getId(), alice.getEmail(), pngBytes(0x33AA66), "managed.png")
+                        .body());
+        String managedPhotoId = uploadJson.get("photo").get("id").asText();
+        String managedPhotoUrl = uploadJson.get("photo").get("url").asText();
+
+        HttpResponse<String> listResponse = authorizedGet(
+                services, port, "/api/users/" + alice.getId() + "/photos", alice.getId(), alice.getEmail());
+        assertEquals(200, listResponse.statusCode(), listResponse.body());
+        JsonNode listJson = MAPPER.readTree(listResponse.body());
+        assertEquals(2, listJson.get("photos").size());
+        String externalPhotoId = listJson.get("photos").get(0).get("id").asText();
+        assertEquals(externalUrl, listJson.get("photos").get(0).get("url").asText());
+
+        HttpResponse<String> reorderResponse = request(
+                port,
+                "/api/users/" + alice.getId() + "/photos/order",
+                "PUT",
+                RestApiTestFixture.bearerToken(services, alice),
+                "application/json",
+                ("{\"photoIds\":[\"" + managedPhotoId + "\",\"" + externalPhotoId + "\"]}")
+                        .getBytes(StandardCharsets.UTF_8));
+        assertEquals(200, reorderResponse.statusCode(), reorderResponse.body());
+        JsonNode reorderJson = MAPPER.readTree(reorderResponse.body());
+        assertEquals(managedPhotoUrl, reorderJson.get("primaryPhotoUrl").asText());
+        assertEquals(managedPhotoUrl, reorderJson.get("photoUrls").get(0).asText());
+        assertEquals(externalUrl, reorderJson.get("photoUrls").get(1).asText());
     }
 
     private AppConfig photoConfig() {

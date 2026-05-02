@@ -267,6 +267,9 @@ Remove a specific photo.
 
 **Auth:** Bearer token required. Token subject must match `{id}`.
 
+**Path parameters:**
+- `photoId` — the stable photo identifier. Accepts both managed UUIDs (from uploaded photos) and derived IDs (for legacy external URLs) as returned by `GET /api/users/{id}/photos`.
+
 **Responses:**
 
 - **200 OK**
@@ -301,7 +304,8 @@ Reorder the user's photos.
 ```
 
 Rules:
-- `photoIds` must include **all** existing photos.
+- `photoIds` must include **all** existing real photos (placeholders are excluded automatically).
+- `photoIds` accepts both managed UUIDs (from uploaded photos) and derived IDs (for legacy external URLs) as returned by `GET /api/users/{id}/photos`.
 - Order in the array becomes the new display order.
 
 **Responses:**
@@ -309,6 +313,48 @@ Rules:
 - **200 OK** — same shape as `POST /api/users/{id}/photos` 201 (without the `photo` wrapper).
 - **400 Bad Request** — missing/unknown photo IDs, or incomplete list.
 - **401 Unauthorized** / **403 Forbidden**
+
+---
+
+### GET /api/users/{id}/photos
+
+List all editable photos for the user.
+
+**Auth:** Bearer token required. Token subject must match `{id}`.
+
+**Path parameters:**
+- `id` — UUID of the user.
+
+**Responses:**
+
+- **200 OK**
+
+```json
+{
+  "primaryUrl": "http://localhost:7070/photos/550e8400-e29b-41d4-a716-446655440000/img_1234567890.jpg",
+  "photos": [
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440000",
+      "url": "http://localhost:7070/photos/550e8400-e29b-41d4-a716-446655440000/img_1234567890.jpg"
+    }
+  ]
+}
+```
+
+Each photo entry includes:
+- `id` — a stable identifier for the photo. For backend-managed photos this is the managed photo UUID. For legacy external URLs this is a deterministic UUID derived from the URL.
+- `url` — the public URL for rendering the photo.
+
+`primaryUrl` is the public URL of the first photo in display order, or `null` if the user has no real photos.
+
+Placeholder photos (`placeholder://default-avatar`) are **not** included. Only real editable photos are returned.
+
+Every `id` returned by this endpoint is valid for use with `DELETE /api/users/{id}/photos/{photoId}` and `PUT /api/users/{id}/photos/order`.
+
+- **401 Unauthorized** — missing or invalid bearer token.
+- **403 Forbidden** — bearer token subject does not match `{id}`.
+- **404 Not Found** — user does not exist.
+- **409 Conflict** — deleted or banned account.
 
 ---
 

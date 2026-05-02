@@ -6,6 +6,7 @@ import io.javalin.http.UploadedFile;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
@@ -113,15 +114,21 @@ final class RestApiPhotoStorage {
         return Optional.of(fileName.substring(0, dotIndex));
     }
 
+    String deriveStablePhotoId(String storedPath) {
+        if (isManagedPhotoPath(storedPath)) {
+            return photoIdFromStoredPath(storedPath)
+                    .orElseThrow(() -> new IllegalArgumentException("Malformed managed photo path: " + storedPath));
+        }
+        return UUID.nameUUIDFromBytes(storedPath.getBytes(StandardCharsets.UTF_8))
+                .toString();
+    }
+
     LinkedHashMap<String, String> photoIdsByStoredPath(List<String> storedPaths) {
         LinkedHashMap<String, String> photoIds = new LinkedHashMap<>();
         for (String storedPath : storedPaths) {
-            Optional<String> photoId = photoIdFromStoredPath(storedPath);
-            if (photoId.isEmpty()) {
-                throw new IllegalArgumentException("Photo order only supports backend-managed photo URLs");
-            }
-            if (photoIds.put(photoId.get(), storedPath) != null) {
-                throw new IllegalArgumentException("Duplicate photo id: " + photoId.get());
+            String photoId = deriveStablePhotoId(storedPath);
+            if (photoIds.put(photoId, storedPath) != null) {
+                throw new IllegalArgumentException("Duplicate photo id: " + photoId);
             }
         }
         return photoIds;

@@ -220,6 +220,7 @@ Phone alpha is not credible without real photos.
 
 Add or expose:
 
+- `GET /api/users/{id}/photos`
 - `POST /api/users/{id}/photos`
 - `DELETE /api/users/{id}/photos/{photoId}`
 - `PUT /api/users/{id}/photos/order`
@@ -253,6 +254,27 @@ Optional but useful:
   ]
 }
 ```
+
+### List response
+
+`GET /api/users/{id}/photos` returns the user's editable photo list:
+
+```json
+{
+  "primaryUrl": "http://localhost:7070/photos/user-id/photo.jpg",
+  "photos": [
+    {
+      "id": "managed-uuid-or-derived-uuid",
+      "url": "http://localhost:7070/photos/user-id/photo.jpg"
+    }
+  ]
+}
+```
+
+- Each `id` is a stable identifier. For backend-managed photos this is the upload UUID. For legacy external URLs (e.g. pre-seeded `randomuser.me` portraits) it is a deterministic UUID derived from the URL, ensuring the same ID is returned across requests.
+- Every `id` returned by the list endpoint is valid for use with `DELETE /api/users/{id}/photos/{photoId}` and `PUT /api/users/{id}/photos/order`.
+- Placeholder photos (`placeholder://default-avatar`) are not included; only real editable photos are returned.
+- `primaryUrl` is `null` when no real photos exist.
 
 ### Storage and processing
 

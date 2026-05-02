@@ -56,6 +56,7 @@ final class RestRouteSupport {
     }
 
     private void registerPhotoRoutes() {
+        app.get("/api/users/{id}/photos", server::listPhotos);
         app.post("/api/users/{id}/photos", server::uploadPhoto);
         app.delete("/api/users/{id}/photos/{photoId}", server::deletePhoto);
         app.put("/api/users/{id}/photos/order", server::reorderPhotos);
