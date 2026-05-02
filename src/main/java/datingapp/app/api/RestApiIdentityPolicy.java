@@ -7,8 +7,12 @@ import io.javalin.http.Context;
 import io.javalin.http.HandlerType;
 import java.util.Optional;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 final class RestApiIdentityPolicy {
+
+    private static final Logger logger = LoggerFactory.getLogger(RestApiIdentityPolicy.class);
 
     private static final String HEADER_ACTING_USER_ID = "X-User-Id";
     private static final String HEADER_AUTHORIZATION = "Authorization";
@@ -50,12 +54,16 @@ final class RestApiIdentityPolicy {
         if (bearerToken.isEmpty()) {
             return Optional.empty();
         }
-        UUID authenticatedUserId = authUseCases
-                .authenticateAccessToken(bearerToken.get())
-                .map(AuthUseCases.AuthIdentity::userId)
-                .orElseThrow(() -> new ApiUnauthorizedException(INVALID_BEARER_MESSAGE));
-        validateLegacyHeaderMatchesSubject(ctx, authenticatedUserId);
-        return Optional.of(authenticatedUserId);
+        AuthUseCases.AuthIdentity identity =
+                authUseCases.authenticateAccessToken(bearerToken.get()).orElse(null);
+        if (identity == null) {
+            if (logger.isWarnEnabled()) {
+                logger.warn("auth.expired path={} method={}", ctx.path(), ctx.method());
+            }
+            throw new ApiUnauthorizedException(INVALID_BEARER_MESSAGE);
+        }
+        validateLegacyHeaderMatchesSubject(ctx, identity.userId());
+        return Optional.of(identity.userId());
     }
 
     private Optional<UUID> resolveLegacyHeader(Context ctx) {
@@ -68,11 +76,20 @@ final class RestApiIdentityPolicy {
 
     UUID requireActingUserId(Context ctx) {
         if (authUseCases == null) {
-            return resolveActingUserId(ctx)
-                    .orElseThrow(() -> new IllegalArgumentException(
-                            HEADER_ACTING_USER_ID + " header is required for scoped API routes"));
+            return resolveActingUserId(ctx).orElseThrow(() -> {
+                if (logger.isWarnEnabled()) {
+                    logger.warn("auth.missing_header path={} method={}", ctx.path(), ctx.method());
+                }
+                return new IllegalArgumentException(
+                        HEADER_ACTING_USER_ID + " header is required for scoped API routes");
+            });
         }
-        return resolveActingUserId(ctx).orElseThrow(() -> new ApiUnauthorizedException(INVALID_BEARER_MESSAGE));
+        return resolveActingUserId(ctx).orElseThrow(() -> {
+            if (logger.isWarnEnabled()) {
+                logger.warn("auth.missing_header path={} method={}", ctx.path(), ctx.method());
+            }
+            return new ApiUnauthorizedException(INVALID_BEARER_MESSAGE);
+        });
     }
 
     void validateActingUserMatchesPathParam(Context ctx, String paramName) {
@@ -130,6 +147,9 @@ final class RestApiIdentityPolicy {
             return Optional.empty();
         }
         if (!authorization.startsWith(BEARER_PREFIX) || authorization.length() <= BEARER_PREFIX.length()) {
+            if (logger.isWarnEnabled()) {
+                logger.warn("auth.malformed path={} method={}", ctx.path(), ctx.method());
+            }
             throw new ApiUnauthorizedException(INVALID_BEARER_MESSAGE);
         }
         return Optional.of(authorization.substring(BEARER_PREFIX.length()).trim());

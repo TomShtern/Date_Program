@@ -24,6 +24,8 @@ import datingapp.core.profile.LocationService.SelectionSeed;
 import datingapp.core.profile.MatchPreferences.Dealbreakers;
 import datingapp.core.profile.MatchPreferences.Interest;
 import datingapp.core.profile.MatchPreferences.Lifestyle;
+import datingapp.core.profile.MatchPreferences.PacePreferences;
+import datingapp.core.workflow.ProfileActivationPolicy;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -268,6 +270,7 @@ final class RestApiDtos {
 
     /** Request body for profile updates. */
     static record ProfileUpdateRequest(
+            String name,
             String bio,
             LocalDate birthDate,
             User.Gender gender,
@@ -285,7 +288,26 @@ final class RestApiDtos {
             Lifestyle.Education education,
             Set<Interest> interests,
             Dealbreakers dealbreakers,
-            ProfileLocationRequest location) {}
+            ProfileLocationRequest location,
+            PacePreferencesDto pacePreferences) {}
+
+    /** Nested DTO for pace preferences in profile update requests. */
+    static record PacePreferencesDto(
+            PacePreferences.MessagingFrequency messagingFrequency,
+            PacePreferences.TimeToFirstDate timeToFirstDate,
+            PacePreferences.CommunicationStyle communicationStyle,
+            PacePreferences.DepthPreference depthPreference) {
+
+        PacePreferences toPacePreferences() {
+            if (messagingFrequency == null
+                    && timeToFirstDate == null
+                    && communicationStyle == null
+                    && depthPreference == null) {
+                return null;
+            }
+            return new PacePreferences(messagingFrequency, timeToFirstDate, communicationStyle, depthPreference);
+        }
+    }
 
     static record PresentationContextDto(
             UUID viewerUserId,
@@ -351,10 +373,29 @@ final class RestApiDtos {
         }
     }
 
-    static record ProfileEditSnapshotDto(UUID userId, ProfileEditableDto editable, ProfileReadOnlyDto readOnly) {
-        static ProfileEditSnapshotDto from(User user, SelectionSeed seed) {
+    static record ProfileEditSnapshotDto(
+            UUID userId,
+            ProfileEditableDto editable,
+            ProfileReadOnlyDto readOnly,
+            List<String> missingProfileFields,
+            List<String> missingProfileFieldLabels,
+            int requiredProfileFieldCount,
+            boolean profileComplete,
+            boolean canActivate,
+            boolean canBrowse) {
+        static ProfileEditSnapshotDto from(User user, SelectionSeed seed, ProfileActivationPolicy activationPolicy) {
+            ProfileCompletionView completion =
+                    activationPolicy != null ? ProfileCompletionView.from(user, activationPolicy) : null;
             return new ProfileEditSnapshotDto(
-                    user.getId(), ProfileEditableDto.from(user, seed), ProfileReadOnlyDto.from(user));
+                    user.getId(),
+                    ProfileEditableDto.from(user, seed),
+                    ProfileReadOnlyDto.from(user),
+                    completion != null ? completion.missingProfileFields() : null,
+                    completion != null ? completion.missingProfileFieldLabels() : null,
+                    completion != null ? completion.requiredProfileFieldCount() : 0,
+                    completion != null && completion.profileComplete(),
+                    completion != null && completion.canActivate(),
+                    completion != null && completion.canBrowse());
         }
     }
 
@@ -374,6 +415,7 @@ final class RestApiDtos {
             String education,
             List<String> interests,
             DealbreakersDto dealbreakers,
+            PacePreferencesEditableDto pacePreferences,
             ProfileEditLocationDto location) {
         static ProfileEditableDto from(User user, SelectionSeed seed) {
             return new ProfileEditableDto(
@@ -392,6 +434,7 @@ final class RestApiDtos {
                     user.getEducation() != null ? user.getEducation().name() : null,
                     enumNames(user.getInterests()),
                     DealbreakersDto.from(user.getDealbreakers()),
+                    PacePreferencesEditableDto.from(user.getPacePreferences()),
                     ProfileEditLocationDto.from(seed));
         }
     }
@@ -416,6 +459,24 @@ final class RestApiDtos {
                     safe.minHeightCm(),
                     safe.maxHeightCm(),
                     safe.maxAgeDifference());
+        }
+    }
+
+    static record PacePreferencesEditableDto(
+            String messagingFrequency, String timeToFirstDate, String communicationStyle, String depthPreference) {
+        static PacePreferencesEditableDto from(PacePreferences pace) {
+            if (pace == null) {
+                return new PacePreferencesEditableDto(null, null, null, null);
+            }
+            return new PacePreferencesEditableDto(
+                    pace.messagingFrequency() != null
+                            ? pace.messagingFrequency().name()
+                            : null,
+                    pace.timeToFirstDate() != null ? pace.timeToFirstDate().name() : null,
+                    pace.communicationStyle() != null
+                            ? pace.communicationStyle().name()
+                            : null,
+                    pace.depthPreference() != null ? pace.depthPreference().name() : null);
         }
     }
 
@@ -664,10 +725,27 @@ final class RestApiDtos {
     static record PhotoRef(String id, String url) {}
 
     /** Response body returned after a successful photo upload. */
-    static record PhotoUploadResponse(PhotoRef photo, String primaryPhotoUrl, List<String> photoUrls) {}
+    static record PhotoUploadResponse(
+            PhotoRef photo,
+            String primaryPhotoUrl,
+            List<String> photoUrls,
+            List<String> missingProfileFields,
+            List<String> missingProfileFieldLabels,
+            int requiredProfileFieldCount,
+            boolean profileComplete,
+            boolean canActivate,
+            boolean canBrowse) {}
 
     /** Response body returned after a photo delete or photo reorder. */
-    static record PhotoMutationResponse(String primaryPhotoUrl, List<String> photoUrls) {}
+    static record PhotoMutationResponse(
+            String primaryPhotoUrl,
+            List<String> photoUrls,
+            List<String> missingProfileFields,
+            List<String> missingProfileFieldLabels,
+            int requiredProfileFieldCount,
+            boolean profileComplete,
+            boolean canActivate,
+            boolean canBrowse) {}
 
     /** Request body for reordering a user's photos. */
     static record PhotoOrderRequest(List<String> photoIds) {}
