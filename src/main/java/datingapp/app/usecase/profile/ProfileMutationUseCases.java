@@ -12,6 +12,7 @@ import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
 import datingapp.core.profile.MatchPreferences.Dealbreakers;
 import datingapp.core.profile.MatchPreferences.Lifestyle;
+import datingapp.core.profile.MatchPreferences.PacePreferences;
 import datingapp.core.profile.SanitizerUtils;
 import datingapp.core.profile.ValidationService;
 import datingapp.core.storage.AccountCleanupStorage;
@@ -130,6 +131,14 @@ public final class ProfileMutationUseCases {
             return UseCaseResult.failure(UseCaseError.internal("Failed to save profile: " + e.getMessage()));
         }
 
+        if (logger.isInfoEnabled()) {
+            logger.info(
+                    "profile.save user={} activated={} missingFields={}",
+                    user.getId(),
+                    activated,
+                    user.getMissingProfileFields());
+        }
+
         List<UserAchievement> newAchievements = List.of();
         try {
             newAchievements = unlockAchievements(user.getId());
@@ -146,6 +155,52 @@ public final class ProfileMutationUseCases {
             publishEvent(
                     new AppEvent.ProfileCompleted(user.getId(), AppClock.now()),
                     "Post-profile-completed event failed for user " + user.getId());
+        }
+
+        return UseCaseResult.success(new ProfileSaveResult(user, activated, newAchievements));
+    }
+
+    public UseCaseResult<ProfileSaveResult> savePhotoUrls(User user) {
+        if (user == null) {
+            return UseCaseResult.failure(UseCaseError.validation("User is required"));
+        }
+        if (userStorage == null) {
+            return UseCaseResult.failure(UseCaseError.dependency(USER_STORAGE_REQUIRED));
+        }
+
+        var activation = activationPolicy.tryActivate(user);
+        boolean activated = activation.activated();
+        try {
+            userStorage.save(user);
+        } catch (Exception e) {
+            return UseCaseResult.failure(UseCaseError.internal("Failed to save photo URLs: " + e.getMessage()));
+        }
+
+        if (logger.isInfoEnabled()) {
+            logger.info(
+                    "profile.savePhotoUrls user={} activated={} missingFields={}",
+                    user.getId(),
+                    activated,
+                    user.getMissingProfileFields());
+        }
+
+        List<UserAchievement> newAchievements = List.of();
+        try {
+            newAchievements = unlockAchievements(user.getId());
+        } catch (Exception e) {
+            if (logger.isWarnEnabled()) {
+                logger.warn(
+                        "Post-photo-save achievement update failed for user {}: {}", user.getId(), e.getMessage(), e);
+            }
+        }
+
+        publishEvent(
+                new AppEvent.ProfileSaved(user.getId(), activated, AppClock.now()),
+                "Post-photo-save event publication failed for user " + user.getId());
+        if (activated) {
+            publishEvent(
+                    new AppEvent.ProfileCompleted(user.getId(), AppClock.now()),
+                    "Post-photo-save profile-completed event failed for user " + user.getId());
         }
 
         return UseCaseResult.success(new ProfileSaveResult(user, activated, newAchievements));
@@ -297,6 +352,13 @@ public final class ProfileMutationUseCases {
     }
 
     private void applyProfileTextAndIdentityFields(User user, UpdateProfileCommand command) {
+        if (command.name() != null) {
+            String trimmed = command.name().trim();
+            if (trimmed.isBlank()) {
+                throw new IllegalArgumentException("Name cannot be blank");
+            }
+            user.setName(SanitizerUtils.sanitize(trimmed));
+        }
         if (command.bio() != null) {
             assertValid(validationService.validateBio(command.bio()));
             user.setBio(SanitizerUtils.sanitize(command.bio()));
@@ -310,6 +372,9 @@ public final class ProfileMutationUseCases {
         }
         if (command.interestedIn() != null) {
             user.setInterestedIn(command.interestedIn());
+        }
+        if (command.pacePreferences() != null) {
+            user.setPacePreferences(command.pacePreferences());
         }
     }
 
@@ -426,6 +491,7 @@ public final class ProfileMutationUseCases {
 
     public static record UpdateProfileCommand(
             datingapp.app.usecase.common.UserContext context,
+            String name,
             String bio,
             java.time.LocalDate birthDate,
             Gender gender,
@@ -442,7 +508,8 @@ public final class ProfileMutationUseCases {
             Lifestyle.LookingFor lookingFor,
             Lifestyle.Education education,
             Set<datingapp.core.profile.MatchPreferences.Interest> interests,
-            Dealbreakers dealbreakers) {}
+            Dealbreakers dealbreakers,
+            PacePreferences pacePreferences) {}
 
     public static record DeleteAccountCommand(
             datingapp.app.usecase.common.UserContext context, AppEvent.DeletionReason reason) {}

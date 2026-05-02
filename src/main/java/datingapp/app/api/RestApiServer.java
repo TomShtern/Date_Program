@@ -104,6 +104,7 @@ import datingapp.core.model.User;
 import datingapp.core.model.User.UserState;
 import datingapp.core.profile.LocationService;
 import datingapp.core.storage.UserStorage;
+import datingapp.core.workflow.ProfileActivationPolicy;
 import io.javalin.Javalin;
 import io.javalin.http.Context;
 import io.javalin.http.NotFoundResponse;
@@ -183,6 +184,8 @@ public class RestApiServer {
     private static final String PARAM_OFFSET = "offset";
 
     private RestApiPhotoStorage photoStorage;
+
+    @SuppressWarnings("PMD.UnusedPrivateField")
     private final UserStorage userStorage;
 
     private final MatchingUseCases matchingUseCases;
@@ -197,8 +200,10 @@ public class RestApiServer {
     private final TrustSafetyService trustSafetyService;
     private final LocationService locationService;
     private final ZoneId userTimeZone;
+    private final ProfileActivationPolicy activationPolicy;
     private final RestApiIdentityPolicy identityPolicy;
     private final RestApiRequestGuards requestGuards;
+    private final RestApiRequestContext requestContext;
     private final Set<String> allowedCorsOrigins;
     private final String host;
     private final String lanSharedSecret;
@@ -235,6 +240,7 @@ public class RestApiServer {
         this.trustSafetyService = services.getTrustSafetyService();
         this.locationService = services.getLocationService();
         this.userTimeZone = services.getConfig().safety().userTimeZone();
+        this.activationPolicy = services.getActivationPolicy();
         this.identityPolicy = new RestApiIdentityPolicy(this.authUseCases);
         this.host = normalizeHost(host);
         this.restrictToLoopbackClients = isLoopbackHost(this.host);
@@ -245,6 +251,7 @@ public class RestApiServer {
                 DEFAULT_RATE_LIMIT_WINDOW,
                 DEFAULT_RATE_LIMIT_REQUESTS,
                 this.restrictToLoopbackClients ? null : this.lanSharedSecret);
+        this.requestContext = new RestApiRequestContext(this.authUseCases);
         this.port = port;
         this.photoStorage = new RestApiPhotoStorage(services.getConfig());
         this.userStorage = services.getUserStorage();
@@ -271,9 +278,13 @@ public class RestApiServer {
                     rule.exposeHeader("Retry-After");
                     rule.exposeHeader("X-RateLimit-Limit");
                     rule.exposeHeader("X-RateLimit-Used");
+                    rule.exposeHeader(RestApiRequestContext.HEADER_REQUEST_ID);
                 }));
             }
         });
+
+        app.before(requestContext::beforeRequest);
+        app.after(requestContext::afterRequest);
 
         registerRequestGuards();
         registerRoutes();
@@ -425,7 +436,8 @@ public class RestApiServer {
                 user.get(),
                 userTimeZone,
                 locationLabel(user.get()),
-                storedPath -> photoStorage.toPublicUrl(ctx, storedPath)));
+                storedPath -> photoStorage.toPublicUrl(ctx, storedPath),
+                activationPolicy));
     }
 
     void getProfileEditSnapshot(Context ctx) {
@@ -439,7 +451,7 @@ public class RestApiServer {
                         .seedSelection(user.get().getLat(), user.get().getLon())
                         .orElse(null)
                 : null;
-        ctx.json(ProfileEditSnapshotDto.from(user.get(), locationSeed));
+        ctx.json(ProfileEditSnapshotDto.from(user.get(), locationSeed, activationPolicy));
     }
 
     void getPresentationContext(Context ctx) {
@@ -530,6 +542,7 @@ public class RestApiServer {
                 ctx,
                 profileMutationUseCases.updateProfile(new UpdateProfileCommand(
                         UserContext.api(userId),
+                        request.name(),
                         request.bio(),
                         request.birthDate(),
                         request.gender(),
@@ -546,7 +559,10 @@ public class RestApiServer {
                         request.lookingFor(),
                         request.education(),
                         request.interests(),
-                        request.dealbreakers())),
+                        request.dealbreakers(),
+                        request.pacePreferences() != null
+                                ? request.pacePreferences().toPacePreferences()
+                                : null)),
                 "Profile update returned no data");
         if (result.isEmpty()) {
             return;
@@ -555,7 +571,8 @@ public class RestApiServer {
                 result.get().user(),
                 result.get().activated(),
                 userTimeZone,
-                locationLabel(result.get().user())));
+                locationLabel(result.get().user()),
+                activationPolicy));
     }
 
     void deleteUser(Context ctx) {
@@ -586,12 +603,26 @@ public class RestApiServer {
         RestApiPhotoStorage.ManagedPhoto photo = photoStorage.storePhoto(userId, ctx.uploadedFile("photo"));
         String storedPath = photo.storedPath();
         user.addPhotoUrl(storedPath);
-        saveUserPhotoUrls(user);
+        Optional<ProfileMutationUseCases.ProfileSaveResult> saveResult = requiredDataOrHandleFailure(
+                ctx, profileMutationUseCases.savePhotoUrls(user), "Photo save returned no data");
+        if (saveResult.isEmpty()) {
+            return;
+        }
         List<String> publicUrls = photoStorage.toPublicUrls(ctx, user.getPhotoUrls());
         String primaryPublicUrl = photoStorage.primaryPublicUrl(ctx, user.getPhotoUrls());
         String publicUrl = photoStorage.toPublicUrl(ctx, storedPath);
+        ProfileCompletionView completion = ProfileCompletionView.from(user, activationPolicy);
         ctx.status(201)
-                .json(new PhotoUploadResponse(new PhotoRef(photo.id(), publicUrl), primaryPublicUrl, publicUrls));
+                .json(new PhotoUploadResponse(
+                        new PhotoRef(photo.id(), publicUrl),
+                        primaryPublicUrl,
+                        publicUrls,
+                        completion.missingProfileFields(),
+                        completion.missingProfileFieldLabels(),
+                        completion.requiredProfileFieldCount(),
+                        completion.profileComplete(),
+                        completion.canActivate(),
+                        completion.canBrowse()));
     }
 
     void deletePhoto(Context ctx) throws IOException {
@@ -623,10 +654,23 @@ public class RestApiServer {
         }
         currentPaths.remove(targetPath);
         user.setPhotoUrls(currentPaths);
-        saveUserPhotoUrls(user);
+        Optional<ProfileMutationUseCases.ProfileSaveResult> saveResult = requiredDataOrHandleFailure(
+                ctx, profileMutationUseCases.savePhotoUrls(user), "Photo save returned no data");
+        if (saveResult.isEmpty()) {
+            return;
+        }
         List<String> publicUrls = photoStorage.toPublicUrls(ctx, user.getPhotoUrls());
         String primaryPublicUrl = photoStorage.primaryPublicUrl(ctx, user.getPhotoUrls());
-        ctx.json(new PhotoMutationResponse(primaryPublicUrl, publicUrls));
+        ProfileCompletionView completion = ProfileCompletionView.from(user, activationPolicy);
+        ctx.json(new PhotoMutationResponse(
+                primaryPublicUrl,
+                publicUrls,
+                completion.missingProfileFields(),
+                completion.missingProfileFieldLabels(),
+                completion.requiredProfileFieldCount(),
+                completion.profileComplete(),
+                completion.canActivate(),
+                completion.canBrowse()));
     }
 
     void reorderPhotos(Context ctx) {
@@ -656,10 +700,23 @@ public class RestApiServer {
             throw new IllegalArgumentException("photoIds must include all existing photos");
         }
         user.setPhotoUrls(reorderedPaths);
-        saveUserPhotoUrls(user);
+        Optional<ProfileMutationUseCases.ProfileSaveResult> saveResult = requiredDataOrHandleFailure(
+                ctx, profileMutationUseCases.savePhotoUrls(user), "Photo save returned no data");
+        if (saveResult.isEmpty()) {
+            return;
+        }
         List<String> publicUrls = photoStorage.toPublicUrls(ctx, user.getPhotoUrls());
         String primaryPublicUrl = photoStorage.primaryPublicUrl(ctx, user.getPhotoUrls());
-        ctx.json(new PhotoMutationResponse(primaryPublicUrl, publicUrls));
+        ProfileCompletionView completion = ProfileCompletionView.from(user, activationPolicy);
+        ctx.json(new PhotoMutationResponse(
+                primaryPublicUrl,
+                publicUrls,
+                completion.missingProfileFields(),
+                completion.missingProfileFieldLabels(),
+                completion.requiredProfileFieldCount(),
+                completion.profileComplete(),
+                completion.canActivate(),
+                completion.canBrowse()));
     }
 
     void listPhotos(Context ctx) {
@@ -689,10 +746,6 @@ public class RestApiServer {
         if (user.getState() == UserState.BANNED) {
             throw new IllegalStateException("Account is banned and cannot upload photos");
         }
-    }
-
-    private void saveUserPhotoUrls(User user) {
-        userStorage.save(user);
     }
 
     void getCandidates(Context ctx) {

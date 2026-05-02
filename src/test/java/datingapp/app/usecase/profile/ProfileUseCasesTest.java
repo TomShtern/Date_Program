@@ -576,8 +576,10 @@ class ProfileUseCasesTest {
                 null,
                 null,
                 null,
+                null,
                 32.0853,
                 34.7818,
+                null,
                 null,
                 null,
                 null,
@@ -629,6 +631,7 @@ class ProfileUseCasesTest {
         // Act - updateProfile with dealbreakers
         var result = useCases.updateProfile(new UpdateProfileCommand(
                 UserContext.cli(user.getId()),
+                null,
                 null, // bio
                 null, // birthDate
                 null, // gender
@@ -645,8 +648,8 @@ class ProfileUseCasesTest {
                 null, // lookingFor
                 null, // education
                 null, // interests
-                dealbreakersToSet // dealbreakers
-                ));
+                dealbreakersToSet, // dealbreakers
+                null)); // pacePreferences
 
         // Assert - updateProfile succeeded
         assertTrue(result.success(), "updateProfile should succeed");
@@ -685,6 +688,7 @@ class ProfileUseCasesTest {
                 null,
                 null,
                 null,
+                null,
                 EnumSet.noneOf(Gender.class),
                 null,
                 null,
@@ -698,6 +702,7 @@ class ProfileUseCasesTest {
                 null,
                 null,
                 EnumSet.noneOf(Interest.class),
+                null,
                 null));
 
         assertTrue(result.success());
@@ -961,5 +966,166 @@ class ProfileUseCasesTest {
         public void softDeleteAccount(User user, Instant deletedAt) {
             throw new IllegalStateException("cleanup failed");
         }
+    }
+
+    @Test
+    @DisplayName("savePhotoUrls activates user when only photo was missing")
+    void savePhotoUrlsActivatesUserWhenOnlyPhotoWasMissing() {
+        User user = User.StorageBuilder.create(UUID.randomUUID(), "Photo User", AppClock.now())
+                .state(User.UserState.INCOMPLETE)
+                .bio("Bio text")
+                .birthDate(AppClock.today().minusYears(25))
+                .gender(User.Gender.MALE)
+                .interestedIn(Set.of(User.Gender.FEMALE))
+                .location(32.0853, 34.7818)
+                .hasLocationSet(true)
+                .maxDistanceKm(config.matching().maxDistanceKm())
+                .ageRange(config.validation().minAge(), config.validation().maxAge())
+                .pacePreferences(new PacePreferences(
+                        MessagingFrequency.OFTEN,
+                        TimeToFirstDate.FEW_DAYS,
+                        CommunicationStyle.MIX_OF_EVERYTHING,
+                        DepthPreference.DEEP_CHAT))
+                .build();
+        assertFalse(user.isComplete());
+        assertTrue(user.getMissingProfileFields().contains("photoUrls"));
+
+        user.addPhotoUrl("http://example.com/photo.jpg");
+        assertTrue(user.isComplete());
+
+        var result = useCases.getProfileMutationUseCases().savePhotoUrls(user);
+        assertTrue(result.success(), "savePhotoUrls should succeed");
+        assertTrue(result.data().activated(), "User should be activated after adding the only missing field");
+        assertEquals(User.UserState.ACTIVE, user.getState());
+    }
+
+    @Test
+    @DisplayName("savePhotoUrls is idempotent for already active user")
+    void savePhotoUrlsIsIdempotentForActiveUser() {
+        User user = TestUserFactory.createActiveUser(UUID.randomUUID(), "Active User");
+        userStorage.save(user);
+        assertEquals(User.UserState.ACTIVE, user.getState());
+
+        user.addPhotoUrl("http://example.com/extra-photo.jpg");
+        var result = useCases.getProfileMutationUseCases().savePhotoUrls(user);
+        assertTrue(result.success(), "savePhotoUrls should succeed");
+        assertFalse(result.data().activated(), "Already active user should not re-activate");
+        assertEquals(User.UserState.ACTIVE, user.getState());
+    }
+
+    @Test
+    @DisplayName("updateProfile accepts name and updates user")
+    void updateProfileAcceptsName() {
+        User user = TestUserFactory.createActiveUser(UUID.randomUUID(), "Original Name");
+        userStorage.save(user);
+        assertEquals("Original Name", user.getName());
+
+        var result = useCases.updateProfile(new UpdateProfileCommand(
+                UserContext.api(user.getId()),
+                "Updated Name",
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null));
+
+        assertTrue(result.success(), "updateProfile should accept name");
+        assertEquals("Updated Name", result.data().user().getName());
+    }
+
+    @Test
+    @DisplayName("updateProfile accepts pacePreferences and activates user")
+    void updateProfileAcceptsPacePreferences() {
+        User user = User.StorageBuilder.create(UUID.randomUUID(), "Pace User", AppClock.now())
+                .state(User.UserState.INCOMPLETE)
+                .bio("Bio text")
+                .birthDate(AppClock.today().minusYears(25))
+                .gender(User.Gender.MALE)
+                .interestedIn(Set.of(User.Gender.FEMALE))
+                .photoUrls(List.of("http://example.com/photo.jpg"))
+                .location(32.0853, 34.7818)
+                .hasLocationSet(true)
+                .maxDistanceKm(config.matching().maxDistanceKm())
+                .ageRange(config.validation().minAge(), config.validation().maxAge())
+                .build();
+        userStorage.save(user);
+        assertFalse(user.hasCompletePace());
+        assertTrue(user.getMissingProfileFields().contains("pacePreferences"));
+
+        PacePreferences pace = new PacePreferences(
+                MessagingFrequency.OFTEN,
+                TimeToFirstDate.FEW_DAYS,
+                CommunicationStyle.MIX_OF_EVERYTHING,
+                DepthPreference.DEEP_CHAT);
+
+        var result = useCases.updateProfile(new UpdateProfileCommand(
+                UserContext.api(user.getId()),
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                pace));
+
+        assertTrue(result.success(), "updateProfile should accept pacePreferences");
+        assertTrue(result.data().activated(), "Setting pacePreferences should activate the user");
+        assertEquals(User.UserState.ACTIVE, result.data().user().getState());
+    }
+
+    @Test
+    @DisplayName("updateProfile rejects blank name")
+    void updateProfileRejectsBlankName() {
+        User user = TestUserFactory.createActiveUser(UUID.randomUUID(), "Valid Name");
+        userStorage.save(user);
+
+        var result = useCases.updateProfile(new UpdateProfileCommand(
+                UserContext.api(user.getId()),
+                "   ",
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null));
+
+        assertFalse(result.success(), "updateProfile should reject blank name");
     }
 }

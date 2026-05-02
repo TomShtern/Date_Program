@@ -1,6 +1,6 @@
 # AGENTS.md
 
-> **Updated:** 2026-05-01
+> **Updated:** 2026-05-03
 > **Role in the instruction stack:** lowest-level workflow guide for agents working in this repo.
 > **Hierarchy:** `.github/copilot-instructions.md` → `CLAUDE.md` → `AGENTS.md`.
 
@@ -83,6 +83,12 @@ For async/location/UI changes, the highest-signal targeted slices are the direct
 mvn --% test -Dtest=ChatViewModelTest,MatchingViewModelTest,SafetyViewModelTest,ImageCacheTest,LocationServiceTest,LocalGeocodingServiceTest,NominatimGeocodingServiceTest,LocationSelectionDialogTest,ProfileControllerTest,ProfileViewModelTest,OnboardingFlowTest
 ```
 
+For REST API / backend changes, the highest-signal targeted slices are:
+
+```powershell
+mvn --% test -Dtest=AuthUseCasesTest,RestApiAuthRoutesTest,RestApiPhotoRoutesTest,RestApiRequestGuardsTest,RestApiIdentityPolicyTest,RestApiRateLimitTest,RestApiDailyLimitTest,RestApiTestFixtureTest
+```
+
 For repo-root PowerShell helper changes, start with the nearest script test, e.g.:
 
 ```powershell
@@ -108,7 +114,8 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File .\src\test\powershell\CheckPostgre
 - Current verified baseline: `mvn spotless:apply verify` passed on 2026-04-14.
 - Treat `.\check_postgresql_runtime_env.ps1` as the first local PostgreSQL preflight when PATH, `.env`, or login state may be the problem.
 - Treat `.\run_verify.ps1` as the canonical repo-level full local verification path; it runs the Maven quality gate and PostgreSQL smoke together.
-- For PostgreSQL runtime changes, prefer the repo-local helpers `start_local_postgres.ps1`, `run_postgresql_smoke.ps1`, and `stop_local_postgres.ps1` over ad-hoc Docker-first validation.
+- For the phone-alpha backend REST API, use `.\start_phone_alpha_backend.ps1` to start a LAN-facing server for Flutter integration testing.
+- For PostgreSQL runtime changes, prefer the repo-local helpers `start_local_postgres.ps1`, `reset_local_postgres.ps1`, `run_postgresql_smoke.ps1`, and `stop_local_postgres.ps1` over ad-hoc Docker-first validation.
 - Use shared test helpers when available:
   - `JavaFxTestSupport`
   - `UiAsyncTestSupport`

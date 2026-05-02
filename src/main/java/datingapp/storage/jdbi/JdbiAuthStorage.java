@@ -3,6 +3,7 @@ package datingapp.storage.jdbi;
 import datingapp.core.storage.AuthStorage;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Types;
 import java.time.Instant;
 import java.util.Objects;
 import java.util.Optional;
@@ -81,24 +82,40 @@ public final class JdbiAuthStorage implements AuthStorage {
 
     @Override
     public void insertRefreshToken(RefreshTokenRecord refreshToken) {
-        jdbi.useHandle(handle -> handle.createUpdate(INSERT_REFRESH_TOKEN_SQL)
-                .bind("tokenId", refreshToken.tokenId())
-                .bind(BIND_USER_ID, refreshToken.userId())
-                .bind("tokenHash", refreshToken.tokenHash())
-                .bind("issuedAt", refreshToken.issuedAt())
-                .bind("expiresAt", refreshToken.expiresAt())
-                .bind("revokedAt", refreshToken.revokedAt())
-                .bind("replacedByTokenId", refreshToken.replacedByTokenId())
-                .execute());
+        jdbi.useHandle(handle -> {
+            var update = handle.createUpdate(INSERT_REFRESH_TOKEN_SQL)
+                    .bind("tokenId", refreshToken.tokenId())
+                    .bind(BIND_USER_ID, refreshToken.userId())
+                    .bind("tokenHash", refreshToken.tokenHash())
+                    .bind("issuedAt", refreshToken.issuedAt())
+                    .bind("expiresAt", refreshToken.expiresAt());
+            if (refreshToken.revokedAt() == null) {
+                update.bindNull("revokedAt", Types.TIMESTAMP_WITH_TIMEZONE);
+            } else {
+                update.bind("revokedAt", refreshToken.revokedAt());
+            }
+            if (refreshToken.replacedByTokenId() == null) {
+                update.bindNull("replacedByTokenId", Types.OTHER);
+            } else {
+                update.bind("replacedByTokenId", refreshToken.replacedByTokenId());
+            }
+            update.execute();
+        });
     }
 
     @Override
     public void revokeRefreshToken(UUID tokenId, Instant revokedAt, UUID replacedByTokenId) {
-        jdbi.useHandle(handle -> handle.createUpdate(REVOKE_REFRESH_TOKEN_SQL)
-                .bind("revokedAt", revokedAt)
-                .bind("replacedByTokenId", replacedByTokenId)
-                .bind("tokenId", tokenId)
-                .execute());
+        jdbi.useHandle(handle -> {
+            var update = handle.createUpdate(REVOKE_REFRESH_TOKEN_SQL)
+                    .bind("revokedAt", revokedAt)
+                    .bind("tokenId", tokenId);
+            if (replacedByTokenId == null) {
+                update.bindNull("replacedByTokenId", Types.OTHER);
+            } else {
+                update.bind("replacedByTokenId", replacedByTokenId);
+            }
+            update.execute();
+        });
     }
 
     private static final class RefreshTokenMapper implements RowMapper<RefreshTokenRecord> {
