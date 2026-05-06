@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.core.matching.DailyLimitService.DailyStatus;
@@ -156,6 +157,16 @@ class RecommendationServiceTest {
     }
 
     @Test
+    @DisplayName("protected no-arg standout constructor fails fast on live use")
+    void protectedNoArgStandoutConstructorFailsFastOnLiveUse() {
+        StandoutService service = new StandoutService() {};
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class, () -> service.getStandouts(seeker));
+
+        assertEquals("StandoutService calculator is not initialized", ex.getMessage());
+    }
+
+    @Test
     @DisplayName("builder stores trustSafetyStorage values")
     void builderStoresTrustSafetyStorage() throws Exception {
         TestStorages.TrustSafety trustSafetyStorage = new TestStorages.TrustSafety();
@@ -185,7 +196,7 @@ class RecommendationServiceTest {
                 Arguments.of(Duration.ofHours(24).plusMinutes(1).plusSeconds(1), "24:01:01"));
     }
 
-    private static final class FakeDailyLimitService implements DailyLimitService {
+    private static final class FakeDailyLimitService extends DailyLimitService {
         private boolean canLikeReturn;
         private boolean canSuperLikeReturn;
         private boolean canPassReturn;
@@ -234,7 +245,7 @@ class RecommendationServiceTest {
         }
     }
 
-    private static final class FakeDailyPickService implements DailyPickService {
+    private static final class FakeDailyPickService extends DailyPickService {
         private Optional<DailyPick> dailyPickReturn = Optional.empty();
         private boolean hasViewedReturn;
         private int cleanupReturn;
@@ -274,7 +285,7 @@ class RecommendationServiceTest {
         }
     }
 
-    private static final class FakeStandoutService implements StandoutService {
+    private static final class FakeStandoutService extends StandoutService {
         private StandoutService.Result resultReturn = StandoutService.Result.empty(null);
         private Map<UUID, User> resolveReturn = Map.of();
         private User lastStandoutsSeeker;

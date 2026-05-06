@@ -16,8 +16,6 @@ public sealed interface AppEvent
                 AppEvent.ProfileNoteSaved,
                 AppEvent.ProfileNoteDeleted,
                 AppEvent.ConversationArchived,
-                AppEvent.LocationUpdated,
-                AppEvent.DailyLimitReset,
                 AppEvent.MatchExpired,
                 AppEvent.AccountDeleted,
                 AppEvent.FriendRequestAccepted,
@@ -58,10 +56,6 @@ public sealed interface AppEvent
     record ProfileNoteDeleted(UUID authorId, UUID subjectId, Instant occurredAt) implements AppEvent {}
 
     record ConversationArchived(String conversationId, UUID archivedByUserId, Instant occurredAt) implements AppEvent {}
-
-    record LocationUpdated(UUID userId, double latitude, double longitude, Instant occurredAt) implements AppEvent {}
-
-    record DailyLimitReset(UUID userId, Instant occurredAt) implements AppEvent {}
 
     record MatchExpired(String matchId, UUID userA, UUID userB, Instant occurredAt) implements AppEvent {}
 

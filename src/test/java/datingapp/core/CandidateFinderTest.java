@@ -4,7 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.core.matching.CandidateFinder;
-import datingapp.core.matching.CandidateFinder.GeoUtils;
+import datingapp.core.model.GeoUtils;
 import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
 import datingapp.core.profile.MatchPreferences.Dealbreakers;

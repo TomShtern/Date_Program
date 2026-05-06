@@ -13,8 +13,8 @@ import datingapp.app.cli.CliTextAndInput.InputReader;
 import datingapp.app.usecase.profile.ProfileInsightsUseCases;
 import datingapp.core.AppConfig;
 import datingapp.core.AppSession;
+import datingapp.core.metrics.AchievementService;
 import datingapp.core.metrics.ActivityMetricsService;
-import datingapp.core.metrics.DefaultAchievementService;
 import datingapp.core.metrics.EngagementDomain.Achievement;
 import datingapp.core.metrics.EngagementDomain.Achievement.UserAchievement;
 import datingapp.core.metrics.EngagementDomain.UserStats;
@@ -68,7 +68,7 @@ class StatsHandlerTest {
         ActivityMetricsService statsService = new ActivityMetricsService(
                 interactionStorage, trustSafetyStorage, analyticsStorage, AppConfig.defaults());
         ProfileInsightsUseCases profileInsightsUseCases = new ProfileInsightsUseCases(
-                new DefaultAchievementService(
+                new AchievementService(
                         AppConfig.defaults(),
                         analyticsStorage,
                         interactionStorage,

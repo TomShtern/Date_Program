@@ -35,7 +35,9 @@ public class SocialUseCases {
     private static final AppEventBus COMPATIBILITY_NO_OP_EVENT_BUS = new AppEventBus() {
         @Override
         public void publish(AppEvent event) {
-            // Compatibility shim for non-production construction paths.
+            if (logger.isWarnEnabled()) {
+                logger.warn("Dropping event {} because no real event bus is configured", event);
+            }
         }
 
         @Override

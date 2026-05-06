@@ -7,19 +7,14 @@ import datingapp.app.event.handlers.MetricsEventHandler;
 import datingapp.app.event.handlers.NotificationEventHandler;
 import datingapp.app.usecase.auth.AuthTokenService;
 import datingapp.app.usecase.auth.AuthUseCases;
-import datingapp.app.usecase.auth.JwtAuthTokenService;
 import datingapp.core.AppConfig;
 import datingapp.core.ServiceRegistry;
 import datingapp.core.connection.ConnectionService;
+import datingapp.core.matching.BrowseRankingService;
 import datingapp.core.matching.CandidateFinder;
 import datingapp.core.matching.CompatibilityCalculator;
 import datingapp.core.matching.DailyLimitService;
 import datingapp.core.matching.DailyPickService;
-import datingapp.core.matching.DefaultBrowseRankingService;
-import datingapp.core.matching.DefaultCompatibilityCalculator;
-import datingapp.core.matching.DefaultDailyLimitService;
-import datingapp.core.matching.DefaultDailyPickService;
-import datingapp.core.matching.DefaultStandoutService;
 import datingapp.core.matching.MatchQualityService;
 import datingapp.core.matching.MatchingService;
 import datingapp.core.matching.RecommendationService;
@@ -29,7 +24,6 @@ import datingapp.core.matching.TrustSafetyService;
 import datingapp.core.matching.UndoService;
 import datingapp.core.metrics.AchievementService;
 import datingapp.core.metrics.ActivityMetricsService;
-import datingapp.core.metrics.DefaultAchievementService;
 import datingapp.core.metrics.SwipeState.Undo;
 import datingapp.core.profile.LocationService;
 import datingapp.core.profile.ProfileService;
@@ -133,9 +127,9 @@ public final class StorageFactory {
         JdbiMatchmakingStorage matchmakingStorage = new JdbiMatchmakingStorage(jdbi, dialect);
         OperationalCommunicationStorage communicationStorage = new JdbiConnectionStorage(jdbi);
         JdbiMetricsStorage metricsStorage = new JdbiMetricsStorage(jdbi, dialect);
-        TrustSafetyStorage trustSafetyStorage = jdbi.onDemand(JdbiTrustSafetyStorage.class);
+        TrustSafetyStorage trustSafetyStorage = new JdbiTrustSafetyStorage(jdbi);
         AccountCleanupStorage accountCleanupStorage = new JdbiAccountCleanupStorage(jdbi);
-        AuthStorage authStorage = new JdbiAuthStorage(jdbi);
+        AuthStorage authStorage = new JdbiAuthStorage(jdbi, dialect);
 
         return new PersistenceComponents(
                 userStorage,
@@ -150,7 +144,7 @@ public final class StorageFactory {
     }
 
     private static DomainServices createDomainServices(AppConfig config, PersistenceComponents persistence) {
-        CompatibilityCalculator compatibilityCalculator = new DefaultCompatibilityCalculator(config);
+        CompatibilityCalculator compatibilityCalculator = new CompatibilityCalculator(config);
         CandidateFinder candidateFinder = new CandidateFinder(
                 persistence.userStorage(),
                 persistence.interactionStorage(),
@@ -159,17 +153,17 @@ public final class StorageFactory {
                 Duration.ofHours(config.matching().rematchCooldownHours()));
 
         ProfileService profileService = new ProfileService(persistence.userStorage());
-        AchievementService achievementService = new DefaultAchievementService(
+        AchievementService achievementService = new AchievementService(
                 config,
                 persistence.analyticsStorage(),
                 persistence.interactionStorage(),
                 persistence.trustSafetyStorage(),
                 persistence.userStorage(),
                 profileService);
-        DailyLimitService dailyLimitService = new DefaultDailyLimitService(persistence.interactionStorage(), config);
+        DailyLimitService dailyLimitService = new DailyLimitService(persistence.interactionStorage(), config);
         DailyPickService dailyPickService =
-                new DefaultDailyPickService(persistence.analyticsStorage(), candidateFinder, config);
-        StandoutService standoutService = new DefaultStandoutService(
+                new DailyPickService(persistence.analyticsStorage(), candidateFinder, config);
+        StandoutService standoutService = new StandoutService(
                 compatibilityCalculator,
                 persistence.userStorage(),
                 candidateFinder,
@@ -180,7 +174,7 @@ public final class StorageFactory {
                 dailyLimitService,
                 dailyPickService,
                 standoutService,
-                new DefaultBrowseRankingService(compatibilityCalculator, profileService, config));
+                new BrowseRankingService(compatibilityCalculator, profileService, config));
         UndoService undoService = new UndoService(persistence.interactionStorage(), persistence.undoStorage(), config);
         ActivityMetricsService activityMetricsService = new ActivityMetricsService(
                 persistence.userStorage(),
@@ -215,7 +209,7 @@ public final class StorageFactory {
 
         ValidationService validationService = new ValidationService(config);
         LocationService locationService = new LocationService(validationService);
-        AuthTokenService authTokenService = new JwtAuthTokenService(config.auth());
+        AuthTokenService authTokenService = new AuthTokenService(config.auth());
         AuthUseCases authUseCases =
                 new AuthUseCases(config, persistence.userStorage(), persistence.authStorage(), authTokenService);
         AppEventBus eventBus = new InProcessAppEventBus();

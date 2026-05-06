@@ -1,6 +1,7 @@
 package datingapp.core.matching;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
@@ -18,15 +19,15 @@ import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-@DisplayName("DefaultBrowseRankingService")
-class DefaultBrowseRankingServiceTest {
+@DisplayName("BrowseRankingService")
+class BrowseRankingServiceTest {
 
     @Test
     @DisplayName("ranks stronger compatibility above simple proximity")
     void ranksStrongerCompatibilityAboveSimpleProximity() {
         AppConfig config = AppConfig.defaults();
-        DefaultBrowseRankingService rankingService = new DefaultBrowseRankingService(
-                new DefaultCompatibilityCalculator(config), new ProfileService(new TestStorages.Users()), config);
+        BrowseRankingService rankingService = new BrowseRankingService(
+                new CompatibilityCalculator(config), new ProfileService(new TestStorages.Users()), config);
 
         User seeker = createBrowseUser(
                 "Seeker",
@@ -55,6 +56,20 @@ class DefaultBrowseRankingServiceTest {
         List<User> ranked = rankingService.rankCandidates(seeker, List.of(nearWeakCandidate, farStrongCandidate));
 
         assertEquals(List.of(farStrongCandidate, nearWeakCandidate), ranked);
+    }
+
+    @Test
+    @DisplayName("identity() filters null candidates and returns a copy")
+    void identityFiltersNullCandidatesAndReturnsCopy() {
+        BrowseRankingService rankingService = BrowseRankingService.identity();
+        User first = createSparseBrowseCandidate("First", 32.0854, 34.7819, AppClock.now());
+        User second = createSparseBrowseCandidate("Second", 32.0855, 34.7820, AppClock.now());
+
+        List<User> ranked = rankingService.rankCandidates(first, java.util.Arrays.asList(first, null, second));
+
+        assertEquals(List.of(first, second), ranked);
+        assertThrows(UnsupportedOperationException.class, () -> ranked.add(first));
+        assertEquals(List.of(), rankingService.rankCandidates(first, null));
     }
 
     private static User createBrowseUser(

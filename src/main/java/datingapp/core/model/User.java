@@ -6,7 +6,6 @@ import datingapp.core.profile.MatchPreferences;
 import datingapp.core.profile.MatchPreferences.Interest;
 import datingapp.core.profile.MatchPreferences.Lifestyle;
 import datingapp.core.profile.MatchPreferences.PacePreferences;
-import datingapp.core.profile.ValidationService;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.Period;
@@ -28,6 +27,7 @@ import java.util.regex.Pattern;
 public class User {
 
     public static final int MAX_PHOTOS = 6;
+    public static final String SIGNUP_PLACEHOLDER_NAME = "New User";
     private static final String PLACEHOLDER_PHOTO_URL = "placeholder://default-avatar";
     private static final Pattern MANAGED_PHOTO_PATH_PATTERN =
             Pattern.compile("^/photos/[0-9a-fA-F-]{36}/[A-Za-z0-9][A-Za-z0-9._-]{0,127}$");
@@ -37,7 +37,9 @@ public class User {
             new RequiredProfileField(
                     "name",
                     "Name",
-                    user -> user.getName() != null && !user.getName().isBlank()),
+                    user -> user.getName() != null
+                            && !user.getName().isBlank()
+                            && !SIGNUP_PLACEHOLDER_NAME.equals(user.getName())),
             new RequiredProfileField(
                     "bio",
                     "Bio",
@@ -248,6 +250,11 @@ public class User {
 
         public StorageBuilder photoUrls(List<String> photoUrls) {
             user.photoUrls = normalizePhotoUrls(photoUrls, true);
+            return this;
+        }
+
+        public StorageBuilder rawPhotoUrls(List<String> photoUrls) {
+            user.photoUrls = photoUrls == null ? new ArrayList<>() : new ArrayList<>(photoUrls);
             return this;
         }
 
@@ -581,12 +588,12 @@ public class User {
     }
 
     public void setEmail(String email) {
-        this.email = ValidationService.normalizeEmail(email);
+        this.email = TextNormalization.normalizeEmail(email);
         touch();
     }
 
     public void setPhone(String phone) {
-        this.phone = ValidationService.normalizePhone(phone);
+        this.phone = TextNormalization.normalizePhone(phone);
         touch();
     }
 
@@ -627,23 +634,8 @@ public class User {
     }
 
     public void setLocation(double lat, double lon) {
-        // Validate finite values
-        if (!Double.isFinite(lat)) {
-            throw new IllegalArgumentException("Latitude cannot be NaN or Infinity");
-        }
-        if (!Double.isFinite(lon)) {
-            throw new IllegalArgumentException("Longitude cannot be NaN or Infinity");
-        }
-
-        // Validate latitude bounds [-90, 90]
-        if (lat < -90.0 || lat > 90.0) {
-            throw new IllegalArgumentException("Latitude must be between -90 and 90, got " + lat);
-        }
-
-        // Validate longitude bounds [-180, 180]
-        if (lon < -180.0 || lon > 180.0) {
-            throw new IllegalArgumentException("Longitude must be between -180 and 180, got " + lon);
-        }
+        GeoValidation.validateLatitude(lat);
+        GeoValidation.validateLongitude(lon);
 
         this.lat = lat;
         this.lon = lon;
@@ -893,7 +885,7 @@ public class User {
         if (isManagedPhotoPath(trimmed)) {
             return trimmed;
         }
-        return ValidationService.normalizePhotoUrl(trimmed);
+        return TextNormalization.normalizePhotoUrl(trimmed);
     }
 
     private static boolean isManagedPhotoPath(String photoUrl) {
@@ -944,7 +936,7 @@ public class User {
                 .rawLocation(lat, lon, hasLocationSet)
                 .maxDistanceKm(maxDistanceKm)
                 .ageRange(minAge, maxAge)
-                .photoUrls(photoUrls)
+                .rawPhotoUrls(photoUrls)
                 .state(state)
                 .updatedAt(updatedAt)
                 .interests(interests)

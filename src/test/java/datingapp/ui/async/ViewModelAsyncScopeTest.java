@@ -124,6 +124,8 @@ class ViewModelAsyncScopeTest {
         releaseFirst.set(true);
         assertTrue(firstFinished.await(2, TimeUnit.SECONDS));
         assertEquals(List.of(Boolean.FALSE, Boolean.TRUE, Boolean.FALSE), loadingStates);
+        assertTrue(UiAsyncTestSupport.waitUntil(
+                () -> scope.diagnosticsSnapshot().cancelledBeforeDeliveryCount() == 1L, Duration.ofSeconds(2)));
 
         ViewModelAsyncScope.DiagnosticsSnapshot diagnostics = scope.diagnosticsSnapshot();
         assertEquals(1L, diagnostics.supersededTaskCount());

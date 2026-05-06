@@ -122,6 +122,14 @@ class ValidationServiceTest {
         }
 
         @Test
+        @DisplayName("Email local part keeps its case while the domain is lowercased")
+        void emailLocalPartCasePreserved() {
+            assertEquals(
+                    "Person@" + IDN.toASCII("Exämple.de").toLowerCase(),
+                    ValidationService.normalizeEmail("Person@Exämple.de"));
+        }
+
+        @Test
         @DisplayName("Valid phone passes validation")
         void validPhone() {
             assertTrue(validator.validatePhone("+1 (555) 123-4567").valid());
@@ -150,6 +158,24 @@ class ValidationServiceTest {
                     validator.validatePhotoUrl("https://example.com/photo.jpg").valid());
         }
 
+        @ParameterizedTest(name = "\"{0}\" is rejected as an internal photo host")
+        @ValueSource(
+                strings = {
+                    "http://localhost/photo.jpg",
+                    "http://127.0.0.1/photo.jpg",
+                    "http://10.0.0.5/photo.jpg",
+                    "http://100.64.0.1/photo.jpg",
+                    "http://[::1]/photo.jpg",
+                    "http://[fc00::1]/photo.jpg"
+                })
+        @DisplayName("Internal photo hosts fail validation")
+        void internalPhotoHostsFailValidation(String url) {
+            ValidationResult result = validator.validatePhotoUrl(url);
+
+            assertFalse(result.valid());
+            assertEquals("Invalid photo URL", result.errors().getFirst());
+        }
+
         @Test
         @DisplayName("File photo URL fails validation by default")
         void filePhotoUrlRejectedByDefault() {
@@ -168,7 +194,8 @@ class ValidationServiceTest {
             System.setProperty(ALLOW_FILE_URLS_PROPERTY, "true");
             System.setProperty(ALLOWED_FILE_URL_ROOT_PROPERTY, allowedRoot.toString());
 
-            String fileUrl = allowedRoot.resolve("photo.jpg").toUri().toString();
+            var photoPath = Files.createFile(allowedRoot.resolve("photo.jpg"));
+            String fileUrl = photoPath.toUri().toString();
             assertTrue(validator.validatePhotoUrl(fileUrl).valid());
         }
 

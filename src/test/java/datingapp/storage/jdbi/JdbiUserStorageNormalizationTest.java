@@ -123,6 +123,42 @@ class JdbiUserStorageNormalizationTest {
     }
 
     @Test
+    @DisplayName("save canonicalizes blank names to signup placeholder")
+    void saveCanonicalizesBlankNamesToSignupPlaceholder() {
+        UUID blankNameUserId = UUID.randomUUID();
+        User blankNameUser = new User(blankNameUserId, "   ");
+
+        storage.save(blankNameUser);
+
+        User reloaded = storage.get(blankNameUserId).orElseThrow();
+
+        assertEquals(User.SIGNUP_PLACEHOLDER_NAME, reloaded.getName());
+    }
+
+    @Test
+    @DisplayName("get canonicalizes legacy blank names to signup placeholder")
+    void getCanonicalizesLegacyBlankNamesToSignupPlaceholder() {
+        UUID legacyUserId = UUID.randomUUID();
+        Instant createdAt = Instant.parse("2026-03-24T12:00:00Z");
+        jdbi.useHandle(handle -> handle.createUpdate("""
+                        INSERT INTO users (id, name, state, created_at, updated_at)
+                        VALUES (:id, :name, :state, :createdAt, :updatedAt)
+                        """)
+                .bind("id", legacyUserId)
+                .bind("name", "   ")
+                .bind("state", UserState.INCOMPLETE.name())
+                .bind("createdAt", createdAt)
+                .bind("updatedAt", createdAt)
+                .execute());
+
+        storage.clearCache();
+
+        User hydrated = storage.get(legacyUserId).orElseThrow();
+
+        assertEquals(User.SIGNUP_PLACEHOLDER_NAME, hydrated.getName());
+    }
+
+    @Test
     @DisplayName("get expires cached users after the TTL")
     void getExpiresCachedUsersAfterTtl() {
         storage.clearCache();

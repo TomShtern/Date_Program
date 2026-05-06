@@ -202,6 +202,11 @@ class NotesViewModelTest {
                         .filter(UPDATED_RILEY_NOTE::equals)
                         .isPresent(),
                 5000));
+        assertTrue(JavaFxTestSupport.waitUntil(
+                () -> viewModel.selectedNoteProperty().get() != null
+                        && subject.getId()
+                                .equals(viewModel.selectedNoteProperty().get().userId()),
+                5000));
 
         viewModel.dispose();
     }

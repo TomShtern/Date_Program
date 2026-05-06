@@ -7,7 +7,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import datingapp.app.event.InProcessAppEventBus;
 import datingapp.app.usecase.auth.AuthTokenService;
 import datingapp.app.usecase.auth.AuthUseCases;
-import datingapp.app.usecase.auth.JwtAuthTokenService;
 import datingapp.app.usecase.common.UserContext;
 import datingapp.app.usecase.matching.MatchingUseCases;
 import datingapp.app.usecase.matching.MatchingUseCases.BrowseCandidatesCommand;
@@ -25,10 +24,6 @@ import datingapp.core.matching.CandidateFinder;
 import datingapp.core.matching.CompatibilityCalculator;
 import datingapp.core.matching.DailyLimitService;
 import datingapp.core.matching.DailyPickService;
-import datingapp.core.matching.DefaultCompatibilityCalculator;
-import datingapp.core.matching.DefaultDailyLimitService;
-import datingapp.core.matching.DefaultDailyPickService;
-import datingapp.core.matching.DefaultStandoutService;
 import datingapp.core.matching.MatchQualityService;
 import datingapp.core.matching.MatchingService;
 import datingapp.core.matching.RecommendationService;
@@ -38,7 +33,6 @@ import datingapp.core.matching.TrustSafetyService;
 import datingapp.core.matching.UndoService;
 import datingapp.core.metrics.AchievementService;
 import datingapp.core.metrics.ActivityMetricsService;
-import datingapp.core.metrics.DefaultAchievementService;
 import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
 import datingapp.core.model.User.UserState;
@@ -195,10 +189,10 @@ class MatchingFlowIntegrationTest {
                 new ActivityMetricsService(interactionStorage, trustSafetyStorage, analyticsStorage, config);
         ProfileService profileService = new ProfileService(userStorage);
 
-        CompatibilityCalculator compatibilityCalculator = new DefaultCompatibilityCalculator(config);
-        DailyLimitService dailyLimitService = new DefaultDailyLimitService(interactionStorage, config);
-        DailyPickService dailyPickService = new DefaultDailyPickService(analyticsStorage, candidateFinder, config);
-        StandoutService standoutService = new DefaultStandoutService(
+        CompatibilityCalculator compatibilityCalculator = new CompatibilityCalculator(config);
+        DailyLimitService dailyLimitService = new DailyLimitService(interactionStorage, config);
+        DailyPickService dailyPickService = new DailyPickService(analyticsStorage, candidateFinder, config);
+        StandoutService standoutService = new StandoutService(
                 compatibilityCalculator, userStorage, candidateFinder, standoutStorage, profileService, config);
         RecommendationService recommendationService =
                 new RecommendationService(dailyLimitService, dailyPickService, standoutService);
@@ -222,9 +216,9 @@ class MatchingFlowIntegrationTest {
                 new MatchQualityService(userStorage, interactionStorage, config, compatibilityCalculator);
         ValidationService validationService = new ValidationService(config);
         LocationService locationService = new LocationService(validationService);
-        AchievementService achievementService = new DefaultAchievementService(
+        AchievementService achievementService = new AchievementService(
                 config, analyticsStorage, interactionStorage, trustSafetyStorage, userStorage, profileService);
-        AuthTokenService authTokenService = new JwtAuthTokenService(config.auth());
+        AuthTokenService authTokenService = new AuthTokenService(config.auth());
         AuthUseCases authUseCases = new AuthUseCases(config, userStorage, new TestStorages.Auth(), authTokenService);
 
         return ServiceRegistry.builder()

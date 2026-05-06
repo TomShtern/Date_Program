@@ -87,7 +87,7 @@ class JdbiAccountCleanupStorageTest {
         userStorage = new JdbiUserStorage(jdbi);
         interactionStorage = new JdbiMatchmakingStorage(jdbi);
         communicationStorage = new JdbiConnectionStorage(jdbi);
-        trustSafetyStorage = jdbi.onDemand(JdbiTrustSafetyStorage.class);
+        trustSafetyStorage = new JdbiTrustSafetyStorage(jdbi);
         accountCleanupStorage = new JdbiAccountCleanupStorage(jdbi);
 
         deletedUser = TestUserFactory.createActiveUser(UUID.randomUUID(), "Cleanup Alice");

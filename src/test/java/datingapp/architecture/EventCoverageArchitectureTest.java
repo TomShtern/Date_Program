@@ -32,12 +32,6 @@ class EventCoverageArchitectureTest {
             Map.entry(AppEvent.ProfileNoteSaved.class, Ownership.of(HandlerOwner.ACHIEVEMENT, HandlerOwner.METRICS)),
             Map.entry(AppEvent.ProfileNoteDeleted.class, Ownership.of(HandlerOwner.METRICS)),
             Map.entry(AppEvent.ConversationArchived.class, Ownership.of(HandlerOwner.METRICS)),
-            Map.entry(
-                    AppEvent.LocationUpdated.class,
-                    Ownership.noOp("Location updates are handled directly by profile/location services, not events.")),
-            Map.entry(
-                    AppEvent.DailyLimitReset.class,
-                    Ownership.noOp("Daily swipe limits are scheduler/state-driven rather than handler-owned.")),
             Map.entry(AppEvent.MatchExpired.class, Ownership.of(HandlerOwner.METRICS)),
             Map.entry(AppEvent.AccountDeleted.class, Ownership.of(HandlerOwner.METRICS, HandlerOwner.NOTIFICATION)),
             Map.entry(AppEvent.FriendRequestAccepted.class, Ownership.of(HandlerOwner.NOTIFICATION)),

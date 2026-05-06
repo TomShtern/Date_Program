@@ -593,6 +593,9 @@ public final class SchemaInitializer {
 
         stmt.execute("CREATE INDEX IF NOT EXISTS idx_profile_notes_author ON profile_notes(author_id)");
 
+        // TODO: Clarify business intent for profile_views PK.
+        // Composite PK (viewer_id, viewed_id, viewed_at) tracks every individual view.
+        // If only the latest view matters, PK should be (viewer_id, viewed_id) instead.
         stmt.execute("""
                 CREATE TABLE IF NOT EXISTS profile_views (
                     viewer_id UUID NOT NULL,
@@ -779,6 +782,11 @@ public final class SchemaInitializer {
                 "CREATE INDEX IF NOT EXISTS idx_sessions_started_at_desc " + "ON swipe_sessions(started_at DESC)");
         stmt.execute("CREATE INDEX IF NOT EXISTS idx_users_state ON users(state)");
         stmt.execute("CREATE INDEX IF NOT EXISTS idx_users_gender_state ON users(gender, state)");
+        createIndexWithFallback(
+                stmt,
+                "CREATE INDEX IF NOT EXISTS idx_users_location_state "
+                        + "ON users(lat, lon, state) WHERE state = 'ACTIVE' AND deleted_at IS NULL",
+                "CREATE INDEX IF NOT EXISTS idx_users_location_state ON users(lat, lon, state)");
     }
 
     static void createStatsIndexes(Statement stmt) throws SQLException {

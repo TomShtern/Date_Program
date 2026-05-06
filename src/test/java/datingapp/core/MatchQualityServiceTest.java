@@ -559,7 +559,7 @@ class MatchQualityServiceTest {
                     .computeQuality(Match.create(alice.getId(), bob.getId()), alice.getId())
                     .orElseThrow();
 
-            assertEquals(90, quality.compatibilityScore());
+            assertEquals(91, quality.compatibilityScore());
             assertEquals(4, quality.getStarRating());
             assertEquals("Great Match", quality.getCompatibilityLabel());
         }

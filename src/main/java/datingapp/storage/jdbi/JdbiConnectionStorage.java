@@ -417,6 +417,28 @@ public final class JdbiConnectionStorage implements OperationalCommunicationStor
         socialDao.deleteOldNotifications(before);
     }
 
+    /**
+     * Shared helper for inserting a notification row using named parameters.
+     * Used by both {@link JdbiConnectionStorage} and {@link JdbiMatchmakingStorage}
+     * to avoid duplicated notification save logic.
+     */
+    public static void insertNotification(org.jdbi.v3.core.Handle handle, Notification notification) {
+        String dataJson = JdbiNotificationJson.write(notification.data());
+        handle.createUpdate("""
+                INSERT INTO notifications (id, user_id, type, title, message, created_at, is_read, data_json)
+                VALUES (:id, :userId, :type, :title, :message, :createdAt, :isRead, :dataJson)
+                """)
+                .bind("id", notification.id())
+                .bind("userId", notification.userId())
+                .bind("type", notification.type().name())
+                .bind("title", notification.title())
+                .bind("message", notification.message())
+                .bind("createdAt", notification.createdAt())
+                .bind("isRead", notification.isRead())
+                .bind("dataJson", dataJson)
+                .execute();
+    }
+
     private <T> Map<String, T> mapConversationBatchResults(
             Set<String> conversationIds,
             Function<org.jdbi.v3.core.Handle, List<Map.Entry<String, T>>> fetchEntries,

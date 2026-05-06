@@ -1,31 +1,221 @@
 package datingapp.core.matching;
 
+import datingapp.core.AppClock;
+import datingapp.core.AppConfig;
+import datingapp.core.model.GeoUtils;
 import datingapp.core.model.User;
+import datingapp.core.storage.AnalyticsStorage;
+import java.time.Clock;
 import java.time.LocalDate;
+import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Random;
 import java.util.UUID;
 
-/**
- * Service for managing the "Daily Pick" feature.
- * Selects a featured profile once per day for each user.
- */
-public interface DailyPickService {
+/** Manages the "Daily Pick" feature. */
+public class DailyPickService {
 
-    /** Get the daily pick for a user if available. */
-    Optional<DailyPick> getDailyPick(User seeker);
+    private final AnalyticsStorage analyticsStorage;
+    private final CandidateFinder candidateFinder;
+    private final AppConfig config;
+    private final Clock clock;
 
-    /** Check whether user has viewed today's daily pick. */
-    boolean hasViewedDailyPick(UUID userId);
+    /**
+     * Protected no-arg constructor for anonymous test subclasses only.
+     * <p>Do not call the public daily-pick API on a base instance created this way; the service
+     * dependencies are intentionally uninitialized and those methods will fail fast.
+     */
+    protected DailyPickService() {
+        this.analyticsStorage = null;
+        this.candidateFinder = null;
+        this.config = null;
+        this.clock = null;
+    }
 
-    /** Mark today's daily pick as viewed for a user. */
-    void markDailyPickViewed(UUID userId);
+    public DailyPickService(AnalyticsStorage analyticsStorage, CandidateFinder candidateFinder, AppConfig config) {
+        this(analyticsStorage, candidateFinder, config, AppClock.clock());
+    }
 
-    /** Cleanup old daily pick view records (for maintenance). */
-    int cleanupOldDailyPickViews(LocalDate before);
+    public DailyPickService(
+            AnalyticsStorage analyticsStorage, CandidateFinder candidateFinder, AppConfig config, Clock clock) {
+        this.analyticsStorage = Objects.requireNonNull(analyticsStorage, "analyticsStorage cannot be null");
+        this.candidateFinder = Objects.requireNonNull(candidateFinder, "candidateFinder cannot be null");
+        this.config = Objects.requireNonNull(config, "config cannot be null");
+        this.clock = Objects.requireNonNull(clock, "clock cannot be null");
+    }
 
-    /** Daily pick payload. */
-    record DailyPick(User user, LocalDate date, String reason, boolean alreadySeen) {
+    public Optional<DailyPick> getDailyPick(User seeker) {
+        requireDependencies();
+        LocalDate today = currentDate();
+        List<User> candidates = candidateFinder.findCandidatesForUser(seeker);
+        if (candidates.isEmpty()) {
+            return Optional.empty();
+        }
+        long seed = today.toEpochDay() + seeker.getId().hashCode();
+        Random pickRandom = new Random(seed);
+        UUID pickedId = analyticsStorage
+                .getDailyPickUser(seeker.getId(), today)
+                .filter(cachedId -> candidates.stream()
+                        .anyMatch(candidate -> candidate.getId().equals(cachedId)))
+                .orElseGet(() -> {
+                    UUID generatedPickId = candidates
+                            .get(pickRandom.nextInt(candidates.size()))
+                            .getId();
+                    analyticsStorage.saveDailyPickUser(seeker.getId(), generatedPickId, today);
+                    return generatedPickId;
+                });
+        User picked = candidates.stream()
+                .filter(candidate -> candidate.getId().equals(pickedId))
+                .findFirst()
+                .orElseGet(() -> {
+                    UUID generatedPickId = candidates
+                            .get(pickRandom.nextInt(candidates.size()))
+                            .getId();
+                    analyticsStorage.saveDailyPickUser(seeker.getId(), generatedPickId, today);
+                    return candidates.stream()
+                            .filter(candidate -> candidate.getId().equals(generatedPickId))
+                            .findFirst()
+                            .orElseThrow();
+                });
+        long reasonSeed =
+                seed ^ picked.getId().getMostSignificantBits() ^ picked.getId().getLeastSignificantBits();
+        Random reasonRandom = new Random(reasonSeed);
+        String reason = generateReason(seeker, picked, reasonRandom);
+        boolean alreadySeen = hasViewedDailyPick(seeker.getId(), today);
+        return Optional.of(new DailyPick(picked, today, reason, alreadySeen));
+    }
+
+    public boolean hasViewedDailyPick(UUID userId) {
+        requireAnalyticsStorage();
+        return hasViewedDailyPick(userId, currentDate());
+    }
+
+    public void markDailyPickViewed(UUID userId) {
+        requireAnalyticsStorage();
+        markDailyPickViewed(userId, currentDate());
+    }
+
+    private boolean hasViewedDailyPick(UUID userId, LocalDate date) {
+        return analyticsStorage.isDailyPickViewed(userId, date);
+    }
+
+    private void markDailyPickViewed(UUID userId, LocalDate date) {
+        analyticsStorage.markDailyPickAsViewed(userId, date);
+    }
+
+    public int cleanupOldDailyPickViews(LocalDate before) {
+        requireAnalyticsStorage();
+        return analyticsStorage.deleteDailyPickViewsOlderThan(before);
+    }
+
+    private LocalDate currentDate() {
+        requireConfigAndClock();
+        return LocalDate.ofInstant(clock.instant(), config.safety().userTimeZone());
+    }
+
+    private String generateReason(User seeker, User picked, Random random) {
+        List<String> reasons = new ArrayList<>();
+        addLocationReasons(reasons, seeker, picked);
+        addAgeReasons(reasons, seeker, picked);
+        addCompatibilityReasons(reasons, seeker, picked);
+        addInterestReasons(reasons, seeker, picked);
+        if (reasons.isEmpty()) {
+            reasons.add("Our algorithm thinks you might click!");
+            reasons.add("Something different today!");
+            reasons.add("Expand your horizons!");
+            reasons.add("Why not give them a chance?");
+            reasons.add("Could be a pleasant surprise!");
+        }
+        return reasons.get(random.nextInt(reasons.size()));
+    }
+
+    private void addLocationReasons(List<String> reasons, User seeker, User picked) {
+        if (!seeker.hasLocationSet() || !picked.hasLocationSet()) {
+            return;
+        }
+        double distance = GeoUtils.distanceKm(seeker.getLat(), seeker.getLon(), picked.getLat(), picked.getLon());
+        if (distance < config.algorithm().nearbyDistanceKm()) {
+            reasons.add("Lives nearby!");
+        } else if (distance < config.algorithm().closeDistanceKm()) {
+            reasons.add("Close enough for coffee!");
+        }
+    }
+
+    private void addAgeReasons(List<String> reasons, User seeker, User picked) {
+        ZoneId tz = config.safety().userTimeZone();
+        if (seeker.getAge(tz).isEmpty() || picked.getAge(tz).isEmpty()) {
+            return;
+        }
+        int ageDiff =
+                Math.abs(seeker.getAge(tz).orElseThrow() - picked.getAge(tz).orElseThrow());
+        if (ageDiff <= config.algorithm().similarAgeDiff()) {
+            reasons.add("Similar age");
+        } else if (ageDiff <= config.algorithm().compatibleAgeDiff()) {
+            reasons.add("Age-appropriate match");
+        }
+    }
+
+    private void addCompatibilityReasons(List<String> reasons, User seeker, User picked) {
+        if (sameNonNull(seeker.getLookingFor(), picked.getLookingFor())) {
+            reasons.add("Looking for the same thing");
+        }
+        if (sameNonNull(seeker.getWantsKids(), picked.getWantsKids())) {
+            reasons.add("Same stance on kids");
+        }
+        if (sameNonNull(seeker.getDrinking(), picked.getDrinking())) {
+            reasons.add("Compatible drinking habits");
+        }
+        if (sameNonNull(seeker.getSmoking(), picked.getSmoking())) {
+            reasons.add("Compatible smoking habits");
+        }
+    }
+
+    private void addInterestReasons(List<String> reasons, User seeker, User picked) {
+        long sharedInterests = seeker.getInterests().stream()
+                .filter(picked.getInterests()::contains)
+                .count();
+        if (sharedInterests >= config.matching().minSharedInterests()) {
+            reasons.add("Many shared interests!");
+        } else if (sharedInterests >= 1) {
+            reasons.add("Some shared interests");
+        }
+    }
+
+    private static <T> boolean sameNonNull(T left, T right) {
+        return left != null && left.equals(right);
+    }
+
+    private void requireDependencies() {
+        requireAnalyticsStorage();
+        requireCandidateFinder();
+        requireConfigAndClock();
+    }
+
+    private void requireAnalyticsStorage() {
+        if (analyticsStorage == null) {
+            throw new IllegalStateException("DailyPickService analyticsStorage is not initialized");
+        }
+    }
+
+    private void requireCandidateFinder() {
+        if (candidateFinder == null) {
+            throw new IllegalStateException("DailyPickService candidateFinder is not initialized");
+        }
+    }
+
+    private void requireConfigAndClock() {
+        if (config == null) {
+            throw new IllegalStateException("DailyPickService config is not initialized");
+        }
+        if (clock == null) {
+            throw new IllegalStateException("DailyPickService clock is not initialized");
+        }
+    }
+
+    public record DailyPick(User user, LocalDate date, String reason, boolean alreadySeen) {
         public DailyPick {
             Objects.requireNonNull(user, "user cannot be null");
             Objects.requireNonNull(date, "date cannot be null");

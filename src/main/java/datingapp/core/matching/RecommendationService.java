@@ -105,12 +105,12 @@ public final class RecommendationService {
                         resolvedConfig.safety().userTimeZone(),
                         Duration.ofHours(resolvedConfig.matching().rematchCooldownHours()));
             }
-            CompatibilityCalculator calculator = new DefaultCompatibilityCalculator(resolvedConfig, resolvedClock);
+            CompatibilityCalculator calculator = new CompatibilityCalculator(resolvedConfig, resolvedClock);
             DailyLimitService dailyLimitService =
-                    new DefaultDailyLimitService(interactionStorage, resolvedConfig, resolvedClock);
-            DailyPickService dailyPickService = new DefaultDailyPickService(
-                    analyticsStorage, resolvedCandidateFinder, resolvedConfig, resolvedClock);
-            StandoutService standoutService = new DefaultStandoutService(
+                    new DailyLimitService(interactionStorage, resolvedConfig, resolvedClock);
+            DailyPickService dailyPickService =
+                    new DailyPickService(analyticsStorage, resolvedCandidateFinder, resolvedConfig, resolvedClock);
+            StandoutService standoutService = new StandoutService(
                     calculator,
                     userStorage,
                     resolvedCandidateFinder,
@@ -119,7 +119,7 @@ public final class RecommendationService {
                     resolvedConfig,
                     resolvedClock);
             BrowseRankingService browseRankingService =
-                    new DefaultBrowseRankingService(calculator, resolvedProfileService, resolvedConfig);
+                    new BrowseRankingService(calculator, resolvedProfileService, resolvedConfig);
             return new RecommendationService(
                     dailyLimitService, dailyPickService, standoutService, browseRankingService);
         }

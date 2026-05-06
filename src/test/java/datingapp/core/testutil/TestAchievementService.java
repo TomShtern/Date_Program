@@ -10,7 +10,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 /** Reusable achievement-service fixture for tests. */
-public final class TestAchievementService implements AchievementService {
+public final class TestAchievementService extends AchievementService {
 
     private final List<UserAchievement> unlocked;
     private final List<AchievementProgress> progress;

@@ -2,9 +2,7 @@ package datingapp.app.api;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -23,8 +21,6 @@ import datingapp.core.storage.OperationalInteractionStorage;
 import datingapp.core.storage.OperationalUserStorage;
 import datingapp.core.testutil.TestStorages;
 import io.javalin.http.Context;
-import io.javalin.http.NotFoundResponse;
-import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.net.URI;
@@ -167,10 +163,13 @@ class RestApiReadRoutesTest {
         UUID missingUserId = UUID.randomUUID();
         CapturingContext ctx = capturingContext(USERS_PATH + missingUserId, Map.of("id", missingUserId.toString()));
 
-        InvocationTargetException thrown =
-                assertThrows(InvocationTargetException.class, () -> method.invoke(server, ctx.context));
-        assertInstanceOf(NotFoundResponse.class, thrown.getCause());
-        assertEquals("User not found", thrown.getCause().getMessage());
+        method.invoke(server, ctx.context);
+
+        assertEquals(404, ctx.status);
+        assertTrue(ctx.jsonPayload instanceof ErrorResponse);
+        ErrorResponse error = (ErrorResponse) ctx.jsonPayload;
+        assertEquals("NOT_FOUND", error.code());
+        assertEquals("User not found", error.message());
     }
 
     @Test

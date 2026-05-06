@@ -149,7 +149,7 @@ class StatsControllerTest {
                 new ProfileInsightsUseCases(achievementService, activityMetricsService));
     }
 
-    private static final class SingleAchievementService implements AchievementService {
+    private static final class SingleAchievementService extends AchievementService {
         private final UUID userId;
 
         private SingleAchievementService(UUID userId) {

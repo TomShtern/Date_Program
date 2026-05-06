@@ -3,7 +3,7 @@ package datingapp.core;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import datingapp.core.metrics.DefaultAchievementService;
+import datingapp.core.metrics.AchievementService;
 import datingapp.core.metrics.EngagementDomain.Achievement;
 import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
@@ -35,7 +35,7 @@ class ProfileCompletionConsistencyTest {
     private TestStorages.Analytics analytics;
     private ProfileService profileService;
     private ProfileActivationPolicy activationPolicy;
-    private DefaultAchievementService achievementService;
+    private AchievementService achievementService;
 
     @BeforeEach
     void setUp() {
@@ -46,7 +46,7 @@ class ProfileCompletionConsistencyTest {
         analytics = new TestStorages.Analytics();
         profileService = new ProfileService(users);
         activationPolicy = new ProfileActivationPolicy();
-        achievementService = new DefaultAchievementService(
+        achievementService = new AchievementService(
                 AppConfig.defaults(), analytics, interactions, trustSafety, users, profileService);
     }
 

@@ -42,8 +42,8 @@ class RestApiAuthRoutesTest {
     }
 
     @Test
-    @DisplayName("signup normalizes email, creates an incomplete user, and rejects duplicates")
-    void signupNormalizesEmailCreatesIncompleteUserAndRejectsDuplicates() throws Exception {
+    @DisplayName("signup normalizes email domain, creates an incomplete user, and rejects duplicates")
+    void signupNormalizesEmailDomainCreatesIncompleteUserAndRejectsDuplicates() throws Exception {
         TestStorages.Users userStorage = new TestStorages.Users();
         TestStorages.Communications communicationStorage = new TestStorages.Communications();
         TestStorages.Interactions interactionStorage = new TestStorages.Interactions(communicationStorage);
@@ -63,12 +63,12 @@ class RestApiAuthRoutesTest {
         assertEquals(1, userStorage.findAll().size());
 
         User createdUser = userStorage.findAll().getFirst();
-        assertEquals("user@example.com", createdUser.getEmail());
+        assertEquals("User@example.com", createdUser.getEmail());
         assertEquals(UserState.INCOMPLETE, createdUser.getState());
 
         HttpResponse<String> duplicateResponse = postJson(port, "/api/auth/signup", """
                 {
-                  "email": "user@example.com",
+                  "email": "User@example.com",
                   "password": "another password",
                   "dateOfBirth": "1995-01-01"
                 }

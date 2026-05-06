@@ -5,7 +5,6 @@ import datingapp.app.event.InProcessAppEventBus;
 import datingapp.app.testutil.TestEventBus;
 import datingapp.app.usecase.auth.AuthTokenService;
 import datingapp.app.usecase.auth.AuthUseCases;
-import datingapp.app.usecase.auth.JwtAuthTokenService;
 import datingapp.app.usecase.profile.ProfileInsightsUseCases;
 import datingapp.app.usecase.profile.ProfileMutationUseCases;
 import datingapp.app.usecase.profile.ProfileNotesUseCases;
@@ -17,10 +16,6 @@ import datingapp.core.matching.CandidateFinder;
 import datingapp.core.matching.CompatibilityCalculator;
 import datingapp.core.matching.DailyLimitService;
 import datingapp.core.matching.DailyPickService;
-import datingapp.core.matching.DefaultCompatibilityCalculator;
-import datingapp.core.matching.DefaultDailyLimitService;
-import datingapp.core.matching.DefaultDailyPickService;
-import datingapp.core.matching.DefaultStandoutService;
 import datingapp.core.matching.MatchQualityService;
 import datingapp.core.matching.MatchingService;
 import datingapp.core.matching.RecommendationService;
@@ -29,7 +24,6 @@ import datingapp.core.matching.TrustSafetyService;
 import datingapp.core.matching.UndoService;
 import datingapp.core.metrics.AchievementService;
 import datingapp.core.metrics.ActivityMetricsService;
-import datingapp.core.metrics.DefaultAchievementService;
 import datingapp.core.profile.LocationService;
 import datingapp.core.profile.ProfileService;
 import datingapp.core.profile.ValidationService;
@@ -84,10 +78,10 @@ public final class TestServiceRegistryBuilder {
         ActivityMetricsService activityMetricsService =
                 new ActivityMetricsService(interactions, trustSafety, analytics, config);
         ProfileService profileService = new ProfileService(users);
-        CompatibilityCalculator compatibilityCalculator = new DefaultCompatibilityCalculator(config);
-        DailyLimitService dailyLimitService = new DefaultDailyLimitService(interactions, config);
-        DailyPickService dailyPickService = new DefaultDailyPickService(analytics, candidateFinder, config);
-        StandoutService standoutService = new DefaultStandoutService(
+        CompatibilityCalculator compatibilityCalculator = new CompatibilityCalculator(config);
+        DailyLimitService dailyLimitService = new DailyLimitService(interactions, config);
+        DailyPickService dailyPickService = new DailyPickService(analytics, candidateFinder, config);
+        StandoutService standoutService = new StandoutService(
                 compatibilityCalculator, users, candidateFinder, new TestStorages.Standouts(), profileService, config);
         RecommendationService recommendationService =
                 new RecommendationService(dailyLimitService, dailyPickService, standoutService);
@@ -109,9 +103,9 @@ public final class TestServiceRegistryBuilder {
                 new MatchQualityService(users, interactions, config, compatibilityCalculator);
         LocationService locationService = new LocationService(validationService);
         AchievementService achievementService =
-                new DefaultAchievementService(config, analytics, interactions, trustSafety, users, profileService);
+                new AchievementService(config, analytics, interactions, trustSafety, users, profileService);
         TestStorages.Auth authStorage = new TestStorages.Auth();
-        AuthTokenService authTokenService = new JwtAuthTokenService(config.auth());
+        AuthTokenService authTokenService = new AuthTokenService(config.auth());
         AuthUseCases authUseCases = new AuthUseCases(config, users, authStorage, authTokenService);
 
         ServiceRegistry registry = ServiceRegistry.builder()

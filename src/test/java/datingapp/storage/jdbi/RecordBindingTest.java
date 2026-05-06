@@ -59,7 +59,7 @@ class RecordBindingTest {
         JdbiTypeCodecs.registerInstantCodec(jdbi);
 
         matchmakingStorage = new JdbiMatchmakingStorage(jdbi);
-        trustSafetyStorage = jdbi.onDemand(JdbiTrustSafetyStorage.class);
+        trustSafetyStorage = new JdbiTrustSafetyStorage(jdbi);
 
         // Insert test users for foreign key constraints
         jdbi.withHandle(handle -> {

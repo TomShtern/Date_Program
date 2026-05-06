@@ -6,7 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import datingapp.core.matching.CandidateFinder.GeoUtils;
+import datingapp.core.model.GeoUtils;
 import datingapp.core.model.Match;
 import datingapp.core.profile.MatchPreferences.Interest;
 import java.util.List;

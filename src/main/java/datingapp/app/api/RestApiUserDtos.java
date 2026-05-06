@@ -21,13 +21,37 @@ final class RestApiUserDtos {
 
     private RestApiUserDtos() {}
 
-    static record PacePreferencesDto(
+    static UserFields mapUserFields(User user, ZoneId userTimeZone, String approximateLocation) {
+        return new UserFields(
+                safeAge(user, userTimeZone),
+                user != null && user.getGender() != null ? user.getGender().name() : null,
+                user != null && user.getInterestedIn() != null
+                        ? user.getInterestedIn().stream().map(Enum::name).toList()
+                        : List.of(),
+                approximateLocation,
+                user != null ? user.getMaxDistanceKm() : 0,
+                user != null && user.getState() != null ? user.getState().name() : null);
+    }
+
+    static int safeAge(User user, ZoneId userTimeZone) {
+        return datingapp.app.support.UserPresentationSupport.safeAge(user, userTimeZone);
+    }
+
+    static record UserFields(
+            int age,
+            String gender,
+            List<String> interestedIn,
+            String approximateLocation,
+            int maxDistanceKm,
+            String state) {}
+
+    static record ReadPacePreferencesDto(
             String messagingFrequency, String timeToFirstDate, String communicationStyle, String depthPreference) {
-        static PacePreferencesDto from(PacePreferences pace) {
+        static ReadPacePreferencesDto from(PacePreferences pace) {
             if (pace == null) {
                 return null;
             }
-            return new PacePreferencesDto(
+            return new ReadPacePreferencesDto(
                     pace.messagingFrequency() != null
                             ? pace.messagingFrequency().name()
                             : null,
@@ -58,7 +82,7 @@ final class RestApiUserDtos {
 
         static UserSummary from(
                 User user, ZoneId userTimeZone, String approximateLocation, UnaryOperator<String> photoUrlResolver) {
-            UserDtoMapper.UserFields fields = UserDtoMapper.map(user, userTimeZone, null);
+            UserFields fields = mapUserFields(user, userTimeZone, null);
             return new UserSummary(
                     user.getId(),
                     user.getName(),
@@ -87,7 +111,7 @@ final class RestApiUserDtos {
             List<String> photoUrls,
             String primaryPhotoUrl,
             String state,
-            PacePreferencesDto pacePreferences,
+            ReadPacePreferencesDto pacePreferences,
             List<String> missingProfileFields,
             List<String> missingProfileFieldLabels,
             int requiredProfileFieldCount,
@@ -109,7 +133,7 @@ final class RestApiUserDtos {
                 String approximateLocation,
                 UnaryOperator<String> photoUrlResolver,
                 ProfileActivationPolicy activationPolicy) {
-            UserDtoMapper.UserFields fields = UserDtoMapper.map(user, userTimeZone, approximateLocation);
+            UserFields fields = mapUserFields(user, userTimeZone, approximateLocation);
             ProfileCompletionView completion =
                     activationPolicy != null ? ProfileCompletionView.from(user, activationPolicy) : null;
             return new UserDetail(
@@ -124,7 +148,7 @@ final class RestApiUserDtos {
                     personPhotoUrls(user, photoUrlResolver),
                     personPrimaryPhotoUrl(user, photoUrlResolver),
                     fields.state(),
-                    PacePreferencesDto.from(user.getPacePreferences()),
+                    ReadPacePreferencesDto.from(user.getPacePreferences()),
                     completion != null ? completion.missingProfileFields() : null,
                     completion != null ? completion.missingProfileFieldLabels() : null,
                     completion != null ? completion.requiredProfileFieldCount() : 0,
@@ -162,7 +186,7 @@ final class RestApiUserDtos {
             return new DailyPickDto(
                     user.getId(),
                     user.getName(),
-                    UserDtoMapper.age(user, userTimeZone),
+                    safeAge(user, userTimeZone),
                     dailyPick.date(),
                     dailyPick.reason(),
                     dailyPick.alreadySeen(),
@@ -200,7 +224,7 @@ final class RestApiUserDtos {
             return new PendingLikerDto(
                     user.getId(),
                     user.getName(),
-                    UserDtoMapper.age(user, userTimeZone),
+                    safeAge(user, userTimeZone),
                     pendingLiker.likedAt(),
                     personPrimaryPhotoUrl(user, photoUrlResolver),
                     personPhotoUrls(user, photoUrlResolver),
@@ -243,7 +267,7 @@ final class RestApiUserDtos {
                     standout.id(),
                     standout.standoutUserId(),
                     user != null ? user.getName() : UNKNOWN_USER,
-                    UserDtoMapper.age(user, userTimeZone),
+                    safeAge(user, userTimeZone),
                     standout.rank(),
                     standout.score(),
                     standout.reason(),
@@ -253,57 +277,6 @@ final class RestApiUserDtos {
                     personPhotoUrls(user, photoUrlResolver),
                     approximateLocation,
                     personSummaryLine(user));
-        }
-    }
-
-    static record ProfileUpdateResponse(
-            UUID id,
-            String name,
-            int age,
-            String bio,
-            String gender,
-            List<String> interestedIn,
-            String approximateLocation,
-            int maxDistanceKm,
-            String state,
-            boolean activated,
-            List<String> missingProfileFields,
-            List<String> missingProfileFieldLabels,
-            int requiredProfileFieldCount,
-            boolean profileComplete,
-            boolean canActivate,
-            boolean canBrowse) {
-        static ProfileUpdateResponse from(
-                User user, boolean activated, ZoneId userTimeZone, String approximateLocation) {
-            return from(user, activated, userTimeZone, approximateLocation, null);
-        }
-
-        static ProfileUpdateResponse from(
-                User user,
-                boolean activated,
-                ZoneId userTimeZone,
-                String approximateLocation,
-                ProfileActivationPolicy activationPolicy) {
-            UserDtoMapper.UserFields fields = UserDtoMapper.map(user, userTimeZone, approximateLocation);
-            ProfileCompletionView completion =
-                    activationPolicy != null ? ProfileCompletionView.from(user, activationPolicy) : null;
-            return new ProfileUpdateResponse(
-                    user.getId(),
-                    user.getName(),
-                    fields.age(),
-                    user.getBio(),
-                    fields.gender(),
-                    fields.interestedIn(),
-                    fields.approximateLocation(),
-                    fields.maxDistanceKm(),
-                    fields.state(),
-                    activated,
-                    completion != null ? completion.missingProfileFields() : null,
-                    completion != null ? completion.missingProfileFieldLabels() : null,
-                    completion != null ? completion.requiredProfileFieldCount() : 0,
-                    completion != null && completion.profileComplete(),
-                    completion != null && completion.canActivate(),
-                    completion != null && completion.canBrowse());
         }
     }
 

@@ -1,5 +1,6 @@
 package datingapp.core.profile;
 
+import datingapp.core.model.GeoUtils;
 import datingapp.core.model.LocationModels;
 import datingapp.core.model.LocationModels.City;
 import datingapp.core.model.LocationModels.Country;
@@ -310,7 +311,7 @@ public final class LocationService {
     private Optional<ZipRange> findZipRangeForCoordinates(double latitude, double longitude) {
         return zipRangesFor(COUNTRY_IL).stream()
                 .map(range -> new ZipRangeCandidate(
-                        distanceKm(latitude, longitude, range.latitude(), range.longitude()), range))
+                        GeoUtils.distanceKm(latitude, longitude, range.latitude(), range.longitude()), range))
                 .filter(candidate -> candidate.distanceKm() <= ZIP_MATCH_MAX_KM)
                 .min(Comparator.comparingDouble(ZipRangeCandidate::distanceKm))
                 .map(ZipRangeCandidate::range);
@@ -318,8 +319,8 @@ public final class LocationService {
 
     private Optional<City> findCityForCoordinates(double latitude, double longitude) {
         return citiesFor(COUNTRY_IL).stream()
-                .map(city ->
-                        new CityCandidate(distanceKm(latitude, longitude, city.latitude(), city.longitude()), city))
+                .map(city -> new CityCandidate(
+                        GeoUtils.distanceKm(latitude, longitude, city.latitude(), city.longitude()), city))
                 .filter(candidate -> candidate.distanceKm() <= CITY_MATCH_MAX_KM)
                 .min(Comparator.comparingDouble(CityCandidate::distanceKm))
                 .map(CityCandidate::city);
@@ -333,19 +334,6 @@ public final class LocationService {
 
     private static String normalizeZip(String zipCode) {
         return zipCode == null ? "" : zipCode.replaceAll("[\\s-]", "");
-    }
-
-    private static double distanceKm(double lat1, double lon1, double lat2, double lon2) {
-        double earthRadiusKm = 6371.0;
-        double deltaLat = Math.toRadians(lat2 - lat1);
-        double deltaLon = Math.toRadians(lon2 - lon1);
-        double a = Math.sin(deltaLat / 2) * Math.sin(deltaLat / 2)
-                + Math.cos(Math.toRadians(lat1))
-                        * Math.cos(Math.toRadians(lat2))
-                        * Math.sin(deltaLon / 2)
-                        * Math.sin(deltaLon / 2);
-        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        return earthRadiusKm * c;
     }
 
     public record ZipLookupResult(

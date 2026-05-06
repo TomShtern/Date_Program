@@ -171,9 +171,10 @@ public final class NotesViewModel extends BaseViewModel {
 
                 ProfileNote savedNote = result.data();
                 asyncScope.dispatchToUi(() -> {
-                    upsertNoteEntry(savedNote);
-                    if (isSelectedNote(subjectId)) {
-                        selectNote(createNoteEntry(savedNote, resolveUserName(subjectId)));
+                    boolean keepSelection = isSelectedNote(subjectId);
+                    NoteEntry updatedEntry = upsertNoteEntry(savedNote);
+                    if (keepSelection) {
+                        selectNote(updatedEntry);
                     }
                     selectedNoteBusy.set(false);
                 });
@@ -229,14 +230,27 @@ public final class NotesViewModel extends BaseViewModel {
         Map<UUID, User> usersById = userStore.findByIds(subjectIds);
 
         return profileNotes.stream()
-                .sorted((left, right) -> right.updatedAt().compareTo(left.updatedAt()))
+                .sorted((left, right) -> {
+                    Instant leftUpdatedAt = left.updatedAt();
+                    Instant rightUpdatedAt = right.updatedAt();
+                    if (leftUpdatedAt == null && rightUpdatedAt == null) {
+                        return 0;
+                    }
+                    if (leftUpdatedAt == null) {
+                        return 1;
+                    }
+                    if (rightUpdatedAt == null) {
+                        return -1;
+                    }
+                    return rightUpdatedAt.compareTo(leftUpdatedAt);
+                })
                 .map(note -> createNoteEntry(note, resolveUserName(note.subjectId(), usersById)))
                 .toList();
     }
 
     private NoteEntry createNoteEntry(ProfileNote note, String userName) {
-        return new NoteEntry(
-                note.subjectId(), userName, note.content(), note.updatedAt(), dateFormatter.format(note.updatedAt()));
+        String lastModified = note.updatedAt() != null ? dateFormatter.format(note.updatedAt()) : "";
+        return new NoteEntry(note.subjectId(), userName, note.content(), note.updatedAt(), lastModified);
     }
 
     private String resolveUserName(UUID subjectId) {
@@ -252,16 +266,17 @@ public final class NotesViewModel extends BaseViewModel {
                 .getName();
     }
 
-    private void upsertNoteEntry(ProfileNote savedNote) {
+    private NoteEntry upsertNoteEntry(ProfileNote savedNote) {
         NoteEntry updatedEntry = createNoteEntry(savedNote, resolveUserName(savedNote.subjectId()));
         int index = indexOfNote(savedNote.subjectId());
         if (index >= 0) {
             notes.set(index, updatedEntry);
             sortNotesByUpdatedAtDescending();
-            return;
+            return updatedEntry;
         }
         notes.add(updatedEntry);
         sortNotesByUpdatedAtDescending();
+        return updatedEntry;
     }
 
     private void sortNotesByUpdatedAtDescending() {

@@ -324,805 +324,655 @@ public final class DevDataSeeder {
 
                 // M1 — Standard MALE interested in FEMALE. Sentinel / first user.
                 //      Matches F1, F2, F3(everyone), F5, F9 based on mutual preferences.
-                build(
-                        SEED_SENTINEL_ID,
-                        "Adam Cohen",
-                        LocalDate.of(1994, 3, 15),
-                        Gender.MALE,
-                        genders(Gender.FEMALE),
-                        "Startup founder who loves hiking and good coffee.",
-                        32.07,
-                        34.79,
-                        50,
-                        22,
-                        35,
-                        Lifestyle.Smoking.NEVER,
-                        Lifestyle.Drinking.SOCIALLY,
-                        Lifestyle.WantsKids.SOMEDAY,
-                        Lifestyle.LookingFor.LONG_TERM,
-                        Lifestyle.Education.BACHELORS,
-                        180,
-                        interests(hiking, coffee, travel),
-                        pace(
+                build(SeedUserDefinition.builder(SEED_SENTINEL_ID, "Adam Cohen", LocalDate.of(1994, 3, 15), Gender.MALE)
+                        .interestedIn(genders(Gender.FEMALE))
+                        .bio("Startup founder who loves hiking and good coffee.")
+                        .location(32.07, 34.79)
+                        .maxDistanceKm(50)
+                        .ageRange(22, 35)
+                        .smoking(Lifestyle.Smoking.NEVER)
+                        .drinking(Lifestyle.Drinking.SOCIALLY)
+                        .wantsKids(Lifestyle.WantsKids.SOMEDAY)
+                        .lookingFor(Lifestyle.LookingFor.LONG_TERM)
+                        .education(Lifestyle.Education.BACHELORS)
+                        .heightCm(180)
+                        .interests(interests(hiking, coffee, travel))
+                        .pace(pace(
                                 MessagingFrequency.OFTEN,
                                 TimeToFirstDate.FEW_DAYS,
                                 CommunicationStyle.TEXT_ONLY,
-                                DepthPreference.DEEP_CHAT)),
+                                DepthPreference.DEEP_CHAT))
+                        .build()),
 
                 // M2 — MALE interested in FEMALE. Narrow age range (27–33).
-                build(
-                        uuid(2),
-                        "Ben Levi",
-                        LocalDate.of(1991, 7, 22),
-                        Gender.MALE,
-                        genders(Gender.FEMALE),
-                        "Software engineer, gym rat, weekend traveler.",
-                        32.11,
-                        34.80,
-                        50,
-                        27,
-                        33,
-                        Lifestyle.Smoking.NEVER,
-                        Lifestyle.Drinking.NEVER,
-                        Lifestyle.WantsKids.OPEN,
-                        Lifestyle.LookingFor.LONG_TERM,
-                        Lifestyle.Education.MASTERS,
-                        185,
-                        interests(gym, travel, cooking),
-                        pace(
+                build(SeedUserDefinition.builder(uuid(2), "Ben Levi", LocalDate.of(1991, 7, 22), Gender.MALE)
+                        .interestedIn(genders(Gender.FEMALE))
+                        .bio("Software engineer, gym rat, weekend traveler.")
+                        .location(32.11, 34.80)
+                        .maxDistanceKm(50)
+                        .ageRange(27, 33)
+                        .smoking(Lifestyle.Smoking.NEVER)
+                        .drinking(Lifestyle.Drinking.NEVER)
+                        .wantsKids(Lifestyle.WantsKids.OPEN)
+                        .lookingFor(Lifestyle.LookingFor.LONG_TERM)
+                        .education(Lifestyle.Education.MASTERS)
+                        .heightCm(185)
+                        .interests(interests(gym, travel, cooking))
+                        .pace(pace(
                                 MessagingFrequency.OFTEN,
                                 TimeToFirstDate.WEEKS,
                                 CommunicationStyle.MIX_OF_EVERYTHING,
-                                DepthPreference.DEEP_CHAT)),
+                                DepthPreference.DEEP_CHAT))
+                        .build()),
 
                 // M3 — MALE interested in FEMALE + OTHER (bi preference).
-                build(
-                        uuid(3),
-                        "Chen Mizrahi",
-                        LocalDate.of(1996, 11, 5),
-                        Gender.MALE,
-                        genders(Gender.FEMALE, Gender.OTHER),
-                        "Musician and art lover. Fluent coffee drinker.",
-                        32.09,
-                        34.82,
-                        80,
-                        20,
-                        30,
-                        Lifestyle.Smoking.NEVER,
-                        Lifestyle.Drinking.SOCIALLY,
-                        Lifestyle.WantsKids.NO,
-                        Lifestyle.LookingFor.CASUAL,
-                        Lifestyle.Education.BACHELORS,
-                        175,
-                        interests(music, photography, coffee),
-                        pace(
+                build(SeedUserDefinition.builder(uuid(3), "Chen Mizrahi", LocalDate.of(1996, 11, 5), Gender.MALE)
+                        .interestedIn(genders(Gender.FEMALE, Gender.OTHER))
+                        .bio("Musician and art lover. Fluent coffee drinker.")
+                        .location(32.09, 34.82)
+                        .maxDistanceKm(80)
+                        .ageRange(20, 30)
+                        .smoking(Lifestyle.Smoking.NEVER)
+                        .drinking(Lifestyle.Drinking.SOCIALLY)
+                        .wantsKids(Lifestyle.WantsKids.NO)
+                        .lookingFor(Lifestyle.LookingFor.CASUAL)
+                        .education(Lifestyle.Education.BACHELORS)
+                        .heightCm(175)
+                        .interests(interests(music, photography, coffee))
+                        .pace(pace(
                                 MessagingFrequency.OFTEN,
                                 TimeToFirstDate.FEW_DAYS,
                                 CommunicationStyle.TEXT_ONLY,
-                                DepthPreference.SMALL_TALK)),
+                                DepthPreference.SMALL_TALK))
+                        .build()),
 
                 // M4 — MALE open to EVERYONE (all genders). Herzliya. Wide radius.
-                build(
-                        uuid(4),
-                        "Daniel Shapiro",
-                        LocalDate.of(1989, 4, 30),
-                        Gender.MALE,
-                        genders(Gender.MALE, Gender.FEMALE, Gender.OTHER),
-                        "Chef and food blogger. Open-minded, adventurous.",
-                        32.17,
-                        34.84,
-                        100,
-                        25,
-                        45,
-                        Lifestyle.Smoking.NEVER,
-                        Lifestyle.Drinking.SOCIALLY,
-                        Lifestyle.WantsKids.OPEN,
-                        Lifestyle.LookingFor.LONG_TERM,
-                        Lifestyle.Education.BACHELORS,
-                        178,
-                        interests(cooking, travel, music),
-                        pace(
+                build(SeedUserDefinition.builder(uuid(4), "Daniel Shapiro", LocalDate.of(1989, 4, 30), Gender.MALE)
+                        .interestedIn(genders(Gender.MALE, Gender.FEMALE, Gender.OTHER))
+                        .bio("Chef and food blogger. Open-minded, adventurous.")
+                        .location(32.17, 34.84)
+                        .maxDistanceKm(100)
+                        .ageRange(25, 45)
+                        .smoking(Lifestyle.Smoking.NEVER)
+                        .drinking(Lifestyle.Drinking.SOCIALLY)
+                        .wantsKids(Lifestyle.WantsKids.OPEN)
+                        .lookingFor(Lifestyle.LookingFor.LONG_TERM)
+                        .education(Lifestyle.Education.BACHELORS)
+                        .heightCm(178)
+                        .interests(interests(cooking, travel, music))
+                        .pace(pace(
                                 MessagingFrequency.OFTEN,
                                 TimeToFirstDate.WEEKS,
                                 CommunicationStyle.MIX_OF_EVERYTHING,
-                                DepthPreference.DEEP_CHAT)),
+                                DepthPreference.DEEP_CHAT))
+                        .build()),
 
                 // M5 — MALE interested in MALE only (gay). Mutual match with M6.
-                build(
-                        uuid(5),
-                        "Ethan Bar",
-                        LocalDate.of(1993, 9, 18),
-                        Gender.MALE,
-                        genders(Gender.MALE),
-                        "Architect. Bookworm. Loves long runs and even longer books.",
-                        32.07,
-                        34.78,
-                        50,
-                        22,
-                        38,
-                        Lifestyle.Smoking.NEVER,
-                        Lifestyle.Drinking.SOCIALLY,
-                        Lifestyle.WantsKids.NO,
-                        Lifestyle.LookingFor.LONG_TERM,
-                        Lifestyle.Education.MASTERS,
-                        183,
-                        interests(reading, running, travel),
-                        pace(
+                build(SeedUserDefinition.builder(uuid(5), "Ethan Bar", LocalDate.of(1993, 9, 18), Gender.MALE)
+                        .interestedIn(genders(Gender.MALE))
+                        .bio("Architect. Bookworm. Loves long runs and even longer books.")
+                        .location(32.07, 34.78)
+                        .maxDistanceKm(50)
+                        .ageRange(22, 38)
+                        .smoking(Lifestyle.Smoking.NEVER)
+                        .drinking(Lifestyle.Drinking.SOCIALLY)
+                        .wantsKids(Lifestyle.WantsKids.NO)
+                        .lookingFor(Lifestyle.LookingFor.LONG_TERM)
+                        .education(Lifestyle.Education.MASTERS)
+                        .heightCm(183)
+                        .interests(interests(reading, running, travel))
+                        .pace(pace(
                                 MessagingFrequency.OFTEN,
                                 TimeToFirstDate.FEW_DAYS,
                                 CommunicationStyle.MIX_OF_EVERYTHING,
-                                DepthPreference.DEEP_CHAT)),
+                                DepthPreference.DEEP_CHAT))
+                        .build()),
 
                 // M6 — MALE interested in MALE only (gay). Mutual match with M5.
-                build(
-                        uuid(6),
-                        "Finn Rosenberg",
-                        LocalDate.of(1995, 2, 14),
-                        Gender.MALE,
-                        genders(Gender.MALE),
-                        "UX designer. Coffee shop hopper. Dog person.",
-                        32.08,
-                        34.79,
-                        50,
-                        22,
-                        35,
-                        Lifestyle.Smoking.NEVER,
-                        Lifestyle.Drinking.SOCIALLY,
-                        Lifestyle.WantsKids.OPEN,
-                        Lifestyle.LookingFor.LONG_TERM,
-                        Lifestyle.Education.BACHELORS,
-                        177,
-                        interests(coffee, dogs, photography),
-                        pace(
+                build(SeedUserDefinition.builder(uuid(6), "Finn Rosenberg", LocalDate.of(1995, 2, 14), Gender.MALE)
+                        .interestedIn(genders(Gender.MALE))
+                        .bio("UX designer. Coffee shop hopper. Dog person.")
+                        .location(32.08, 34.79)
+                        .maxDistanceKm(50)
+                        .ageRange(22, 35)
+                        .smoking(Lifestyle.Smoking.NEVER)
+                        .drinking(Lifestyle.Drinking.SOCIALLY)
+                        .wantsKids(Lifestyle.WantsKids.OPEN)
+                        .lookingFor(Lifestyle.LookingFor.LONG_TERM)
+                        .education(Lifestyle.Education.BACHELORS)
+                        .heightCm(177)
+                        .interests(interests(coffee, dogs, photography))
+                        .pace(pace(
                                 MessagingFrequency.OFTEN,
                                 TimeToFirstDate.FEW_DAYS,
                                 CommunicationStyle.TEXT_ONLY,
-                                DepthPreference.SMALL_TALK)),
+                                DepthPreference.SMALL_TALK))
+                        .build()),
 
                 // M7 — MALE interested in FEMALE. Jerusalem (~54 km away).
                 //      Distance edge case: filtered by any seeker with maxDistance < 55.
-                build(
-                        uuid(7),
-                        "Gil Avraham",
-                        LocalDate.of(1987, 6, 10),
-                        Gender.MALE,
-                        genders(Gender.FEMALE),
-                        "History teacher and amateur archaeologist.",
-                        31.78,
-                        35.22,
-                        100,
-                        25,
-                        45,
-                        Lifestyle.Smoking.NEVER,
-                        Lifestyle.Drinking.NEVER,
-                        Lifestyle.WantsKids.SOMEDAY,
-                        Lifestyle.LookingFor.LONG_TERM,
-                        Lifestyle.Education.MASTERS,
-                        175,
-                        interests(travel, reading, cycling),
-                        pace(
+                build(SeedUserDefinition.builder(uuid(7), "Gil Avraham", LocalDate.of(1987, 6, 10), Gender.MALE)
+                        .interestedIn(genders(Gender.FEMALE))
+                        .bio("History teacher and amateur archaeologist.")
+                        .location(31.78, 35.22)
+                        .maxDistanceKm(100)
+                        .ageRange(25, 45)
+                        .smoking(Lifestyle.Smoking.NEVER)
+                        .drinking(Lifestyle.Drinking.NEVER)
+                        .wantsKids(Lifestyle.WantsKids.SOMEDAY)
+                        .lookingFor(Lifestyle.LookingFor.LONG_TERM)
+                        .education(Lifestyle.Education.MASTERS)
+                        .heightCm(175)
+                        .interests(interests(travel, reading, cycling))
+                        .pace(pace(
                                 MessagingFrequency.RARELY,
                                 TimeToFirstDate.MONTHS,
                                 CommunicationStyle.VOICE_NOTES,
-                                DepthPreference.DEEP_CHAT)),
+                                DepthPreference.DEEP_CHAT))
+                        .build()),
 
                 // M8 — MALE interested in FEMALE. Very tight max distance (5 km).
                 //      Tests ultra-narrow distance filter — only sees users within 5 km.
-                build(
-                        uuid(8),
-                        "Harel Dan",
-                        LocalDate.of(1998, 1, 25),
-                        Gender.MALE,
-                        genders(Gender.FEMALE),
-                        "Yoga instructor. Plant-based lifestyle advocate.",
-                        32.08,
-                        34.82,
-                        5,
-                        20,
-                        30,
-                        Lifestyle.Smoking.NEVER,
-                        Lifestyle.Drinking.NEVER,
-                        Lifestyle.WantsKids.NO,
-                        Lifestyle.LookingFor.CASUAL,
-                        Lifestyle.Education.BACHELORS,
-                        172,
-                        interests(yoga, cooking, running),
-                        pace(
+                build(SeedUserDefinition.builder(uuid(8), "Harel Dan", LocalDate.of(1998, 1, 25), Gender.MALE)
+                        .interestedIn(genders(Gender.FEMALE))
+                        .bio("Yoga instructor. Plant-based lifestyle advocate.")
+                        .location(32.08, 34.82)
+                        .maxDistanceKm(5)
+                        .ageRange(20, 30)
+                        .smoking(Lifestyle.Smoking.NEVER)
+                        .drinking(Lifestyle.Drinking.NEVER)
+                        .wantsKids(Lifestyle.WantsKids.NO)
+                        .lookingFor(Lifestyle.LookingFor.CASUAL)
+                        .education(Lifestyle.Education.BACHELORS)
+                        .heightCm(172)
+                        .interests(interests(yoga, cooking, running))
+                        .pace(pace(
                                 MessagingFrequency.OFTEN,
                                 TimeToFirstDate.FEW_DAYS,
                                 CommunicationStyle.TEXT_ONLY,
-                                DepthPreference.SMALL_TALK)),
+                                DepthPreference.SMALL_TALK))
+                        .build()),
 
                 // M9 — MALE interested in FEMALE. Wider age range (35–55).
                 //      Tests: only sees older FEMALE candidates.
-                build(
-                        uuid(9),
-                        "Ido Weiss",
-                        LocalDate.of(1980, 8, 3),
-                        Gender.MALE,
-                        genders(Gender.FEMALE),
-                        "Finance manager, jazz lover, father of two.",
-                        32.10,
-                        34.81,
-                        80,
-                        35,
-                        55,
-                        Lifestyle.Smoking.NEVER,
-                        Lifestyle.Drinking.SOCIALLY,
-                        Lifestyle.WantsKids.HAS_KIDS,
-                        Lifestyle.LookingFor.LONG_TERM,
-                        Lifestyle.Education.MASTERS,
-                        181,
-                        interests(music, travel, cooking),
-                        pace(
+                build(SeedUserDefinition.builder(uuid(9), "Ido Weiss", LocalDate.of(1980, 8, 3), Gender.MALE)
+                        .interestedIn(genders(Gender.FEMALE))
+                        .bio("Finance manager, jazz lover, father of two.")
+                        .location(32.10, 34.81)
+                        .maxDistanceKm(80)
+                        .ageRange(35, 55)
+                        .smoking(Lifestyle.Smoking.NEVER)
+                        .drinking(Lifestyle.Drinking.SOCIALLY)
+                        .wantsKids(Lifestyle.WantsKids.HAS_KIDS)
+                        .lookingFor(Lifestyle.LookingFor.LONG_TERM)
+                        .education(Lifestyle.Education.MASTERS)
+                        .heightCm(181)
+                        .interests(interests(music, travel, cooking))
+                        .pace(pace(
                                 MessagingFrequency.OFTEN,
                                 TimeToFirstDate.WEEKS,
                                 CommunicationStyle.MIX_OF_EVERYTHING,
-                                DepthPreference.DEEP_CHAT)),
+                                DepthPreference.DEEP_CHAT))
+                        .build()),
 
                 // M10 — MALE open to EVERYONE. Haifa (~90 km). Distance edge case.
                 //       Even though he is open to all genders, his 200 km radius is the
                 //       binding side; seekers with 50 km max distance won't find him.
-                build(
-                        uuid(10),
-                        "Jake Peretz",
-                        LocalDate.of(1992, 12, 7),
-                        Gender.MALE,
-                        genders(Gender.MALE, Gender.FEMALE, Gender.OTHER),
-                        "Marine biologist. Sea lover. Professional scuba diver.",
-                        32.81,
-                        34.99,
-                        200,
-                        22,
-                        40,
-                        Lifestyle.Smoking.SOMETIMES,
-                        Lifestyle.Drinking.SOCIALLY,
-                        Lifestyle.WantsKids.OPEN,
-                        Lifestyle.LookingFor.CASUAL,
-                        Lifestyle.Education.MASTERS,
-                        182,
-                        interests(swimming, travel, running),
-                        pace(
+                build(SeedUserDefinition.builder(uuid(10), "Jake Peretz", LocalDate.of(1992, 12, 7), Gender.MALE)
+                        .interestedIn(genders(Gender.MALE, Gender.FEMALE, Gender.OTHER))
+                        .bio("Marine biologist. Sea lover. Professional scuba diver.")
+                        .location(32.81, 34.99)
+                        .maxDistanceKm(200)
+                        .ageRange(22, 40)
+                        .smoking(Lifestyle.Smoking.SOMETIMES)
+                        .drinking(Lifestyle.Drinking.SOCIALLY)
+                        .wantsKids(Lifestyle.WantsKids.OPEN)
+                        .lookingFor(Lifestyle.LookingFor.CASUAL)
+                        .education(Lifestyle.Education.MASTERS)
+                        .heightCm(182)
+                        .interests(interests(swimming, travel, running))
+                        .pace(pace(
                                 MessagingFrequency.RARELY,
                                 TimeToFirstDate.WEEKS,
                                 CommunicationStyle.MIX_OF_EVERYTHING,
-                                DepthPreference.SMALL_TALK)),
+                                DepthPreference.SMALL_TALK))
+                        .build()),
 
                 // ── 10 FEMALE users ────────────────────────────────────────────────────
 
                 // F1 — FEMALE interested in MALE. Tel Aviv. Matches M1, M4.
-                build(
-                        uuid(11),
-                        "Avital Katz",
-                        LocalDate.of(1995, 5, 20),
-                        Gender.FEMALE,
-                        genders(Gender.MALE),
-                        "Pediatric nurse. Loves yoga, hiking and quiet evenings.",
-                        32.07,
-                        34.79,
-                        60,
-                        25,
-                        38,
-                        Lifestyle.Smoking.NEVER,
-                        Lifestyle.Drinking.SOCIALLY,
-                        Lifestyle.WantsKids.SOMEDAY,
-                        Lifestyle.LookingFor.LONG_TERM,
-                        Lifestyle.Education.BACHELORS,
-                        165,
-                        interests(hiking, yoga, cooking),
-                        pace(
+                build(SeedUserDefinition.builder(uuid(11), "Avital Katz", LocalDate.of(1995, 5, 20), Gender.FEMALE)
+                        .interestedIn(genders(Gender.MALE))
+                        .bio("Pediatric nurse. Loves yoga, hiking and quiet evenings.")
+                        .location(32.07, 34.79)
+                        .maxDistanceKm(60)
+                        .ageRange(25, 38)
+                        .smoking(Lifestyle.Smoking.NEVER)
+                        .drinking(Lifestyle.Drinking.SOCIALLY)
+                        .wantsKids(Lifestyle.WantsKids.SOMEDAY)
+                        .lookingFor(Lifestyle.LookingFor.LONG_TERM)
+                        .education(Lifestyle.Education.BACHELORS)
+                        .heightCm(165)
+                        .interests(interests(hiking, yoga, cooking))
+                        .pace(pace(
                                 MessagingFrequency.OFTEN,
                                 TimeToFirstDate.FEW_DAYS,
                                 CommunicationStyle.TEXT_ONLY,
-                                DepthPreference.DEEP_CHAT)),
+                                DepthPreference.DEEP_CHAT))
+                        .build()),
 
                 // F2 — FEMALE interested in MALE. Ramat Aviv. Open age range (28–45).
-                build(
-                        uuid(12),
-                        "Batel Oron",
-                        LocalDate.of(1992, 9, 11),
-                        Gender.FEMALE,
-                        genders(Gender.MALE, Gender.OTHER),
-                        "Graphic designer who paints on weekends.",
-                        32.11,
-                        34.81,
-                        50,
-                        28,
-                        45,
-                        Lifestyle.Smoking.NEVER,
-                        Lifestyle.Drinking.NEVER,
-                        Lifestyle.WantsKids.OPEN,
-                        Lifestyle.LookingFor.LONG_TERM,
-                        Lifestyle.Education.BACHELORS,
-                        168,
-                        interests(photography, travel, theater),
-                        pace(
+                build(SeedUserDefinition.builder(uuid(12), "Batel Oron", LocalDate.of(1992, 9, 11), Gender.FEMALE)
+                        .interestedIn(genders(Gender.MALE, Gender.OTHER))
+                        .bio("Graphic designer who paints on weekends.")
+                        .location(32.11, 34.81)
+                        .maxDistanceKm(50)
+                        .ageRange(28, 45)
+                        .smoking(Lifestyle.Smoking.NEVER)
+                        .drinking(Lifestyle.Drinking.NEVER)
+                        .wantsKids(Lifestyle.WantsKids.OPEN)
+                        .lookingFor(Lifestyle.LookingFor.LONG_TERM)
+                        .education(Lifestyle.Education.BACHELORS)
+                        .heightCm(168)
+                        .interests(interests(photography, travel, theater))
+                        .pace(pace(
                                 MessagingFrequency.OFTEN,
                                 TimeToFirstDate.WEEKS,
                                 CommunicationStyle.MIX_OF_EVERYTHING,
-                                DepthPreference.DEEP_CHAT)),
+                                DepthPreference.DEEP_CHAT))
+                        .build()),
 
                 // F3 — FEMALE open to EVERYONE (all genders). Wide match target.
                 //      All gender-preference tests that include FEMALE + OTHER seekers
                 //      should find her.
-                build(
-                        uuid(13),
-                        "Chen Nachum",
-                        LocalDate.of(1990, 1, 28),
-                        Gender.FEMALE,
-                        genders(Gender.MALE, Gender.FEMALE, Gender.OTHER),
-                        "Psychologist and mindfulness coach.",
-                        32.08,
-                        34.78,
-                        80,
-                        24,
-                        45,
-                        Lifestyle.Smoking.NEVER,
-                        Lifestyle.Drinking.SOCIALLY,
-                        Lifestyle.WantsKids.OPEN,
-                        Lifestyle.LookingFor.LONG_TERM,
-                        Lifestyle.Education.MASTERS,
-                        162,
-                        interests(reading, yoga, music),
-                        pace(
+                build(SeedUserDefinition.builder(uuid(13), "Chen Nachum", LocalDate.of(1990, 1, 28), Gender.FEMALE)
+                        .interestedIn(genders(Gender.MALE, Gender.FEMALE, Gender.OTHER))
+                        .bio("Psychologist and mindfulness coach.")
+                        .location(32.08, 34.78)
+                        .maxDistanceKm(80)
+                        .ageRange(24, 45)
+                        .smoking(Lifestyle.Smoking.NEVER)
+                        .drinking(Lifestyle.Drinking.SOCIALLY)
+                        .wantsKids(Lifestyle.WantsKids.OPEN)
+                        .lookingFor(Lifestyle.LookingFor.LONG_TERM)
+                        .education(Lifestyle.Education.MASTERS)
+                        .heightCm(162)
+                        .interests(interests(reading, yoga, music))
+                        .pace(pace(
                                 MessagingFrequency.RARELY,
                                 TimeToFirstDate.WEEKS,
                                 CommunicationStyle.MIX_OF_EVERYTHING,
-                                DepthPreference.DEEP_CHAT)),
+                                DepthPreference.DEEP_CHAT))
+                        .build()),
 
                 // F4 — FEMALE interested in FEMALE only (lesbian). Mutual match with F6.
-                build(
-                        uuid(14),
-                        "Dana Sagi",
-                        LocalDate.of(1994, 7, 4),
-                        Gender.FEMALE,
-                        genders(Gender.FEMALE),
-                        "Environmental lawyer. Weekend surfer.",
-                        32.06,
-                        34.77,
-                        60,
-                        24,
-                        38,
-                        Lifestyle.Smoking.NEVER,
-                        Lifestyle.Drinking.SOCIALLY,
-                        Lifestyle.WantsKids.NO,
-                        Lifestyle.LookingFor.LONG_TERM,
-                        Lifestyle.Education.MASTERS,
-                        170,
-                        interests(swimming, travel, pets),
-                        pace(
+                build(SeedUserDefinition.builder(uuid(14), "Dana Sagi", LocalDate.of(1994, 7, 4), Gender.FEMALE)
+                        .interestedIn(genders(Gender.FEMALE))
+                        .bio("Environmental lawyer. Weekend surfer.")
+                        .location(32.06, 34.77)
+                        .maxDistanceKm(60)
+                        .ageRange(24, 38)
+                        .smoking(Lifestyle.Smoking.NEVER)
+                        .drinking(Lifestyle.Drinking.SOCIALLY)
+                        .wantsKids(Lifestyle.WantsKids.NO)
+                        .lookingFor(Lifestyle.LookingFor.LONG_TERM)
+                        .education(Lifestyle.Education.MASTERS)
+                        .heightCm(170)
+                        .interests(interests(swimming, travel, pets))
+                        .pace(pace(
                                 MessagingFrequency.OFTEN,
                                 TimeToFirstDate.FEW_DAYS,
                                 CommunicationStyle.TEXT_ONLY,
-                                DepthPreference.DEEP_CHAT)),
+                                DepthPreference.DEEP_CHAT))
+                        .build()),
 
                 // F5 — FEMALE interested in MALE. Herzliya. Narrow age range (30–42).
-                build(
-                        uuid(15),
-                        "Ella Raz",
-                        LocalDate.of(1988, 3, 17),
-                        Gender.FEMALE,
-                        genders(Gender.MALE),
-                        "Marketing director. Pilates addict. Cat mom.",
-                        32.16,
-                        34.83,
-                        50,
-                        30,
-                        42,
-                        Lifestyle.Smoking.NEVER,
-                        Lifestyle.Drinking.SOCIALLY,
-                        Lifestyle.WantsKids.SOMEDAY,
-                        Lifestyle.LookingFor.LONG_TERM,
-                        Lifestyle.Education.MASTERS,
-                        164,
-                        interests(yoga, cooking, pets),
-                        pace(
+                build(SeedUserDefinition.builder(uuid(15), "Ella Raz", LocalDate.of(1988, 3, 17), Gender.FEMALE)
+                        .interestedIn(genders(Gender.MALE))
+                        .bio("Marketing director. Pilates addict. Cat mom.")
+                        .location(32.16, 34.83)
+                        .maxDistanceKm(50)
+                        .ageRange(30, 42)
+                        .smoking(Lifestyle.Smoking.NEVER)
+                        .drinking(Lifestyle.Drinking.SOCIALLY)
+                        .wantsKids(Lifestyle.WantsKids.SOMEDAY)
+                        .lookingFor(Lifestyle.LookingFor.LONG_TERM)
+                        .education(Lifestyle.Education.MASTERS)
+                        .heightCm(164)
+                        .interests(interests(yoga, cooking, pets))
+                        .pace(pace(
                                 MessagingFrequency.OFTEN,
                                 TimeToFirstDate.WEEKS,
                                 CommunicationStyle.MIX_OF_EVERYTHING,
-                                DepthPreference.DEEP_CHAT)),
+                                DepthPreference.DEEP_CHAT))
+                        .build()),
 
                 // F6 — FEMALE interested in FEMALE only (lesbian). Mutual match with F4.
-                build(
-                        uuid(16),
-                        "Fay Stern",
-                        LocalDate.of(1993, 10, 9),
-                        Gender.FEMALE,
-                        genders(Gender.FEMALE),
-                        "Tech startup co-founder. Board game enthusiast.",
-                        32.07,
-                        34.80,
-                        60,
-                        25,
-                        40,
-                        Lifestyle.Smoking.NEVER,
-                        Lifestyle.Drinking.SOCIALLY,
-                        Lifestyle.WantsKids.OPEN,
-                        Lifestyle.LookingFor.LONG_TERM,
-                        Lifestyle.Education.BACHELORS,
-                        167,
-                        interests(boardGames, coffee, travel),
-                        pace(
+                build(SeedUserDefinition.builder(uuid(16), "Fay Stern", LocalDate.of(1993, 10, 9), Gender.FEMALE)
+                        .interestedIn(genders(Gender.FEMALE))
+                        .bio("Tech startup co-founder. Board game enthusiast.")
+                        .location(32.07, 34.80)
+                        .maxDistanceKm(60)
+                        .ageRange(25, 40)
+                        .smoking(Lifestyle.Smoking.NEVER)
+                        .drinking(Lifestyle.Drinking.SOCIALLY)
+                        .wantsKids(Lifestyle.WantsKids.OPEN)
+                        .lookingFor(Lifestyle.LookingFor.LONG_TERM)
+                        .education(Lifestyle.Education.BACHELORS)
+                        .heightCm(167)
+                        .interests(interests(boardGames, coffee, travel))
+                        .pace(pace(
                                 MessagingFrequency.OFTEN,
                                 TimeToFirstDate.FEW_DAYS,
                                 CommunicationStyle.TEXT_ONLY,
-                                DepthPreference.SMALL_TALK)),
+                                DepthPreference.SMALL_TALK))
+                        .build()),
 
                 // F7 — FEMALE interested in MALE. Petah Tikva (~9 km east).
                 //      Inside 50 km radius but outside the 5 km tight M8 filter.
-                build(
-                        uuid(17),
-                        "Gal Harel",
-                        LocalDate.of(1996, 6, 21),
-                        Gender.FEMALE,
-                        genders(Gender.MALE),
-                        "Elementary school teacher. Loves baking and pottery.",
-                        32.09,
-                        34.89,
-                        50,
-                        22,
-                        35,
-                        Lifestyle.Smoking.NEVER,
-                        Lifestyle.Drinking.NEVER,
-                        Lifestyle.WantsKids.SOMEDAY,
-                        Lifestyle.LookingFor.LONG_TERM,
-                        Lifestyle.Education.BACHELORS,
-                        163,
-                        interests(baking, reading, dancing),
-                        pace(
+                build(SeedUserDefinition.builder(uuid(17), "Gal Harel", LocalDate.of(1996, 6, 21), Gender.FEMALE)
+                        .interestedIn(genders(Gender.MALE))
+                        .bio("Elementary school teacher. Loves baking and pottery.")
+                        .location(32.09, 34.89)
+                        .maxDistanceKm(50)
+                        .ageRange(22, 35)
+                        .smoking(Lifestyle.Smoking.NEVER)
+                        .drinking(Lifestyle.Drinking.NEVER)
+                        .wantsKids(Lifestyle.WantsKids.SOMEDAY)
+                        .lookingFor(Lifestyle.LookingFor.LONG_TERM)
+                        .education(Lifestyle.Education.BACHELORS)
+                        .heightCm(163)
+                        .interests(interests(baking, reading, dancing))
+                        .pace(pace(
                                 MessagingFrequency.RARELY,
                                 TimeToFirstDate.WEEKS,
                                 CommunicationStyle.VOICE_NOTES,
-                                DepthPreference.DEEP_CHAT)),
+                                DepthPreference.DEEP_CHAT))
+                        .build()),
 
                 // F8 — FEMALE (22), interested in MALE. Strict age preference (21–27).
                 //      Tests bidirectional age filter: won't show up for 35+ year old seekers.
-                build(
-                        uuid(18),
-                        "Hila Baruch",
-                        LocalDate.of(2002, 2, 2),
-                        Gender.FEMALE,
-                        genders(Gender.MALE),
-                        "Film student and aspiring director.",
-                        32.07,
-                        34.79,
-                        50,
-                        21,
-                        27,
-                        Lifestyle.Smoking.SOMETIMES,
-                        Lifestyle.Drinking.SOCIALLY,
-                        Lifestyle.WantsKids.NO,
-                        Lifestyle.LookingFor.CASUAL,
-                        Lifestyle.Education.SOME_COLLEGE,
-                        160,
-                        interests(movies, music, travel),
-                        pace(
+                build(SeedUserDefinition.builder(uuid(18), "Hila Baruch", LocalDate.of(2002, 2, 2), Gender.FEMALE)
+                        .interestedIn(genders(Gender.MALE))
+                        .bio("Film student and aspiring director.")
+                        .location(32.07, 34.79)
+                        .maxDistanceKm(50)
+                        .ageRange(21, 27)
+                        .smoking(Lifestyle.Smoking.SOMETIMES)
+                        .drinking(Lifestyle.Drinking.SOCIALLY)
+                        .wantsKids(Lifestyle.WantsKids.NO)
+                        .lookingFor(Lifestyle.LookingFor.CASUAL)
+                        .education(Lifestyle.Education.SOME_COLLEGE)
+                        .heightCm(160)
+                        .interests(interests(movies, music, travel))
+                        .pace(pace(
                                 MessagingFrequency.OFTEN,
                                 TimeToFirstDate.FEW_DAYS,
                                 CommunicationStyle.TEXT_ONLY,
-                                DepthPreference.SMALL_TALK)),
+                                DepthPreference.SMALL_TALK))
+                        .build()),
 
                 // F9 — FEMALE (45), interested in MALE. Wide age range (35–55).
                 //      Matches M9 (Ido Weiss, 46) who also wants 35–55.
-                build(
-                        uuid(19),
-                        "Iris Golan",
-                        LocalDate.of(1980, 11, 30),
-                        Gender.FEMALE,
-                        genders(Gender.MALE),
-                        "Architect. Two adult kids. Loves jazz evenings.",
-                        32.08,
-                        34.80,
-                        80,
-                        35,
-                        55,
-                        Lifestyle.Smoking.NEVER,
-                        Lifestyle.Drinking.SOCIALLY,
-                        Lifestyle.WantsKids.HAS_KIDS,
-                        Lifestyle.LookingFor.LONG_TERM,
-                        Lifestyle.Education.MASTERS,
-                        168,
-                        interests(music, travel, reading),
-                        pace(
+                build(SeedUserDefinition.builder(uuid(19), "Iris Golan", LocalDate.of(1980, 11, 30), Gender.FEMALE)
+                        .interestedIn(genders(Gender.MALE))
+                        .bio("Architect. Two adult kids. Loves jazz evenings.")
+                        .location(32.08, 34.80)
+                        .maxDistanceKm(80)
+                        .ageRange(35, 55)
+                        .smoking(Lifestyle.Smoking.NEVER)
+                        .drinking(Lifestyle.Drinking.SOCIALLY)
+                        .wantsKids(Lifestyle.WantsKids.HAS_KIDS)
+                        .lookingFor(Lifestyle.LookingFor.LONG_TERM)
+                        .education(Lifestyle.Education.MASTERS)
+                        .heightCm(168)
+                        .interests(interests(music, travel, reading))
+                        .pace(pace(
                                 MessagingFrequency.OFTEN,
                                 TimeToFirstDate.WEEKS,
                                 CommunicationStyle.MIX_OF_EVERYTHING,
-                                DepthPreference.DEEP_CHAT)),
+                                DepthPreference.DEEP_CHAT))
+                        .build()),
 
                 // F10 — FEMALE interested in MALE. Jerusalem (~54 km). Out of range.
                 //       Distance edge case: won't appear for Tel Aviv seekers with 50 km limit.
-                build(
-                        uuid(20),
-                        "Julia Ben-David",
-                        LocalDate.of(1985, 4, 14),
-                        Gender.FEMALE,
-                        genders(Gender.MALE),
-                        "University professor and novelist.",
-                        31.77,
-                        35.21,
-                        100,
-                        30,
-                        50,
-                        Lifestyle.Smoking.NEVER,
-                        Lifestyle.Drinking.SOCIALLY,
-                        Lifestyle.WantsKids.HAS_KIDS,
-                        Lifestyle.LookingFor.LONG_TERM,
-                        Lifestyle.Education.PHD,
-                        166,
-                        interests(reading, travel, writing),
-                        pace(
+                build(SeedUserDefinition.builder(uuid(20), "Julia Ben-David", LocalDate.of(1985, 4, 14), Gender.FEMALE)
+                        .interestedIn(genders(Gender.MALE))
+                        .bio("University professor and novelist.")
+                        .location(31.77, 35.21)
+                        .maxDistanceKm(100)
+                        .ageRange(30, 50)
+                        .smoking(Lifestyle.Smoking.NEVER)
+                        .drinking(Lifestyle.Drinking.SOCIALLY)
+                        .wantsKids(Lifestyle.WantsKids.HAS_KIDS)
+                        .lookingFor(Lifestyle.LookingFor.LONG_TERM)
+                        .education(Lifestyle.Education.PHD)
+                        .heightCm(166)
+                        .interests(interests(reading, travel, writing))
+                        .pace(pace(
                                 MessagingFrequency.RARELY,
                                 TimeToFirstDate.MONTHS,
                                 CommunicationStyle.VOICE_NOTES,
-                                DepthPreference.DEEP_CHAT)),
+                                DepthPreference.DEEP_CHAT))
+                        .build()),
 
                 // ── 10 OTHER users ─────────────────────────────────────────────────────
 
                 // O1 — OTHER interested in FEMALE + OTHER. Tel Aviv.
                 //      Matches F3 (everyone) and O4/O5 (if they like OTHER).
-                build(
-                        uuid(21),
-                        "Alex Tal",
-                        LocalDate.of(1997, 8, 15),
-                        Gender.OTHER,
-                        genders(Gender.FEMALE, Gender.OTHER),
-                        "Non-binary barista and zine creator.",
-                        32.07,
-                        34.79,
-                        60,
-                        21,
-                        35,
-                        Lifestyle.Smoking.NEVER,
-                        Lifestyle.Drinking.NEVER,
-                        Lifestyle.WantsKids.NO,
-                        Lifestyle.LookingFor.CASUAL,
-                        Lifestyle.Education.BACHELORS,
-                        168,
-                        interests(photography, coffee, music),
-                        pace(
+                build(SeedUserDefinition.builder(uuid(21), "Alex Tal", LocalDate.of(1997, 8, 15), Gender.OTHER)
+                        .interestedIn(genders(Gender.FEMALE, Gender.OTHER))
+                        .bio("Non-binary barista and zine creator.")
+                        .location(32.07, 34.79)
+                        .maxDistanceKm(60)
+                        .ageRange(21, 35)
+                        .smoking(Lifestyle.Smoking.NEVER)
+                        .drinking(Lifestyle.Drinking.NEVER)
+                        .wantsKids(Lifestyle.WantsKids.NO)
+                        .lookingFor(Lifestyle.LookingFor.CASUAL)
+                        .education(Lifestyle.Education.BACHELORS)
+                        .heightCm(168)
+                        .interests(interests(photography, coffee, music))
+                        .pace(pace(
                                 MessagingFrequency.OFTEN,
                                 TimeToFirstDate.FEW_DAYS,
                                 CommunicationStyle.TEXT_ONLY,
-                                DepthPreference.SMALL_TALK)),
+                                DepthPreference.SMALL_TALK))
+                        .build()),
 
                 // O2 — OTHER open to EVERYONE. Ramat Aviv. Broad match target.
-                build(
-                        uuid(22),
-                        "Blair Nir",
-                        LocalDate.of(1991, 3, 22),
-                        Gender.OTHER,
-                        genders(Gender.MALE, Gender.FEMALE, Gender.OTHER),
-                        "Therapist, runner, amateur photographer.",
-                        32.12,
-                        34.80,
-                        80,
-                        24,
-                        42,
-                        Lifestyle.Smoking.NEVER,
-                        Lifestyle.Drinking.SOCIALLY,
-                        Lifestyle.WantsKids.OPEN,
-                        Lifestyle.LookingFor.LONG_TERM,
-                        Lifestyle.Education.MASTERS,
-                        173,
-                        interests(running, yoga, travel),
-                        pace(
+                build(SeedUserDefinition.builder(uuid(22), "Blair Nir", LocalDate.of(1991, 3, 22), Gender.OTHER)
+                        .interestedIn(genders(Gender.MALE, Gender.FEMALE, Gender.OTHER))
+                        .bio("Therapist, runner, amateur photographer.")
+                        .location(32.12, 34.80)
+                        .maxDistanceKm(80)
+                        .ageRange(24, 42)
+                        .smoking(Lifestyle.Smoking.NEVER)
+                        .drinking(Lifestyle.Drinking.SOCIALLY)
+                        .wantsKids(Lifestyle.WantsKids.OPEN)
+                        .lookingFor(Lifestyle.LookingFor.LONG_TERM)
+                        .education(Lifestyle.Education.MASTERS)
+                        .heightCm(173)
+                        .interests(interests(running, yoga, travel))
+                        .pace(pace(
                                 MessagingFrequency.OFTEN,
                                 TimeToFirstDate.WEEKS,
                                 CommunicationStyle.MIX_OF_EVERYTHING,
-                                DepthPreference.DEEP_CHAT)),
+                                DepthPreference.DEEP_CHAT))
+                        .build()),
 
                 // O3 — OTHER interested in MALE only. Tel Aviv.
                 //      Matches M4 (everyone) and M3 (likes FEMALE+OTHER).
                 //      M1/M2 do NOT match because they only like FEMALE.
-                build(
-                        uuid(23),
-                        "Casey Dror",
-                        LocalDate.of(1994, 6, 5),
-                        Gender.OTHER,
-                        genders(Gender.MALE),
-                        "Sound engineer and music producer.",
-                        32.09,
-                        34.78,
-                        60,
-                        22,
-                        38,
-                        Lifestyle.Smoking.SOMETIMES,
-                        Lifestyle.Drinking.SOCIALLY,
-                        Lifestyle.WantsKids.NO,
-                        Lifestyle.LookingFor.CASUAL,
-                        Lifestyle.Education.BACHELORS,
-                        170,
-                        interests(music, podcasts, concerts),
-                        pace(
+                build(SeedUserDefinition.builder(uuid(23), "Casey Dror", LocalDate.of(1994, 6, 5), Gender.OTHER)
+                        .interestedIn(genders(Gender.MALE))
+                        .bio("Sound engineer and music producer.")
+                        .location(32.09, 34.78)
+                        .maxDistanceKm(60)
+                        .ageRange(22, 38)
+                        .smoking(Lifestyle.Smoking.SOMETIMES)
+                        .drinking(Lifestyle.Drinking.SOCIALLY)
+                        .wantsKids(Lifestyle.WantsKids.NO)
+                        .lookingFor(Lifestyle.LookingFor.CASUAL)
+                        .education(Lifestyle.Education.BACHELORS)
+                        .heightCm(170)
+                        .interests(interests(music, podcasts, concerts))
+                        .pace(pace(
                                 MessagingFrequency.OFTEN,
                                 TimeToFirstDate.FEW_DAYS,
                                 CommunicationStyle.TEXT_ONLY,
-                                DepthPreference.SMALL_TALK)),
+                                DepthPreference.SMALL_TALK))
+                        .build()),
 
                 // O4 — OTHER interested in OTHER only. Mutual match with O5.
-                build(
-                        uuid(24),
-                        "Drew Eitan",
-                        LocalDate.of(1995, 11, 19),
-                        Gender.OTHER,
-                        genders(Gender.OTHER),
-                        "Fashion designer. Vintage collector. Tea over coffee.",
-                        32.07,
-                        34.80,
-                        50,
-                        22,
-                        38,
-                        Lifestyle.Smoking.NEVER,
-                        Lifestyle.Drinking.NEVER,
-                        Lifestyle.WantsKids.NO,
-                        Lifestyle.LookingFor.LONG_TERM,
-                        Lifestyle.Education.BACHELORS,
-                        165,
-                        interests(dancing, theater, reading),
-                        pace(
+                build(SeedUserDefinition.builder(uuid(24), "Drew Eitan", LocalDate.of(1995, 11, 19), Gender.OTHER)
+                        .interestedIn(genders(Gender.OTHER))
+                        .bio("Fashion designer. Vintage collector. Tea over coffee.")
+                        .location(32.07, 34.80)
+                        .maxDistanceKm(50)
+                        .ageRange(22, 38)
+                        .smoking(Lifestyle.Smoking.NEVER)
+                        .drinking(Lifestyle.Drinking.NEVER)
+                        .wantsKids(Lifestyle.WantsKids.NO)
+                        .lookingFor(Lifestyle.LookingFor.LONG_TERM)
+                        .education(Lifestyle.Education.BACHELORS)
+                        .heightCm(165)
+                        .interests(interests(dancing, theater, reading))
+                        .pace(pace(
                                 MessagingFrequency.OFTEN,
                                 TimeToFirstDate.WEEKS,
                                 CommunicationStyle.MIX_OF_EVERYTHING,
-                                DepthPreference.DEEP_CHAT)),
+                                DepthPreference.DEEP_CHAT))
+                        .build()),
 
                 // O5 — OTHER interested in OTHER only. Mutual match with O4.
-                build(
-                        uuid(25),
-                        "Eden Mor",
-                        LocalDate.of(1993, 4, 8),
-                        Gender.OTHER,
-                        genders(Gender.OTHER),
-                        "Biotech researcher. Loves bouldering and podcasts.",
-                        32.08,
-                        34.81,
-                        50,
-                        24,
-                        40,
-                        Lifestyle.Smoking.NEVER,
-                        Lifestyle.Drinking.SOCIALLY,
-                        Lifestyle.WantsKids.OPEN,
-                        Lifestyle.LookingFor.LONG_TERM,
-                        Lifestyle.Education.MASTERS,
-                        172,
-                        interests(running, reading, podcasts),
-                        pace(
+                build(SeedUserDefinition.builder(uuid(25), "Eden Mor", LocalDate.of(1993, 4, 8), Gender.OTHER)
+                        .interestedIn(genders(Gender.OTHER))
+                        .bio("Biotech researcher. Loves bouldering and podcasts.")
+                        .location(32.08, 34.81)
+                        .maxDistanceKm(50)
+                        .ageRange(24, 40)
+                        .smoking(Lifestyle.Smoking.NEVER)
+                        .drinking(Lifestyle.Drinking.SOCIALLY)
+                        .wantsKids(Lifestyle.WantsKids.OPEN)
+                        .lookingFor(Lifestyle.LookingFor.LONG_TERM)
+                        .education(Lifestyle.Education.MASTERS)
+                        .heightCm(172)
+                        .interests(interests(running, reading, podcasts))
+                        .pace(pace(
                                 MessagingFrequency.RARELY,
                                 TimeToFirstDate.WEEKS,
                                 CommunicationStyle.MIX_OF_EVERYTHING,
-                                DepthPreference.DEEP_CHAT)),
+                                DepthPreference.DEEP_CHAT))
+                        .build()),
 
                 // O6 — OTHER open to EVERYONE. Herzliya. Wide radius (100 km).
-                build(
-                        uuid(26),
-                        "Frankie Lior",
-                        LocalDate.of(1998, 9, 1),
-                        Gender.OTHER,
-                        genders(Gender.MALE, Gender.FEMALE, Gender.OTHER),
-                        "DJ and event organiser. Night owl.",
-                        32.17,
-                        34.83,
-                        100,
-                        20,
-                        35,
-                        Lifestyle.Smoking.SOMETIMES,
-                        Lifestyle.Drinking.SOCIALLY,
-                        Lifestyle.WantsKids.NO,
-                        Lifestyle.LookingFor.CASUAL,
-                        Lifestyle.Education.SOME_COLLEGE,
-                        167,
-                        interests(music, dancing, concerts),
-                        pace(
+                build(SeedUserDefinition.builder(uuid(26), "Frankie Lior", LocalDate.of(1998, 9, 1), Gender.OTHER)
+                        .interestedIn(genders(Gender.MALE, Gender.FEMALE, Gender.OTHER))
+                        .bio("DJ and event organiser. Night owl.")
+                        .location(32.17, 34.83)
+                        .maxDistanceKm(100)
+                        .ageRange(20, 35)
+                        .smoking(Lifestyle.Smoking.SOMETIMES)
+                        .drinking(Lifestyle.Drinking.SOCIALLY)
+                        .wantsKids(Lifestyle.WantsKids.NO)
+                        .lookingFor(Lifestyle.LookingFor.CASUAL)
+                        .education(Lifestyle.Education.SOME_COLLEGE)
+                        .heightCm(167)
+                        .interests(interests(music, dancing, concerts))
+                        .pace(pace(
                                 MessagingFrequency.OFTEN,
                                 TimeToFirstDate.FEW_DAYS,
                                 CommunicationStyle.TEXT_ONLY,
-                                DepthPreference.SMALL_TALK)),
+                                DepthPreference.SMALL_TALK))
+                        .build()),
 
                 // O7 — OTHER interested in FEMALE only. Tel Aviv.
                 //      Matches F3 (everyone). F4 does NOT match (she only likes FEMALE,
                 //      not OTHER).
-                build(
-                        uuid(27),
-                        "Gael Ofer",
-                        LocalDate.of(1990, 7, 13),
-                        Gender.OTHER,
-                        genders(Gender.FEMALE),
-                        "Landscape architect who paints watercolors.",
-                        32.10,
-                        34.82,
-                        70,
-                        25,
-                        42,
-                        Lifestyle.Smoking.NEVER,
-                        Lifestyle.Drinking.NEVER,
-                        Lifestyle.WantsKids.OPEN,
-                        Lifestyle.LookingFor.LONG_TERM,
-                        Lifestyle.Education.MASTERS,
-                        175,
-                        interests(cycling, travel, photography),
-                        pace(
+                build(SeedUserDefinition.builder(uuid(27), "Gael Ofer", LocalDate.of(1990, 7, 13), Gender.OTHER)
+                        .interestedIn(genders(Gender.FEMALE))
+                        .bio("Landscape architect who paints watercolors.")
+                        .location(32.10, 34.82)
+                        .maxDistanceKm(70)
+                        .ageRange(25, 42)
+                        .smoking(Lifestyle.Smoking.NEVER)
+                        .drinking(Lifestyle.Drinking.NEVER)
+                        .wantsKids(Lifestyle.WantsKids.OPEN)
+                        .lookingFor(Lifestyle.LookingFor.LONG_TERM)
+                        .education(Lifestyle.Education.MASTERS)
+                        .heightCm(175)
+                        .interests(interests(cycling, travel, photography))
+                        .pace(pace(
                                 MessagingFrequency.RARELY,
                                 TimeToFirstDate.WEEKS,
                                 CommunicationStyle.VOICE_NOTES,
-                                DepthPreference.DEEP_CHAT)),
+                                DepthPreference.DEEP_CHAT))
+                        .build()),
 
                 // O8 — OTHER interested in MALE + OTHER. Ramat Gan.
-                build(
-                        uuid(28),
-                        "Harper Ziv",
-                        LocalDate.of(1992, 2, 27),
-                        Gender.OTHER,
-                        genders(Gender.MALE, Gender.OTHER),
-                        "Stand-up comedian. Podcast host. Avid reader.",
-                        32.09,
-                        34.83,
-                        60,
-                        24,
-                        40,
-                        Lifestyle.Smoking.NEVER,
-                        Lifestyle.Drinking.SOCIALLY,
-                        Lifestyle.WantsKids.NO,
-                        Lifestyle.LookingFor.CASUAL,
-                        Lifestyle.Education.BACHELORS,
-                        171,
-                        interests(reading, music, podcasts),
-                        pace(
+                build(SeedUserDefinition.builder(uuid(28), "Harper Ziv", LocalDate.of(1992, 2, 27), Gender.OTHER)
+                        .interestedIn(genders(Gender.MALE, Gender.OTHER))
+                        .bio("Stand-up comedian. Podcast host. Avid reader.")
+                        .location(32.09, 34.83)
+                        .maxDistanceKm(60)
+                        .ageRange(24, 40)
+                        .smoking(Lifestyle.Smoking.NEVER)
+                        .drinking(Lifestyle.Drinking.SOCIALLY)
+                        .wantsKids(Lifestyle.WantsKids.NO)
+                        .lookingFor(Lifestyle.LookingFor.CASUAL)
+                        .education(Lifestyle.Education.BACHELORS)
+                        .heightCm(171)
+                        .interests(interests(reading, music, podcasts))
+                        .pace(pace(
                                 MessagingFrequency.OFTEN,
                                 TimeToFirstDate.FEW_DAYS,
                                 CommunicationStyle.TEXT_ONLY,
-                                DepthPreference.SMALL_TALK)),
+                                DepthPreference.SMALL_TALK))
+                        .build()),
 
                 // O9 — OTHER (40), open to EVERYONE. Wide age (28–55). Older "everyone" profile.
-                build(
-                        uuid(29),
-                        "Indie Sasson",
-                        LocalDate.of(1985, 5, 25),
-                        Gender.OTHER,
-                        genders(Gender.MALE, Gender.FEMALE, Gender.OTHER),
-                        "Yoga retreat organiser and meditation teacher.",
-                        32.08,
-                        34.79,
-                        100,
-                        28,
-                        55,
-                        Lifestyle.Smoking.NEVER,
-                        Lifestyle.Drinking.NEVER,
-                        Lifestyle.WantsKids.HAS_KIDS,
-                        Lifestyle.LookingFor.LONG_TERM,
-                        Lifestyle.Education.BACHELORS,
-                        164,
-                        interests(yoga, travel, dogs),
-                        pace(
+                build(SeedUserDefinition.builder(uuid(29), "Indie Sasson", LocalDate.of(1985, 5, 25), Gender.OTHER)
+                        .interestedIn(genders(Gender.MALE, Gender.FEMALE, Gender.OTHER))
+                        .bio("Yoga retreat organiser and meditation teacher.")
+                        .location(32.08, 34.79)
+                        .maxDistanceKm(100)
+                        .ageRange(28, 55)
+                        .smoking(Lifestyle.Smoking.NEVER)
+                        .drinking(Lifestyle.Drinking.NEVER)
+                        .wantsKids(Lifestyle.WantsKids.HAS_KIDS)
+                        .lookingFor(Lifestyle.LookingFor.LONG_TERM)
+                        .education(Lifestyle.Education.BACHELORS)
+                        .heightCm(164)
+                        .interests(interests(yoga, travel, dogs))
+                        .pace(pace(
                                 MessagingFrequency.RARELY,
                                 TimeToFirstDate.WEEKS,
                                 CommunicationStyle.VOICE_NOTES,
-                                DepthPreference.DEEP_CHAT)),
+                                DepthPreference.DEEP_CHAT))
+                        .build()),
 
                 // O10 — OTHER interested in MALE only. Jerusalem. Out of range.
                 //       Distance edge case for OTHER-gender user.
-                build(
-                        uuid(30),
-                        "Jordan Naor",
-                        LocalDate.of(1996, 1, 9),
-                        Gender.OTHER,
-                        genders(Gender.MALE),
-                        "Data scientist and amateur astronomer.",
-                        31.79,
-                        35.20,
-                        120,
-                        22,
-                        38,
-                        Lifestyle.Smoking.NEVER,
-                        Lifestyle.Drinking.SOCIALLY,
-                        Lifestyle.WantsKids.OPEN,
-                        Lifestyle.LookingFor.LONG_TERM,
-                        Lifestyle.Education.MASTERS,
-                        170,
-                        interests(travel, coding, reading),
-                        pace(
+                build(SeedUserDefinition.builder(uuid(30), "Jordan Naor", LocalDate.of(1996, 1, 9), Gender.OTHER)
+                        .interestedIn(genders(Gender.MALE))
+                        .bio("Data scientist and amateur astronomer.")
+                        .location(31.79, 35.20)
+                        .maxDistanceKm(120)
+                        .ageRange(22, 38)
+                        .smoking(Lifestyle.Smoking.NEVER)
+                        .drinking(Lifestyle.Drinking.SOCIALLY)
+                        .wantsKids(Lifestyle.WantsKids.OPEN)
+                        .lookingFor(Lifestyle.LookingFor.LONG_TERM)
+                        .education(Lifestyle.Education.MASTERS)
+                        .heightCm(170)
+                        .interests(interests(travel, coding, reading))
+                        .pace(pace(
                                 MessagingFrequency.OFTEN,
                                 TimeToFirstDate.WEEKS,
                                 CommunicationStyle.MIX_OF_EVERYTHING,
-                                DepthPreference.DEEP_CHAT)));
+                                DepthPreference.DEEP_CHAT))
+                        .build()));
     }
 
     // ════════════════════════════════════════════════════════════════════════
@@ -1177,50 +1027,6 @@ public final class DevDataSeeder {
         // making bad seed entries fail loudly at startup rather than silently.
         user.activate();
         return user;
-    }
-
-    /**
-     * Constructs a fully-formed, ACTIVE seed user. Uses explicit-limit setters where the
-     * system limit is required. Throws if the profile is still incomplete when
-     * {@code activate()} is called — surfaces misconfigured seed entries early.
-     *
-     */
-    @SuppressWarnings({"checkstyle:ParameterNumber", "PMD.ExcessiveParameterList", "java:S107"})
-    private static User build(
-            UUID id,
-            String name,
-            LocalDate birthDate,
-            Gender gender,
-            Set<Gender> interestedIn,
-            String bio,
-            double lat,
-            double lon,
-            int maxDistanceKm,
-            int minAge,
-            int maxAge,
-            Lifestyle.Smoking smoking,
-            Lifestyle.Drinking drinking,
-            Lifestyle.WantsKids wantsKids,
-            Lifestyle.LookingFor lookingFor,
-            Lifestyle.Education education,
-            int heightCm,
-            Set<Interest> interests,
-            PacePreferences pace) {
-        return build(SeedUserDefinition.builder(id, name, birthDate, gender)
-                .interestedIn(interestedIn)
-                .bio(bio)
-                .location(lat, lon)
-                .maxDistanceKm(maxDistanceKm)
-                .ageRange(minAge, maxAge)
-                .smoking(smoking)
-                .drinking(drinking)
-                .wantsKids(wantsKids)
-                .lookingFor(lookingFor)
-                .education(education)
-                .heightCm(heightCm)
-                .interests(interests)
-                .pace(pace)
-                .build());
     }
 
     /** Builds a {@link Set} of genders from varargs. */

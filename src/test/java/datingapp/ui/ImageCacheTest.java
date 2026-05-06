@@ -34,6 +34,8 @@ import org.junit.jupiter.api.Timeout;
 @DisplayName("ImageCache default avatar handling")
 class ImageCacheTest {
 
+    private static final String ALLOW_UNSAFE_REMOTE_IMAGE_HOSTS_PROPERTY = "datingapp.allowUnsafeRemoteImageHosts";
+
     private static final byte[] PNG_1X1 = Base64.getDecoder()
             .decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO6qK9kAAAAASUVORK5CYII=");
 
@@ -44,11 +46,13 @@ class ImageCacheTest {
 
     @BeforeEach
     void clearCache() {
+        System.clearProperty(ALLOW_UNSAFE_REMOTE_IMAGE_HOSTS_PROPERTY);
         ImageCache.clearCache();
     }
 
     @AfterEach
     void clearCacheAfterTest() {
+        System.clearProperty(ALLOW_UNSAFE_REMOTE_IMAGE_HOSTS_PROPERTY);
         ImageCache.clearCache();
     }
 
@@ -73,8 +77,23 @@ class ImageCacheTest {
     }
 
     @Test
+    @DisplayName("unsafe remote image hosts are rejected before the network fetch starts")
+    void unsafeRemoteImageHostsAreRejectedBeforeTheNetworkFetchStarts() throws Exception {
+        try (BlockingImageServer server = new BlockingImageServer()) {
+            server.releaseResponse();
+
+            Image image = ImageCache.getImage(server.imageUrl(), 64, 64);
+
+            assertNotNull(image);
+            assertTrue(image.getWidth() > 0, "fallback avatar should be renderable");
+            assertEquals(0, server.getRequestCount(), "unsafe remote hosts should be rejected before fetch");
+        }
+    }
+
+    @Test
     @DisplayName("repeated preload calls stay bounded and still populate the cache")
     void repeatedPreloadCallsStayBoundedAndStillPopulateTheCache() throws Exception {
+        allowUnsafeRemoteImageHosts();
         try (BlockingImageServer server = new BlockingImageServer()) {
             String imageUrl = server.imageUrl();
 
@@ -100,6 +119,7 @@ class ImageCacheTest {
     @Test
     @DisplayName("slow image loading does not block unrelated fallback avatar reads")
     void slowImageLoadingDoesNotBlockUnrelatedFallbackAvatarReads() throws Exception {
+        allowUnsafeRemoteImageHosts();
         try (BlockingImageServer server = new BlockingImageServer()) {
             FutureTask<Image> slowLoad = new FutureTask<>(() -> ImageCache.getImage(server.imageUrl(), 64, 64));
             Thread loader = Thread.ofPlatform().start(slowLoad);
@@ -158,6 +178,7 @@ class ImageCacheTest {
     @Test
     @DisplayName("async image loading does not block the FX thread for uncached images")
     void asyncImageLoadingDoesNotBlockFxThreadForUncachedImages() throws Exception {
+        allowUnsafeRemoteImageHosts();
         try (BlockingImageServer server = new BlockingImageServer()) {
             CountDownLatch callbackInvoked = new CountDownLatch(1);
             AtomicReference<Image> loadedImage = new AtomicReference<>();
@@ -189,6 +210,7 @@ class ImageCacheTest {
     @Test
     @DisplayName("async image loading does not block the FX thread when a preload is already in flight")
     void asyncImageLoadingDoesNotBlockFxThreadWhenPreloadIsInFlight() throws Exception {
+        allowUnsafeRemoteImageHosts();
         try (BlockingImageServer server = new BlockingImageServer()) {
             CountDownLatch callbackInvoked = new CountDownLatch(1);
             AtomicReference<Image> loadedImage = new AtomicReference<>();
@@ -238,6 +260,10 @@ class ImageCacheTest {
         return (int) Thread.getAllStackTraces().keySet().stream()
                 .filter(thread -> thread.getName().startsWith("image-preload-worker"))
                 .count();
+    }
+
+    private static void allowUnsafeRemoteImageHosts() {
+        System.setProperty(ALLOW_UNSAFE_REMOTE_IMAGE_HOSTS_PROPERTY, "true");
     }
 
     private static final class BlockingImageServer implements AutoCloseable {

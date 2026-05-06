@@ -24,6 +24,7 @@ import datingapp.app.usecase.matching.MatchingUseCases.UndoSwipeCommand;
 import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
 import datingapp.core.connection.ConnectionModels.Like;
+import datingapp.core.matching.BrowseRankingService;
 import datingapp.core.matching.CandidateFinder;
 import datingapp.core.matching.DailyLimitService;
 import datingapp.core.matching.DailyPickService;
@@ -160,12 +161,14 @@ class MatchingUseCasesTest {
                 rankedTrustSafety,
                 config.safety().userTimeZone());
         RecommendationService rankedRecommendationService = new RecommendationService(
-                dailyLimitService,
-                dailyPickService,
-                standoutService,
-                (browseSeeker, browseCandidates) -> browseCandidates.stream()
-                        .sorted(Comparator.comparing(User::getName).reversed())
-                        .toList());
+                dailyLimitService, dailyPickService, standoutService, new BrowseRankingService() {
+                    @Override
+                    public List<User> rankCandidates(User browseSeeker, List<User> browseCandidates) {
+                        return browseCandidates.stream()
+                                .sorted(Comparator.comparing(User::getName).reversed())
+                                .toList();
+                    }
+                });
         UndoService rankedUndoService = new UndoService(rankedInteractions, rankedUndos, config);
         MatchingService rankedMatchingService = MatchingService.builder()
                 .interactionStorage(rankedInteractions)
@@ -875,10 +878,11 @@ class MatchingUseCasesTest {
     @Test
     @DisplayName("builder rejects missing event bus for production wiring")
     void builderRejectsMissingEventBusForProductionWiring() {
-        NullPointerException exception =
-                assertThrows(NullPointerException.class, this::buildMatchingUseCasesWithoutEventBus);
+        IllegalStateException exception =
+                assertThrows(IllegalStateException.class, this::buildMatchingUseCasesWithoutEventBus);
 
-        assertEquals("eventBus cannot be null", exception.getMessage());
+        assertTrue(exception.getMessage().contains("Missing required dependencies:"));
+        assertTrue(exception.getMessage().contains("eventBus"));
     }
 
     @Test

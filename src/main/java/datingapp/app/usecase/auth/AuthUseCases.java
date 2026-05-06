@@ -1,7 +1,10 @@
 package datingapp.app.usecase.auth;
 
+import datingapp.app.usecase.common.UseCaseError;
+import datingapp.app.usecase.common.UseCaseResult;
 import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
+import datingapp.core.model.TextNormalization;
 import datingapp.core.model.User;
 import datingapp.core.storage.AuthStorage;
 import datingapp.core.storage.AuthStorage.RefreshTokenRecord;
@@ -14,7 +17,6 @@ import java.time.LocalDate;
 import java.time.Period;
 import java.util.Base64;
 import java.util.List;
-import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -40,65 +42,90 @@ public final class AuthUseCases {
         this.authTokenService = Objects.requireNonNull(authTokenService, "authTokenService cannot be null");
     }
 
-    public AuthSession signup(SignupCommand command) {
-        String normalizedEmail = normalizeEmail(command.email());
-        validatePassword(command.password());
-        validateDateOfBirth(command.dateOfBirth());
-        if (userStorage.findByEmail(normalizedEmail).isPresent()) {
-            throw new DuplicateAccountException("Account already exists for email");
-        }
+    public UseCaseResult<AuthSession> signup(SignupCommand command) {
+        try {
+            String normalizedEmail = normalizeEmail(command.email());
+            validatePassword(command.password());
+            validateDateOfBirth(command.dateOfBirth());
+            if (userStorage.findByEmail(normalizedEmail).isPresent()) {
+                return UseCaseResult.failure(UseCaseError.conflict("Account already exists for email"));
+            }
 
-        Instant now = AppClock.now();
-        User user = User.StorageBuilder.create(UUID.randomUUID(), "", now)
-                .email(normalizedEmail)
-                .birthDate(command.dateOfBirth())
-                .updatedAt(now)
-                .build();
-        userStorage.save(user);
-        authStorage.savePasswordHash(
-                user.getId(), BCrypt.hashpw(command.password(), BCrypt.gensalt(BCRYPT_LOG_ROUNDS)), now, now);
-        return createSession(user, now);
+            Instant now = AppClock.now();
+            User user = User.StorageBuilder.create(UUID.randomUUID(), normalizeSignupName(command.name()), now)
+                    .email(normalizedEmail)
+                    .birthDate(command.dateOfBirth())
+                    .updatedAt(now)
+                    .build();
+            userStorage.save(user);
+            authStorage.savePasswordHash(
+                    user.getId(), BCrypt.hashpw(command.password(), BCrypt.gensalt(BCRYPT_LOG_ROUNDS)), now, now);
+            return UseCaseResult.success(createSession(user, now));
+        } catch (IllegalArgumentException e) {
+            return UseCaseResult.failure(UseCaseError.validation(e.getMessage()));
+        } catch (DuplicateAccountException e) {
+            return UseCaseResult.failure(UseCaseError.conflict(e.getMessage()));
+        }
     }
 
-    public AuthSession login(LoginCommand command) {
-        String normalizedEmail = normalizeEmail(command.email());
-        User user = userStorage.findByEmail(normalizedEmail).orElseThrow(UnauthorizedException::invalidCredentials);
-        if (isDeletedOrBanned(user)) {
-            throw UnauthorizedException.invalidCredentials();
+    public UseCaseResult<AuthSession> login(LoginCommand command) {
+        try {
+            String normalizedEmail = normalizeEmail(command.email());
+            User user = userStorage.findByEmail(normalizedEmail).orElseThrow(UnauthorizedException::invalidCredentials);
+            if (isDeletedOrBanned(user)) {
+                throw UnauthorizedException.invalidCredentials();
+            }
+            String passwordHash =
+                    authStorage.findPasswordHash(user.getId()).orElseThrow(UnauthorizedException::invalidCredentials);
+            if (!BCrypt.checkpw(command.password(), passwordHash)) {
+                throw UnauthorizedException.invalidCredentials();
+            }
+            return UseCaseResult.success(createSession(user, AppClock.now()));
+        } catch (UnauthorizedException e) {
+            return UseCaseResult.failure(UseCaseError.unauthorized(e.getMessage()));
+        } catch (IllegalArgumentException e) {
+            return UseCaseResult.failure(UseCaseError.validation(e.getMessage()));
         }
-        String passwordHash =
-                authStorage.findPasswordHash(user.getId()).orElseThrow(UnauthorizedException::invalidCredentials);
-        if (!BCrypt.checkpw(command.password(), passwordHash)) {
-            throw UnauthorizedException.invalidCredentials();
-        }
-        return createSession(user, AppClock.now());
     }
 
-    public AuthSession refresh(String rawRefreshToken) {
-        RefreshTokenRecord currentToken = requireRefreshToken(rawRefreshToken);
-        Instant now = AppClock.now();
-        User user = userStorage.get(currentToken.userId()).orElseThrow(UnauthorizedException::invalidRefreshToken);
-        if (isDeletedOrBanned(user)) {
-            throw UnauthorizedException.invalidRefreshToken();
+    public UseCaseResult<AuthSession> refresh(String rawRefreshToken) {
+        try {
+            RefreshTokenRecord currentToken = requireRefreshToken(rawRefreshToken);
+            Instant now = AppClock.now();
+            User user = userStorage.get(currentToken.userId()).orElseThrow(UnauthorizedException::invalidRefreshToken);
+            if (isDeletedOrBanned(user)) {
+                throw UnauthorizedException.invalidRefreshToken();
+            }
+            IssuedRefreshToken rotatedToken = issueRefreshToken(user.getId(), now);
+            authStorage.insertRefreshToken(rotatedToken.record());
+            authStorage.revokeRefreshToken(
+                    currentToken.tokenId(), now, rotatedToken.record().tokenId());
+            return UseCaseResult.success(buildSession(user, now, rotatedToken.rawToken()));
+        } catch (UnauthorizedException e) {
+            return UseCaseResult.failure(UseCaseError.unauthorized(e.getMessage()));
         }
-        IssuedRefreshToken rotatedToken = issueRefreshToken(user.getId(), now);
-        authStorage.insertRefreshToken(rotatedToken.record());
-        authStorage.revokeRefreshToken(
-                currentToken.tokenId(), now, rotatedToken.record().tokenId());
-        return buildSession(user, now, rotatedToken.rawToken());
     }
 
-    public void logout(String rawRefreshToken) {
-        RefreshTokenRecord currentToken = requireRefreshToken(rawRefreshToken);
-        authStorage.revokeRefreshToken(currentToken.tokenId(), AppClock.now(), null);
+    public UseCaseResult<Void> logout(String rawRefreshToken) {
+        try {
+            RefreshTokenRecord currentToken = requireRefreshToken(rawRefreshToken);
+            authStorage.revokeRefreshToken(currentToken.tokenId(), AppClock.now(), null);
+            return UseCaseResult.success(null);
+        } catch (UnauthorizedException e) {
+            return UseCaseResult.failure(UseCaseError.unauthorized(e.getMessage()));
+        }
     }
 
-    public AuthUser requireAuthenticatedUser(UUID userId) {
-        User user = userStorage.get(userId).orElseThrow(UnauthorizedException::invalidCredentials);
-        if (isDeletedOrBanned(user)) {
-            throw UnauthorizedException.invalidCredentials();
+    public UseCaseResult<AuthUser> requireAuthenticatedUser(UUID userId) {
+        try {
+            User user = userStorage.get(userId).orElseThrow(UnauthorizedException::invalidCredentials);
+            if (isDeletedOrBanned(user)) {
+                throw UnauthorizedException.invalidCredentials();
+            }
+            return UseCaseResult.success(AuthUser.from(user));
+        } catch (UnauthorizedException e) {
+            return UseCaseResult.failure(UseCaseError.unauthorized(e.getMessage()));
         }
-        return AuthUser.from(user);
     }
 
     public Optional<AuthIdentity> authenticateAccessToken(String token) {
@@ -113,7 +140,9 @@ public final class AuthUseCases {
         if (user.isEmpty() || isDeletedOrBanned(user.get())) {
             return Optional.empty();
         }
-        return identity;
+        User authUser = user.get();
+        return Optional.of(
+                new AuthIdentity(authUser.getId(), AuthUser.from(authUser).email()));
     }
 
     private static boolean isDeletedOrBanned(User user) {
@@ -177,7 +206,14 @@ public final class AuthUseCases {
         if (email == null || email.isBlank()) {
             throw new IllegalArgumentException("email is required");
         }
-        return email.trim().toLowerCase(Locale.ROOT);
+        return TextNormalization.normalizeEmail(email);
+    }
+
+    private static String normalizeSignupName(String name) {
+        if (name == null || name.isBlank()) {
+            return User.SIGNUP_PLACEHOLDER_NAME;
+        }
+        return name.trim();
     }
 
     private static String generateOpaqueToken() {
@@ -199,7 +235,7 @@ public final class AuthUseCases {
 
     private record IssuedRefreshToken(String rawToken, RefreshTokenRecord record) {}
 
-    public record SignupCommand(String email, String password, LocalDate dateOfBirth) {}
+    public record SignupCommand(String email, String password, LocalDate dateOfBirth, String name) {}
 
     public record LoginCommand(String email, String password) {}
 
@@ -209,7 +245,11 @@ public final class AuthUseCases {
 
     public record AuthUser(UUID id, String email, String displayName, String profileCompletionState) {
         static AuthUser from(User user) {
-            String displayName = user.getName() == null || user.getName().isBlank() ? null : user.getName();
+            String displayName = user.getName() == null
+                            || user.getName().isBlank()
+                            || User.SIGNUP_PLACEHOLDER_NAME.equals(user.getName())
+                    ? null
+                    : user.getName();
             String profileCompletionState;
             if (user.isComplete()) {
                 profileCompletionState = "complete";
