@@ -3,7 +3,7 @@ package datingapp.core.matching;
 import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
 import datingapp.core.connection.ConnectionModels.Like;
-import datingapp.core.matching.CandidateFinder.GeoUtils;
+import datingapp.core.model.GeoUtils;
 import datingapp.core.model.Match;
 import datingapp.core.model.User;
 import datingapp.core.profile.MatchPreferences.Lifestyle;
@@ -185,7 +185,7 @@ public class MatchQualityService {
     // === Constructor ===
 
     public MatchQualityService(UserStorage userStorage, InteractionStorage interactionStorage, AppConfig config) {
-        this(userStorage, interactionStorage, config, new DefaultCompatibilityCalculator(config));
+        this(userStorage, interactionStorage, config, new CompatibilityCalculator(config));
     }
 
     public MatchQualityService(

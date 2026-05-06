@@ -2,25 +2,34 @@ package datingapp.app.api;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import datingapp.app.api.RestApiDtos.AchievementSnapshotDto;
-import datingapp.app.api.RestApiDtos.BlockedUsersResponse;
-import datingapp.app.api.RestApiDtos.ConfirmVerificationResponse;
+import datingapp.app.api.MessageDtos.MessageDto;
+import datingapp.app.api.ProfileDtos.ProfileEditSnapshotDto;
+import datingapp.app.api.ProfileDtos.ProfileReadOnlyDto;
+import datingapp.app.api.ProfileDtos.ProfileUpdateResponse;
 import datingapp.app.api.RestApiDtos.ErrorResponse;
 import datingapp.app.api.RestApiDtos.HealthResponse;
-import datingapp.app.api.RestApiDtos.MessageDto;
-import datingapp.app.api.RestApiDtos.StartVerificationResponse;
-import datingapp.app.api.RestApiUserDtos.ProfileUpdateResponse;
 import datingapp.app.api.RestApiUserDtos.UserDetail;
 import datingapp.app.api.RestApiUserDtos.UserSummary;
+import datingapp.app.api.SocialDtos.BlockedUsersResponse;
+import datingapp.app.api.StatsDtos.AchievementSnapshotDto;
+import datingapp.app.api.VerificationDtos.ConfirmVerificationResponse;
+import datingapp.app.api.VerificationDtos.StartVerificationResponse;
 import datingapp.app.usecase.profile.ProfileInsightsUseCases;
 import datingapp.app.usecase.profile.VerificationUseCases;
 import datingapp.core.metrics.EngagementDomain.Achievement;
+import datingapp.core.model.LocationModels.City;
+import datingapp.core.model.LocationModels.Country;
+import datingapp.core.model.LocationModels.Precision;
+import datingapp.core.model.LocationModels.ResolvedLocation;
 import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
 import datingapp.core.model.User.UserState;
 import datingapp.core.model.User.VerificationMethod;
+import datingapp.core.profile.LocationService.SelectionSeed;
 import datingapp.core.testutil.TestClock;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -40,7 +49,7 @@ import org.junit.jupiter.api.Test;
  * <p>Tests the DTO records used in API responses.
  */
 @SuppressWarnings("unused")
-@DisplayName("REST API DTOs")
+@DisplayName("API DTOs")
 class RestApiDtosTest {
 
     @BeforeEach
@@ -186,6 +195,44 @@ class RestApiDtosTest {
     }
 
     @Nested
+    @DisplayName("ProfileEditSnapshotDto")
+    class ProfileEditSnapshotDtoTests {
+
+        @Test
+        @DisplayName("Leaves completion fields null when activation policy is absent")
+        void leavesCompletionFieldsNullWhenActivationPolicyIsAbsent() {
+            User user = buildTestUser();
+
+            ProfileEditSnapshotDto dto = ProfileEditSnapshotDto.from(
+                    user,
+                    new SelectionSeed(
+                            new Country("IL", "Israel", "🇮🇱", true, true),
+                            java.util.Optional.of(new City("Tel Aviv", "Tel Aviv", 32.0853, 34.7818, "IL", 1)),
+                            java.util.Optional.empty(),
+                            new ResolvedLocation(32.0853, 34.7818, "Tel Aviv, Tel Aviv", Precision.CITY)),
+                    null);
+
+            assertNull(dto.requiredProfileFieldCount());
+            assertNull(dto.profileComplete());
+            assertNull(dto.canActivate());
+            assertNull(dto.canBrowse());
+        }
+
+        @Test
+        @DisplayName("ProfileReadOnlyDto snapshots photo URLs")
+        void profileReadOnlyDtoSnapshotsPhotoUrls() {
+            User user = buildTestUser();
+            user.setPhotoUrls(List.of("https://example.com/photo-1.jpg"));
+
+            ProfileReadOnlyDto dto = ProfileReadOnlyDto.from(user);
+            user.addPhotoUrl("https://example.com/photo-2.jpg");
+
+            assertEquals(List.of("https://example.com/photo-1.jpg"), dto.photoUrls());
+            assertNotSame(user.getPhotoUrls(), dto.photoUrls());
+        }
+    }
+
+    @Nested
     @DisplayName("Safety parity DTOs")
     class SafetyParityDtoTests {
 
@@ -213,6 +260,21 @@ class RestApiDtosTest {
             assertEquals(user.getId(), response.userId());
             assertEquals("EMAIL", response.method());
             assertEquals("verified@example.com", response.contact());
+            assertEquals("123456", response.devVerificationCode());
+        }
+
+        @Test
+        @DisplayName("StartVerificationResponse omits contact when verification method is absent")
+        void startVerificationResponseOmitsContactWhenVerificationMethodIsAbsent() {
+            User user = buildTestUser();
+            user.setEmail("verified@example.com");
+
+            StartVerificationResponse response =
+                    StartVerificationResponse.from(new VerificationUseCases.StartVerificationResult(user, "123456"));
+
+            assertEquals(user.getId(), response.userId());
+            assertNull(response.method());
+            assertNull(response.contact());
             assertEquals("123456", response.devVerificationCode());
         }
 

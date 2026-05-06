@@ -30,7 +30,6 @@ import datingapp.core.ServiceRegistry;
 import datingapp.core.connection.ConnectionModels.FriendRequest;
 import datingapp.core.connection.ConnectionModels.Like;
 import datingapp.core.connection.ConnectionModels.Notification;
-import datingapp.core.matching.CandidateFinder.GeoUtils;
 import datingapp.core.matching.DailyPickService.DailyPick;
 import datingapp.core.matching.InterestMatcher;
 import datingapp.core.matching.MatchQualityService;
@@ -40,6 +39,7 @@ import datingapp.core.matching.RecommendationService;
 import datingapp.core.matching.Standout;
 import datingapp.core.matching.StandoutService;
 import datingapp.core.matching.UndoService;
+import datingapp.core.model.GeoUtils;
 import datingapp.core.model.Match;
 import datingapp.core.model.User;
 import datingapp.core.model.User.UserState;
@@ -268,6 +268,14 @@ public class MatchingHandler implements LoggingSupport {
         lines.forEach(this::logInfo);
     }
 
+    private String readLowerCaseChoice(String prompt) {
+        String input = inputReader.readLine(prompt);
+        if (input == null || inputReader.wasInputExhausted()) {
+            return null;
+        }
+        return input.toLowerCase(Locale.ROOT);
+    }
+
     private String readValidatedChoice(String prompt, String errorMsg, String... valid) {
         while (true) {
             String input = inputReader.readLine(prompt);
@@ -312,7 +320,10 @@ public class MatchingHandler implements LoggingSupport {
 
             logInfo(CliTextAndInput.MENU_DIVIDER_WITH_NEWLINES);
             logInfo("  " + CliTextAndInput.PROMPT_VIEW_UNMATCH_BLOCK);
-            String action = inputReader.readLine("\nYour choice: ").toLowerCase(Locale.ROOT);
+            String action = readLowerCaseChoice("\nYour choice: ");
+            if (action == null) {
+                return;
+            }
             handleMatchesAction(action, matches, currentUser);
         });
     }
@@ -396,7 +407,10 @@ public class MatchingHandler implements LoggingSupport {
 
         logInfo(CliTextAndInput.MENU_DIVIDER_WITH_NEWLINES);
         logInfo("  (U)nmatch | (B)lock | (F)riend Zone | (G)raceful Exit | back");
-        String action = inputReader.readLine("  Your choice: ").toLowerCase(Locale.ROOT);
+        String action = readLowerCaseChoice("  Your choice: ");
+        if (action == null) {
+            return;
+        }
 
         handleMatchDetailAction(action, otherUser, otherUserId, currentUser);
     }
@@ -609,7 +623,10 @@ public class MatchingHandler implements LoggingSupport {
 
         int secondsLeft = availabilityResult.data().secondsRemaining();
         String prompt = String.format("⏪ Undo last swipe? (%ds remaining) (Y/N): ", secondsLeft);
-        String response = inputReader.readLine(prompt).toLowerCase(Locale.ROOT);
+        String response = readLowerCaseChoice(prompt);
+        if (response == null) {
+            return;
+        }
 
         if ("y".equals(response)) {
             var undoResult = matchingUseCases.undoSwipe(new UndoSwipeCommand(UserContext.cli(currentUser.getId())));
@@ -660,7 +677,10 @@ public class MatchingHandler implements LoggingSupport {
             Map<UUID, User> users = standoutResult.data().usersById();
             displayStandoutCandidates(standouts, users, result.totalCandidates());
             logInfo("\n[L] Like a standout  [P] Pass  [B] Back to menu");
-            String input = inputReader.readLine("\nYour choice: ").toLowerCase(Locale.ROOT);
+            String input = readLowerCaseChoice("\nYour choice: ");
+            if (input == null) {
+                return;
+            }
             handleStandoutSelection(input, standouts, users, currentUser);
         });
     }
@@ -779,8 +799,10 @@ public class MatchingHandler implements LoggingSupport {
         String fromName = from != null ? from.getName() : "Unknown User";
         logInfo("\nFriend Request from {}", fromName);
 
-        String action =
-                inputReader.readLine("Do you want to (A)ccept or (D)ecline? ").toLowerCase(Locale.ROOT);
+        String action = readLowerCaseChoice("Do you want to (A)ccept or (D)ecline? ");
+        if (action == null) {
+            return;
+        }
         User currentUser = session.getCurrentUser();
 
         if ("a".equals(action)) {

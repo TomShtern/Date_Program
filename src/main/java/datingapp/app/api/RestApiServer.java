@@ -3,55 +3,58 @@ package datingapp.app.api;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-import datingapp.app.api.RestApiDtos.AchievementSnapshotDto;
-import datingapp.app.api.RestApiDtos.ArchiveConversationRequest;
-import datingapp.app.api.RestApiDtos.AuthResponse;
-import datingapp.app.api.RestApiDtos.AuthUserDto;
-import datingapp.app.api.RestApiDtos.BlockedUsersResponse;
-import datingapp.app.api.RestApiDtos.BrowseCandidatesResponse;
-import datingapp.app.api.RestApiDtos.ConfirmVerificationRequest;
-import datingapp.app.api.RestApiDtos.ConfirmVerificationResponse;
-import datingapp.app.api.RestApiDtos.ConversationSummary;
+import datingapp.app.api.AuthDtos.AuthResponse;
+import datingapp.app.api.AuthDtos.AuthUserDto;
+import datingapp.app.api.AuthDtos.LoginRequest;
+import datingapp.app.api.AuthDtos.RefreshTokenRequest;
+import datingapp.app.api.AuthDtos.SignupRequest;
+import datingapp.app.api.LocationDtos.LocationCityDto;
+import datingapp.app.api.LocationDtos.LocationCountryDto;
+import datingapp.app.api.LocationDtos.LocationResolveRequest;
+import datingapp.app.api.LocationDtos.LocationResolveResponse;
+import datingapp.app.api.MatchDtos.BrowseCandidatesResponse;
+import datingapp.app.api.MatchDtos.LikeResponse;
+import datingapp.app.api.MatchDtos.MatchQualityDto;
+import datingapp.app.api.MatchDtos.MatchSummary;
+import datingapp.app.api.MatchDtos.PagedMatchResponse;
+import datingapp.app.api.MatchDtos.PassResponse;
+import datingapp.app.api.MatchDtos.PendingLikersResponse;
+import datingapp.app.api.MatchDtos.StandoutsResponse;
+import datingapp.app.api.MatchDtos.UndoResponse;
+import datingapp.app.api.MessageDtos.ArchiveConversationRequest;
+import datingapp.app.api.MessageDtos.ConversationSummary;
+import datingapp.app.api.MessageDtos.MessageDto;
+import datingapp.app.api.MessageDtos.SendMessageRequest;
+import datingapp.app.api.NotificationDtos.MarkAllNotificationsReadResponse;
+import datingapp.app.api.NotificationDtos.NotificationDto;
+import datingapp.app.api.PhotoDtos.PhotoListResponse;
+import datingapp.app.api.PhotoDtos.PhotoMutationResponse;
+import datingapp.app.api.PhotoDtos.PhotoOrderRequest;
+import datingapp.app.api.PhotoDtos.PhotoRef;
+import datingapp.app.api.PhotoDtos.PhotoUploadResponse;
+import datingapp.app.api.ProfileDtos.PresentationContextDto;
+import datingapp.app.api.ProfileDtos.ProfileEditSnapshotDto;
+import datingapp.app.api.ProfileDtos.ProfileNoteDto;
+import datingapp.app.api.ProfileDtos.ProfileNoteUpsertRequest;
+import datingapp.app.api.ProfileDtos.ProfileUpdateRequest;
+import datingapp.app.api.ProfileDtos.ProfileUpdateResponse;
 import datingapp.app.api.RestApiDtos.ErrorResponse;
-import datingapp.app.api.RestApiDtos.FriendRequestsResponse;
-import datingapp.app.api.RestApiDtos.LikeResponse;
-import datingapp.app.api.RestApiDtos.LocationCityDto;
-import datingapp.app.api.RestApiDtos.LocationCountryDto;
-import datingapp.app.api.RestApiDtos.LocationResolveRequest;
-import datingapp.app.api.RestApiDtos.LocationResolveResponse;
-import datingapp.app.api.RestApiDtos.LoginRequest;
-import datingapp.app.api.RestApiDtos.MarkAllNotificationsReadResponse;
-import datingapp.app.api.RestApiDtos.MatchQualityDto;
-import datingapp.app.api.RestApiDtos.MatchSummary;
-import datingapp.app.api.RestApiDtos.MessageDto;
-import datingapp.app.api.RestApiDtos.ModerationResponse;
-import datingapp.app.api.RestApiDtos.NotificationDto;
-import datingapp.app.api.RestApiDtos.PagedMatchResponse;
-import datingapp.app.api.RestApiDtos.PassResponse;
-import datingapp.app.api.RestApiDtos.PendingLikersResponse;
-import datingapp.app.api.RestApiDtos.PhotoListResponse;
-import datingapp.app.api.RestApiDtos.PhotoMutationResponse;
-import datingapp.app.api.RestApiDtos.PhotoOrderRequest;
-import datingapp.app.api.RestApiDtos.PhotoRef;
-import datingapp.app.api.RestApiDtos.PhotoUploadResponse;
-import datingapp.app.api.RestApiDtos.PresentationContextDto;
-import datingapp.app.api.RestApiDtos.ProfileEditSnapshotDto;
-import datingapp.app.api.RestApiDtos.ProfileUpdateRequest;
-import datingapp.app.api.RestApiDtos.RefreshTokenRequest;
-import datingapp.app.api.RestApiDtos.ReportResponse;
-import datingapp.app.api.RestApiDtos.SendMessageRequest;
-import datingapp.app.api.RestApiDtos.SignupRequest;
-import datingapp.app.api.RestApiDtos.StandoutsResponse;
-import datingapp.app.api.RestApiDtos.StartVerificationRequest;
-import datingapp.app.api.RestApiDtos.StartVerificationResponse;
-import datingapp.app.api.RestApiDtos.TransitionResponse;
-import datingapp.app.api.RestApiDtos.UndoResponse;
-import datingapp.app.api.RestApiDtos.UserStatsDto;
 import datingapp.app.api.RestApiUserDtos.PendingLikerDto;
-import datingapp.app.api.RestApiUserDtos.ProfileUpdateResponse;
 import datingapp.app.api.RestApiUserDtos.StandoutDto;
 import datingapp.app.api.RestApiUserDtos.UserDetail;
 import datingapp.app.api.RestApiUserDtos.UserSummary;
+import datingapp.app.api.SocialDtos.BlockedUsersResponse;
+import datingapp.app.api.SocialDtos.FriendRequestsResponse;
+import datingapp.app.api.SocialDtos.ModerationResponse;
+import datingapp.app.api.SocialDtos.ReportResponse;
+import datingapp.app.api.SocialDtos.ReportUserRequest;
+import datingapp.app.api.SocialDtos.TransitionResponse;
+import datingapp.app.api.StatsDtos.AchievementSnapshotDto;
+import datingapp.app.api.StatsDtos.UserStatsDto;
+import datingapp.app.api.VerificationDtos.ConfirmVerificationRequest;
+import datingapp.app.api.VerificationDtos.ConfirmVerificationResponse;
+import datingapp.app.api.VerificationDtos.StartVerificationRequest;
+import datingapp.app.api.VerificationDtos.StartVerificationResponse;
 import datingapp.app.bootstrap.ApplicationStartup;
 import datingapp.app.event.AppEvent;
 import datingapp.app.usecase.auth.AuthUseCases;
@@ -107,7 +110,6 @@ import datingapp.core.storage.UserStorage;
 import datingapp.core.workflow.ProfileActivationPolicy;
 import io.javalin.Javalin;
 import io.javalin.http.Context;
-import io.javalin.http.NotFoundResponse;
 import io.javalin.json.JavalinJackson;
 import java.io.IOException;
 import java.net.InetAddress;
@@ -385,31 +387,52 @@ public class RestApiServer {
 
     void signup(Context ctx) {
         SignupRequest request = ctx.bodyAsClass(SignupRequest.class);
-        AuthUseCases.AuthSession session = authUseCases.signup(
-                new AuthUseCases.SignupCommand(request.email(), request.password(), request.dateOfBirth()));
-        ctx.status(201).json(AuthResponse.from(session));
+        var result = authUseCases.signup(new AuthUseCases.SignupCommand(
+                request.email(), request.password(), request.dateOfBirth(), request.name()));
+        if (!result.success()) {
+            handleUseCaseFailure(ctx, result.error());
+            return;
+        }
+        ctx.status(201).json(AuthResponse.from(result.data()));
     }
 
     void login(Context ctx) {
         LoginRequest request = ctx.bodyAsClass(LoginRequest.class);
-        AuthUseCases.AuthSession session =
-                authUseCases.login(new AuthUseCases.LoginCommand(request.email(), request.password()));
-        ctx.json(AuthResponse.from(session));
+        var result = authUseCases.login(new AuthUseCases.LoginCommand(request.email(), request.password()));
+        if (!result.success()) {
+            handleUseCaseFailure(ctx, result.error());
+            return;
+        }
+        ctx.json(AuthResponse.from(result.data()));
     }
 
     void refresh(Context ctx) {
         RefreshTokenRequest request = ctx.bodyAsClass(RefreshTokenRequest.class);
-        ctx.json(AuthResponse.from(authUseCases.refresh(request.refreshToken())));
+        var result = authUseCases.refresh(request.refreshToken());
+        if (!result.success()) {
+            handleUseCaseFailure(ctx, result.error());
+            return;
+        }
+        ctx.json(AuthResponse.from(result.data()));
     }
 
     void logout(Context ctx) {
         RefreshTokenRequest request = ctx.bodyAsClass(RefreshTokenRequest.class);
-        authUseCases.logout(request.refreshToken());
+        var result = authUseCases.logout(request.refreshToken());
+        if (!result.success()) {
+            handleUseCaseFailure(ctx, result.error());
+            return;
+        }
         ctx.status(204);
     }
 
     void me(Context ctx) {
-        ctx.json(AuthUserDto.from(authUseCases.requireAuthenticatedUser(requireActingUserId(ctx))));
+        var result = authUseCases.requireAuthenticatedUser(requireActingUserId(ctx));
+        if (!result.success()) {
+            handleUseCaseFailure(ctx, result.error());
+            return;
+        }
+        ctx.json(AuthUserDto.from(result.data()));
     }
 
     // ── User Handlers ───────────────────────────────────────────────────
@@ -603,9 +626,19 @@ public class RestApiServer {
         RestApiPhotoStorage.ManagedPhoto photo = photoStorage.storePhoto(userId, ctx.uploadedFile("photo"));
         String storedPath = photo.storedPath();
         user.addPhotoUrl(storedPath);
-        Optional<ProfileMutationUseCases.ProfileSaveResult> saveResult = requiredDataOrHandleFailure(
-                ctx, profileMutationUseCases.savePhotoUrls(user), "Photo save returned no data");
+        Optional<ProfileMutationUseCases.ProfileSaveResult> saveResult;
+        try {
+            saveResult = requiredDataOrHandleFailure(
+                    ctx,
+                    profileMutationUseCases.savePhotoUrls(
+                            new ProfileMutationUseCases.SavePhotoUrlsCommand(UserContext.api(userId), user)),
+                    "Photo save returned no data");
+        } catch (RuntimeException ex) {
+            photoStorage.deleteManagedPhoto(storedPath);
+            throw ex;
+        }
         if (saveResult.isEmpty()) {
+            photoStorage.deleteManagedPhoto(storedPath);
             return;
         }
         List<String> publicUrls = photoStorage.toPublicUrls(ctx, user.getPhotoUrls());
@@ -649,15 +682,18 @@ public class RestApiServer {
             ctx.status(404).json(new ErrorResponse("NOT_FOUND", "Photo not found"));
             return;
         }
-        if (photoStorage.photoIdFromStoredPath(targetPath).isPresent()) {
-            photoStorage.deleteManagedPhoto(targetPath);
-        }
         currentPaths.remove(targetPath);
         user.setPhotoUrls(currentPaths);
         Optional<ProfileMutationUseCases.ProfileSaveResult> saveResult = requiredDataOrHandleFailure(
-                ctx, profileMutationUseCases.savePhotoUrls(user), "Photo save returned no data");
+                ctx,
+                profileMutationUseCases.savePhotoUrls(
+                        new ProfileMutationUseCases.SavePhotoUrlsCommand(UserContext.api(userId), user)),
+                "Photo save returned no data");
         if (saveResult.isEmpty()) {
             return;
+        }
+        if (photoStorage.photoIdFromStoredPath(targetPath).isPresent()) {
+            photoStorage.deleteManagedPhoto(targetPath);
         }
         List<String> publicUrls = photoStorage.toPublicUrls(ctx, user.getPhotoUrls());
         String primaryPublicUrl = photoStorage.primaryPublicUrl(ctx, user.getPhotoUrls());
@@ -701,7 +737,10 @@ public class RestApiServer {
         }
         user.setPhotoUrls(reorderedPaths);
         Optional<ProfileMutationUseCases.ProfileSaveResult> saveResult = requiredDataOrHandleFailure(
-                ctx, profileMutationUseCases.savePhotoUrls(user), "Photo save returned no data");
+                ctx,
+                profileMutationUseCases.savePhotoUrls(
+                        new ProfileMutationUseCases.SavePhotoUrlsCommand(UserContext.api(userId), user)),
+                "Photo save returned no data");
         if (saveResult.isEmpty()) {
             return;
         }
@@ -748,6 +787,10 @@ public class RestApiServer {
         }
     }
 
+    /**
+     * Compatibility route returning only candidate list (no daily pick metadata).
+     * Clients should migrate to {@code /api/users/{id}/browse}.
+     */
     void getCandidates(Context ctx) {
         UUID id = parseUuid(ctx.pathParam("id"));
         Optional<User> user = loadExistingUser(ctx, id);
@@ -1181,7 +1224,7 @@ public class RestApiServer {
             return;
         }
 
-        RestApiDtos.ReportUserRequest request = ctx.bodyAsClass(RestApiDtos.ReportUserRequest.class);
+        ReportUserRequest request = ctx.bodyAsClass(ReportUserRequest.class);
         if (request.reason() == null) {
             throw new IllegalArgumentException("reason is required");
         }
@@ -1382,7 +1425,7 @@ public class RestApiServer {
             handleUseCaseFailure(ctx, result.error());
             return;
         }
-        ctx.json(result.data().stream().map(RestApiDtos.ProfileNoteDto::from).toList());
+        ctx.json(result.data().stream().map(ProfileNoteDto::from).toList());
     }
 
     void getProfileNote(Context ctx) {
@@ -1397,7 +1440,7 @@ public class RestApiServer {
             handleUseCaseFailure(ctx, result.error());
             return;
         }
-        ctx.json(RestApiDtos.ProfileNoteDto.from(result.data()));
+        ctx.json(ProfileNoteDto.from(result.data()));
     }
 
     void upsertProfileNote(Context ctx) {
@@ -1406,7 +1449,7 @@ public class RestApiServer {
         if (!ensureUsersExist(ctx, authorId, subjectId)) {
             return;
         }
-        RestApiDtos.ProfileNoteUpsertRequest request = ctx.bodyAsClass(RestApiDtos.ProfileNoteUpsertRequest.class);
+        ProfileNoteUpsertRequest request = ctx.bodyAsClass(ProfileNoteUpsertRequest.class);
         if (request.content() == null) {
             throw new IllegalArgumentException("content is required");
         }
@@ -1417,7 +1460,7 @@ public class RestApiServer {
             handleUseCaseFailure(ctx, result.error());
             return;
         }
-        ctx.json(RestApiDtos.ProfileNoteDto.from(result.data()));
+        ctx.json(ProfileNoteDto.from(result.data()));
     }
 
     void deleteProfileNote(Context ctx) {
@@ -1483,7 +1526,7 @@ public class RestApiServer {
             throw new RestApiRequestGuards.ApiForbiddenException("Blocked users cannot view each other's profiles");
         }
         if (target.getState() != UserState.ACTIVE) {
-            throw new IllegalStateException("Target user is not visible");
+            throw new RestApiRequestGuards.ApiConflictException("Target user is not visible");
         }
     }
 
@@ -1623,7 +1666,7 @@ public class RestApiServer {
 
     private void ensureActiveCandidateBrowser(User user) {
         if (user.getState() != UserState.ACTIVE) {
-            throw new IllegalStateException("User must be ACTIVE to browse candidates");
+            throw new RestApiRequestGuards.ApiConflictException("User must be ACTIVE to browse candidates");
         }
     }
 
@@ -1650,7 +1693,14 @@ public class RestApiServer {
                 ctx.status(400);
                 ctx.json(new ErrorResponse(BAD_REQUEST, error.message()));
             }
-            case NOT_FOUND -> throw new NotFoundResponse(error.message());
+            case NOT_FOUND -> {
+                ctx.status(404);
+                ctx.json(new ErrorResponse("NOT_FOUND", error.message()));
+            }
+            case UNAUTHORIZED -> {
+                ctx.status(401);
+                ctx.json(new ErrorResponse(UNAUTHORIZED, error.message()));
+            }
             case FORBIDDEN -> {
                 ctx.status(403);
                 ctx.json(new ErrorResponse(FORBIDDEN, error.message()));
@@ -1700,6 +1750,11 @@ public class RestApiServer {
             ctx.json(new ErrorResponse(UNAUTHORIZED, e.getMessage()));
         });
 
+        app.exception(RestApiRequestGuards.ApiConflictException.class, (e, ctx) -> {
+            ctx.status(409);
+            ctx.json(new ErrorResponse(CONFLICT, e.getMessage()));
+        });
+
         app.exception(AuthUseCases.UnauthorizedException.class, (e, ctx) -> {
             ctx.status(401);
             ctx.json(new ErrorResponse(UNAUTHORIZED, e.getMessage()));
@@ -1714,9 +1769,14 @@ public class RestApiServer {
             ctx.json(new ErrorResponse(TOO_MANY_REQUESTS, e.getMessage()));
         });
 
-        app.exception(IllegalStateException.class, (e, ctx) -> {
+        app.exception(AuthUseCases.DuplicateAccountException.class, (e, ctx) -> {
             ctx.status(409);
             ctx.json(new ErrorResponse(CONFLICT, e.getMessage()));
+        });
+
+        app.exception(IllegalStateException.class, (e, ctx) -> {
+            ctx.status(500);
+            ctx.json(new ErrorResponse(INTERNAL_ERROR, e.getMessage()));
         });
 
         app.exception(java.util.NoSuchElementException.class, (e, ctx) -> {

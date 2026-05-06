@@ -105,6 +105,7 @@ public final class JdbiUserStorage implements OperationalUserStorage {
     @Override
     public void save(User user) {
         Objects.requireNonNull(user, "user cannot be null");
+        applyCanonicalStoredFields(user);
         try {
             jdbi.useTransaction(handle -> saveWithHandle(handle, user));
         } finally {
@@ -227,6 +228,18 @@ public final class JdbiUserStorage implements OperationalUserStorage {
     }
 
     @Override
+    public Optional<User> findByEmail(String normalizedEmail) {
+        if (normalizedEmail == null || normalizedEmail.isBlank()) {
+            return Optional.empty();
+        }
+        return jdbi.withHandle(
+                handle -> handle.createQuery("SELECT * FROM users WHERE email = :email AND deleted_at IS NULL")
+                        .bind("email", normalizedEmail)
+                        .map(new Mapper())
+                        .findOne());
+    }
+
+    @Override
     public void delete(UUID id) {
         try {
             dao.delete(id);
@@ -301,35 +314,54 @@ public final class JdbiUserStorage implements OperationalUserStorage {
                 }));
     }
 
+    /**
+     * Compatibility/test shim for direct normalized-fragment persistence.
+     * Production code should persist the full {@link User} aggregate instead.
+     */
+    @Deprecated(forRemoval = false)
     public void saveUserPhotos(UUID userId, List<String> urls) {
         saveNormalizedProfileFragment(userId, () -> normalizedProfileRepository.saveUserPhotos(userId, urls));
     }
 
+    /** Compatibility/test shim for normalized photo reads. */
+    @Deprecated(forRemoval = false)
     public List<String> loadUserPhotos(UUID userId) {
         return normalizedProfileRepository.loadUserPhotos(userId);
     }
 
+    /** Compatibility/test shim for direct normalized-fragment persistence. */
+    @Deprecated(forRemoval = false)
     public void saveUserInterests(UUID userId, Set<String> interests) {
         saveNormalizedProfileFragment(userId, () -> normalizedProfileRepository.saveUserInterests(userId, interests));
     }
 
+    /** Compatibility/test shim for normalized interest reads. */
+    @Deprecated(forRemoval = false)
     public Set<String> loadUserInterests(UUID userId) {
         return normalizedProfileRepository.loadUserInterests(userId);
     }
 
+    /** Compatibility/test shim for direct normalized-fragment persistence. */
+    @Deprecated(forRemoval = false)
     public void saveUserInterestedIn(UUID userId, Set<String> genders) {
         saveNormalizedProfileFragment(userId, () -> normalizedProfileRepository.saveUserInterestedIn(userId, genders));
     }
 
+    /** Compatibility/test shim for normalized gender-preference reads. */
+    @Deprecated(forRemoval = false)
     public Set<String> loadUserInterestedIn(UUID userId) {
         return normalizedProfileRepository.loadUserInterestedIn(userId);
     }
 
+    /** Compatibility/test shim for direct normalized-fragment persistence. */
+    @Deprecated(forRemoval = false)
     public void saveDealbreaker(UUID userId, String tableName, Set<String> values) {
         saveNormalizedProfileFragment(
                 userId, () -> normalizedProfileRepository.saveDealbreaker(userId, tableName, values));
     }
 
+    /** Compatibility/test shim for normalized dealbreaker reads. */
+    @Deprecated(forRemoval = false)
     public Set<String> loadDealbreaker(UUID userId, String tableName) {
         return normalizedProfileRepository.loadDealbreaker(userId, tableName);
     }
@@ -538,7 +570,7 @@ public final class JdbiUserStorage implements OperationalUserStorage {
             boolean hasLocationSet = Boolean.TRUE.equals(hasLocationFlag);
             User user = User.StorageBuilder.create(
                             JdbiTypeCodecs.SqlRowReaders.readUuid(rs, "id"),
-                            rs.getString("name"),
+                            canonicalStoredName(rs.getString("name")),
                             JdbiTypeCodecs.SqlRowReaders.readInstant(rs, CREATED_AT_COLUMN))
                     .bio(rs.getString("bio"))
                     .birthDate(JdbiTypeCodecs.SqlRowReaders.readLocalDate(rs, "birth_date"))
@@ -616,6 +648,16 @@ public final class JdbiUserStorage implements OperationalUserStorage {
                     JdbiTypeCodecs.SqlRowReaders.readInstant(rs, CREATED_AT_COLUMN),
                     JdbiTypeCodecs.SqlRowReaders.readInstant(rs, UPDATED_AT_COLUMN));
         }
+    }
+
+    private static void applyCanonicalStoredFields(User user) {
+        if (user.getName() == null || user.getName().isBlank()) {
+            user.setName(User.SIGNUP_PLACEHOLDER_NAME);
+        }
+    }
+
+    private static String canonicalStoredName(String name) {
+        return name == null || name.isBlank() ? User.SIGNUP_PLACEHOLDER_NAME : name;
     }
 
     /** Bind helper for user upserts. */

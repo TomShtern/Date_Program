@@ -1,6 +1,7 @@
 package datingapp.core.metrics;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.core.AppClock;
@@ -17,15 +18,15 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-@DisplayName("DefaultAchievementService")
-class DefaultAchievementServiceTest {
+@DisplayName("AchievementService")
+class AchievementServiceTest {
 
     private TestStorages.Users users;
     private TestStorages.Interactions interactions;
     private TestStorages.TrustSafety trustSafety;
     private TestStorages.Analytics analytics;
     private AppConfig config;
-    private DefaultAchievementService achievementService;
+    private AchievementService achievementService;
 
     @BeforeEach
     void setUp() {
@@ -37,7 +38,7 @@ class DefaultAchievementServiceTest {
 
         ProfileService profileService = new ProfileService(users);
         achievementService =
-                new DefaultAchievementService(config, analytics, interactions, trustSafety, users, profileService);
+                new AchievementService(config, analytics, interactions, trustSafety, users, profileService);
     }
 
     @Test
@@ -61,6 +62,17 @@ class DefaultAchievementServiceTest {
         assertTrue(unlocked.stream().anyMatch(a -> a.achievement() == EngagementDomain.Achievement.FIRST_SPARK));
         assertTrue(unlocked.stream().anyMatch(a -> a.achievement() == EngagementDomain.Achievement.COMPLETE_PACKAGE));
         assertEquals(2, achievementService.countUnlocked(user.getId()));
+    }
+
+    @Test
+    @DisplayName("protected no-arg constructor fails fast on live use")
+    void protectedNoArgConstructorFailsFastOnLiveUse() {
+        AchievementService service = new AchievementService() {};
+
+        IllegalStateException ex =
+                assertThrows(IllegalStateException.class, () -> service.getUnlocked(UUID.randomUUID()));
+
+        assertEquals("AchievementService analyticsStorage is not initialized", ex.getMessage());
     }
 
     private static User createActiveUser(String name) {

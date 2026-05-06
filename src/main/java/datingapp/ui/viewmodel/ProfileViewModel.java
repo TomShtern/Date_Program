@@ -6,6 +6,7 @@ import datingapp.app.usecase.profile.ProfileMutationUseCases.SaveProfileCommand;
 import datingapp.app.usecase.profile.ProfileUseCases;
 import datingapp.core.AppConfig;
 import datingapp.core.AppSession;
+import datingapp.core.model.GeoValidation;
 import datingapp.core.model.LocationModels.ResolvedLocation;
 import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
@@ -733,12 +734,8 @@ public class ProfileViewModel extends BaseViewModel {
     }
 
     private void validateCoordinates(double latitude, double longitude) {
-        if (latitude < -90.0 || latitude > 90.0) {
-            throw new IllegalArgumentException("Latitude must be between -90 and 90");
-        }
-        if (longitude < -180.0 || longitude > 180.0) {
-            throw new IllegalArgumentException("Longitude must be between -180 and 180");
-        }
+        GeoValidation.validateLatitude(latitude);
+        GeoValidation.validateLongitude(longitude);
     }
 
     private void applyLocationDisplay(double latitude, double longitude, String displayLabel) {

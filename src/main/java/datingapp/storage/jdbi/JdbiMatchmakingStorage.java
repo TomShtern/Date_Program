@@ -1,5 +1,6 @@
 package datingapp.storage.jdbi;
 
+import datingapp.core.AppClock;
 import datingapp.core.connection.ConnectionModels;
 import datingapp.core.connection.ConnectionModels.Conversation;
 import datingapp.core.connection.ConnectionModels.FriendRequest;
@@ -89,7 +90,7 @@ public final class JdbiMatchmakingStorage implements OperationalInteractionStora
 
     private static final String SQL_SOFT_DELETE_OWNED_LIKE = """
                         UPDATE likes
-                        SET deleted_at = CURRENT_TIMESTAMP
+                        SET deleted_at = :now
                         WHERE id = :likeId
                             AND who_likes = :ownerUserId
                             AND deleted_at IS NULL
@@ -172,11 +173,6 @@ public final class JdbiMatchmakingStorage implements OperationalInteractionStora
                 AND deleted_at IS NULL
             """;
 
-    private static final String SQL_INSERT_NOTIFICATION = """
-            INSERT INTO notifications (id, user_id, type, title, message, created_at, is_read, data_json)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """;
-
     private final Jdbi jdbi;
     private final LikeDao likeDao;
     private final MatchDao matchDao;
@@ -220,7 +216,7 @@ public final class JdbiMatchmakingStorage implements OperationalInteractionStora
     @Override
     public void save(Like like) {
         Objects.requireNonNull(like, "like cannot be null");
-        jdbi.useHandle(handle -> saveLike(handle, like));
+        jdbi.useTransaction(handle -> saveLike(handle, like));
     }
 
     @Override
@@ -228,26 +224,30 @@ public final class JdbiMatchmakingStorage implements OperationalInteractionStora
         Objects.requireNonNull(like, "like cannot be null");
         try {
             return jdbi.inTransaction(handle -> {
-                if (activeLikeExists(handle, like)) {
+                Like transactionalLike =
+                        new Like(like.id(), like.whoLikes(), like.whoGotLiked(), like.direction(), AppClock.now());
+
+                if (activeLikeExists(handle, transactionalLike)) {
                     return LikeMatchWriteResult.duplicateLike();
                 }
 
-                saveLike(handle, like);
-                if (!isPositiveLikeDirection(like.direction())) {
+                saveLike(handle, transactionalLike);
+                if (!isPositiveLikeDirection(transactionalLike.direction())) {
                     return LikeMatchWriteResult.likeOnly();
                 }
 
-                if (!mutualLikeExists(handle, like)) {
+                if (!mutualLikeExists(handle, transactionalLike)) {
                     return LikeMatchWriteResult.likeOnly();
                 }
 
-                String matchId = Match.generateId(like.whoLikes(), like.whoGotLiked());
-                Optional<LikeMatchWriteResult> existingMatchResult = handleExistingMatch(handle, like, matchId);
+                String matchId = Match.generateId(transactionalLike.whoLikes(), transactionalLike.whoGotLiked());
+                Optional<LikeMatchWriteResult> existingMatchResult =
+                        handleExistingMatch(handle, transactionalLike, matchId);
                 if (existingMatchResult.isPresent()) {
                     return existingMatchResult.get();
                 }
 
-                return createFreshMatch(handle, like);
+                return createFreshMatch(handle, transactionalLike);
             });
         } catch (Exception e) {
             throw new StorageException("Atomic like->match persistence failed", e);
@@ -401,19 +401,19 @@ public final class JdbiMatchmakingStorage implements OperationalInteractionStora
 
     @Override
     public void delete(UUID likeId) {
-        likeDao.delete(likeId);
+        likeDao.delete(likeId, AppClock.now());
     }
 
     @Override
     public boolean deleteLikeOwnedBy(UUID ownerUserId, UUID likeId) {
         Objects.requireNonNull(ownerUserId, "ownerUserId cannot be null");
         Objects.requireNonNull(likeId, "likeId cannot be null");
-        return likeDao.deleteLikeOwnedBy(ownerUserId, likeId) == 1;
+        return likeDao.deleteLikeOwnedBy(ownerUserId, likeId, AppClock.now()) == 1;
     }
 
     @Override
     public void save(Match match) {
-        jdbi.useHandle(handle -> saveMatch(handle, match));
+        jdbi.useTransaction(handle -> saveMatch(handle, match));
     }
 
     @Override
@@ -696,7 +696,7 @@ public final class JdbiMatchmakingStorage implements OperationalInteractionStora
 
     @Override
     public void delete(String matchId) {
-        matchDao.delete(matchId);
+        matchDao.delete(matchId, AppClock.now());
     }
 
     @Override
@@ -705,21 +705,7 @@ public final class JdbiMatchmakingStorage implements OperationalInteractionStora
     }
 
     private void saveNotification(Handle handle, Notification notification) {
-        String dataJson = serializeNotificationData(notification.data());
-        handle.execute(
-                SQL_INSERT_NOTIFICATION,
-                notification.id(),
-                notification.userId(),
-                notification.type().name(),
-                notification.title(),
-                notification.message(),
-                notification.createdAt(),
-                notification.isRead(),
-                dataJson);
-    }
-
-    private String serializeNotificationData(Map<String, String> data) {
-        return JdbiNotificationJson.write(data);
+        JdbiConnectionStorage.insertNotification(handle, notification);
     }
 
     private static boolean isPositiveLikeDirection(Like.Direction direction) {
@@ -730,9 +716,11 @@ public final class JdbiMatchmakingStorage implements OperationalInteractionStora
     public boolean atomicUndoDelete(UUID likeId, String matchId) {
         try {
             return jdbi.inTransaction(handle -> {
+                Instant now = AppClock.now();
                 int likesDeleted = handle.createUpdate(
-                                "UPDATE likes SET deleted_at = CURRENT_TIMESTAMP WHERE id = :id AND deleted_at IS NULL")
+                                "UPDATE likes SET deleted_at = :now WHERE id = :id AND deleted_at IS NULL")
                         .bind("id", likeId)
+                        .bind("now", now)
                         .execute();
 
                 if (likesDeleted == 0) {
@@ -740,9 +728,9 @@ public final class JdbiMatchmakingStorage implements OperationalInteractionStora
                 }
 
                 if (matchId != null) {
-                    handle.createUpdate(
-                                    "UPDATE matches SET deleted_at = CURRENT_TIMESTAMP WHERE id = :id AND deleted_at IS NULL")
+                    handle.createUpdate("UPDATE matches SET deleted_at = :now WHERE id = :id AND deleted_at IS NULL")
                             .bind("id", matchId)
+                            .bind("now", now)
                             .execute();
                 }
 
@@ -966,11 +954,12 @@ public final class JdbiMatchmakingStorage implements OperationalInteractionStora
                 """)
         int countPassesToday(@Bind("userId") UUID userId, @Bind("startOfDay") Instant startOfDay);
 
-        @SqlUpdate("UPDATE likes SET deleted_at = CURRENT_TIMESTAMP WHERE id = :likeId AND deleted_at IS NULL")
-        void delete(@Bind("likeId") UUID likeId);
+        @SqlUpdate("UPDATE likes SET deleted_at = :now WHERE id = :likeId AND deleted_at IS NULL")
+        void delete(@Bind("likeId") UUID likeId, @Bind("now") Instant now);
 
         @SqlUpdate(SQL_SOFT_DELETE_OWNED_LIKE)
-        int deleteLikeOwnedBy(@Bind("ownerUserId") UUID ownerUserId, @Bind("likeId") UUID likeId);
+        int deleteLikeOwnedBy(
+                @Bind("ownerUserId") UUID ownerUserId, @Bind("likeId") UUID likeId, @Bind("now") Instant now);
     }
 
     @RegisterRowMapper(MatchMapper.class)
@@ -1041,8 +1030,8 @@ public final class JdbiMatchmakingStorage implements OperationalInteractionStora
         List<Match> getPageOfActiveMatchesFor(
                 @Bind("userId") UUID userId, @Bind("offset") int offset, @Bind("limit") int limit);
 
-        @SqlUpdate("UPDATE matches SET deleted_at = CURRENT_TIMESTAMP WHERE id = :matchId")
-        void delete(@Bind("matchId") String matchId);
+        @SqlUpdate("UPDATE matches SET deleted_at = :now WHERE id = :matchId")
+        void delete(@Bind("matchId") String matchId, @Bind("now") Instant now);
 
         @SqlUpdate("DELETE FROM matches WHERE deleted_at < :threshold")
         int purgeDeletedBefore(@Bind("threshold") Instant threshold);

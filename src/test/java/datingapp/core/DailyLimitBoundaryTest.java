@@ -7,7 +7,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.core.connection.ConnectionModels.Like;
 import datingapp.core.matching.DailyLimitService;
-import datingapp.core.matching.DefaultDailyLimitService;
 import datingapp.core.testutil.TestStorages;
 import java.time.Clock;
 import java.time.Instant;
@@ -86,8 +85,7 @@ class DailyLimitBoundaryTest {
         TestStorages.Interactions interactions = new TestStorages.Interactions();
         saveLike(interactions, Instant.parse("2026-03-25T14:30:00Z"));
 
-        DefaultDailyLimitService service =
-                createService(interactions, Instant.parse("2026-03-25T15:30:00Z"), UTC, TOKYO);
+        DailyLimitService service = createService(interactions, Instant.parse("2026-03-25T15:30:00Z"), UTC, TOKYO);
         DailyLimitService.DailyStatus status = service.getStatus(USER_ID);
 
         assertEquals(0, status.likesUsed());
@@ -95,19 +93,18 @@ class DailyLimitBoundaryTest {
         assertEquals(Instant.parse("2026-03-26T15:00:00Z"), status.resetsAt());
     }
 
-    private static DefaultDailyLimitService createService(
-            TestStorages.Interactions interactions, Instant now, ZoneId zone) {
+    private static DailyLimitService createService(TestStorages.Interactions interactions, Instant now, ZoneId zone) {
         return createService(interactions, now, zone, zone);
     }
 
-    private static DefaultDailyLimitService createService(
+    private static DailyLimitService createService(
             TestStorages.Interactions interactions, Instant now, ZoneId clockZone, ZoneId configuredZone) {
         AppConfig config = AppConfig.builder()
                 .dailyLikeLimit(1)
                 .userTimeZone(configuredZone)
                 .build();
         Clock clock = Clock.fixed(now, clockZone);
-        return new DefaultDailyLimitService(interactions, config, clock);
+        return new DailyLimitService(interactions, config, clock);
     }
 
     private static void saveLike(TestStorages.Interactions interactions, Instant createdAt) {

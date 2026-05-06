@@ -115,7 +115,7 @@ class AchievementEventHandlerTest {
         assertEquals(List.of(userId), achievementService.checkedUserIds);
     }
 
-    private static final class CapturingAchievementService implements AchievementService {
+    private static final class CapturingAchievementService extends AchievementService {
         private final List<UUID> checkedUserIds = new ArrayList<>();
 
         @Override

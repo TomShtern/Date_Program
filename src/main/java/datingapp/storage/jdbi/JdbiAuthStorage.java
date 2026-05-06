@@ -1,10 +1,12 @@
 package datingapp.storage.jdbi;
 
 import datingapp.core.storage.AuthStorage;
+import datingapp.storage.DatabaseDialect;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Types;
 import java.time.Instant;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -15,13 +17,6 @@ import org.jdbi.v3.core.statement.StatementContext;
 public final class JdbiAuthStorage implements AuthStorage {
 
     private static final String BIND_USER_ID = "userId";
-    private static final String UPSERT_PASSWORD_HASH_SQL = """
-            INSERT INTO user_credentials (user_id, password_hash, created_at, updated_at)
-            VALUES (:userId, :passwordHash, :createdAt, :updatedAt)
-            ON CONFLICT (user_id) DO UPDATE
-            SET password_hash = EXCLUDED.password_hash,
-                updated_at = EXCLUDED.updated_at
-            """;
     private static final String INSERT_REFRESH_TOKEN_SQL = """
             INSERT INTO auth_refresh_tokens (
                 token_id,
@@ -46,9 +41,16 @@ public final class JdbiAuthStorage implements AuthStorage {
             + "WHERE token_id = :tokenId";
 
     private final Jdbi jdbi;
+    private final String upsertPasswordHashSql;
 
     public JdbiAuthStorage(Jdbi jdbi) {
+        this(jdbi, SqlDialectSupport.detectDialect(jdbi));
+    }
+
+    public JdbiAuthStorage(Jdbi jdbi, DatabaseDialect dialect) {
         this.jdbi = Objects.requireNonNull(jdbi, "jdbi cannot be null");
+        Objects.requireNonNull(dialect, "dialect cannot be null");
+        this.upsertPasswordHashSql = buildUpsertPasswordHashSql(dialect);
     }
 
     @Override
@@ -62,7 +64,7 @@ public final class JdbiAuthStorage implements AuthStorage {
 
     @Override
     public void savePasswordHash(UUID userId, String passwordHash, Instant createdAt, Instant updatedAt) {
-        jdbi.useHandle(handle -> handle.createUpdate(UPSERT_PASSWORD_HASH_SQL)
+        jdbi.useHandle(handle -> handle.createUpdate(upsertPasswordHashSql)
                 .bind(BIND_USER_ID, userId)
                 .bind("passwordHash", passwordHash)
                 .bind("createdAt", createdAt)
@@ -116,6 +118,18 @@ public final class JdbiAuthStorage implements AuthStorage {
             }
             update.execute();
         });
+    }
+
+    private static String buildUpsertPasswordHashSql(DatabaseDialect dialect) {
+        return SqlDialectSupport.upsertSql(
+                dialect,
+                "user_credentials",
+                List.of(
+                        new SqlDialectSupport.ColumnBinding("user_id", "userId"),
+                        new SqlDialectSupport.ColumnBinding("password_hash", "passwordHash"),
+                        new SqlDialectSupport.ColumnBinding("created_at", "createdAt"),
+                        new SqlDialectSupport.ColumnBinding("updated_at", "updatedAt")),
+                List.of("user_id"));
     }
 
     private static final class RefreshTokenMapper implements RowMapper<RefreshTokenRecord> {

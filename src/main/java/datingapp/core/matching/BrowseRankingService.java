@@ -1,15 +1,103 @@
 package datingapp.core.matching;
 
+import datingapp.core.AppConfig;
+import datingapp.core.model.GeoUtils;
 import datingapp.core.model.User;
+import datingapp.core.profile.ProfileService;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 
 /** Ranks already-eligible browse candidates for presentation order. */
-@FunctionalInterface
-public interface BrowseRankingService {
+public class BrowseRankingService {
 
-    List<User> rankCandidates(User seeker, List<User> candidates);
+    private static final double UNKNOWN_DISTANCE_SCORE = 0.5;
+    private static final Comparator<ScoredCandidate> RANK_ORDER = Comparator.comparingDouble(ScoredCandidate::score)
+            .reversed()
+            .thenComparing(Comparator.comparingDouble(ScoredCandidate::completenessScore)
+                    .reversed())
+            .thenComparing(
+                    Comparator.comparingDouble(ScoredCandidate::activityScore).reversed())
+            .thenComparing(
+                    Comparator.comparing(ScoredCandidate::updatedAt, Comparator.nullsLast(Comparator.reverseOrder())))
+            .thenComparing(scoredCandidate -> scoredCandidate.candidate().getId());
 
-    static BrowseRankingService identity() {
-        return (seeker, candidates) -> candidates == null ? List.of() : List.copyOf(candidates);
+    private final CompatibilityCalculator calculator;
+    private final ProfileService profileService;
+    private final AppConfig config;
+
+    protected BrowseRankingService() {
+        this.calculator = null;
+        this.profileService = null;
+        this.config = null;
     }
+
+    public BrowseRankingService(CompatibilityCalculator calculator, ProfileService profileService, AppConfig config) {
+        this.calculator = Objects.requireNonNull(calculator, "calculator cannot be null");
+        this.profileService = Objects.requireNonNull(profileService, "profileService cannot be null");
+        this.config = Objects.requireNonNull(config, "config cannot be null");
+    }
+
+    public List<User> rankCandidates(User seeker, List<User> candidates) {
+        if (seeker == null || candidates == null || candidates.isEmpty()) {
+            return List.of();
+        }
+        return candidates.stream()
+                .filter(Objects::nonNull)
+                .map(candidate -> scoreCandidate(seeker, candidate))
+                .sorted(RANK_ORDER)
+                .map(ScoredCandidate::candidate)
+                .toList();
+    }
+
+    public static BrowseRankingService identity() {
+        return new BrowseRankingService() {
+            @Override
+            public List<User> rankCandidates(User seeker, List<User> candidates) {
+                if (candidates == null) {
+                    return List.of();
+                }
+                return candidates.stream().filter(Objects::nonNull).toList();
+            }
+        };
+    }
+
+    private ScoredCandidate scoreCandidate(User seeker, User candidate) {
+        double distanceScore = calculateDistanceScore(seeker, candidate);
+        double ageScore = calculator.calculateAgeScore(seeker, candidate);
+        double interestScore = calculator.calculateInterestScore(seeker, candidate);
+        double lifestyleScore = calculator.calculateLifestyleScore(seeker, candidate);
+        double paceScore = calculator.calculatePaceScore(seeker.getPacePreferences(), candidate.getPacePreferences());
+        var completeness = profileService.calculate(candidate);
+        double completenessScore = completeness == null ? 0.0 : completeness.score() / 100.0;
+        double activityScore = calculator.calculateActivityScore(candidate);
+
+        WeightedScore weightedScore = WeightedScore.empty()
+                .add(distanceScore, config.matching().distanceWeight())
+                .add(ageScore, config.matching().ageWeight())
+                .add(interestScore, config.matching().interestWeight())
+                .add(lifestyleScore, config.matching().lifestyleWeight())
+                .add(paceScore, config.matching().paceWeight())
+                .add(completenessScore, config.algorithm().standoutCompletenessWeight())
+                .add(activityScore, config.algorithm().standoutActivityWeight());
+
+        return new ScoredCandidate(
+                candidate, weightedScore.normalized(), completenessScore, activityScore, candidate.getUpdatedAt());
+    }
+
+    private double calculateDistanceScore(User seeker, User candidate) {
+        if (!seeker.hasLocationSet() || !candidate.hasLocationSet() || seeker.getMaxDistanceKm() <= 0) {
+            return UNKNOWN_DISTANCE_SCORE;
+        }
+        double distanceKm =
+                GeoUtils.distanceKm(seeker.getLat(), seeker.getLon(), candidate.getLat(), candidate.getLon());
+        return calculator.calculateDistanceScore(distanceKm, seeker.getMaxDistanceKm());
+    }
+
+    private record ScoredCandidate(
+            User candidate,
+            double score,
+            double completenessScore,
+            double activityScore,
+            java.time.Instant updatedAt) {}
 }

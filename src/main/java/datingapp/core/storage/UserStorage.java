@@ -1,6 +1,6 @@
 package datingapp.core.storage;
 
-import datingapp.core.matching.CandidateFinder.GeoUtils;
+import datingapp.core.model.GeoUtils;
 import datingapp.core.model.ProfileNote;
 import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;

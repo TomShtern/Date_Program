@@ -32,8 +32,8 @@ public final class LocationModels {
             name = requireText(name, "name");
             district = requireText(district, "district");
             countryCode = requireText(countryCode, "countryCode");
-            validateLatitude(latitude);
-            validateLongitude(longitude);
+            GeoValidation.validateLatitude(latitude);
+            GeoValidation.validateLongitude(longitude);
             if (priority < 1) {
                 throw new IllegalArgumentException("priority must be at least 1");
             }
@@ -51,8 +51,8 @@ public final class LocationModels {
             countryCode = requireText(countryCode, "countryCode");
             city = requireText(city, "city");
             district = requireText(district, "district");
-            validateLatitude(latitude);
-            validateLongitude(longitude);
+            GeoValidation.validateLatitude(latitude);
+            GeoValidation.validateLongitude(longitude);
         }
 
         public String displayName() {
@@ -62,16 +62,16 @@ public final class LocationModels {
 
     public record ResolvedLocation(double latitude, double longitude, String label, Precision precision) {
         public ResolvedLocation {
-            validateLatitude(latitude);
-            validateLongitude(longitude);
+            GeoValidation.validateLatitude(latitude);
+            GeoValidation.validateLongitude(longitude);
             label = requireText(label, "label");
             Objects.requireNonNull(precision, "precision cannot be null");
         }
     }
 
     public static String formatCoordinates(double latitude, double longitude) {
-        validateLatitude(latitude);
-        validateLongitude(longitude);
+        GeoValidation.validateLatitude(latitude);
+        GeoValidation.validateLongitude(longitude);
         return String.format(Locale.ROOT, "%.4f, %.4f", latitude, longitude);
     }
 
@@ -80,17 +80,5 @@ public final class LocationModels {
             throw new IllegalArgumentException(fieldName + " cannot be blank");
         }
         return value.trim();
-    }
-
-    private static void validateLatitude(double latitude) {
-        if (latitude < -90.0 || latitude > 90.0) {
-            throw new IllegalArgumentException("latitude must be between -90 and 90");
-        }
-    }
-
-    private static void validateLongitude(double longitude) {
-        if (longitude < -180.0 || longitude > 180.0) {
-            throw new IllegalArgumentException("longitude must be between -180 and 180");
-        }
     }
 }

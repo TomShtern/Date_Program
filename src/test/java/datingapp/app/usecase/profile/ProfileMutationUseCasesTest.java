@@ -98,4 +98,17 @@ class ProfileMutationUseCasesTest {
         assertEquals(25, result.data().getMaxDistanceKm());
         assertEquals(java.util.Set.of(Gender.OTHER), result.data().getInterestedIn());
     }
+
+    @Test
+    @DisplayName("savePhotoUrls requires matching user context")
+    void savePhotoUrlsRequiresMatchingUserContext() {
+        User user = new User(java.util.UUID.randomUUID(), "Photo User");
+        userStorage.save(user);
+
+        var result = useCases.savePhotoUrls(
+                new ProfileMutationUseCases.SavePhotoUrlsCommand(UserContext.cli(java.util.UUID.randomUUID()), user));
+
+        assertFalse(result.success());
+        assertEquals("User context does not match profile user", result.error().message());
+    }
 }

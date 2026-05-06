@@ -211,6 +211,12 @@ final class RestApiRequestGuards {
         }
     }
 
+    static final class ApiConflictException extends RuntimeException {
+        ApiConflictException(String message) {
+            super(message);
+        }
+    }
+
     static final class ApiTooManyRequestsException extends RuntimeException {
         private final RateLimitStatus status;
 

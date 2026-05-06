@@ -4,6 +4,7 @@ import datingapp.app.event.AppEvent;
 import datingapp.app.event.AppEventBus;
 import datingapp.app.usecase.common.UseCaseError;
 import datingapp.app.usecase.common.UseCaseResult;
+import datingapp.app.usecase.common.UserContext;
 import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
 import datingapp.core.metrics.AchievementService;
@@ -121,7 +122,26 @@ public final class ProfileMutationUseCases {
             return UseCaseResult.failure(UseCaseError.forbidden("User context does not match profile user"));
         }
 
-        User user = command.user();
+        return executeProfileSave(command.user(), "profile.save user={} activated={} missingFields={}");
+    }
+
+    public UseCaseResult<ProfileSaveResult> savePhotoUrls(SavePhotoUrlsCommand command) {
+        if (command == null || command.user() == null || command.context() == null) {
+            return UseCaseResult.failure(UseCaseError.validation("Context and user are required"));
+        }
+        if (userStorage == null) {
+            return UseCaseResult.failure(UseCaseError.dependency(USER_STORAGE_REQUIRED));
+        }
+        if (!command.context().userId().equals(command.user().getId())) {
+            return UseCaseResult.failure(UseCaseError.forbidden("User context does not match profile user"));
+        }
+
+        return executeProfileSave(command.user(), "profile.savePhotoUrls user={} activated={} missingFields={}");
+    }
+
+    public record SavePhotoUrlsCommand(UserContext context, User user) {}
+
+    private UseCaseResult<ProfileSaveResult> executeProfileSave(User user, String logMessage) {
         sanitizeProfileText(user);
         var activation = activationPolicy.tryActivate(user);
         boolean activated = activation.activated();
@@ -132,11 +152,7 @@ public final class ProfileMutationUseCases {
         }
 
         if (logger.isInfoEnabled()) {
-            logger.info(
-                    "profile.save user={} activated={} missingFields={}",
-                    user.getId(),
-                    activated,
-                    user.getMissingProfileFields());
+            logger.info(logMessage, user.getId(), activated, user.getMissingProfileFields());
         }
 
         List<UserAchievement> newAchievements = List.of();
@@ -155,52 +171,6 @@ public final class ProfileMutationUseCases {
             publishEvent(
                     new AppEvent.ProfileCompleted(user.getId(), AppClock.now()),
                     "Post-profile-completed event failed for user " + user.getId());
-        }
-
-        return UseCaseResult.success(new ProfileSaveResult(user, activated, newAchievements));
-    }
-
-    public UseCaseResult<ProfileSaveResult> savePhotoUrls(User user) {
-        if (user == null) {
-            return UseCaseResult.failure(UseCaseError.validation("User is required"));
-        }
-        if (userStorage == null) {
-            return UseCaseResult.failure(UseCaseError.dependency(USER_STORAGE_REQUIRED));
-        }
-
-        var activation = activationPolicy.tryActivate(user);
-        boolean activated = activation.activated();
-        try {
-            userStorage.save(user);
-        } catch (Exception e) {
-            return UseCaseResult.failure(UseCaseError.internal("Failed to save photo URLs: " + e.getMessage()));
-        }
-
-        if (logger.isInfoEnabled()) {
-            logger.info(
-                    "profile.savePhotoUrls user={} activated={} missingFields={}",
-                    user.getId(),
-                    activated,
-                    user.getMissingProfileFields());
-        }
-
-        List<UserAchievement> newAchievements = List.of();
-        try {
-            newAchievements = unlockAchievements(user.getId());
-        } catch (Exception e) {
-            if (logger.isWarnEnabled()) {
-                logger.warn(
-                        "Post-photo-save achievement update failed for user {}: {}", user.getId(), e.getMessage(), e);
-            }
-        }
-
-        publishEvent(
-                new AppEvent.ProfileSaved(user.getId(), activated, AppClock.now()),
-                "Post-photo-save event publication failed for user " + user.getId());
-        if (activated) {
-            publishEvent(
-                    new AppEvent.ProfileCompleted(user.getId(), AppClock.now()),
-                    "Post-photo-save profile-completed event failed for user " + user.getId());
         }
 
         return UseCaseResult.success(new ProfileSaveResult(user, activated, newAchievements));
@@ -255,10 +225,6 @@ public final class ProfileMutationUseCases {
             return UseCaseResult.failure(UseCaseError.notFound(USER_NOT_FOUND));
         }
 
-        boolean locationWasSet = user.hasLocationSet();
-        double previousLatitude = user.getLat();
-        double previousLongitude = user.getLon();
-
         try {
             applyProfileTextAndIdentityFields(user, command);
             applyProfileLocationFields(user, command);
@@ -268,18 +234,7 @@ public final class ProfileMutationUseCases {
             return UseCaseResult.failure(UseCaseError.validation(e.getMessage()));
         }
 
-        UseCaseResult<ProfileSaveResult> saveResult = saveProfile(new SaveProfileCommand(command.context(), user));
-        if (saveResult.success()
-                && command.latitude() != null
-                && command.longitude() != null
-                && (!locationWasSet
-                        || Double.compare(previousLatitude, command.latitude()) != 0
-                        || Double.compare(previousLongitude, command.longitude()) != 0)) {
-            publishEvent(
-                    new AppEvent.LocationUpdated(user.getId(), command.latitude(), command.longitude(), AppClock.now()),
-                    "Post-location-updated event failed for user " + user.getId());
-        }
-        return saveResult;
+        return saveProfile(new SaveProfileCommand(command.context(), user));
     }
 
     /**
@@ -407,9 +362,7 @@ public final class ProfileMutationUseCases {
         int minAge = command.minAge() != null ? command.minAge() : user.getMinAge();
         int maxAge = command.maxAge() != null ? command.maxAge() : user.getMaxAge();
         if (minAge > maxAge) {
-            int swap = minAge;
-            minAge = maxAge;
-            maxAge = swap;
+            throw new IllegalArgumentException("Min age cannot exceed max age");
         }
         assertValid(validationService.validateAgeRange(minAge, maxAge));
         user.setAgeRange(
@@ -474,7 +427,7 @@ public final class ProfileMutationUseCases {
         }
     }
 
-    public static record SaveProfileCommand(datingapp.app.usecase.common.UserContext context, User user) {}
+    public static record SaveProfileCommand(UserContext context, User user) {}
 
     public static record ProfileSaveResult(User user, boolean activated, List<UserAchievement> newlyUnlocked) {
         public ProfileSaveResult {
@@ -483,14 +436,10 @@ public final class ProfileMutationUseCases {
     }
 
     public static record UpdateDiscoveryPreferencesCommand(
-            datingapp.app.usecase.common.UserContext context,
-            int minAge,
-            int maxAge,
-            int maxDistanceKm,
-            Set<Gender> interestedIn) {}
+            UserContext context, int minAge, int maxAge, int maxDistanceKm, Set<Gender> interestedIn) {}
 
     public static record UpdateProfileCommand(
-            datingapp.app.usecase.common.UserContext context,
+            UserContext context,
             String name,
             String bio,
             java.time.LocalDate birthDate,
@@ -511,8 +460,7 @@ public final class ProfileMutationUseCases {
             Dealbreakers dealbreakers,
             PacePreferences pacePreferences) {}
 
-    public static record DeleteAccountCommand(
-            datingapp.app.usecase.common.UserContext context, AppEvent.DeletionReason reason) {}
+    public static record DeleteAccountCommand(UserContext context, AppEvent.DeletionReason reason) {}
 
     public static record CreateUserCommand(String name, Integer age, Gender gender, Gender interestedIn) {}
 

@@ -2,7 +2,7 @@ package datingapp.ui.viewmodel;
 
 import datingapp.core.AppSession;
 import datingapp.core.ServiceRegistry;
-import datingapp.core.matching.CandidateFinder;
+import datingapp.core.model.GeoUtils;
 import datingapp.core.model.User;
 import datingapp.ui.NavigationService;
 import datingapp.ui.UiPreferencesStore;
@@ -208,7 +208,7 @@ public class ViewModelFactory {
                                 services.getMatchingUseCases(),
                                 services.getSocialUseCases(),
                                 getUiProfileNoteDataAccess(),
-                                CandidateFinder.GeoUtils::distanceKm),
+                                GeoUtils::distanceKm),
                         session,
                         uiDispatcher));
     }

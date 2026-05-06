@@ -1,5 +1,7 @@
 package datingapp.ui;
 
+import datingapp.core.model.TextNormalization;
+import java.net.URI;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -40,6 +42,9 @@ public final class ImageCache {
 
     /** Path to default avatar resource. */
     private static final String DEFAULT_AVATAR_PATH = UiConstants.DEFAULT_AVATAR_PATH;
+
+    /** Test/development escape hatch for loopback-host image fixtures. */
+    private static final String ALLOW_UNSAFE_REMOTE_IMAGE_HOSTS_PROPERTY = "datingapp.allowUnsafeRemoteImageHosts";
 
     /**
      * Single bounded preload worker that prevents repeated calls from creating
@@ -139,6 +144,14 @@ public final class ImageCache {
     /** Loads an image with error handling. */
     private static Image loadImage(String path, double width, double height) {
         try {
+            URI remoteUri = remoteHttpUri(path);
+            if (remoteUri != null
+                    && !allowUnsafeRemoteImageHosts()
+                    && TextNormalization.isUnsafeHost(remoteUri.getHost())) {
+                logWarn("Rejected unsafe remote image host: {}", path);
+                return getDefaultAvatar(width, height);
+            }
+
             // Synchronous loading to ensure isError() reflects final load status
             Image image = new Image(path, width, height, true, true, false);
 
@@ -401,6 +414,27 @@ public final class ImageCache {
 
     private static String cacheKey(String path, double width, double height) {
         return path + "@" + width + "x" + height;
+    }
+
+    private static boolean allowUnsafeRemoteImageHosts() {
+        return Boolean.getBoolean(ALLOW_UNSAFE_REMOTE_IMAGE_HOSTS_PROPERTY);
+    }
+
+    private static URI remoteHttpUri(String path) {
+        try {
+            URI uri = URI.create(path);
+            String scheme = uri.getScheme();
+            if (scheme == null) {
+                return null;
+            }
+            String normalizedScheme = scheme.toLowerCase(java.util.Locale.ROOT);
+            if (!"http".equals(normalizedScheme) && !"https".equals(normalizedScheme)) {
+                return null;
+            }
+            return uri;
+        } catch (IllegalArgumentException _) {
+            return null;
+        }
     }
 
     private static final class PreloadThreadFactory implements ThreadFactory {

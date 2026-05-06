@@ -24,9 +24,13 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /** Consolidated messaging + relationship transition service. */
 public class ConnectionService {
+
+    private static final Logger logger = LoggerFactory.getLogger(ConnectionService.class);
 
     private static final String SENDER_NOT_FOUND = "Sender not found or inactive";
     private static final String RECIPIENT_NOT_FOUND = "Recipient not found or inactive";
@@ -217,6 +221,12 @@ public class ConnectionService {
             User otherUser = otherUsers.get(otherUserId);
 
             if (otherUser == null) {
+                if (logger.isDebugEnabled()) {
+                    logger.debug(
+                            "Skipping conversation {} because other user {} is null (soft-deleted)",
+                            convo.getId(),
+                            otherUserId);
+                }
                 continue;
             }
 

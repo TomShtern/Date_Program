@@ -1,9 +1,10 @@
 package datingapp.core;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import datingapp.core.matching.DefaultCompatibilityCalculator;
+import datingapp.core.matching.CompatibilityCalculator;
 import datingapp.core.model.User;
 import datingapp.core.profile.MatchPreferences.Interest;
 import datingapp.core.profile.MatchPreferences.PacePreferences;
@@ -16,16 +17,16 @@ import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-@DisplayName("DefaultCompatibilityCalculator")
-class DefaultCompatibilityCalculatorTest {
+@DisplayName("CompatibilityCalculator")
+class CompatibilityCalculatorTest {
 
     private static final Instant FIXED_INSTANT = Instant.parse("2026-02-01T12:00:00Z");
 
     @Test
     @DisplayName("distance score handles negatives and max-distance boundary")
     void calculateDistanceScoreBoundaries() {
-        DefaultCompatibilityCalculator calculator =
-                new DefaultCompatibilityCalculator(AppConfig.defaults(), Clock.fixed(FIXED_INSTANT, ZoneId.of("UTC")));
+        CompatibilityCalculator calculator =
+                new CompatibilityCalculator(AppConfig.defaults(), Clock.fixed(FIXED_INSTANT, ZoneId.of("UTC")));
 
         assertEquals(0.5, calculator.calculateDistanceScore(-1, 100), 0.0001);
         assertEquals(0.0, calculator.calculateDistanceScore(100, 100), 0.0001);
@@ -35,8 +36,8 @@ class DefaultCompatibilityCalculatorTest {
     @Test
     @DisplayName("response score decreases as response time grows")
     void calculateResponseScoreMonotonic() {
-        DefaultCompatibilityCalculator calculator =
-                new DefaultCompatibilityCalculator(AppConfig.defaults(), Clock.fixed(FIXED_INSTANT, ZoneId.of("UTC")));
+        CompatibilityCalculator calculator =
+                new CompatibilityCalculator(AppConfig.defaults(), Clock.fixed(FIXED_INSTANT, ZoneId.of("UTC")));
 
         double fast = calculator.calculateResponseScore(Duration.ofHours(1));
         double slow = calculator.calculateResponseScore(Duration.ofDays(40));
@@ -48,8 +49,8 @@ class DefaultCompatibilityCalculatorTest {
     @Test
     @DisplayName("pace wildcard gives moderate compatibility")
     void calculatePaceScoreSupportsWildcard() {
-        DefaultCompatibilityCalculator calculator =
-                new DefaultCompatibilityCalculator(AppConfig.defaults(), Clock.fixed(FIXED_INSTANT, ZoneId.of("UTC")));
+        CompatibilityCalculator calculator =
+                new CompatibilityCalculator(AppConfig.defaults(), Clock.fixed(FIXED_INSTANT, ZoneId.of("UTC")));
 
         PacePreferences a = new PacePreferences(
                 PacePreferences.MessagingFrequency.OFTEN,
@@ -69,8 +70,8 @@ class DefaultCompatibilityCalculatorTest {
     @Test
     @DisplayName("interest score rewards overlap")
     void calculateInterestScoreRewardsOverlap() {
-        DefaultCompatibilityCalculator calculator =
-                new DefaultCompatibilityCalculator(AppConfig.defaults(), Clock.fixed(FIXED_INSTANT, ZoneId.of("UTC")));
+        CompatibilityCalculator calculator =
+                new CompatibilityCalculator(AppConfig.defaults(), Clock.fixed(FIXED_INSTANT, ZoneId.of("UTC")));
 
         User me = new User(UUID.randomUUID(), "Me");
         me.setBirthDate(LocalDate.of(1998, 1, 1));
@@ -89,8 +90,8 @@ class DefaultCompatibilityCalculatorTest {
     @Test
     @DisplayName("age score reads each user's age once")
     void calculateAgeScoreUsesEachAgeOnce() {
-        DefaultCompatibilityCalculator calculator =
-                new DefaultCompatibilityCalculator(AppConfig.defaults(), Clock.fixed(FIXED_INSTANT, ZoneId.of("UTC")));
+        CompatibilityCalculator calculator =
+                new CompatibilityCalculator(AppConfig.defaults(), Clock.fixed(FIXED_INSTANT, ZoneId.of("UTC")));
 
         CountingUser me = new CountingUser(UUID.randomUUID(), "Me");
         me.setBirthDate(LocalDate.of(1995, 1, 1));
@@ -105,6 +106,20 @@ class DefaultCompatibilityCalculatorTest {
         assertTrue(score > 0.0);
         assertEquals(1, me.ageLookupCount());
         assertEquals(1, them.ageLookupCount());
+    }
+
+    @Test
+    @DisplayName("protected no-arg constructor fails fast on live use")
+    void protectedNoArgConstructorFailsFastOnLiveUse() {
+        CompatibilityCalculator calculator = new CompatibilityCalculator() {};
+        User me = new User(UUID.randomUUID(), "Me");
+        User them = new User(UUID.randomUUID(), "Them");
+
+        IllegalStateException ex =
+                assertThrows(IllegalStateException.class, () -> calculator.calculateResponseScore(Duration.ofHours(1)));
+
+        assertEquals("CompatibilityCalculator config is not initialized", ex.getMessage());
+        assertThrows(IllegalStateException.class, () -> calculator.calculateActivityScore(me));
     }
 
     private static final class CountingUser extends User {

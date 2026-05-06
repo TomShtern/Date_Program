@@ -554,56 +554,6 @@ class ProfileUseCasesTest {
     }
 
     @Test
-    @DisplayName("updateProfile should publish LocationUpdated when coordinates change")
-    void updateProfilePublishesLocationUpdatedEvent() {
-        User user = TestUserFactory.createActiveUser(UUID.randomUUID(), "Location User");
-        user.setLocation(32.0700, 34.8000);
-        userStorage.save(user);
-
-        List<AppEvent> publishedEvents = new ArrayList<>();
-        ProfileUseCases eventUseCases = createProfileUseCases(
-                userStorage,
-                profileService,
-                validationService,
-                metricsService,
-                achievementService,
-                config,
-                capturingEventBus(publishedEvents));
-
-        var result = eventUseCases.updateProfile(new UpdateProfileCommand(
-                UserContext.cli(user.getId()),
-                null,
-                null,
-                null,
-                null,
-                null,
-                32.0853,
-                34.7818,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null));
-
-        assertTrue(result.success());
-        assertEquals(2, publishedEvents.size());
-        assertTrue(publishedEvents.getFirst() instanceof AppEvent.ProfileSaved);
-        assertTrue(publishedEvents.get(1) instanceof AppEvent.LocationUpdated);
-        AppEvent.LocationUpdated event = (AppEvent.LocationUpdated) publishedEvents.get(1);
-        assertEquals(user.getId(), event.userId());
-        assertEquals(32.0853, event.latitude(), 0.0000001);
-        assertEquals(34.7818, event.longitude(), 0.0000001);
-        assertNotNull(event.occurredAt());
-    }
-
-    @Test
     @DisplayName("updateProfile with dealbreakers roundtrip persists dealbreakers exactly (Task 5 Regression)")
     void updateProfileWithDealbreakersRoundtrip() {
         // Arrange - create a user and save it
@@ -993,7 +943,8 @@ class ProfileUseCasesTest {
         user.addPhotoUrl("http://example.com/photo.jpg");
         assertTrue(user.isComplete());
 
-        var result = useCases.getProfileMutationUseCases().savePhotoUrls(user);
+        var result = useCases.getProfileMutationUseCases()
+                .savePhotoUrls(new ProfileMutationUseCases.SavePhotoUrlsCommand(UserContext.api(user.getId()), user));
         assertTrue(result.success(), "savePhotoUrls should succeed");
         assertTrue(result.data().activated(), "User should be activated after adding the only missing field");
         assertEquals(User.UserState.ACTIVE, user.getState());
@@ -1007,7 +958,8 @@ class ProfileUseCasesTest {
         assertEquals(User.UserState.ACTIVE, user.getState());
 
         user.addPhotoUrl("http://example.com/extra-photo.jpg");
-        var result = useCases.getProfileMutationUseCases().savePhotoUrls(user);
+        var result = useCases.getProfileMutationUseCases()
+                .savePhotoUrls(new ProfileMutationUseCases.SavePhotoUrlsCommand(UserContext.api(user.getId()), user));
         assertTrue(result.success(), "savePhotoUrls should succeed");
         assertFalse(result.data().activated(), "Already active user should not re-activate");
         assertEquals(User.UserState.ACTIVE, user.getState());

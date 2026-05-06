@@ -418,15 +418,17 @@ public final class ApplicationStartup {
     }
 
     private static void installShutdownHook() {
-        Thread existingHook = SHUTDOWN_HOOK_REF.get();
+        Thread existingHook = SHUTDOWN_HOOK_REF.getAndSet(null);
         if (existingHook != null) {
-            return;
+            try {
+                Runtime.getRuntime().removeShutdownHook(existingHook);
+            } catch (IllegalStateException | SecurityException ex) {
+                logWarn("Unable to remove existing shutdown hook", ex);
+            }
         }
 
         Thread hook = new Thread(ApplicationStartup::shutdown, "datingapp-shutdown-hook");
-        if (!SHUTDOWN_HOOK_REF.compareAndSet(null, hook)) {
-            return;
-        }
+        SHUTDOWN_HOOK_REF.set(hook);
 
         try {
             Runtime.getRuntime().addShutdownHook(hook);

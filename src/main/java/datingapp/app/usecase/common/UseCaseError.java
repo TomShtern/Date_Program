@@ -9,6 +9,7 @@ public record UseCaseError(Code code, String message) {
         VALIDATION,
         NOT_FOUND,
         CONFLICT,
+        UNAUTHORIZED,
         FORBIDDEN,
         DEPENDENCY,
         INTERNAL
@@ -29,6 +30,10 @@ public record UseCaseError(Code code, String message) {
 
     public static UseCaseError conflict(String message) {
         return new UseCaseError(Code.CONFLICT, message);
+    }
+
+    public static UseCaseError unauthorized(String message) {
+        return new UseCaseError(Code.UNAUTHORIZED, message);
     }
 
     public static UseCaseError forbidden(String message) {

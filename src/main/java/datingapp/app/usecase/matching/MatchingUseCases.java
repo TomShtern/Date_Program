@@ -25,6 +25,7 @@ import datingapp.core.storage.PageData;
 import datingapp.core.storage.UserStorage;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -38,6 +39,8 @@ import java.util.UUID;
 public class MatchingUseCases {
 
     private static final String CONTEXT_REQUIRED = "Context is required";
+
+    @Deprecated
     private static final DailyLimitService NO_OP_DAILY_LIMIT_SERVICE = new DailyLimitService() {
         @Override
         public boolean canLike(UUID userId) {
@@ -64,6 +67,8 @@ public class MatchingUseCases {
             return Duration.ZERO;
         }
     };
+
+    @Deprecated
     private static final DailyPickService NO_OP_DAILY_PICK_SERVICE = new DailyPickService() {
         @Override
         public Optional<DailyPick> getDailyPick(User seeker) {
@@ -85,6 +90,7 @@ public class MatchingUseCases {
             return 0;
         }
     };
+
     private static final StandoutService NO_OP_STANDOUT_SERVICE = new StandoutService() {
         @Override
         public Result getStandouts(User seeker) {
@@ -229,37 +235,55 @@ public class MatchingUseCases {
         }
 
         public MatchingUseCases build() {
-            CandidateFinder resolvedCandidateFinder =
-                    Objects.requireNonNull(candidateFinder, "candidateFinder cannot be null");
-            MatchingService resolvedMatchingService =
-                    Objects.requireNonNull(matchingService, "matchingService cannot be null");
-            DailyLimitService resolvedDailyLimitService =
-                    Objects.requireNonNull(dailyLimitService, "dailyLimitService cannot be null");
-            DailyPickService resolvedDailyPickService =
-                    Objects.requireNonNull(dailyPickService, "dailyPickService cannot be null");
-            StandoutService resolvedStandoutService =
-                    Objects.requireNonNull(standoutService, "standoutService cannot be null");
-            UndoService resolvedUndoService = Objects.requireNonNull(undoService, "undoService cannot be null");
-            InteractionStorage resolvedInteractionStorage =
-                    Objects.requireNonNull(interactionStorage, "interactionStorage cannot be null");
-            UserStorage resolvedUserStorage = Objects.requireNonNull(userStorage, "userStorage cannot be null");
-            MatchQualityService resolvedMatchQualityService =
-                    Objects.requireNonNull(matchQualityService, "matchQualityService cannot be null");
-            AppEventBus resolvedEventBus = Objects.requireNonNull(eventBus, "eventBus cannot be null");
-            RecommendationService resolvedRecommendationService =
-                    Objects.requireNonNull(recommendationService, "recommendationService cannot be null");
+            List<String> missing = new ArrayList<>();
+            if (candidateFinder == null) {
+                missing.add("candidateFinder");
+            }
+            if (matchingService == null) {
+                missing.add("matchingService");
+            }
+            if (dailyLimitService == null) {
+                missing.add("dailyLimitService");
+            }
+            if (dailyPickService == null) {
+                missing.add("dailyPickService");
+            }
+            if (standoutService == null) {
+                missing.add("standoutService");
+            }
+            if (undoService == null) {
+                missing.add("undoService");
+            }
+            if (interactionStorage == null) {
+                missing.add("interactionStorage");
+            }
+            if (userStorage == null) {
+                missing.add("userStorage");
+            }
+            if (matchQualityService == null) {
+                missing.add("matchQualityService");
+            }
+            if (eventBus == null) {
+                missing.add("eventBus");
+            }
+            if (recommendationService == null) {
+                missing.add("recommendationService");
+            }
+            if (!missing.isEmpty()) {
+                throw new IllegalStateException("Missing required dependencies: " + String.join(", ", missing));
+            }
             return new MatchingUseCases(
-                    resolvedCandidateFinder,
-                    resolvedMatchingService,
-                    resolvedDailyLimitService,
-                    resolvedDailyPickService,
-                    resolvedStandoutService,
-                    resolvedUndoService,
-                    resolvedInteractionStorage,
-                    resolvedUserStorage,
-                    resolvedMatchQualityService,
-                    resolvedEventBus,
-                    resolvedRecommendationService);
+                    candidateFinder,
+                    matchingService,
+                    dailyLimitService,
+                    dailyPickService,
+                    standoutService,
+                    undoService,
+                    interactionStorage,
+                    userStorage,
+                    matchQualityService,
+                    eventBus,
+                    recommendationService);
         }
     }
 

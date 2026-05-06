@@ -6,7 +6,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.core.connection.ConnectionModels.Report;
 import datingapp.core.metrics.AchievementService;
-import datingapp.core.metrics.DefaultAchievementService;
 import datingapp.core.metrics.EngagementDomain.Achievement;
 import datingapp.core.metrics.EngagementDomain.Achievement.UserAchievement;
 import datingapp.core.model.Match;
@@ -54,7 +53,7 @@ class AchievementServiceTest {
         userStorage = new InMemoryUserStorage();
         config = AppConfig.defaults();
         ProfileService profileService = new ProfileService(userStorage);
-        service = new DefaultAchievementService(
+        service = new AchievementService(
                 config, analyticsStorage, interactionStorage, trustSafetyStorage, userStorage, profileService);
         userId = UUID.randomUUID();
     }
