@@ -2,7 +2,6 @@ package datingapp.core.matching;
 
 import datingapp.core.AppConfig;
 import datingapp.core.LoggingSupport;
-import datingapp.core.model.GeoUtils;
 import datingapp.core.model.Match;
 import datingapp.core.model.Match.MatchArchiveReason;
 import datingapp.core.model.User;
@@ -12,6 +11,7 @@ import datingapp.core.profile.MatchPreferences.Dealbreakers;
 import datingapp.core.storage.InteractionStorage;
 import datingapp.core.storage.TrustSafetyStorage;
 import datingapp.core.storage.UserStorage;
+import datingapp.location.GeoUtils;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;

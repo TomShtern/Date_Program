@@ -9,11 +9,11 @@ import datingapp.core.AppConfig;
 import datingapp.core.AppSession;
 import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
-import datingapp.core.profile.LocationService;
 import datingapp.core.profile.MatchPreferences.PacePreferences;
 import datingapp.core.profile.ProfileService;
 import datingapp.core.profile.ValidationService;
 import datingapp.core.testutil.TestStorages;
+import datingapp.location.LocationService;
 import datingapp.ui.JavaFxTestSupport;
 import datingapp.ui.NavigationService;
 import datingapp.ui.OnboardingContext;
@@ -143,7 +143,7 @@ class OnboardingFlowTest {
                 AppSession.getInstance(),
                 validationService,
                 locationService,
-                new datingapp.core.profile.LocalGeocodingService(locationService),
+                new datingapp.location.LocalGeocodingService(locationService),
                 TEST_DISPATCHER,
                 new datingapp.core.workflow.ProfileActivationPolicy()));
     }

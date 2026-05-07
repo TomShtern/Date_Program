@@ -1,14 +1,15 @@
-package datingapp.core.profile;
+package datingapp.location;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.core.AppConfig;
-import datingapp.core.model.LocationModels.City;
-import datingapp.core.model.LocationModels.Country;
-import datingapp.core.model.LocationModels.Precision;
-import datingapp.core.model.LocationModels.ResolvedLocation;
+import datingapp.core.profile.ValidationService;
+import datingapp.location.LocationModels.City;
+import datingapp.location.LocationModels.Country;
+import datingapp.location.LocationModels.Precision;
+import datingapp.location.LocationModels.ResolvedLocation;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;

@@ -344,7 +344,7 @@ class ProfileViewModelTest {
                 new datingapp.core.workflow.ProfileActivationPolicy(),
                 new datingapp.app.testutil.TestEventBus());
 
-        var locationService = new datingapp.core.profile.LocationService(validationService);
+        var locationService = new datingapp.location.LocationService(validationService);
         ProfileViewModel viewModel = new ProfileViewModel(new ProfileViewModel.Dependencies(
                 new UiDataAdapters.StorageUiUserStore(users),
                 profileService,
@@ -354,7 +354,7 @@ class ProfileViewModelTest {
                 session,
                 validationService,
                 locationService,
-                new datingapp.core.profile.LocalGeocodingService(locationService),
+                new datingapp.location.LocalGeocodingService(locationService),
                 TEST_DISPATCHER,
                 new datingapp.core.workflow.ProfileActivationPolicy()));
         viewModel.loadCurrentUser();

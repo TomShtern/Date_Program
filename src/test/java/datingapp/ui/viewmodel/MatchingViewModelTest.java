@@ -445,7 +445,7 @@ class MatchingViewModelTest {
 
         private MatchingViewModel createViewModel(
                 UiThreadDispatcher dispatcher, UiProfileNoteDataAccess noteDataAccess) {
-            return createViewModel(dispatcher, noteDataAccess, datingapp.core.model.GeoUtils::distanceKm);
+            return createViewModel(dispatcher, noteDataAccess, datingapp.location.GeoUtils::distanceKm);
         }
 
         private MatchingViewModel createViewModel(
@@ -464,7 +464,7 @@ class MatchingViewModelTest {
             return createViewModel(
                     dispatcher,
                     new UseCaseUiProfileNoteDataAccess(createNoteUseCases().getProfileNotesUseCases()),
-                    datingapp.core.model.GeoUtils::distanceKm,
+                    datingapp.location.GeoUtils::distanceKm,
                     swipeStarted,
                     releaseSwipe,
                     undoStarted,

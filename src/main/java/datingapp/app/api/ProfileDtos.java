@@ -1,16 +1,16 @@
 package datingapp.app.api;
 
 import datingapp.core.AppClock;
-import datingapp.core.model.LocationModels.City;
-import datingapp.core.model.LocationModels.ResolvedLocation;
 import datingapp.core.model.ProfileNote;
 import datingapp.core.model.User;
-import datingapp.core.profile.LocationService.SelectionSeed;
 import datingapp.core.profile.MatchPreferences.Dealbreakers;
 import datingapp.core.profile.MatchPreferences.Interest;
 import datingapp.core.profile.MatchPreferences.Lifestyle;
 import datingapp.core.profile.MatchPreferences.PacePreferences;
 import datingapp.core.workflow.ProfileActivationPolicy;
+import datingapp.location.LocationModels.City;
+import datingapp.location.LocationModels.ResolvedLocation;
+import datingapp.location.LocationService.SelectionSeed;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;

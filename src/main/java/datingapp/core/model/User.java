@@ -6,6 +6,7 @@ import datingapp.core.profile.MatchPreferences;
 import datingapp.core.profile.MatchPreferences.Interest;
 import datingapp.core.profile.MatchPreferences.Lifestyle;
 import datingapp.core.profile.MatchPreferences.PacePreferences;
+import datingapp.location.GeoUtils;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.Period;
@@ -634,8 +635,8 @@ public class User {
     }
 
     public void setLocation(double lat, double lon) {
-        GeoValidation.validateLatitude(lat);
-        GeoValidation.validateLongitude(lon);
+        GeoUtils.validateLatitude(lat);
+        GeoUtils.validateLongitude(lon);
 
         this.lat = lat;
         this.lon = lon;

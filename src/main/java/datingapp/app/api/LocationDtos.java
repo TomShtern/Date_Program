@@ -1,8 +1,8 @@
 package datingapp.app.api;
 
-import datingapp.core.model.LocationModels.City;
-import datingapp.core.model.LocationModels.Country;
-import datingapp.core.model.LocationModels.ResolvedLocation;
+import datingapp.location.LocationModels.City;
+import datingapp.location.LocationModels.Country;
+import datingapp.location.LocationModels.ResolvedLocation;
 
 final class LocationDtos {
     private LocationDtos() {}

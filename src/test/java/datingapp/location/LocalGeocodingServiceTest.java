@@ -1,10 +1,11 @@
-package datingapp.core.profile;
+package datingapp.location;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.core.AppConfig;
-import datingapp.core.model.LocationModels.Precision;
+import datingapp.core.profile.ValidationService;
+import datingapp.location.LocationModels.Precision;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;

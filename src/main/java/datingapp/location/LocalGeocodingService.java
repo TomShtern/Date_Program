@@ -1,6 +1,6 @@
-package datingapp.core.profile;
+package datingapp.location;
 
-import datingapp.core.model.LocationModels.Precision;
+import datingapp.location.LocationModels.Precision;
 import java.util.List;
 import java.util.Objects;
 

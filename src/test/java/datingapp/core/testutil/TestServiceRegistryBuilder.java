@@ -24,11 +24,11 @@ import datingapp.core.matching.TrustSafetyService;
 import datingapp.core.matching.UndoService;
 import datingapp.core.metrics.AchievementService;
 import datingapp.core.metrics.ActivityMetricsService;
-import datingapp.core.profile.LocationService;
 import datingapp.core.profile.ProfileService;
 import datingapp.core.profile.ValidationService;
 import datingapp.core.storage.UserStorage;
 import datingapp.core.workflow.ProfileActivationPolicy;
+import datingapp.location.LocationService;
 import java.time.ZoneOffset;
 
 /**

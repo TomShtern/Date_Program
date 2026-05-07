@@ -1,9 +1,9 @@
 package datingapp.core.matching;
 
 import datingapp.core.AppConfig;
-import datingapp.core.model.GeoUtils;
 import datingapp.core.model.User;
 import datingapp.core.profile.ProfileService;
+import datingapp.location.GeoUtils;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;

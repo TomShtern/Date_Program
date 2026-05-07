@@ -4,7 +4,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.core.matching.CandidateFinder;
-import datingapp.core.model.GeoUtils;
 import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
 import datingapp.core.profile.MatchPreferences.Dealbreakers;
@@ -16,6 +15,7 @@ import datingapp.core.profile.MatchPreferences.PacePreferences.MessagingFrequenc
 import datingapp.core.profile.MatchPreferences.PacePreferences.TimeToFirstDate;
 import datingapp.core.testutil.TestClock;
 import datingapp.core.testutil.TestStorages;
+import datingapp.location.GeoUtils;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;

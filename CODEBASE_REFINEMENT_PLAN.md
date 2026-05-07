@@ -1,5 +1,4 @@
 # Codebase Refinement Plan
-
 > **Sources:**
 > - [CODEBASE_DEEP_ANALYSIS.md](./CODEBASE_DEEP_ANALYSIS.md) — 125 findings (88 from fresh audit + 37 from prior review, May 2026)
 >
@@ -15,7 +14,7 @@
 > - **Total:** 445 files · 100,750 code lines
 >
 > **Ordered by:** impact-to-effort ratio, lowest effort first.
-
+>
 > **Baseline** (via `tokei`):
 > - **Main:** 199 files · 46,392 code lines · 57,334 total
 > - **Test:** 219 files · 49,403 code lines · 59,632 total
@@ -27,11 +26,11 @@
 
 *Low effort, high impact, minimal risk. Each item is independent and self-contained.*
 
-1. Delete the empty `validateMatchingBehaviorFlags()` method from `AppConfigValidator`. (Analysis 2.3)
+1. [Invalidated; see appendix] `validateMatchingBehaviorFlags()` is an intentional no-op hook in `AppConfigValidator`, so deleting it is not a valid cleanup today. (Analysis 2.3)
 
 2. Rename `SwipeState.Session.MatchState` → `SessionState` to eliminate the name collision with `Match.MatchState`. Update all references in `SwipeState`, `ActivityMetricsService`, `MetricsEventHandler`, and tests. (Analysis 2.2)
 
-3. Merge `GeoValidation` into `GeoUtils` — one file of 67 lines instead of two. (Analysis 2.4)
+3. [Implemented] Merge `GeoValidation` into `GeoUtils` to reduce geo-helper fragmentation, but keep the remaining location models and profile services separate by layer. (Analysis 2.4)
 
 4. Merge `ModerationAuditLogger` into `ModerationAuditEvent` as a `static log(ModerationAuditEvent)` method. Delete `ModerationAuditLogger.java`. (Analysis 2.7)
 
@@ -49,7 +48,7 @@
 
 11. Promote `CandidateFinder.GeoUtils` to a top-level utility in `core/matching/` or merge into `core/model/GeoUtils.java`. Update imports in `MatchingViewModel` and other callers. (Analysis CR31)
 
-12. Remove `ProfileHandler.copyForProfileEditing()` — it is a wrapper around `source.copy()`. Call `User.copy()` directly at the single call site. (Analysis CR35)
+12. [Invalidated; see appendix] `ProfileHandler.copyForProfileEditing()` no longer exists; `ProfileHandler` already uses `currentUser.copy()` directly. (Analysis CR35)
 
 ---
 
@@ -59,13 +58,13 @@
 
 1. **`ValidationService` email/phone → delegate to `TextNormalization`.** Have `ValidationService.validateEmail()` call `TextNormalization.normalizeEmail()` instead of its own private copy. Same for `validatePhone()`. Remove the duplicate constants (`MAX_EMAIL_LENGTH`, `EMAIL_LOCAL_PATTERN`, `DOMAIN_LABEL_PATTERN`, `PHONE_ALLOWED_PATTERN`, `MIN_PHONE_DIGITS`, `MAX_PHONE_DIGITS`, `containsControlCharacters()`, `isValidAsciiDomain()`) from `ValidationService`. The `normalizePhotoUrl()` delegation already follows this pattern. (Analysis 1.1)
 
-2. Add `Match.copy()` to the `Match` model (mirroring `User.copy()`). Replace the 3 call sites in `ConnectionService:613`, `TrustSafetyService:417`, and `MatchingUseCases:789` that reconstruct Match via full constructor. (Analysis 1.9)
+2. Add `Match.copy()` to the `Match` model (mirroring `User.copy()`). Replace the 4 call sites in `ConnectionService:613`, `TrustSafetyService:417`, `JdbiMatchmakingStorage:1091`, and `MatchingUseCases:789` that reconstruct Match via full constructor. (Analysis 1.9)
 
 3. Extract `EventPublishing.publishOrWarn(AppEventBus, AppEvent, String, Logger)` into `app/event/`. Replace the 4 copies of the try-catch wrapper in `ProfileMutationUseCases`, `MessagingUseCases`, `ProfileNotesUseCases`, and `SocialUseCases`. (Analysis 3.6)
 
 4. Create `PagedQuery<T>` helper accepting `Supplier<Integer>` (count) and `BiFunction<Integer, Integer, List<T>>` (fetch). Replace the 4+ identical count-then-page patterns in `JdbiUserStorage` and `JdbiMatchmakingStorage`. (Analysis 2.12)
 
-5. Move `bindNullableUuid()`, `bindNullableInstant()`, and `bindNullableString()` from `JdbiMatchmakingStorage`, `JdbiMetricsStorage`, and `JdbiAuthStorage` into `JdbiTypeCodecs` as shared static methods. (Analysis 2.11)
+5. Move `bindNullableUuid()` and `bindNullableInstant()` from `JdbiMatchmakingStorage` and `JdbiMetricsStorage` into `JdbiTypeCodecs` as shared static methods. `JdbiAuthStorage` uses inline `bindNull` branches rather than the same helper shape. (Analysis 2.11)
 
 6. **REST API utility consolidation.** Create a package-level `RestApiUtils` class containing:
    - `parseUuid(String)` — remove from `RestApiServer` and `RestApiIdentityPolicy` (Analysis 1.6)
@@ -75,7 +74,7 @@
 
 7. Extract a shared route handler template in `RestApiServer` for the 14+ handlers following the "Lookup User → Execute → Result → DTO → Respond" pattern. Also extract `parsePagination(ctx, defaultLimit)` for the 3 repeated pagination parsing blocks. (Analysis 5.1, 5.2)
 
-8. Create `UiStyles` utility with `getThemeUrl()` for the 4 call sites that load `/css/theme.css` via `getClass().getResource("/css/theme.css").toExternalForm()`. The 4 sites: `UiUtils`, `UiDialogs`, `UiFeedbackService`, `MatchingController`. (Analysis 6.1)
+8. Create `UiStyles` utility with `getThemeUrl()` for the 5 call sites that load `/css/theme.css` via `getClass().getResource("/css/theme.css").toExternalForm()`. The 5 sites: `UiUtils`, `UiDialogs`, `UiFeedbackService`, `MatchingController`, `NavigationService`. (Analysis 6.1)
 
 9. Add `protected final Logger logger = LoggerFactory.getLogger(getClass())` to `BaseController` (matching `BaseViewModel`'s existing pattern). Remove the individual logger declarations and the `logInfo`/`logWarn`/`logDebug`/`logError` wrapper methods from `DashboardController`, `MatchingController`, `ProfileController`, `PreferencesController`, and `MatchesController`. (Analysis 1.4)
 
@@ -175,17 +174,15 @@
 
 17. Resolve the match lifecycle split: document the boundary between `MatchingUseCases.archiveMatch()` and `SocialUseCases.unmatch()`/`gracefulExit()`, or consolidate all match state transitions under one use-case. (Analysis 3.5)
 
-18. **ChatViewModel correctness pass.** Fix the following in one coordinated change set (Analysis CR1–CR8):
-    - Return read-only observable views from `getConversations()` and `getActiveMessages()`.
+18. **ChatViewModel correctness pass.** Fix the following in one coordinated change set (Analysis CR2, CR3, CR5, CR6–CR8):
     - Document `sendMessage()` boolean return as "accepted for async send."
     - Fix the profile-note save token race condition — capture the initiating token before async work.
-    - Clear all UI-observable state when `setCurrentUser(null)` is called.
     - Refresh `currentUser` from `AppSession` on initialize and explicit session changes.
     - Expose error/retry state for `loadMessagesInBackground()` failures.
     - Maintain explicit visible error state for message send failures.
     - Batch UI updates and compare cheaper summary signals before full list comparisons in polling.
 
-19. Remove the `SafetyViewModel` compatibility fallback that performs verification work directly with `TrustSafetyService`. Route all verification through `VerificationUseCases`. (Analysis CR9)
+19. [Invalidated; see appendix] `SafetyViewModel` already routes verification through `VerificationUseCases`; there is no `TrustSafetyService` fallback to remove. (Analysis CR9)
 
 20. Add a `dealbreakers(Dealbreakers)` setter to `User.StorageBuilder` so persistence/load code can set dealbreakers during construction rather than patching them after build. (Analysis CR14)
 
@@ -269,8 +266,23 @@
 
 *Numbers are conservative estimates. Actual savings depend on implementation choices (e.g., how generics replace boilerplate, how large files are split).*
 
-*Numbers are conservative estimates. Actual savings depend on implementation choices (e.g., how generics replace boilerplate, how large files are split).*
+## False Claims
 
----
+*The items below were found false against the current code. The original wording is preserved for context, followed by the correction.*
+
+- Original: `Delete the empty validateMatchingBehaviorFlags() method from AppConfigValidator.`
+  Correction: Invalidated. `AppConfig.MatchingConfig` still calls the method, so it is an intentional no-op hook rather than dead code.
+
+- Original: `ProfileHandler.copyForProfileEditing()` is a wrapper around `source.copy().`
+  Correction: Invalidated. `ProfileHandler` already uses `currentUser.copy()` directly and has no such wrapper method.
+
+- Original: `Return read-only observable views from getConversations() and getActiveMessages().`
+  Correction: Invalidated. `ChatViewModel` already exposes unmodifiable observable views for both lists.
+
+- Original: `Clear all UI-observable state when setCurrentUser(null) is called.`
+  Correction: Invalidated. The null-user path already clears the selected conversation, lists, unread count, sending flag, note state, and presence state.
+
+- Original: `Remove the SafetyViewModel compatibility fallback that performs verification work directly with TrustSafetyService.`
+  Correction: Invalidated. `SafetyViewModel` already requires `VerificationUseCases`; missing wiring reports `PROFILE_VERIFICATION_UNAVAILABLE`.
 
 *End of plan.*

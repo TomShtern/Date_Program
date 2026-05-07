@@ -1,4 +1,4 @@
-package datingapp.app.geocoding;
+package datingapp.location;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -6,8 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
-import datingapp.core.model.LocationModels.Precision;
-import datingapp.core.profile.GeocodingService;
+import datingapp.location.LocationModels.Precision;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
