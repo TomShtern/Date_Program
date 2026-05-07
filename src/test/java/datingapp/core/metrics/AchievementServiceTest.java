@@ -68,9 +68,9 @@ class AchievementServiceTest {
     @DisplayName("protected no-arg constructor fails fast on live use")
     void protectedNoArgConstructorFailsFastOnLiveUse() {
         AchievementService service = new AchievementService() {};
+        UUID userId = UUID.randomUUID();
 
-        IllegalStateException ex =
-                assertThrows(IllegalStateException.class, () -> service.getUnlocked(UUID.randomUUID()));
+        IllegalStateException ex = assertThrows(IllegalStateException.class, () -> service.getUnlocked(userId));
 
         assertEquals("AchievementService analyticsStorage is not initialized", ex.getMessage());
     }

@@ -231,13 +231,13 @@ class ImageCacheTest {
             Platform.runLater(fxCall);
             fxCall.get(1, TimeUnit.SECONDS);
 
-            assertTrue(callbackInvoked.getCount() == 1, "callback should wait for the in-flight preload to finish");
+            assertEquals(1L, callbackInvoked.getCount(), "callback should wait for the in-flight preload to finish");
 
             server.releaseResponse();
 
             assertTrue(callbackInvoked.await(5, TimeUnit.SECONDS), "callback should run after the preload completes");
             assertNotNull(loadedImage.get());
-            assertTrue(Boolean.TRUE.equals(callbackOnFxThread.get()), "callback should run on the FX thread");
+            assertEquals(Boolean.TRUE, callbackOnFxThread.get(), "callback should run on the FX thread");
             assertEquals(1, server.getRequestCount(), "async lookups should reuse the existing in-flight load");
         }
     }

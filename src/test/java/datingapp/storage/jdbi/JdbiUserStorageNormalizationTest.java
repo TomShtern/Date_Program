@@ -159,6 +159,24 @@ class JdbiUserStorageNormalizationTest {
     }
 
     @Test
+    @DisplayName("findByEmail hydrates normalized profile collections")
+    void findByEmailHydratesNormalizedProfileCollections() {
+        UUID lookupUserId = UUID.randomUUID();
+        User user = new User(lookupUserId, "Lookup User");
+        user.setEmail("lookup@example.com");
+        user.setPhotoUrls(List.of("https://example.com/lookup.jpg"));
+        user.setInterests(Set.of(Interest.MUSIC, Interest.TRAVEL));
+
+        storage.save(user);
+        storage.clearCache();
+
+        User found = storage.findByEmail("lookup@example.com").orElseThrow();
+
+        assertEquals(List.of("https://example.com/lookup.jpg"), found.getPhotoUrls());
+        assertEquals(Set.of(Interest.MUSIC, Interest.TRAVEL), found.getInterests());
+    }
+
+    @Test
     @DisplayName("get expires cached users after the TTL")
     void getExpiresCachedUsersAfterTtl() {
         storage.clearCache();

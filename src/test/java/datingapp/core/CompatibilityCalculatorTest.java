@@ -113,7 +113,6 @@ class CompatibilityCalculatorTest {
     void protectedNoArgConstructorFailsFastOnLiveUse() {
         CompatibilityCalculator calculator = new CompatibilityCalculator() {};
         User me = new User(UUID.randomUUID(), "Me");
-        User them = new User(UUID.randomUUID(), "Them");
 
         IllegalStateException ex =
                 assertThrows(IllegalStateException.class, () -> calculator.calculateResponseScore(Duration.ofHours(1)));
