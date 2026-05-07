@@ -13,6 +13,12 @@ record ProfileCompletionView(
         boolean canActivate,
         boolean canBrowse) {
 
+    ProfileCompletionView {
+        missingProfileFields = missingProfileFields == null ? List.of() : List.copyOf(missingProfileFields);
+        missingProfileFieldLabels =
+                missingProfileFieldLabels == null ? List.of() : List.copyOf(missingProfileFieldLabels);
+    }
+
     static ProfileCompletionView from(User user, ProfileActivationPolicy activationPolicy) {
         boolean profileComplete = user.isComplete();
         boolean canActivate = activationPolicy.canActivate(user).isAllowed();

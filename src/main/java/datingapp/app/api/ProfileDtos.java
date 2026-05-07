@@ -43,7 +43,12 @@ final class ProfileDtos {
             Set<Interest> interests,
             Dealbreakers dealbreakers,
             LocationDtos.ProfileLocationRequest location,
-            WritePacePreferencesDto pacePreferences) {}
+            WritePacePreferencesDto pacePreferences) {
+        ProfileUpdateRequest {
+            interestedIn = interestedIn == null ? Set.of() : Set.copyOf(interestedIn);
+            interests = interests == null ? Set.of() : Set.copyOf(interests);
+        }
+    }
 
     /** Nested DTO for pace preferences in profile update requests. */
     static record WritePacePreferencesDto(
@@ -70,6 +75,11 @@ final class ProfileDtos {
             List<String> reasonTags,
             List<String> details,
             Instant generatedAt) {
+        PresentationContextDto {
+            reasonTags = reasonTags == null ? List.of() : List.copyOf(reasonTags);
+            details = details == null ? List.of() : List.copyOf(details);
+        }
+
         static PresentationContextDto from(
                 User viewer, User target, String targetLocation, java.time.ZoneId userTimeZone) {
             List<String> tags = new ArrayList<>();
@@ -138,6 +148,12 @@ final class ProfileDtos {
             Boolean profileComplete,
             Boolean canActivate,
             Boolean canBrowse) {
+        ProfileEditSnapshotDto {
+            missingProfileFields = missingProfileFields == null ? List.of() : List.copyOf(missingProfileFields);
+            missingProfileFieldLabels =
+                    missingProfileFieldLabels == null ? List.of() : List.copyOf(missingProfileFieldLabels);
+        }
+
         static ProfileEditSnapshotDto from(User user, SelectionSeed seed, ProfileActivationPolicy activationPolicy) {
             ProfileCompletionView completion =
                     activationPolicy != null ? ProfileCompletionView.from(user, activationPolicy) : null;
@@ -172,6 +188,11 @@ final class ProfileDtos {
             DealbreakersDto dealbreakers,
             PacePreferencesEditableDto pacePreferences,
             ProfileEditLocationDto location) {
+        ProfileEditableDto {
+            interestedIn = interestedIn == null ? List.of() : List.copyOf(interestedIn);
+            interests = interests == null ? List.of() : List.copyOf(interests);
+        }
+
         static ProfileEditableDto from(User user, SelectionSeed seed) {
             return new ProfileEditableDto(
                     user.getBio(),
@@ -203,6 +224,14 @@ final class ProfileDtos {
             Integer minHeightCm,
             Integer maxHeightCm,
             Integer maxAgeDifference) {
+        DealbreakersDto {
+            acceptableSmoking = acceptableSmoking == null ? List.of() : List.copyOf(acceptableSmoking);
+            acceptableDrinking = acceptableDrinking == null ? List.of() : List.copyOf(acceptableDrinking);
+            acceptableKidsStance = acceptableKidsStance == null ? List.of() : List.copyOf(acceptableKidsStance);
+            acceptableLookingFor = acceptableLookingFor == null ? List.of() : List.copyOf(acceptableLookingFor);
+            acceptableEducation = acceptableEducation == null ? List.of() : List.copyOf(acceptableEducation);
+        }
+
         static DealbreakersDto from(Dealbreakers dealbreakers) {
             Dealbreakers safe = dealbreakers != null ? dealbreakers : Dealbreakers.none();
             return new DealbreakersDto(
@@ -268,6 +297,10 @@ final class ProfileDtos {
             boolean verified,
             String verificationMethod,
             Instant verifiedAt) {
+        ProfileReadOnlyDto {
+            photoUrls = photoUrls == null ? List.of() : List.copyOf(photoUrls);
+        }
+
         static ProfileReadOnlyDto from(User user) {
             return new ProfileReadOnlyDto(
                     user.getName(),
@@ -298,6 +331,13 @@ final class ProfileDtos {
             boolean profileComplete,
             boolean canActivate,
             boolean canBrowse) {
+        ProfileUpdateResponse {
+            interestedIn = interestedIn == null ? List.of() : List.copyOf(interestedIn);
+            missingProfileFields = missingProfileFields == null ? List.of() : List.copyOf(missingProfileFields);
+            missingProfileFieldLabels =
+                    missingProfileFieldLabels == null ? List.of() : List.copyOf(missingProfileFieldLabels);
+        }
+
         static ProfileUpdateResponse from(
                 User user, boolean activated, java.time.ZoneId userTimeZone, String approximateLocation) {
             return from(user, activated, userTimeZone, approximateLocation, null);

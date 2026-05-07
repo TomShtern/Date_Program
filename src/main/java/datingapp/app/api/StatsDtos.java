@@ -85,6 +85,11 @@ final class StatsDtos {
             List<AchievementUnlockedDto> newlyUnlocked,
             int unlockedCount,
             int newlyUnlockedCount) {
+        AchievementSnapshotDto {
+            unlocked = unlocked == null ? List.of() : List.copyOf(unlocked);
+            newlyUnlocked = newlyUnlocked == null ? List.of() : List.copyOf(newlyUnlocked);
+        }
+
         static AchievementSnapshotDto from(
                 datingapp.app.usecase.profile.ProfileInsightsUseCases.AchievementSnapshot snapshot) {
             return new AchievementSnapshotDto(

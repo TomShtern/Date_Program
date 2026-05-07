@@ -21,7 +21,9 @@ If any markdown guidance and the code disagree, trust:
 2. For multi-step work, keep an explicit todo list with exactly one step in progress.
 3. Read the owning file and the nearest deciding seam fully before editing.
 4. Prefer one coordinator for shared files and only parallelize independent work.
-5. Make the smallest coherent change that actually fixes the contract or behavior.
+5. Prefer the simplest complete fix, not the smallest diff. Refactor when needed to fully correct the contract, behavior, and all affected code paths, including callers, dependencies, tests, and related design.
+6. Do not dismiss compilation errors as “pre-existing” just because they appear outside your edited files. Treat every compile failure as relevant and fix it, even if it is unrelated to your current change.
+ After fixing unrelated/pre-existing errors, clearly report them separately: what failed, where it was, what you changed, and that it was outside the original task scope.
 
 ## Search and tool discipline
 

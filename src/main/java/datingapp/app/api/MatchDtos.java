@@ -21,6 +21,10 @@ final class MatchDtos {
             RestApiUserDtos.DailyPickDto dailyPick,
             boolean dailyPickViewed,
             boolean locationMissing) {
+        BrowseCandidatesResponse {
+            candidates = candidates == null ? List.of() : List.copyOf(candidates);
+        }
+
         static BrowseCandidatesResponse from(
                 datingapp.app.usecase.matching.MatchingUseCases.BrowseCandidatesResult result,
                 java.time.ZoneId userTimeZone) {
@@ -45,6 +49,10 @@ final class MatchDtos {
             List<String> photoUrls,
             String approximateLocation,
             String summaryLine) {
+        MatchSummary {
+            photoUrls = photoUrls == null ? List.of() : List.copyOf(photoUrls);
+        }
+
         static MatchSummary from(Match match, UUID currentUserId, Map<UUID, User> usersById) {
             return from(match, currentUserId, usersById, null);
         }
@@ -60,7 +68,7 @@ final class MatchDtos {
                     match.getState().name(),
                     match.getCreatedAt(),
                     RestApiUserDtos.personPrimaryPhotoUrl(otherUser),
-                    otherUser != null ? otherUser.getPhotoUrls() : List.of(),
+                    otherUser != null ? List.copyOf(otherUser.getPhotoUrls()) : List.of(),
                     approximateLocation,
                     RestApiUserDtos.personSummaryLine(otherUser));
         }
@@ -89,14 +97,26 @@ final class MatchDtos {
      * @param hasMore    {@code true} if another page exists
      */
     static record PagedMatchResponse(
-            List<MatchSummary> matches, int totalCount, int offset, int limit, boolean hasMore) {}
+            List<MatchSummary> matches, int totalCount, int offset, int limit, boolean hasMore) {
+        PagedMatchResponse {
+            matches = matches == null ? List.of() : List.copyOf(matches);
+        }
+    }
 
     /** Pending likers response. */
-    static record PendingLikersResponse(List<RestApiUserDtos.PendingLikerDto> pendingLikers) {}
+    static record PendingLikersResponse(List<RestApiUserDtos.PendingLikerDto> pendingLikers) {
+        PendingLikersResponse {
+            pendingLikers = pendingLikers == null ? List.of() : List.copyOf(pendingLikers);
+        }
+    }
 
     /** Standouts response. */
     static record StandoutsResponse(
-            List<RestApiUserDtos.StandoutDto> standouts, int totalCandidates, boolean fromCache, String message) {}
+            List<RestApiUserDtos.StandoutDto> standouts, int totalCandidates, boolean fromCache, String message) {
+        StandoutsResponse {
+            standouts = standouts == null ? List.of() : List.copyOf(standouts);
+        }
+    }
 
     /** Match quality response. */
     static record MatchQualityDto(
@@ -110,6 +130,10 @@ final class MatchDtos {
             double distanceKm,
             int ageDifference,
             List<String> highlights) {
+        MatchQualityDto {
+            highlights = highlights == null ? List.of() : List.copyOf(highlights);
+        }
+
         static MatchQualityDto from(MatchQualitySnapshot quality) {
             return new MatchQualityDto(
                     quality.matchId(),

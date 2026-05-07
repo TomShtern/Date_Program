@@ -10,6 +10,10 @@
 
 ---
 
+## Progress Tracking
+- As you finish each step, mark it `✅ IMPLEMENTED`.
+- When the plan is fully implemented end-to-end, add `✅ IMPLEMENTED` immediately below the title at the top of this file.
+
 ## Decision Check
 
 - This plan is about adapter-layer duplication, not core completion math. Do not rewrite completion scoring here.

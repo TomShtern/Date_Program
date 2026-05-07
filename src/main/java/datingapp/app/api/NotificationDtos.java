@@ -17,6 +17,10 @@ final class NotificationDtos {
             Instant createdAt,
             boolean isRead,
             Map<String, String> data) {
+        NotificationDto {
+            data = data == null ? Map.of() : Map.copyOf(data);
+        }
+
         static NotificationDto from(Notification notification) {
             return new NotificationDto(
                     notification.id(),

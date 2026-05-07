@@ -8,6 +8,10 @@
 
 ---
 
+## Progress Tracking
+- As you finish each step, mark it `✅ IMPLEMENTED`.
+- When the plan is fully implemented end-to-end, add `✅ IMPLEMENTED` immediately below the title at the top of this file.
+
 ## Pre-flight
 
 1. The user manages all git operations. **Do not run `git` commands** at any point — including `git mv` for the file relocation in Item 2. Use the regular file-system move instead.

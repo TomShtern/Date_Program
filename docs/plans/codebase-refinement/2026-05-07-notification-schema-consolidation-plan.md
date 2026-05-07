@@ -10,6 +10,10 @@
 
 ---
 
+## Progress Tracking
+- As you finish each step, mark it `✅ IMPLEMENTED`.
+- When the plan is fully implemented end-to-end, add `✅ IMPLEMENTED` immediately below the title at the top of this file.
+
 ## Decision Check
 
 - The current pain comes from ownership drift: notification model, event projection, DTO mapping, and read APIs all live under different roofs.
