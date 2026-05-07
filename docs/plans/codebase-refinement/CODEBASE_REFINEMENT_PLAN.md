@@ -46,7 +46,7 @@
 
 10. Delete the deprecated `NO_OP_DAILY_LIMIT_SERVICE` and `NO_OP_DAILY_PICK_SERVICE` inner classes from `MatchingUseCases`. (Analysis 3.4)
 
-11. Promote `CandidateFinder.GeoUtils` to a top-level utility in `core/matching/` or merge into `core/model/GeoUtils.java`. Update imports in `MatchingViewModel` and other callers. (Analysis CR31)
+11. [Invalidated; see appendix] `CandidateFinder` has no inner `GeoUtils`; it already imports the top-level `datingapp.location.GeoUtils`. (Analysis CR31)
 
 12. [Invalidated; see appendix] `ProfileHandler.copyForProfileEditing()` no longer exists; `ProfileHandler` already uses `currentUser.copy()` directly. (Analysis CR35)
 
@@ -67,10 +67,10 @@
 5. Move `bindNullableUuid()` and `bindNullableInstant()` from `JdbiMatchmakingStorage` and `JdbiMetricsStorage` into `JdbiTypeCodecs` as shared static methods. `JdbiAuthStorage` uses inline `bindNull` branches rather than the same helper shape. (Analysis 2.11)
 
 6. **REST API utility consolidation.** Create a package-level `RestApiUtils` class containing:
-   - `parseUuid(String)` — remove from `RestApiServer` and `RestApiIdentityPolicy` (Analysis 1.6)
-   - `isLoopback(String)` — remove from `RestApiServer` and `RestApiRequestGuards` (Analysis 5.9)
-   - `extractBearerToken(Context)` returning `Optional<String>` — remove from `RestApiIdentityPolicy` and `RestApiRequestContext` (Analysis 5.5)
-   - Have `RestApiServer` pass already-normalized shared secret to `RestApiRequestGuards`; remove the redundant second `normalizeSharedSecret()` call. (Analysis 5.10)
+   - `isLoopback(String)` — unify `RestApiServer.isLoopbackHost` and `RestApiRequestGuards.isLoopbackAddress` into a single helper (Analysis 5.9)
+   - Have `RestApiServer` pass the already-normalized shared secret into `RestApiRequestGuards`; remove the redundant second `normalizeSharedSecret()` call. (Analysis 5.10)
+   - [Reduced scope] `parseUuid(String)` is only defined in `RestApiIdentityPolicy` and reused from `RestApiServer` — no duplication to remove. (Analysis 1.6 invalidated)
+   - [Reduced scope] `extractBearerToken(Context)` was not found in `RestApiRequestContext`; only the `RestApiIdentityPolicy` definition exists. (Analysis 5.5 invalidated)
 
 7. Extract a shared route handler template in `RestApiServer` for the 14+ handlers following the "Lookup User → Execute → Result → DTO → Respond" pattern. Also extract `parsePagination(ctx, defaultLimit)` for the 3 repeated pagination parsing blocks. (Analysis 5.1, 5.2)
 
@@ -100,7 +100,7 @@
 
 5. Consolidate the 6 smallest DTO files into domain-grouped files: `RestApiDtos` (14 lines), `MessageDtos` (28 lines), `NotificationDtos` (34 lines), `VerificationDtos` (36 lines), `AuthDtos` (35 lines), `PhotoDtos` (39 lines). (Analysis 4.3)
 
-6. Extract the 44 schema constants (`TABLE_MATCHES`, `TABLE_USERS`, `COLUMN_CREATED_AT`, etc.) from `MigrationRunner` into a shared `SchemaConstants` class. Reference them from both `SchemaInitializer` and `MigrationRunner`. (Analysis 2.13)
+6. [Invalidated; see appendix] `MigrationRunner` has ~25 schema constants (not 44), and `SchemaInitializer` does not duplicate them — DDL strings are inline. No consolidation needed. (Analysis 2.13)
 
 7. Add a `ProfileCompletionDto.of(ProfileCompletionView)` method that encapsulates the 8-field unwrapping pattern. Replace the 6 sites that manually unpack `ProfileCompletionView` into DTOs. (Analysis 5.3)
 
@@ -110,7 +110,7 @@
 
 10. Unify `TestServiceRegistryBuilder.buildWithStorages()` and `RestApiTestFixture.Builder.build()` into a single builder with extension points for REST-specific additions. (Analysis 8.1)
 
-11. Extract `SchemaEnumValues` constants for each enum's valid SQL CHECK constraint values, referenced by both `SchemaInitializer` and `MigrationRunner`. (Analysis 2.16)
+11. [Invalidated; see appendix] Neither `SchemaInitializer` nor `MigrationRunner` uses Java enums for CHECK constraint values — both inline SQL string literals, with no overlap to extract. (Analysis 2.16)
 
 ---
 
@@ -130,9 +130,9 @@
 
 6. Move `TestJdbiMapping.java` from `src/test/java/datingapp/` to `src/test/java/datingapp/storage/jdbi/`. (Analysis 8.5)
 
-7. Split `RestApiPhaseTwoRoutesTest.java` (1007 lines) into smaller route-specific test classes. (Analysis 8.7)
+7. Split `RestApiPhaseTwoRoutesTest.java` (~1119 lines) into smaller route-specific test classes. (Analysis 8.7)
 
-8. Replace `InMemoryUndoStorage` (2 copies) and `InMemoryStandoutStorage` (3 copies) with `TestStorages.Undos` and `TestStorages.Standouts`. (Analysis 1.8)
+8. Replace `InMemoryUndoStorage` (3 copies in `RestApiPhaseTwoRoutesTest`, `RestApiTestFixture`, `LikerBrowserServiceTest`) with `TestStorages.Undos`. `InMemoryStandoutStorage` exists in only 1 file (`RestApiTestFixture`) — leave in place. (Analysis 1.8)
 
 ---
 
@@ -284,5 +284,20 @@
 
 - Original: `Remove the SafetyViewModel compatibility fallback that performs verification work directly with TrustSafetyService.`
   Correction: Invalidated. `SafetyViewModel` already requires `VerificationUseCases`; missing wiring reports `PROFILE_VERIFICATION_UNAVAILABLE`.
+
+- Original: `Promote CandidateFinder.GeoUtils to a top-level utility in core/matching/ or merge into core/model/GeoUtils.java.`
+  Correction: Invalidated. `CandidateFinder` has no inner `GeoUtils`; it already imports the top-level `datingapp.location.GeoUtils`. There is no `core/model/GeoUtils.java` — the canonical class lives in the `location` package.
+
+- Original: `Extract the 44 schema constants from MigrationRunner into a shared SchemaConstants class referenced by SchemaInitializer and MigrationRunner.`
+  Correction: Invalidated. `MigrationRunner` defines ~25 such constants and `SchemaInitializer` defines zero — DDL strings are inline. There is no duplication to extract.
+
+- Original: `Extract SchemaEnumValues constants for each enum's valid SQL CHECK constraint values, referenced by both SchemaInitializer and MigrationRunner.`
+  Correction: Invalidated. Neither file uses Java enums for CHECK constraint values — both inline SQL string literals.
+
+- Original (partial): `Create RestApiUtils with parseUuid(String) and extractBearerToken(Context) deduplicated from multiple call sites.`
+  Correction: Invalidated for these two helpers. `parseUuid` is only defined in `RestApiIdentityPolicy` (called from `RestApiServer`, no second copy). `extractBearerToken` does not exist in `RestApiRequestContext`. The remaining `isLoopback` consolidation and the redundant `normalizeSharedSecret()` call are still valid.
+
+- Original (partial): `Replace InMemoryStandoutStorage (3 copies) with TestStorages.Standouts.`
+  Correction: Invalidated. `InMemoryStandoutStorage` exists in only one test file (`RestApiTestFixture`). `InMemoryUndoStorage` duplication remains valid (3 copies).
 
 *End of plan.*
