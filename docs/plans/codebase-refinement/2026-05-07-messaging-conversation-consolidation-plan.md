@@ -10,6 +10,10 @@
 
 ---
 
+## Progress Tracking
+- As you finish each step, mark it `✅ IMPLEMENTED`.
+- When the plan is fully implemented end-to-end, add `✅ IMPLEMENTED` immediately below the title at the top of this file.
+
 ## Decision Check
 
 - The messaging problem is leakage, not the absence of another facade. Do not create a new conversation package or a new high-level coordinator unless the existing roofs cannot hold the behavior.

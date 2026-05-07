@@ -8,6 +8,10 @@
 
 ---
 
+## Progress Tracking
+- As you finish each step, mark it `✅ IMPLEMENTED`.
+- When the plan is fully implemented end-to-end, add `✅ IMPLEMENTED` immediately below the title at the top of this file.
+
 ## Pre-flight
 
 1. The user manages all git operations. **Do not run `git` commands** at any point. Branching, staging, committing, reverting are entirely the user's responsibility.

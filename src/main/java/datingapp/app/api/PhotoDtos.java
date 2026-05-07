@@ -18,7 +18,14 @@ final class PhotoDtos {
             int requiredProfileFieldCount,
             boolean profileComplete,
             boolean canActivate,
-            boolean canBrowse) {}
+            boolean canBrowse) {
+        PhotoUploadResponse {
+            photoUrls = photoUrls == null ? List.of() : List.copyOf(photoUrls);
+            missingProfileFields = missingProfileFields == null ? List.of() : List.copyOf(missingProfileFields);
+            missingProfileFieldLabels =
+                    missingProfileFieldLabels == null ? List.of() : List.copyOf(missingProfileFieldLabels);
+        }
+    }
 
     /** Response body returned after a photo delete or photo reorder. */
     static record PhotoMutationResponse(
@@ -29,11 +36,26 @@ final class PhotoDtos {
             int requiredProfileFieldCount,
             boolean profileComplete,
             boolean canActivate,
-            boolean canBrowse) {}
+            boolean canBrowse) {
+        PhotoMutationResponse {
+            photoUrls = photoUrls == null ? List.of() : List.copyOf(photoUrls);
+            missingProfileFields = missingProfileFields == null ? List.of() : List.copyOf(missingProfileFields);
+            missingProfileFieldLabels =
+                    missingProfileFieldLabels == null ? List.of() : List.copyOf(missingProfileFieldLabels);
+        }
+    }
 
     /** Request body for reordering a user's photos. */
-    static record PhotoOrderRequest(List<String> photoIds) {}
+    static record PhotoOrderRequest(List<String> photoIds) {
+        PhotoOrderRequest {
+            photoIds = photoIds == null ? List.of() : List.copyOf(photoIds);
+        }
+    }
 
     /** Response body returned when listing a user's photos. */
-    static record PhotoListResponse(String primaryUrl, List<PhotoRef> photos) {}
+    static record PhotoListResponse(String primaryUrl, List<PhotoRef> photos) {
+        PhotoListResponse {
+            photos = photos == null ? List.of() : List.copyOf(photos);
+        }
+    }
 }

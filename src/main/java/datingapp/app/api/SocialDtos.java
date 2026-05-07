@@ -26,6 +26,10 @@ final class SocialDtos {
 
     /** Friend request listing response. */
     static record FriendRequestsResponse(List<FriendRequestDto> friendRequests) {
+        FriendRequestsResponse {
+            friendRequests = friendRequests == null ? List.of() : List.copyOf(friendRequests);
+        }
+
         static FriendRequestsResponse from(List<FriendRequest> requests) {
             return new FriendRequestsResponse(
                     requests.stream().map(FriendRequestDto::from).toList());
@@ -52,6 +56,10 @@ final class SocialDtos {
 
     /** Blocked users response. */
     static record BlockedUsersResponse(List<BlockedUserDto> blockedUsers) {
+        BlockedUsersResponse {
+            blockedUsers = blockedUsers == null ? List.of() : List.copyOf(blockedUsers);
+        }
+
         static BlockedUsersResponse from(
                 List<datingapp.app.usecase.social.SocialUseCases.BlockedUserSummary> blockedUsers) {
             return new BlockedUsersResponse(

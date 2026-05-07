@@ -43,7 +43,11 @@ final class RestApiUserDtos {
             List<String> interestedIn,
             String approximateLocation,
             int maxDistanceKm,
-            String state) {}
+            String state) {
+        UserFields {
+            interestedIn = interestedIn == null ? List.of() : List.copyOf(interestedIn);
+        }
+    }
 
     static record ReadPacePreferencesDto(
             String messagingFrequency, String timeToFirstDate, String communicationStyle, String depthPreference) {
@@ -72,6 +76,10 @@ final class RestApiUserDtos {
             List<String> photoUrls,
             String approximateLocation,
             String summaryLine) {
+        UserSummary {
+            photoUrls = photoUrls == null ? List.of() : List.copyOf(photoUrls);
+        }
+
         static UserSummary from(User user, ZoneId userTimeZone) {
             return from(user, userTimeZone, null, UnaryOperator.identity());
         }
@@ -118,6 +126,14 @@ final class RestApiUserDtos {
             boolean profileComplete,
             boolean canActivate,
             boolean canBrowse) {
+        UserDetail {
+            interestedIn = interestedIn == null ? List.of() : List.copyOf(interestedIn);
+            photoUrls = photoUrls == null ? List.of() : List.copyOf(photoUrls);
+            missingProfileFields = missingProfileFields == null ? List.of() : List.copyOf(missingProfileFields);
+            missingProfileFieldLabels =
+                    missingProfileFieldLabels == null ? List.of() : List.copyOf(missingProfileFieldLabels);
+        }
+
         static UserDetail from(User user, ZoneId userTimeZone, String approximateLocation) {
             return from(user, userTimeZone, approximateLocation, UnaryOperator.identity(), null);
         }
@@ -169,6 +185,10 @@ final class RestApiUserDtos {
             List<String> photoUrls,
             String approximateLocation,
             String summaryLine) {
+        DailyPickDto {
+            photoUrls = photoUrls == null ? List.of() : List.copyOf(photoUrls);
+        }
+
         static DailyPickDto from(DailyPick dailyPick, ZoneId userTimeZone) {
             return from(dailyPick, userTimeZone, null, UnaryOperator.identity());
         }
@@ -206,6 +226,10 @@ final class RestApiUserDtos {
             List<String> photoUrls,
             String approximateLocation,
             String summaryLine) {
+        PendingLikerDto {
+            photoUrls = photoUrls == null ? List.of() : List.copyOf(photoUrls);
+        }
+
         static PendingLikerDto from(MatchingService.PendingLiker pendingLiker, ZoneId userTimeZone) {
             return from(pendingLiker, userTimeZone, null, UnaryOperator.identity());
         }
@@ -247,6 +271,10 @@ final class RestApiUserDtos {
             List<String> photoUrls,
             String approximateLocation,
             String summaryLine) {
+        StandoutDto {
+            photoUrls = photoUrls == null ? List.of() : List.copyOf(photoUrls);
+        }
+
         static StandoutDto from(Standout standout, Map<UUID, User> usersById, ZoneId userTimeZone) {
             return from(standout, usersById, userTimeZone, null, UnaryOperator.identity());
         }
