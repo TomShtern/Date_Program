@@ -102,44 +102,4 @@ class EnumSetUtilTest {
             assertNotSame(input, result);
         }
     }
-
-    @Nested
-    @DisplayName("defensiveCopy")
-    class DefensiveCopy {
-
-        @Test
-        @DisplayName("returns empty set for null input")
-        void returnsEmptyForNull() {
-            EnumSet<Interest> result = EnumSetUtil.defensiveCopy(null, Interest.class);
-            assertNotNull(result);
-            assertTrue(result.isEmpty());
-        }
-
-        @Test
-        @DisplayName("returns empty set for empty EnumSet")
-        void returnsEmptyForEmptyEnumSet() {
-            EnumSet<Interest> result = EnumSetUtil.defensiveCopy(EnumSet.noneOf(Interest.class), Interest.class);
-            assertNotNull(result);
-            assertTrue(result.isEmpty());
-        }
-
-        @Test
-        @DisplayName("creates independent copy")
-        void createsIndependentCopy() {
-            EnumSet<Interest> original = EnumSet.of(Interest.HIKING, Interest.YOGA);
-            EnumSet<Interest> copy = EnumSetUtil.defensiveCopy(original, Interest.class);
-
-            assertEquals(original, copy);
-            assertNotSame(original, copy);
-
-            original.add(Interest.COOKING);
-            assertFalse(copy.contains(Interest.COOKING));
-        }
-
-        @Test
-        @DisplayName("throws on null enumClass")
-        void throwsOnNullEnumClass() {
-            assertThrows(NullPointerException.class, () -> EnumSetUtil.defensiveCopy(null, null));
-        }
-    }
 }

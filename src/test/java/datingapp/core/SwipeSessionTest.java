@@ -48,7 +48,7 @@ class SwipeSessionTest {
         Instant lastActivityAt = AppClock.now();
 
         Session session =
-                new Session(id, userId, createdAt, lastActivityAt, null, Session.MatchState.ACTIVE, 0, 0, 0, 0);
+                new Session(id, userId, createdAt, lastActivityAt, null, Session.SessionState.ACTIVE, 0, 0, 0, 0);
 
         assertNotNull(session);
         assertEquals(id, session.getId());
@@ -67,7 +67,7 @@ class SwipeSessionTest {
 
             assertNotNull(session.getId());
             assertEquals(userId, session.getUserId());
-            assertEquals(Session.MatchState.ACTIVE, session.getState());
+            assertEquals(Session.SessionState.ACTIVE, session.getState());
             assertTrue(session.isActive());
             assertEquals(0, session.getSwipeCount());
             assertEquals(0, session.getLikeCount());
@@ -163,7 +163,7 @@ class SwipeSessionTest {
 
             session.end();
 
-            assertEquals(Session.MatchState.COMPLETED, session.getState());
+            assertEquals(Session.SessionState.COMPLETED, session.getState());
             assertFalse(session.isActive());
             assertNotNull(session.getEndedAt());
         }
@@ -204,7 +204,7 @@ class SwipeSessionTest {
                     AppClock.now().minus(Duration.ofHours(1)),
                     AppClock.now().minus(Duration.ofHours(1)),
                     AppClock.now().minus(Duration.ofMinutes(30)),
-                    Session.MatchState.COMPLETED,
+                    Session.SessionState.COMPLETED,
                     5,
                     3,
                     2,
@@ -224,7 +224,7 @@ class SwipeSessionTest {
                     AppClock.now().minus(Duration.ofMinutes(10)),
                     AppClock.now().minus(Duration.ofMinutes(10)), // 10 min ago
                     null,
-                    Session.MatchState.ACTIVE,
+                    Session.SessionState.ACTIVE,
                     5,
                     3,
                     2,
@@ -290,7 +290,7 @@ class SwipeSessionTest {
                     now.minus(Duration.ofMinutes(5).plusSeconds(30)),
                     now,
                     null,
-                    Session.MatchState.ACTIVE,
+                    Session.SessionState.ACTIVE,
                     0,
                     0,
                     0,
@@ -307,8 +307,8 @@ class SwipeSessionTest {
             UUID userId = UUID.randomUUID();
             Instant future = AppClock.now().plus(Duration.ofMinutes(5));
 
-            Session session =
-                    new Session(UUID.randomUUID(), userId, future, future, null, Session.MatchState.ACTIVE, 0, 0, 0, 0);
+            Session session = new Session(
+                    UUID.randomUUID(), userId, future, future, null, Session.SessionState.ACTIVE, 0, 0, 0, 0);
 
             assertEquals(0, session.getDurationSeconds());
         }
@@ -323,7 +323,7 @@ class SwipeSessionTest {
                     now.minusSeconds(10),
                     now,
                     null,
-                    Session.MatchState.ACTIVE,
+                    Session.SessionState.ACTIVE,
                     5,
                     3,
                     2,
@@ -337,7 +337,7 @@ class SwipeSessionTest {
                     now.minusSeconds(60),
                     now,
                     null,
-                    Session.MatchState.ACTIVE,
+                    Session.SessionState.ACTIVE,
                     60,
                     30,
                     30,
@@ -358,8 +358,8 @@ class SwipeSessionTest {
             UUID userId = UUID.randomUUID();
             Instant now = AppClock.now();
 
-            Session session1 = new Session(id, userId, now, now, null, Session.MatchState.ACTIVE, 0, 0, 0, 0);
-            Session session2 = new Session(id, userId, now, now, null, Session.MatchState.ACTIVE, 5, 3, 2, 1);
+            Session session1 = new Session(id, userId, now, now, null, Session.SessionState.ACTIVE, 0, 0, 0, 0);
+            Session session2 = new Session(id, userId, now, now, null, Session.SessionState.ACTIVE, 5, 3, 2, 1);
 
             assertEquals(session1, session2);
             assertEquals(session1.hashCode(), session2.hashCode());
@@ -372,9 +372,9 @@ class SwipeSessionTest {
             Instant now = AppClock.now();
 
             Session session1 =
-                    new Session(UUID.randomUUID(), userId, now, now, null, Session.MatchState.ACTIVE, 0, 0, 0, 0);
+                    new Session(UUID.randomUUID(), userId, now, now, null, Session.SessionState.ACTIVE, 0, 0, 0, 0);
             Session session2 =
-                    new Session(UUID.randomUUID(), userId, now, now, null, Session.MatchState.ACTIVE, 0, 0, 0, 0);
+                    new Session(UUID.randomUUID(), userId, now, now, null, Session.SessionState.ACTIVE, 0, 0, 0, 0);
 
             assertNotEquals(session1, session2);
         }
@@ -485,7 +485,7 @@ class SwipeSessionTest {
             Session session = Session.create(UUID.randomUUID());
 
             assertTrue(session.isActive());
-            assertEquals(Session.MatchState.ACTIVE, session.getState());
+            assertEquals(Session.SessionState.ACTIVE, session.getState());
         }
 
         @Test
@@ -495,7 +495,7 @@ class SwipeSessionTest {
             session.end();
 
             assertFalse(session.isActive());
-            assertEquals(Session.MatchState.COMPLETED, session.getState());
+            assertEquals(Session.SessionState.COMPLETED, session.getState());
         }
 
         @Test
@@ -585,8 +585,8 @@ class SwipeSessionTest {
             Instant start = AppClock.now().minus(Duration.ofMinutes(10));
             Instant end = start.plus(Duration.ofMinutes(5));
 
-            Session session =
-                    new Session(UUID.randomUUID(), userId, start, end, end, Session.MatchState.COMPLETED, 10, 5, 5, 2);
+            Session session = new Session(
+                    UUID.randomUUID(), userId, start, end, end, Session.SessionState.COMPLETED, 10, 5, 5, 2);
 
             String formatted = session.getFormattedDuration();
             assertTrue(formatted.matches("\\d+:\\d{2}"));
@@ -609,7 +609,7 @@ class SwipeSessionTest {
                     AppClock.now().minus(timeout),
                     AppClock.now().minus(timeout),
                     null,
-                    Session.MatchState.ACTIVE,
+                    Session.SessionState.ACTIVE,
                     0,
                     0,
                     0,
@@ -630,7 +630,7 @@ class SwipeSessionTest {
                     AppClock.now().minus(timeout.minusSeconds(1)),
                     AppClock.now().minus(timeout.minusSeconds(1)),
                     null,
-                    Session.MatchState.ACTIVE,
+                    Session.SessionState.ACTIVE,
                     0,
                     0,
                     0,
@@ -662,14 +662,14 @@ class SwipeSessionTest {
             Instant endedAt = AppClock.now();
 
             Session session = new Session(
-                    id, userId, createdAt, lastActivityAt, endedAt, Session.MatchState.COMPLETED, 20, 12, 8, 5);
+                    id, userId, createdAt, lastActivityAt, endedAt, Session.SessionState.COMPLETED, 20, 12, 8, 5);
 
             assertEquals(id, session.getId());
             assertEquals(userId, session.getUserId());
             assertEquals(createdAt, session.getStartedAt());
             assertEquals(lastActivityAt, session.getLastActivityAt());
             assertEquals(endedAt, session.getEndedAt());
-            assertEquals(Session.MatchState.COMPLETED, session.getState());
+            assertEquals(Session.SessionState.COMPLETED, session.getState());
             assertEquals(20, session.getSwipeCount());
             assertEquals(12, session.getLikeCount());
             assertEquals(8, session.getPassCount());

@@ -33,7 +33,6 @@ public final class MetricsEventHandler {
                 AppEventBus.HandlerPolicy.BEST_EFFORT);
         eventBus.subscribe(AppEvent.UserBlocked.class, this::onUserBlocked, AppEventBus.HandlerPolicy.BEST_EFFORT);
         eventBus.subscribe(AppEvent.UserReported.class, this::onUserReported, AppEventBus.HandlerPolicy.BEST_EFFORT);
-        eventBus.subscribe(AppEvent.MatchExpired.class, this::onMatchExpired, AppEventBus.HandlerPolicy.BEST_EFFORT);
     }
 
     void onSwipeRecorded(AppEvent.SwipeRecorded event) {
@@ -70,10 +69,5 @@ public final class MetricsEventHandler {
 
     void onUserReported(AppEvent.UserReported event) {
         activityMetricsService.recordActivity(event.reporterId());
-    }
-
-    void onMatchExpired(AppEvent.MatchExpired event) {
-        activityMetricsService.recordActivity(event.userA());
-        activityMetricsService.recordActivity(event.userB());
     }
 }

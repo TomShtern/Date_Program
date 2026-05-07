@@ -1,9 +1,17 @@
 package datingapp.app.api;
 
 import java.util.List;
+import java.util.Objects;
 
 final class PhotoDtos {
     private PhotoDtos() {}
+
+    private static <T> List<T> cleanList(List<T> source) {
+        if (source == null) {
+            return List.of();
+        }
+        return source.stream().filter(Objects::nonNull).toList();
+    }
 
     /** A single uploaded photo reference returned after upload. */
     static record PhotoRef(String id, String url) {}
@@ -20,10 +28,9 @@ final class PhotoDtos {
             boolean canActivate,
             boolean canBrowse) {
         PhotoUploadResponse {
-            photoUrls = photoUrls == null ? List.of() : List.copyOf(photoUrls);
-            missingProfileFields = missingProfileFields == null ? List.of() : List.copyOf(missingProfileFields);
-            missingProfileFieldLabels =
-                    missingProfileFieldLabels == null ? List.of() : List.copyOf(missingProfileFieldLabels);
+            photoUrls = cleanList(photoUrls);
+            missingProfileFields = cleanList(missingProfileFields);
+            missingProfileFieldLabels = cleanList(missingProfileFieldLabels);
         }
     }
 
@@ -38,24 +45,23 @@ final class PhotoDtos {
             boolean canActivate,
             boolean canBrowse) {
         PhotoMutationResponse {
-            photoUrls = photoUrls == null ? List.of() : List.copyOf(photoUrls);
-            missingProfileFields = missingProfileFields == null ? List.of() : List.copyOf(missingProfileFields);
-            missingProfileFieldLabels =
-                    missingProfileFieldLabels == null ? List.of() : List.copyOf(missingProfileFieldLabels);
+            photoUrls = cleanList(photoUrls);
+            missingProfileFields = cleanList(missingProfileFields);
+            missingProfileFieldLabels = cleanList(missingProfileFieldLabels);
         }
     }
 
     /** Request body for reordering a user's photos. */
     static record PhotoOrderRequest(List<String> photoIds) {
         PhotoOrderRequest {
-            photoIds = photoIds == null ? List.of() : List.copyOf(photoIds);
+            photoIds = cleanList(photoIds);
         }
     }
 
     /** Response body returned when listing a user's photos. */
     static record PhotoListResponse(String primaryUrl, List<PhotoRef> photos) {
         PhotoListResponse {
-            photos = photos == null ? List.of() : List.copyOf(photos);
+            photos = cleanList(photos);
         }
     }
 }

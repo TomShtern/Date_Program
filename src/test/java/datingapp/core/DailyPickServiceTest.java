@@ -329,7 +329,6 @@ class DailyPickServiceTest {
         DailyPick firstPick = service.getDailyPick(seeker).orElseThrow();
         UUID pickedId = firstPick.user().getId();
         userStorage.delete(pickedId);
-        candidateFinder.clearCache();
 
         DailyPick secondPick = service.getDailyPick(seeker).orElseThrow();
 

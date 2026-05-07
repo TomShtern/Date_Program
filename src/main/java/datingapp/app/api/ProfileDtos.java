@@ -305,7 +305,7 @@ final class ProfileDtos {
             return new ProfileReadOnlyDto(
                     user.getName(),
                     user.getState().name(),
-                    List.copyOf(user.getPhotoUrls()),
+                    user.getPhotoUrls(),
                     user.isVerified(),
                     user.getVerificationMethod() != null
                             ? user.getVerificationMethod().name()

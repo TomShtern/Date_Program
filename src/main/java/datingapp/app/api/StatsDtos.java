@@ -88,6 +88,8 @@ final class StatsDtos {
         AchievementSnapshotDto {
             unlocked = unlocked == null ? List.of() : List.copyOf(unlocked);
             newlyUnlocked = newlyUnlocked == null ? List.of() : List.copyOf(newlyUnlocked);
+            unlockedCount = unlocked.size();
+            newlyUnlockedCount = newlyUnlocked.size();
         }
 
         static AchievementSnapshotDto from(

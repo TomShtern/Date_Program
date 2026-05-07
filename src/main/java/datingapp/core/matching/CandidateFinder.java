@@ -226,11 +226,7 @@ public class CandidateFinder implements LoggingSupport {
     }
 
     public void invalidateCacheFor(UUID userId) {
-        // No-op: candidate browsing is deliberately freshness-first for Phase 1.
-    }
-
-    public void clearCache() {
-        // No-op: candidate browsing is deliberately freshness-first for Phase 1.
+        // Intentionally a no-op: candidate browsing is deliberately freshness-first for Phase 1.
     }
 
     private boolean isNotSelf(User seeker, User candidate) {

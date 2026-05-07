@@ -673,8 +673,7 @@ public final class JdbiMetricsStorage implements AnalyticsStorage, Standout.Stor
             var lastActivityAt = JdbiTypeCodecs.SqlRowReaders.readInstant(rs, "last_activity_at");
             var endedAt = JdbiTypeCodecs.SqlRowReaders.readInstant(rs, ENDED_AT_COLUMN);
             String stateStr = rs.getString(STATE_COLUMN);
-            Session.MatchState state =
-                    stateStr == null ? Session.MatchState.ACTIVE : Session.MatchState.valueOf(stateStr);
+            Session.SessionState state = parseSessionState(stateStr);
             int swipeCount = rs.getInt("swipe_count");
             int likeCount = rs.getInt("like_count");
             int passCount = rs.getInt("pass_count");
@@ -691,6 +690,17 @@ public final class JdbiMetricsStorage implements AnalyticsStorage, Standout.Stor
                     likeCount,
                     passCount,
                     matchCount);
+        }
+
+        private static Session.SessionState parseSessionState(String stateStr) {
+            if (stateStr == null) {
+                return Session.SessionState.ACTIVE;
+            }
+            try {
+                return Session.SessionState.valueOf(stateStr);
+            } catch (IllegalArgumentException e) {
+                return Session.SessionState.ACTIVE;
+            }
         }
     }
 

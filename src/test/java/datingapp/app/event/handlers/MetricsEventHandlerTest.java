@@ -182,24 +182,6 @@ class MetricsEventHandlerTest {
     }
 
     @Test
-    void matchExpiredTriggersRecordActivityForBothUsers() {
-        UUID userA = UUID.randomUUID();
-        UUID userB = UUID.randomUUID();
-        ActivityMetricsService service = new ActivityMetricsService(
-                new TestStorages.Interactions(),
-                new TestStorages.TrustSafety(),
-                new TestStorages.Analytics(),
-                AppConfig.defaults());
-        InProcessAppEventBus eventBus = new InProcessAppEventBus();
-        new MetricsEventHandler(service).register(eventBus);
-
-        eventBus.publish(new AppEvent.MatchExpired("match-1", userA, userB, Instant.now()));
-
-        assertNotNull(service.getCurrentSession(userA).orElse(null));
-        assertNotNull(service.getCurrentSession(userB).orElse(null));
-    }
-
-    @Test
     void accountDeletedEndsSession() {
         UUID userId = UUID.randomUUID();
         ActivityMetricsService service = new ActivityMetricsService(

@@ -111,7 +111,7 @@ class PostgresqlRuntimeSmokeTest {
                 Instant.parse("2026-04-05T12:00:00Z"),
                 Instant.parse("2026-04-05T12:00:15Z"),
                 Instant.parse("2026-04-05T12:00:15Z"),
-                Session.MatchState.COMPLETED,
+                Session.SessionState.COMPLETED,
                 2,
                 1,
                 1,

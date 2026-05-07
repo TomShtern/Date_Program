@@ -16,7 +16,6 @@ public sealed interface AppEvent
                 AppEvent.ProfileNoteSaved,
                 AppEvent.ProfileNoteDeleted,
                 AppEvent.ConversationArchived,
-                AppEvent.MatchExpired,
                 AppEvent.AccountDeleted,
                 AppEvent.FriendRequestAccepted,
                 AppEvent.RelationshipTransitioned,
@@ -56,8 +55,6 @@ public sealed interface AppEvent
     record ProfileNoteDeleted(UUID authorId, UUID subjectId, Instant occurredAt) implements AppEvent {}
 
     record ConversationArchived(String conversationId, UUID archivedByUserId, Instant occurredAt) implements AppEvent {}
-
-    record MatchExpired(String matchId, UUID userA, UUID userB, Instant occurredAt) implements AppEvent {}
 
     record AccountDeleted(UUID userId, DeletionReason reason, Instant occurredAt) implements AppEvent {}
 

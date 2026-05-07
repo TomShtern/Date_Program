@@ -32,7 +32,6 @@ class EventCoverageArchitectureTest {
             Map.entry(AppEvent.ProfileNoteSaved.class, Ownership.of(HandlerOwner.ACHIEVEMENT, HandlerOwner.METRICS)),
             Map.entry(AppEvent.ProfileNoteDeleted.class, Ownership.of(HandlerOwner.METRICS)),
             Map.entry(AppEvent.ConversationArchived.class, Ownership.of(HandlerOwner.METRICS)),
-            Map.entry(AppEvent.MatchExpired.class, Ownership.of(HandlerOwner.METRICS)),
             Map.entry(AppEvent.AccountDeleted.class, Ownership.of(HandlerOwner.METRICS, HandlerOwner.NOTIFICATION)),
             Map.entry(AppEvent.FriendRequestAccepted.class, Ownership.of(HandlerOwner.NOTIFICATION)),
             Map.entry(AppEvent.RelationshipTransitioned.class, Ownership.of(HandlerOwner.NOTIFICATION)),

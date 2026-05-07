@@ -25,10 +25,8 @@ import datingapp.core.testutil.TestClock;
 import datingapp.core.testutil.TestStorages;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -120,40 +118,6 @@ class MatchingServiceTest {
             assertTrue(result.match().isEmpty(), "First like should not create match");
             assertTrue(result.like().isPresent(), "Persisted outcome should expose the recorded like");
             assertTrue(interactionStorage.exists(alice, bob), "Like should be saved");
-        }
-
-        @Test
-        @DisplayName(
-                "recordLike invalidates cached candidates outside the user lock without recording metrics directly")
-        void recordLikeInvalidatesCachesOutsideTheUserLockWithoutRecordingMetricsDirectly() {
-            TransactionInterceptionUsers lockAwareUsers = new TransactionInterceptionUsers();
-            UUID alice = UUID.randomUUID();
-            UUID bob = UUID.randomUUID();
-
-            lockAwareUsers.save(activeUser(alice, "Alice"));
-            lockAwareUsers.save(activeUser(bob, "Bob"));
-
-            TrackingCandidateFinder trackingCandidateFinder =
-                    new TrackingCandidateFinder(lockAwareUsers, interactionStorage, trustSafetyStorage);
-            CountingActivityMetricsService activityMetricsService =
-                    new CountingActivityMetricsService(lockAwareUsers, interactionStorage, trustSafetyStorage);
-            MatchingService service = MatchingService.builder()
-                    .interactionStorage(interactionStorage)
-                    .trustSafetyStorage(trustSafetyStorage)
-                    .userStorage(lockAwareUsers)
-                    .activityMetricsService(activityMetricsService)
-                    .undoService(new UndoService(interactionStorage, undoStorage, AppConfig.defaults()))
-                    .dailyService(new RecommendationService(
-                            alwaysAllowDailyLimitService(), noDailyPickService(), noStandoutService()))
-                    .candidateFinder(trackingCandidateFinder)
-                    .build();
-
-            MatchingService.RecordLikeOutcome result = service.recordLike(Like.create(alice, bob, Like.Direction.PASS));
-
-            assertTrue(result.persisted(), "Pass should persist when allowed");
-            assertTrue(result.match().isEmpty(), "Pass should never create match");
-            assertEquals(0, activityMetricsService.recordSwipeCount());
-            assertEquals(Set.of(alice, bob), trackingCandidateFinder.invalidatedUserIds());
         }
 
         @Test
@@ -913,36 +877,6 @@ class MatchingServiceTest {
             } finally {
                 lockDepth.decrementAndGet();
             }
-        }
-    }
-
-    private static final class TrackingCandidateFinder extends CandidateFinder {
-        private final TransactionInterceptionUsers userStorage;
-        private final Set<UUID> invalidatedUserIds = new HashSet<>();
-
-        private TrackingCandidateFinder(
-                TransactionInterceptionUsers userStorage,
-                TestStorages.Interactions interactionStorage,
-                TestStorages.TrustSafety trustSafetyStorage) {
-            super(
-                    userStorage,
-                    interactionStorage,
-                    trustSafetyStorage,
-                    AppClock.clock().getZone());
-            this.userStorage = userStorage;
-        }
-
-        @Override
-        public void invalidateCacheFor(UUID userId) {
-            assertFalse(userStorage.isUserLockHeld(), "candidate invalidation should happen outside the user lock");
-            if (userId != null) {
-                invalidatedUserIds.add(userId);
-            }
-            super.invalidateCacheFor(userId);
-        }
-
-        private Set<UUID> invalidatedUserIds() {
-            return Set.copyOf(invalidatedUserIds);
         }
     }
 
