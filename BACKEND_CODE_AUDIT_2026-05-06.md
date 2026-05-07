@@ -7,6 +7,70 @@
 
 ---
 
+## Current Status
+
+### ✅ IMPLEMENTED / FIXED / DONE
+
+- ✅ `C1` — `JdbiAuthStorage` now uses `DatabaseDialect` and `SqlDialectSupport.upsertSql`.
+- ✅ `C4` — `JdbiUserStorage.findByEmail()` now uses a direct SQL lookup and hydrates the result.
+- ✅ `H2` — `LocationService` now delegates distance math to `GeoUtils.distanceKm()`.
+- ✅ `H5` — `User` now uses `TextNormalization` directly instead of `ValidationService`.
+- ✅ `H6` — `saveProfile()` and `savePhotoUrls()` now share `executeProfileSave()`.
+- ✅ `H7` — the location index now exists in `SchemaInitializer`.
+- ✅ `H8` — `save(Like)` and `save(Match)` are transaction-wrapped.
+- ✅ `H9` — signup normalization now delegates to `TextNormalization`.
+- ✅ `H10` — `User.copy()` now uses `rawPhotoUrls()`.
+- ✅ `L9` — the old `DevDataSeeder` build shim has been replaced.
+- ✅ `L17` — blank signup names now become the placeholder name.
+- ✅ `L21` — `ApplicationStartup` now refreshes the shutdown hook cleanly.
+- ✅ `M1` — `LocationUpdated` has been removed.
+- ✅ `M2` — `DailyLimitReset` has been removed.
+- ✅ `M4` — `AuthUseCases` now returns `UseCaseResult` on auth failures.
+- ✅ `M10` — `CURRENT_TIMESTAMP` literals were removed from matchmaking SQL.
+- ✅ `M11` — notification save logic was consolidated.
+- ✅ `M12` — read/write `PacePreferences` DTOs are now distinct.
+- ✅ `M13` — `RestApiDtos` is now reduced to shared DTOs.
+- ✅ `M17` — `NOT_FOUND` now returns a 404 directly.
+- ✅ `M20` — `updateProfile()` now validates the age range instead of silently swapping it.
+
+### OPEN
+
+- OPEN `C2` — `JdbiTrustSafetyStorage` is transactional now, but the read-then-insert uniqueness check still leaves a reduced concurrency race.
+- OPEN `C3` — `AppClock` still uses static mutable state with manual set/reset APIs, so test leakage is still possible if cleanup is missed.
+- OPEN `H1` — `RestApiServer` is still the single HTTP surface; the split-controller refactor has not happened yet.
+- OPEN `H3` — `copyMatch()` still exists in both connection and trust-safety services.
+- OPEN `H4` — the match state machine is still encoded in both `Match` and `RelationshipWorkflowPolicy`.
+- OPEN `H11` — `TrustSafetyService.block()` still uses save + transition + compensation rollback instead of one atomic boundary.
+- OPEN `M3` — the compatibility no-op event bus still drops events in those constructor paths.
+- OPEN `M5` — location validation is still duplicated because `ValidationService` keeps its own coordinate helper.
+- OPEN `M6` — `MatchingUseCases.Builder` still auto-seeds compatibility wrappers and keeps no-op fallback services.
+- OPEN `M9` — `AppConfigValidator` still imports `DatabaseDialect` from the storage layer.
+- OPEN `M14` — `ProfileHandler` is still a very large CLI class with mixed responsibilities.
+- OPEN `M15` — `MatchingUseCases.Builder` still hides part of the wiring behind compatibility auto-seeding.
+- OPEN `M16` — `ApplicationStartup` still keeps static mutable singleton state and shutdown-hook management.
+- OPEN `M18` — `IllegalStateException` is still collapsed into a single generic 500 response.
+- OPEN `M19` — deleted-user conversations are still skipped from the conversation list.
+- OPEN `M21` — `MatchingService` still relies on try/finally cleanup for inflight keys without time-based eviction.
+- OPEN `L2-L6` — `AppConfig.Builder`, `Achievement` UI literals, `SwipeState` naming, `ProfileNote.create()`, and pair-ID helper duplication remain backlog items.
+- OPEN `L12` — `ProfileUseCases` is still a broad compatibility facade.
+- OPEN `L14` — `profile_views` still uses a composite key including `viewed_at`; the business rule remains unresolved in the schema comment.
+- OPEN `L16` — `sentLikes()` still lacks a REST API route.
+- OPEN `L18-L20` — `ProfileNote.withContent()`, `TrustSafetyService.contextOf()`, and the `Like` timestamp boundary still need cleanup.
+
+### RECYCLE BIN
+
+- RECYCLE BIN `L1` — stale/incorrect: the named types are concrete classes now, so the interface-plus-single-impl framing no longer matches the code.
+- RECYCLE BIN `L7` — stale/incorrect: the no-op cache invalidation methods are deliberate compatibility behavior.
+- RECYCLE BIN `L8` — stale/incorrect: the normalized-profile methods are still used by compatibility and test code, so they are not dead code.
+- RECYCLE BIN `L10` — stale/incorrect: `UserDtoMapper.java` no longer exists.
+- RECYCLE BIN `L11` — stale/incorrect: `AuthTokenService` is a concrete final class now, not a single-impl interface.
+- RECYCLE BIN `L13` — stale/incorrect: `TestClock` is used by multiple current tests, so it is no longer underused.
+- RECYCLE BIN `L15` — stale/incorrect/compatibility only: `getCandidates()` is still an intentional deprecated alias, not a correctness bug.
+- RECYCLE BIN `M7` — stale/incorrect: the cited messaging method is no longer present in the current code.
+- RECYCLE BIN `M8` — stale/incorrect: `UserStorage` now imports `GeoUtils` from `core.model`, not the matching package.
+
+> Historical note: the original severity buckets above are preserved for provenance only. Use the status sections above for current actioning.
+
 ## CRITICAL — Correctness & Security Bugs
 
 ### C1 — `JdbiAuthStorage` hardcodes PostgreSQL `ON CONFLICT`, breaks H2
@@ -456,36 +520,9 @@ The `try/finally` correctly handles all normal exception paths. However, JVM-fat
 | **Low**      | 21     | 6 over-abstraction, 7 dead code, 2 naming, 3 misc, 1 empty-name bug, 1 redundant validation, 1 silent null drop, 1 timestamp misplacement, 1 stale hook                                                                                        |
 | **Total**    | **57** |                                                                                                                                                                                                                                                |
 
-> Review note: the original severity buckets are preserved above for provenance, but the bucket math and the fix-order labels do not fully reconcile. The calibration below is the actioning view after re-checking the codebase. I did not remove any original finding.
+> Review note: the original severity buckets above are preserved for provenance. The current actioning view is the status sections near the top of this document.
 
-### Review Calibration
+### Notes
 
-Suggested review-severity counts: **High 6**, **Medium 6**, **Low 44**, **None 1**. In this calibrated view, no item remains Critical.
-
-| IDs                                                          | Original labels         | Review verdict                              | Suggested severity | Observation                                                                                                                                                                                                |
-|--------------------------------------------------------------|-------------------------|---------------------------------------------|--------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| C1, C2, C4, H7, H9, H11                                      | Critical / High         | confirmed issue                             | High               | Real defects with current impact. C1 is H2 SQL compatibility, C2 and H11 are transaction-integrity races, C4 is auth-path scanning, H7 is location-query performance, and H9 is email-normalization drift. |
-| C3, M1, M2, M7, M17, L21                                     | Critical / Medium / Low | real but narrow                             | Medium             | Valid issues, but they are mostly test hygiene, dead code, or lifecycle cleanup rather than user-facing defects.                                                                                           |
-| H1-H6, H8, H10, M3-M6, M8-M16, M18-M20, M21, L1-L14, L16-L20 | High / Medium / Low     | design, cleanup, intentional, or overstated | Low                | Mostly maintainability, compatibility shims, deliberate normalization, or duplicated helpers. Treat these as backlog items, not defects.                                                                   |
-| L15                                                          | Low                     | incorrect / false positive                  | None               | `getCandidates()` is a compatibility route, not a deprecated alias.                                                                                                                                        |
-
-### Recommended Fix Order
-
-1. **C4** — `findByEmail()` full table scan (performance/correctness under load)
-2. **C1** — H2/PG auth SQL (correctness)
-3. **C2** — block/report race condition (data integrity)
-4. **C3** — AppClock test leaking (test reliability)
-5. **H2, H3, H4** — duplicated code (maintenance hazard)
-6. **H5, H8, M9** — layering violations (architectural hygiene)
-7. **H9** — email normalization divergence (data consistency)
-8. **H8** — non-transactional saves (data consistency)
-9. **H11** — block() transactional inconsistency (data integrity)
-10. **H7** — missing spatial index (performance)
-11. **H1** — split RestApiServer (scalability)
-12. **H10** — redundant photo URL normalization (correctness on copy)
-13. **M1, M2, M6, M7** — dead code removal (hygiene)
-14. **M3, M4** — consistency (event dropping, error handling)
-15. **M5, M10-M12** — remaining duplication/quality
-16. **M17-M21** — medium-level bugs and inconsistencies
-17. **H6** — saveProfile/savePhotoUrls dedup
-18. **L1-L21** — nice-to-haves
+- The original severity buckets above are preserved for provenance only.
+- The current actioning view is the status sections near the top of this document.

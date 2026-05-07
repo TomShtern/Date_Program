@@ -1030,7 +1030,7 @@ public final class JdbiMatchmakingStorage implements OperationalInteractionStora
         List<Match> getPageOfActiveMatchesFor(
                 @Bind("userId") UUID userId, @Bind("offset") int offset, @Bind("limit") int limit);
 
-        @SqlUpdate("UPDATE matches SET deleted_at = :now WHERE id = :matchId")
+        @SqlUpdate("UPDATE matches SET deleted_at = :now WHERE id = :matchId AND deleted_at IS NULL")
         void delete(@Bind("matchId") String matchId, @Bind("now") Instant now);
 
         @SqlUpdate("DELETE FROM matches WHERE deleted_at < :threshold")

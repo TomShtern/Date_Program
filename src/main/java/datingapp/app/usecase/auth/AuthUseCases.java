@@ -63,8 +63,6 @@ public final class AuthUseCases {
             return UseCaseResult.success(createSession(user, now));
         } catch (IllegalArgumentException e) {
             return UseCaseResult.failure(UseCaseError.validation(e.getMessage()));
-        } catch (DuplicateAccountException e) {
-            return UseCaseResult.failure(UseCaseError.conflict(e.getMessage()));
         }
     }
 
@@ -97,9 +95,11 @@ public final class AuthUseCases {
                 throw UnauthorizedException.invalidRefreshToken();
             }
             IssuedRefreshToken rotatedToken = issueRefreshToken(user.getId(), now);
-            authStorage.insertRefreshToken(rotatedToken.record());
+            authStorage.insertRefreshToken(rotatedToken.refreshTokenRecord());
             authStorage.revokeRefreshToken(
-                    currentToken.tokenId(), now, rotatedToken.record().tokenId());
+                    currentToken.tokenId(),
+                    now,
+                    rotatedToken.refreshTokenRecord().tokenId());
             return UseCaseResult.success(buildSession(user, now, rotatedToken.rawToken()));
         } catch (UnauthorizedException e) {
             return UseCaseResult.failure(UseCaseError.unauthorized(e.getMessage()));
@@ -151,7 +151,7 @@ public final class AuthUseCases {
 
     private AuthSession createSession(User user, Instant now) {
         IssuedRefreshToken refreshToken = issueRefreshToken(user.getId(), now);
-        authStorage.insertRefreshToken(refreshToken.record());
+        authStorage.insertRefreshToken(refreshToken.refreshTokenRecord());
         return buildSession(user, now, refreshToken.rawToken());
     }
 
@@ -164,10 +164,10 @@ public final class AuthUseCases {
     private IssuedRefreshToken issueRefreshToken(UUID userId, Instant now) {
         String rawToken = generateOpaqueToken();
         String tokenHash = hashRefreshToken(rawToken);
-        Instant expiresAt = now.plusSeconds((long) config.auth().refreshTokenTtlDays() * 24L * 60L * 60L);
-        RefreshTokenRecord record =
+        Instant expiresAt = now.plusSeconds(config.auth().refreshTokenTtlDays() * 24L * 60L * 60L);
+        RefreshTokenRecord refreshTokenRecord =
                 new RefreshTokenRecord(UUID.randomUUID(), userId, tokenHash, now, expiresAt, null, null);
-        return new IssuedRefreshToken(rawToken, record);
+        return new IssuedRefreshToken(rawToken, refreshTokenRecord);
     }
 
     private RefreshTokenRecord requireRefreshToken(String rawRefreshToken) {
@@ -175,13 +175,14 @@ public final class AuthUseCases {
             throw UnauthorizedException.invalidRefreshToken();
         }
         Instant now = AppClock.now();
-        RefreshTokenRecord record = authStorage
+        RefreshTokenRecord refreshTokenRecord = authStorage
                 .findRefreshTokenByHash(hashRefreshToken(rawRefreshToken))
                 .orElseThrow(UnauthorizedException::invalidRefreshToken);
-        if (record.revokedAt() != null || !record.expiresAt().isAfter(now)) {
+        if (refreshTokenRecord.revokedAt() != null
+                || !refreshTokenRecord.expiresAt().isAfter(now)) {
             throw UnauthorizedException.invalidRefreshToken();
         }
-        return record;
+        return refreshTokenRecord;
     }
 
     private void validatePassword(String password) {
@@ -233,7 +234,7 @@ public final class AuthUseCases {
         }
     }
 
-    private record IssuedRefreshToken(String rawToken, RefreshTokenRecord record) {}
+    private record IssuedRefreshToken(String rawToken, RefreshTokenRecord refreshTokenRecord) {}
 
     public record SignupCommand(String email, String password, LocalDate dateOfBirth, String name) {}
 

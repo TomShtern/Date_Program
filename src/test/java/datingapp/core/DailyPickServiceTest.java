@@ -366,10 +366,11 @@ class DailyPickServiceTest {
 
     @Test
     void protectedNoArgConstructorFailsFastOnLiveUse() {
-        DailyPickService service = new DailyPickService() {};
+        DailyPickService dailyPickService = new DailyPickService() {};
         User seeker = createActiveUser("Broken", 25);
 
-        IllegalStateException ex = assertThrows(IllegalStateException.class, () -> service.getDailyPick(seeker));
+        IllegalStateException ex =
+                assertThrows(IllegalStateException.class, () -> dailyPickService.getDailyPick(seeker));
 
         assertEquals("DailyPickService analyticsStorage is not initialized", ex.getMessage());
     }

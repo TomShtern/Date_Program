@@ -236,7 +236,8 @@ public final class JdbiUserStorage implements OperationalUserStorage {
                 handle -> handle.createQuery("SELECT * FROM users WHERE email = :email AND deleted_at IS NULL")
                         .bind("email", normalizedEmail)
                         .map(new Mapper())
-                        .findOne());
+                        .findOne()
+                        .map(user -> hydrateUsers(handle, List.of(user)).getFirst()));
     }
 
     @Override

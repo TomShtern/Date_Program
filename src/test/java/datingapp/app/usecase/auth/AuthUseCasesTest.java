@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.core.AppConfig;
 import datingapp.core.model.User;
+import datingapp.core.testutil.TestClock;
 import datingapp.core.testutil.TestStorages;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -70,15 +71,20 @@ class AuthUseCasesTest {
         user.setEmail("alpha@example.com");
         userStorage.save(user);
 
-        String token = new AuthTokenService(config.auth())
-                .issueAccessToken(
-                        new AuthUseCases.AuthIdentity(user.getId(), "ignored@example.com"), java.time.Instant.now());
+        Instant issuedAt = Instant.parse("2026-05-06T00:00:00Z");
+        TestClock.setFixed(issuedAt.plusSeconds(1));
+        try {
+            String token = new AuthTokenService(config.auth())
+                    .issueAccessToken(new AuthUseCases.AuthIdentity(user.getId(), "ignored@example.com"), issuedAt);
 
-        AuthUseCases.AuthIdentity identity =
-                useCases.authenticateAccessToken(token).orElseThrow();
+            AuthUseCases.AuthIdentity identity =
+                    useCases.authenticateAccessToken(token).orElseThrow();
 
-        assertEquals(user.getId(), identity.userId());
-        assertEquals("alpha@example.com", identity.email());
+            assertEquals(user.getId(), identity.userId());
+            assertEquals("alpha@example.com", identity.email());
+        } finally {
+            TestClock.reset();
+        }
     }
 
     @Test
