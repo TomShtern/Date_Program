@@ -40,57 +40,6 @@ public class MatchingUseCases {
 
     private static final String CONTEXT_REQUIRED = "Context is required";
 
-    @Deprecated
-    private static final DailyLimitService NO_OP_DAILY_LIMIT_SERVICE = new DailyLimitService() {
-        @Override
-        public boolean canLike(UUID userId) {
-            return true;
-        }
-
-        @Override
-        public boolean canSuperLike(UUID userId) {
-            return true;
-        }
-
-        @Override
-        public boolean canPass(UUID userId) {
-            return true;
-        }
-
-        @Override
-        public DailyStatus getStatus(UUID userId) {
-            return new DailyStatus(0, -1, 0, -1, 0, -1, AppClock.today(), AppClock.now());
-        }
-
-        @Override
-        public Duration getTimeUntilReset() {
-            return Duration.ZERO;
-        }
-    };
-
-    @Deprecated
-    private static final DailyPickService NO_OP_DAILY_PICK_SERVICE = new DailyPickService() {
-        @Override
-        public Optional<DailyPick> getDailyPick(User seeker) {
-            return Optional.empty();
-        }
-
-        @Override
-        public boolean hasViewedDailyPick(UUID userId) {
-            return false;
-        }
-
-        @Override
-        public void markDailyPickViewed(UUID userId) {
-            // Compatibility shim intentionally does nothing.
-        }
-
-        @Override
-        public int cleanupOldDailyPickViews(java.time.LocalDate before) {
-            return 0;
-        }
-    };
-
     private static final StandoutService NO_OP_STANDOUT_SERVICE = new StandoutService() {
         @Override
         public Result getStandouts(User seeker) {
@@ -801,7 +750,32 @@ public class MatchingUseCases {
 
     public static DailyLimitService wrapDailyLimitService(RecommendationService recommendationService) {
         if (recommendationService == null) {
-            return NO_OP_DAILY_LIMIT_SERVICE;
+            return new DailyLimitService() {
+                @Override
+                public boolean canLike(UUID userId) {
+                    return true;
+                }
+
+                @Override
+                public boolean canSuperLike(UUID userId) {
+                    return true;
+                }
+
+                @Override
+                public boolean canPass(UUID userId) {
+                    return true;
+                }
+
+                @Override
+                public DailyStatus getStatus(UUID userId) {
+                    return new DailyStatus(0, -1, 0, -1, 0, -1, AppClock.today(), AppClock.now());
+                }
+
+                @Override
+                public Duration getTimeUntilReset() {
+                    return Duration.ZERO;
+                }
+            };
         }
         return new DailyLimitService() {
             @Override
@@ -842,7 +816,27 @@ public class MatchingUseCases {
 
     public static DailyPickService wrapDailyPickService(RecommendationService recommendationService) {
         if (recommendationService == null) {
-            return NO_OP_DAILY_PICK_SERVICE;
+            return new DailyPickService() {
+                @Override
+                public Optional<DailyPick> getDailyPick(User seeker) {
+                    return Optional.empty();
+                }
+
+                @Override
+                public boolean hasViewedDailyPick(UUID userId) {
+                    return false;
+                }
+
+                @Override
+                public void markDailyPickViewed(UUID userId) {
+                    // Intentionally empty — no-op fallback service.
+                }
+
+                @Override
+                public int cleanupOldDailyPickViews(java.time.LocalDate before) {
+                    return 0;
+                }
+            };
         }
         return new DailyPickService() {
             @Override

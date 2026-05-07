@@ -326,7 +326,10 @@ final class RestApiUserDtos {
     static List<String> personPhotoUrls(User user, UnaryOperator<String> photoUrlResolver) {
         return user == null
                 ? List.of()
-                : user.getPhotoUrls().stream().map(photoUrlResolver).toList();
+                : user.getPhotoUrls().stream()
+                        .map(photoUrlResolver)
+                        .filter(java.util.Objects::nonNull)
+                        .toList();
     }
 
     static String personSummaryLine(User user) {

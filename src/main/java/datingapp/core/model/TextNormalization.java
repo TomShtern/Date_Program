@@ -30,6 +30,7 @@ import java.util.regex.Pattern;
 public final class TextNormalization {
 
     private static final int MAX_EMAIL_LENGTH = 254;
+    private static final String INVALID_EMAIL_FORMAT = "Invalid email format";
     private static final int MIN_PHONE_DIGITS = 7;
     private static final int MAX_PHONE_DIGITS = 15;
     private static final Pattern EMAIL_LOCAL_PATTERN = Pattern.compile("^[^\\s@]+$");
@@ -55,11 +56,11 @@ public final class TextNormalization {
         }
         String normalized = Normalizer.normalize(email.trim(), Normalizer.Form.NFKC);
         if (normalized.length() > MAX_EMAIL_LENGTH) {
-            throw new IllegalArgumentException("Invalid email format");
+            throw new IllegalArgumentException(INVALID_EMAIL_FORMAT);
         }
         int atIndex = normalized.lastIndexOf('@');
         if (atIndex <= 0 || atIndex == normalized.length() - 1 || normalized.indexOf('@') != atIndex) {
-            throw new IllegalArgumentException("Invalid email format");
+            throw new IllegalArgumentException(INVALID_EMAIL_FORMAT);
         }
 
         String localPart = normalized.substring(0, atIndex);
@@ -67,17 +68,17 @@ public final class TextNormalization {
         if (!EMAIL_LOCAL_PATTERN.matcher(localPart).matches()
                 || containsControlCharacters(localPart)
                 || domainPart.isBlank()) {
-            throw new IllegalArgumentException("Invalid email format");
+            throw new IllegalArgumentException(INVALID_EMAIL_FORMAT);
         }
 
         String asciiDomain;
         try {
             asciiDomain = IDN.toASCII(domainPart);
         } catch (IllegalArgumentException _) {
-            throw new IllegalArgumentException("Invalid email format");
+            throw new IllegalArgumentException(INVALID_EMAIL_FORMAT);
         }
         if (!isValidAsciiDomain(asciiDomain)) {
-            throw new IllegalArgumentException("Invalid email format");
+            throw new IllegalArgumentException(INVALID_EMAIL_FORMAT);
         }
 
         return localPart + "@" + asciiDomain.toLowerCase(Locale.ROOT);

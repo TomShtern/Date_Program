@@ -36,6 +36,7 @@ public final class MatchingService {
     private final Optional<ActivityMetricsService> activityMetricsService;
     private final UndoService undoService;
     private final RecommendationService dailyService;
+
     private final CandidateFinder candidateFinder;
 
     /** Constructor with all dependencies except CandidateFinder; ActivityMetricsService is optional. */
@@ -144,11 +145,7 @@ public final class MatchingService {
         final RecordLikeOutcome[] resultHolder = new RecordLikeOutcome[1];
         userStorage.executeWithUserLock(
                 like.whoLikes(), () -> storeRecordLikeOutcome(resultHolder, recordLikeWithinLock(like)));
-        RecordLikeOutcome outcome = resultHolder[0];
-        if (outcome.persisted()) {
-            invalidateCandidateCaches(like.whoLikes(), like.whoGotLiked());
-        }
-        return outcome;
+        return resultHolder[0];
     }
 
     private RecordLikeOutcome recordLikeWithinLock(Like like) {
@@ -163,6 +160,7 @@ public final class MatchingService {
                     .orElseThrow(() -> new IllegalStateException("Duplicate like was not found in storage"));
             return RecordLikeOutcome.duplicate(persistedLike);
         }
+        invalidateCandidateCaches(like.whoLikes(), like.whoGotLiked());
         return RecordLikeOutcome.persisted(like, writeResult.createdMatch());
     }
 
@@ -301,6 +299,8 @@ public final class MatchingService {
         if (!writeResult.likePersisted()) {
             return SwipeResult.alreadySwiped();
         }
+
+        invalidateCandidateCaches(currentUser.getId(), candidate.getId());
 
         Optional<Match> match = writeResult.createdMatch();
         // Keep undo state inside the user lock so the most recent swipe remains serialized per user.

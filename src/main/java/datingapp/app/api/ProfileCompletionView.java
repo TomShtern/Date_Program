@@ -4,6 +4,7 @@ import datingapp.core.model.User;
 import datingapp.core.model.User.UserState;
 import datingapp.core.workflow.ProfileActivationPolicy;
 import java.util.List;
+import java.util.Objects;
 
 record ProfileCompletionView(
         List<String> missingProfileFields,
@@ -14,9 +15,15 @@ record ProfileCompletionView(
         boolean canBrowse) {
 
     ProfileCompletionView {
-        missingProfileFields = missingProfileFields == null ? List.of() : List.copyOf(missingProfileFields);
-        missingProfileFieldLabels =
-                missingProfileFieldLabels == null ? List.of() : List.copyOf(missingProfileFieldLabels);
+        missingProfileFields = cleanList(missingProfileFields);
+        missingProfileFieldLabels = cleanList(missingProfileFieldLabels);
+    }
+
+    private static <T> List<T> cleanList(List<T> source) {
+        if (source == null) {
+            return List.of();
+        }
+        return source.stream().filter(Objects::nonNull).toList();
     }
 
     static ProfileCompletionView from(User user, ProfileActivationPolicy activationPolicy) {

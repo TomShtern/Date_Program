@@ -2,6 +2,7 @@ package datingapp.app.api;
 
 import datingapp.core.connection.ConnectionModels.Notification;
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
 
@@ -18,7 +19,7 @@ final class NotificationDtos {
             boolean isRead,
             Map<String, String> data) {
         NotificationDto {
-            data = data == null ? Map.of() : Map.copyOf(data);
+            data = filterNullEntries(data);
         }
 
         static NotificationDto from(Notification notification) {
@@ -31,6 +32,19 @@ final class NotificationDtos {
                     notification.isRead(),
                     notification.data());
         }
+    }
+
+    static <K, V> Map<K, V> filterNullEntries(Map<K, V> source) {
+        if (source == null) {
+            return Map.of();
+        }
+        Map<K, V> clean = new LinkedHashMap<>();
+        for (Map.Entry<K, V> entry : source.entrySet()) {
+            if (entry.getKey() != null && entry.getValue() != null) {
+                clean.put(entry.getKey(), entry.getValue());
+            }
+        }
+        return Map.copyOf(clean);
     }
 
     /** Mark-all-notifications-read response. */
