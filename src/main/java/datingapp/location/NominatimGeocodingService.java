@@ -1,10 +1,9 @@
-package datingapp.app.geocoding;
+package datingapp.location;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import datingapp.core.AppClock;
-import datingapp.core.model.LocationModels.Precision;
-import datingapp.core.profile.GeocodingService;
+import datingapp.location.LocationModels.Precision;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URLEncoder;
@@ -46,7 +45,7 @@ public final class NominatimGeocodingService implements GeocodingService {
                 waitMillis -> {
                     try {
                         Thread.sleep(waitMillis);
-                    } catch (InterruptedException exception) {
+                    } catch (InterruptedException _) {
                         Thread.currentThread().interrupt();
                     }
                 });

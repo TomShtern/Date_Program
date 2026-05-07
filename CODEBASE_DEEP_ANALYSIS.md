@@ -47,17 +47,17 @@ private static String buildXxxUpsertSql(DatabaseDialect dialect) {
 
 ---
 
-### 1.3 5+ screen controllers duplicate block, report, photo carousel, and photo preloading logic
+### 1.3 `MatchingController` and `ChatController` duplicate block/report handlers; `MatchingController` and `ProfileController` duplicate photo carousel/preloading logic
 
-**Why included:** `handleBlock()`, `handleReport()`, photo carousel visibility toggling, and photo preloading are repeated with identical structure in `MatchingController`, `ChatController`, and `ProfileController`. Cut-paste of ~77 lines.
+**Why included:** `handleBlock()` and `handleReport()` are repeated in `MatchingController` and `ChatController`. Photo carousel visibility toggling and photo preloading are repeated in `MatchingController` and `ProfileController`. The earlier wording overstated the overlap across all three controllers.
 
 **Suggestion:** Extract shared handlers into a `ControllerInteractionSupport` class or a shared base. At minimum, factor out the block/report dialog flows.
 
 **Location:**
 - `ui/screen/MatchingController.java:684-709` — block + report handlers
 - `ui/screen/ChatController.java:861-887` — identical block + report handlers
-- `ui/screen/ProfileController.java:694-745` — photo controls + preloading
 - `ui/screen/MatchingController.java:274-322` — identical photo controls + preloading
+- `ui/screen/ProfileController.java:694-745` — photo controls + preloading
 
 **Evidence:** Block handler pattern (both controllers, verbatim):
 ```java
@@ -129,11 +129,11 @@ UiDialogs.confirmAndExecute("Block User", "Block " + other.getName() + "?", "...
 
 ---
 
-### 1.9 `copyMatch()` constructor-pattern duplicated 3 times
+### 1.9 `copyMatch()` constructor-pattern duplicated 4 times
 
 **Why included:** Identical Match reconstruction via full constructor appears in three service classes. No `Match.copy()` method exists (unlike `User.copy()`).
 
-**Suggestion:** Add `Match.copy()` to the Match model class. Replace all 3 call sites.
+**Suggestion:** Add `Match.copy()` to the Match model class. Replace all 4 call sites.
 
 **Location:**
 - `core/connection/ConnectionService.java:613-625`
@@ -168,13 +168,13 @@ UiDialogs.confirmAndExecute("Block User", "Block " + other.getName() + "?", "...
 
 ---
 
-### 2.3 `AppConfigValidator.validateMatchingBehaviorFlags()` — empty dead method
+### 2.3 `AppConfigValidator.validateMatchingBehaviorFlags()` — intentional no-op hook, not dead code
 
-**Why included:** A public static method with a completely empty body (line 62-64). Comment says it's a "hook" but no behavior exists.
+**Why included:** The method body is empty, but it is still called from `AppConfig.MatchingConfig`, so this is an intentional hook rather than dead code.
 
-**Suggestion:** Remove or add actual validation logic.
+**Suggestion:** Keep the hook unless matching-behavior validation is added.
 
-**Location:** `core/AppConfigValidator.java:62-64`
+**Location:** `core/AppConfigValidator.java:62-64`, `core/AppConfig.java:62`
 
 ---
 
@@ -485,14 +485,14 @@ UiDialogs.confirmAndExecute("Block User", "Block " + other.getName() + "?", "...
 
 ## 6. UI Layer
 
-### 6.1 Theme CSS loading duplicated in 4 classes
+### 6.1 Theme CSS loading duplicated in 5 classes
 
-**Why included:** `UiUtils`, `UiDialogs`, `UiFeedbackService`, and `MatchingController` each load `/css/theme.css` with the same `getClass().getResource("/css/theme.css").toExternalForm()` pattern.
+**Why included:** `UiUtils`, `UiDialogs`, `UiFeedbackService`, `MatchingController`, and `NavigationService` each load `/css/theme.css` with the same `getClass().getResource("/css/theme.css").toExternalForm()` pattern.
 
-**Suggestion:** Create `UiStyles.getThemeUrl()` utility used by all 4 call sites.
+**Suggestion:** Create `UiStyles.getThemeUrl()` utility used by all 5 call sites.
 
 **Location:**
-- `ui/UiUtils.java:46-49`, `ui/UiDialogs.java:101-107`, `ui/UiFeedbackService.java:64-67`, `ui/screen/MatchingController.java:755-762`
+- `ui/UiUtils.java:46-49`, `ui/UiDialogs.java:101-107`, `ui/UiFeedbackService.java:64-67`, `ui/screen/MatchingController.java:755-762`, `ui/NavigationService.java:465`
 
 ---
 
@@ -779,15 +779,15 @@ This is unusual and suggests either excellent discipline or that problematic tes
 
 ---
 
-## 10.5. Findings from Prior Review (April 2026) — Still Valid
+## 10.5. Findings from Prior Review (April 2026) — Mixed Validity
 
-*Extracted from a prior codebase review. Only findings NOT already covered above. Verified against current source.*
+*Extracted from a prior codebase review. Only findings NOT already covered above. Verified against current source; invalidated items are moved to the false-claims appendix.*
 
 ### CR1. `ChatViewModel` exposes mutable backing lists
 
-**Why included:** `getConversations()` and `getActiveMessages()` return writable backing lists — external UI code can bypass ViewModel invariants.
+**Status:** Invalidated; moved to the false claims appendix.
 
-**Suggestion:** Return read-only observable views (`FXCollections.unmodifiableObservableList`).
+**Evidence:** `getConversations()` and `getActiveMessages()` already expose unmodifiable observable views.
 
 **Location:** `ui/viewmodel/ChatViewModel.java`
 
@@ -815,9 +815,9 @@ This is unusual and suggests either excellent discipline or that problematic tes
 
 ### CR4. `ChatViewModel.setCurrentUser(null)` does not reset visible UI state
 
-**Why included:** Logout/reset leaves stale conversations and messages visible in UI-observable state.
+**Status:** Invalidated; moved to the false claims appendix.
 
-**Suggestion:** Clear all UI-observable state and related properties when currentUser is set to null.
+**Evidence:** The null-user path already clears the selected conversation, lists, unread count, sending flag, note state, and presence state.
 
 **Location:** `ui/viewmodel/ChatViewModel.java`
 
@@ -825,9 +825,9 @@ This is unusual and suggests either excellent discipline or that problematic tes
 
 ### CR5. `ChatViewModel.ensureCurrentUser()` caches session state too aggressively
 
-**Why included:** Session changes are not automatically reflected. The cached user outlives the screen/session boundary.
+**Status:** Invalidated as stated; moved to the false claims appendix.
 
-**Suggestion:** Refresh `currentUser` from `AppSession` on initialize and on explicit session changes.
+**Evidence:** `ChatViewModel` only lazily falls back to `AppSession` when `currentUser` is null; session propagation lives in `ViewModelFactory`.
 
 **Location:** `ui/viewmodel/ChatViewModel.java`
 
@@ -865,9 +865,9 @@ This is unusual and suggests either excellent discipline or that problematic tes
 
 ### CR9. `SafetyViewModel` retains a fallback that bypasses `VerificationUseCases`
 
-**Why included:** `SafetyViewModel` contains a compatibility fallback that performs verification work directly with `TrustSafetyService` when `verificationUseCases` is absent, weakening the intended UI/application seam.
+**Status:** Invalidated; moved to the false claims appendix.
 
-**Suggestion:** Remove the fallback. Use `VerificationUseCases` exclusively as the canonical path.
+**Evidence:** `startVerification()` and `confirmVerification()` both require `VerificationUseCases`; missing wiring reports `PROFILE_VERIFICATION_UNAVAILABLE`.
 
 **Location:** `ui/viewmodel/SafetyViewModel.java`
 
@@ -1117,9 +1117,9 @@ This is unusual and suggests either excellent discipline or that problematic tes
 
 ### CR35. `copyForProfileEditing()` in `ProfileHandler` adds indirection without value
 
-**Why included:** It is effectively a wrapper around `source.copy()`. Extra indirection increases reading overhead without improving the contract.
+**Status:** Invalidated; moved to the false claims appendix.
 
-**Suggestion:** Call `User.copy()` directly.
+**Evidence:** `ProfileHandler` already uses `currentUser.copy()` directly and has no `copyForProfileEditing()` method.
 
 **Location:** `app/cli/ProfileHandler.java` — `copyForProfileEditing()`
 
@@ -1192,5 +1192,27 @@ This is unusual and suggests either excellent discipline or that problematic tes
 | Java test code lines | 49,403  | ~48,880 | –520 (–1.1%)   |
 
 ---
+
+## False Claims
+
+*The items below were found false against the current code. The original wording is preserved for context, followed by the correction.*
+
+- Original: `A public static method with a completely empty body (line 62-64). Comment says it's a "hook" but no behavior exists.`
+    Correction: Invalidated. `AppConfig.MatchingConfig` still calls `validateMatchingBehaviorFlags()`, so the method is an intentional no-op hook rather than dead code.
+
+- Original: `ChatViewModel` exposes mutable backing lists.
+    Correction: Invalidated. `getConversations()` and `getActiveMessages()` already expose unmodifiable observable views.
+
+- Original: `ChatViewModel.setCurrentUser(null) does not reset visible UI state.`
+    Correction: Invalidated. The null-user path already clears the selected conversation, lists, unread count, sending flag, note state, and presence state.
+
+- Original: `ChatViewModel.ensureCurrentUser() caches session state too aggressively.`
+    Correction: Invalidated as stated. `ChatViewModel` only lazily falls back to `AppSession` when `currentUser` is null; session propagation lives in `ViewModelFactory`.
+
+- Original: `SafetyViewModel` retains a fallback that bypasses `VerificationUseCases`.
+    Correction: Invalidated. `SafetyViewModel` already requires `VerificationUseCases`; missing wiring reports `PROFILE_VERIFICATION_UNAVAILABLE`.
+
+- Original: `copyForProfileEditing()` in `ProfileHandler` adds indirection without value.
+    Correction: Invalidated. `ProfileHandler` already uses `currentUser.copy()` directly and has no `copyForProfileEditing()` method.
 
 *End of report. All findings are read-only observations. No code was modified.*

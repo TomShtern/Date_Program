@@ -1,12 +1,11 @@
-package datingapp.core.profile;
+package datingapp.location;
 
-import datingapp.core.model.GeoUtils;
-import datingapp.core.model.LocationModels;
-import datingapp.core.model.LocationModels.City;
-import datingapp.core.model.LocationModels.Country;
-import datingapp.core.model.LocationModels.Precision;
-import datingapp.core.model.LocationModels.ResolvedLocation;
-import datingapp.core.model.LocationModels.ZipRange;
+import datingapp.core.profile.ValidationService;
+import datingapp.location.LocationModels.City;
+import datingapp.location.LocationModels.Country;
+import datingapp.location.LocationModels.Precision;
+import datingapp.location.LocationModels.ResolvedLocation;
+import datingapp.location.LocationModels.ZipRange;
 import java.text.Normalizer;
 import java.util.Comparator;
 import java.util.List;

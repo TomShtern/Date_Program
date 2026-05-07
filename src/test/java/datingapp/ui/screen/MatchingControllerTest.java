@@ -324,7 +324,7 @@ class MatchingControllerTest {
                                     recommendationService),
                             datingapp.app.usecase.social.SocialUseCases.forTrustSafetyOnly(trustSafetyService),
                             new UseCaseUiProfileNoteDataAccess(noteUseCases.getProfileNotesUseCases()),
-                            datingapp.core.model.GeoUtils::distanceKm),
+                            datingapp.location.GeoUtils::distanceKm),
                     AppSession.getInstance(),
                     TEST_DISPATCHER);
         }

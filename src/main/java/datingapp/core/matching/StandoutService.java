@@ -2,10 +2,10 @@ package datingapp.core.matching;
 
 import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
-import datingapp.core.model.GeoUtils;
 import datingapp.core.model.User;
 import datingapp.core.profile.ProfileService;
 import datingapp.core.storage.UserStorage;
+import datingapp.location.GeoUtils;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.util.ArrayList;

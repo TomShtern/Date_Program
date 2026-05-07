@@ -6,13 +6,8 @@ import datingapp.app.usecase.profile.ProfileMutationUseCases.SaveProfileCommand;
 import datingapp.app.usecase.profile.ProfileUseCases;
 import datingapp.core.AppConfig;
 import datingapp.core.AppSession;
-import datingapp.core.model.GeoValidation;
-import datingapp.core.model.LocationModels.ResolvedLocation;
 import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
-import datingapp.core.profile.GeocodingService;
-import datingapp.core.profile.LocalGeocodingService;
-import datingapp.core.profile.LocationService;
 import datingapp.core.profile.MatchPreferences.Dealbreakers;
 import datingapp.core.profile.MatchPreferences.Interest;
 import datingapp.core.profile.MatchPreferences.Lifestyle;
@@ -22,6 +17,11 @@ import datingapp.core.profile.ProfileService.CompletionResult;
 import datingapp.core.profile.ValidationService;
 import datingapp.core.workflow.ProfileActivationPolicy;
 import datingapp.core.workflow.WorkflowDecision;
+import datingapp.location.GeoUtils;
+import datingapp.location.GeocodingService;
+import datingapp.location.LocalGeocodingService;
+import datingapp.location.LocationModels.ResolvedLocation;
+import datingapp.location.LocationService;
 import datingapp.ui.LocalPhotoStore;
 import datingapp.ui.OnboardingContext;
 import datingapp.ui.UiFeedbackService;
@@ -734,8 +734,8 @@ public class ProfileViewModel extends BaseViewModel {
     }
 
     private void validateCoordinates(double latitude, double longitude) {
-        GeoValidation.validateLatitude(latitude);
-        GeoValidation.validateLongitude(longitude);
+        GeoUtils.validateLatitude(latitude);
+        GeoUtils.validateLongitude(longitude);
     }
 
     private void applyLocationDisplay(double latitude, double longitude, String displayLabel) {

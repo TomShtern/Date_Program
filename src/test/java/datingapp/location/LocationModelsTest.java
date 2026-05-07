@@ -1,10 +1,10 @@
-package datingapp.core.model;
+package datingapp.location;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import datingapp.core.model.LocationModels.Precision;
-import datingapp.core.model.LocationModels.ResolvedLocation;
+import datingapp.location.LocationModels.Precision;
+import datingapp.location.LocationModels.ResolvedLocation;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 

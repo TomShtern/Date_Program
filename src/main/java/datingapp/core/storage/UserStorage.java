@@ -1,9 +1,9 @@
 package datingapp.core.storage;
 
-import datingapp.core.model.GeoUtils;
 import datingapp.core.model.ProfileNote;
 import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
+import datingapp.location.GeoUtils;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.HashMap;

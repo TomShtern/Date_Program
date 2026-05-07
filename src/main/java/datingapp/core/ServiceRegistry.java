@@ -1,7 +1,6 @@
 package datingapp.core;
 
 import datingapp.app.event.AppEventBus;
-import datingapp.app.geocoding.NominatimGeocodingService;
 import datingapp.app.usecase.auth.AuthUseCases;
 import datingapp.app.usecase.dashboard.DashboardUseCases;
 import datingapp.app.usecase.matching.MatchingUseCases;
@@ -24,10 +23,6 @@ import datingapp.core.matching.TrustSafetyService;
 import datingapp.core.matching.UndoService;
 import datingapp.core.metrics.AchievementService;
 import datingapp.core.metrics.ActivityMetricsService;
-import datingapp.core.profile.FallbackGeocodingService;
-import datingapp.core.profile.GeocodingService;
-import datingapp.core.profile.LocalGeocodingService;
-import datingapp.core.profile.LocationService;
 import datingapp.core.profile.ProfileService;
 import datingapp.core.profile.ValidationService;
 import datingapp.core.storage.AccountCleanupStorage;
@@ -38,6 +33,11 @@ import datingapp.core.storage.TrustSafetyStorage;
 import datingapp.core.storage.UserStorage;
 import datingapp.core.workflow.ProfileActivationPolicy;
 import datingapp.core.workflow.RelationshipWorkflowPolicy;
+import datingapp.location.FallbackGeocodingService;
+import datingapp.location.GeocodingService;
+import datingapp.location.LocalGeocodingService;
+import datingapp.location.LocationService;
+import datingapp.location.NominatimGeocodingService;
 import java.util.Objects;
 
 @SuppressWarnings("java:S6539")

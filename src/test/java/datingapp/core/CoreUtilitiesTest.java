@@ -6,9 +6,9 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import datingapp.core.model.GeoUtils;
 import datingapp.core.model.Match;
 import datingapp.core.profile.MatchPreferences.Interest;
+import datingapp.location.GeoUtils;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -64,6 +64,24 @@ class CoreUtilitiesTest {
 
             // Should be approximately 5570km
             assertTrue(distance > 5500 && distance < 5600, "Distance should be between 5500-5600km, was: " + distance);
+        }
+
+        @Test
+        @DisplayName("Latitude validation rejects non-finite values")
+        void validateLatitudeRejectsNonFiniteValues() {
+            IllegalArgumentException exception =
+                    assertThrows(IllegalArgumentException.class, () -> GeoUtils.validateLatitude(Double.NaN));
+
+            assertTrue(exception.getMessage().contains("Latitude cannot be NaN or Infinity"));
+        }
+
+        @Test
+        @DisplayName("Longitude validation rejects out-of-range values")
+        void validateLongitudeRejectsOutOfRangeValues() {
+            IllegalArgumentException exception =
+                    assertThrows(IllegalArgumentException.class, () -> GeoUtils.validateLongitude(181.0));
+
+            assertTrue(exception.getMessage().contains("Longitude must be between -180 and 180"));
         }
     }
 

@@ -1,7 +1,7 @@
-package datingapp.core.model;
+package datingapp.location;
 
 /**
- * Geographic utility functions. Pure Java - no external dependencies.
+ * Geographic helpers for coordinate validation and distance calculations.
  */
 public final class GeoUtils {
 
@@ -9,6 +9,24 @@ public final class GeoUtils {
 
     private GeoUtils() {
         // Utility class
+    }
+
+    public static void validateLatitude(double latitude) {
+        if (!Double.isFinite(latitude)) {
+            throw new IllegalArgumentException("Latitude cannot be NaN or Infinity");
+        }
+        if (latitude < -90.0 || latitude > 90.0) {
+            throw new IllegalArgumentException("Latitude must be between -90 and 90, got " + latitude);
+        }
+    }
+
+    public static void validateLongitude(double longitude) {
+        if (!Double.isFinite(longitude)) {
+            throw new IllegalArgumentException("Longitude cannot be NaN or Infinity");
+        }
+        if (longitude < -180.0 || longitude > 180.0) {
+            throw new IllegalArgumentException("Longitude must be between -180 and 180, got " + longitude);
+        }
     }
 
     /**
@@ -22,6 +40,11 @@ public final class GeoUtils {
      * @return Distance in kilometers
      */
     public static double distanceKm(double lat1, double lon1, double lat2, double lon2) {
+        validateLatitude(lat1);
+        validateLongitude(lon1);
+        validateLatitude(lat2);
+        validateLongitude(lon2);
+
         double deltaLatitude = Math.toRadians(lat2 - lat1);
         double deltaLongitude = Math.toRadians(lon2 - lon1);
 

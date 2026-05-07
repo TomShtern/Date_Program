@@ -1,4 +1,4 @@
-package datingapp.core.model;
+package datingapp.location;
 
 import java.util.Locale;
 import java.util.Objects;
@@ -32,8 +32,8 @@ public final class LocationModels {
             name = requireText(name, "name");
             district = requireText(district, "district");
             countryCode = requireText(countryCode, "countryCode");
-            GeoValidation.validateLatitude(latitude);
-            GeoValidation.validateLongitude(longitude);
+            GeoUtils.validateLatitude(latitude);
+            GeoUtils.validateLongitude(longitude);
             if (priority < 1) {
                 throw new IllegalArgumentException("priority must be at least 1");
             }
@@ -51,8 +51,8 @@ public final class LocationModels {
             countryCode = requireText(countryCode, "countryCode");
             city = requireText(city, "city");
             district = requireText(district, "district");
-            GeoValidation.validateLatitude(latitude);
-            GeoValidation.validateLongitude(longitude);
+            GeoUtils.validateLatitude(latitude);
+            GeoUtils.validateLongitude(longitude);
         }
 
         public String displayName() {
@@ -62,16 +62,16 @@ public final class LocationModels {
 
     public record ResolvedLocation(double latitude, double longitude, String label, Precision precision) {
         public ResolvedLocation {
-            GeoValidation.validateLatitude(latitude);
-            GeoValidation.validateLongitude(longitude);
+            GeoUtils.validateLatitude(latitude);
+            GeoUtils.validateLongitude(longitude);
             label = requireText(label, "label");
             Objects.requireNonNull(precision, "precision cannot be null");
         }
     }
 
     public static String formatCoordinates(double latitude, double longitude) {
-        GeoValidation.validateLatitude(latitude);
-        GeoValidation.validateLongitude(longitude);
+        GeoUtils.validateLatitude(latitude);
+        GeoUtils.validateLongitude(longitude);
         return String.format(Locale.ROOT, "%.4f, %.4f", latitude, longitude);
     }
 

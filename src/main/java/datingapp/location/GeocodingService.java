@@ -1,8 +1,7 @@
-package datingapp.core.profile;
+package datingapp.location;
 
-import datingapp.core.model.GeoValidation;
-import datingapp.core.model.LocationModels.Precision;
-import datingapp.core.model.LocationModels.ResolvedLocation;
+import datingapp.location.LocationModels.Precision;
+import datingapp.location.LocationModels.ResolvedLocation;
 import java.util.List;
 import java.util.Objects;
 
@@ -16,8 +15,8 @@ public interface GeocodingService {
             if (displayName == null || displayName.isBlank()) {
                 throw new IllegalArgumentException("displayName cannot be blank");
             }
-            GeoValidation.validateLatitude(latitude);
-            GeoValidation.validateLongitude(longitude);
+            GeoUtils.validateLatitude(latitude);
+            GeoUtils.validateLongitude(longitude);
             Objects.requireNonNull(precision, "precision cannot be null");
         }
 

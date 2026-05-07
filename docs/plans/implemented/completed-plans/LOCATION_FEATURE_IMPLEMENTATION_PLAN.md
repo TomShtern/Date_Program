@@ -12,6 +12,8 @@
 
 Replace raw lat/lon coordinate input with **Country → City → ZIP fallback** flow, optimized for Israel-first deployment. Users never see or enter raw coordinates.
 
+> Historical note: this completed plan predates the later namespace cleanup. The current codebase now keeps the location stack under `datingapp.location` rather than the older split across `core/model`, `core/profile`, and `app/geocoding` shown in some snippets below.
+
 ## Verified Implementation Outcome (2026-03-12)
 
 This feature has now been implemented end to end and verified with `mvn spotless:apply verify`.

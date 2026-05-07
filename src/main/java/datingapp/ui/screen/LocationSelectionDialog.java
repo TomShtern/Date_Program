@@ -1,12 +1,12 @@
 package datingapp.ui.screen;
 
-import datingapp.core.model.LocationModels.City;
-import datingapp.core.model.LocationModels.Country;
-import datingapp.core.model.LocationModels.Precision;
-import datingapp.core.model.LocationModels.ResolvedLocation;
-import datingapp.core.profile.GeocodingService;
-import datingapp.core.profile.LocalGeocodingService;
-import datingapp.core.profile.LocationService;
+import datingapp.location.GeocodingService;
+import datingapp.location.LocalGeocodingService;
+import datingapp.location.LocationModels.City;
+import datingapp.location.LocationModels.Country;
+import datingapp.location.LocationModels.Precision;
+import datingapp.location.LocationModels.ResolvedLocation;
+import datingapp.location.LocationService;
 import datingapp.ui.UiConstants;
 import datingapp.ui.UiUtils;
 import datingapp.ui.async.JavaFxUiThreadDispatcher;

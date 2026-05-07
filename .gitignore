@@ -152,3 +152,7 @@ telemetry-id
 .kilocodemodes
 .github/agents/Delta-Ops-Agent.agent.md
 .qwen/settings.json
+memories/repo/geo-utilities-separation.json
+memories/repo/geo-utils-now-owns-validation.json
+.gitignore
+memories/repo/location-test-hierarchy.json

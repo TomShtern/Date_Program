@@ -404,6 +404,10 @@
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
                 <version>0.8.14</version>
+                <configuration>
+                    <append>false</append>
+                    <destFile>${project.build.directory}/jacoco.exec</destFile>
+                </configuration>
                 <executions>
                     <execution>
                         <id>prepare-agent</id>

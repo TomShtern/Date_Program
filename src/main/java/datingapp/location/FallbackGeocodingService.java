@@ -1,4 +1,4 @@
-package datingapp.core.profile;
+package datingapp.location;
 
 import java.util.List;
 import java.util.Objects;
