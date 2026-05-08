@@ -1,5 +1,7 @@
 package datingapp.app.api;
 
+import java.util.Objects;
+
 final class RestApiExceptions {
 
     private RestApiExceptions() {}
@@ -27,6 +29,7 @@ final class RestApiExceptions {
 
         ApiTooManyRequestsException(String message, RateLimitStatus status) {
             super(message);
+            Objects.requireNonNull(status, "status cannot be null");
             this.status = status;
         }
 
