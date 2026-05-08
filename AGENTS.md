@@ -1,6 +1,6 @@
 # AGENTS.md
 
-> **Updated:** 2026-05-03
+> **Updated:** 2026-05-08
 > **Role in the instruction stack:** lowest-level workflow guide for agents working in this repo.
 > **Hierarchy:** `.github/copilot-instructions.md` → `CLAUDE.md` → `AGENTS.md`.
 
@@ -95,8 +95,12 @@ mvn --% test -Dtest=AuthUseCasesTest,RestApiAuthRoutesTest,RestApiPhotoRoutesTes
 For repo-root PowerShell helper changes, start with the nearest script test, e.g.:
 
 ```powershell
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\src\test\powershell\StartLocalPostgresScriptTest.ps1
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\src\test\powershell\RunPostgresqlSmokeScriptTest.ps1
 pwsh -NoProfile -ExecutionPolicy Bypass -File .\src\test\powershell\RunVerifyScriptTest.ps1
 pwsh -NoProfile -ExecutionPolicy Bypass -File .\src\test\powershell\CheckPostgresqlRuntimeEnvScriptTest.ps1
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\src\test\powershell\StopLocalPostgresScriptTest.ps1
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\src\test\powershell\ResetLocalPostgresScriptTest.ps1
 ```
 
 ## Documentation maintenance rules
@@ -117,7 +121,7 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File .\src\test\powershell\CheckPostgre
 - Current verified baseline: `mvn spotless:apply verify` passed on 2026-04-14.
 - Treat `.\check_postgresql_runtime_env.ps1` as the first local PostgreSQL preflight when PATH, `.env`, or login state may be the problem.
 - Treat `.\run_verify.ps1` as the canonical repo-level full local verification path; it runs the Maven quality gate and PostgreSQL smoke together.
-- For the phone-alpha backend REST API, use `.\start_phone_alpha_backend.ps1` to start a LAN-facing server for Flutter integration testing.
+- For the phone-alpha backend REST API, prefer `.\start_phone_alpha_backend.ps1` as the one-command LAN startup path; it runs PostgreSQL preflight, starts local PostgreSQL if needed, verifies `/api/health`, and prints the Flutter `dart-define` values.
 - For PostgreSQL runtime changes, prefer the repo-local helpers `start_local_postgres.ps1`, `reset_local_postgres.ps1`, `run_postgresql_smoke.ps1`, and `stop_local_postgres.ps1` over ad-hoc Docker-first validation.
 - Use shared test helpers when available:
   - `JavaFxTestSupport`
