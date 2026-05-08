@@ -10,6 +10,12 @@ record ProfileCompletionDto(
         boolean canActivate,
         boolean canBrowse) {
 
+    ProfileCompletionDto {
+        missingProfileFields = missingProfileFields == null ? List.of() : List.copyOf(missingProfileFields);
+        missingProfileFieldLabels =
+                missingProfileFieldLabels == null ? List.of() : List.copyOf(missingProfileFieldLabels);
+    }
+
     static ProfileCompletionDto of(ProfileCompletionView view) {
         if (view == null) {
             return null;

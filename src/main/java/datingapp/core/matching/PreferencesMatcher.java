@@ -42,6 +42,7 @@ public final class PreferencesMatcher {
             if (jaccardIndex < 0.0 || jaccardIndex > 1.0) {
                 throw new IllegalArgumentException("jaccardIndex must be 0.0-1.0");
             }
+            shared = shared.isEmpty() ? Set.of() : Set.copyOf(shared);
         }
 
         /** Returns true if there are any shared interests. */

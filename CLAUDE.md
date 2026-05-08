@@ -1,5 +1,5 @@
-> 🚀 **VERIFIED & UPDATED: 2026-04-14**
-> Refreshed against the current source tree and a passing `mvn spotless:apply verify` run on 2026-04-14.
+> 🚀 **VERIFIED & UPDATED: 2026-05-08**
+> Refreshed against the current source tree on 2026-05-08 (build snapshot from 2026-04-14 verify run).
 
 # CLAUDE.md
 
@@ -18,10 +18,10 @@ Second-level guidance for AI coding agents working in this repository.
 - JavaFX 25.0.2
 - Maven
 
-## Verified Source Snapshot (2026-04-14)
+## Verified Source Snapshot (2026-05-08)
 
-- Java files: **396 total** (`186` main / `210` test)
-- Java LOC (`tokei src`, Java only): **110,483 total / 89,850 code / 15,576 blank / 5,057 comments**
+- Java files: **423 total** (`201` main / `222` test)
+- Java LOC (`tokei src`, Java only): **116,934 total / 95,788 code / 16,154 blank / 4,992 comments**
 
 ## Verified Build Snapshot (2026-04-14)
 
@@ -38,9 +38,9 @@ datingapp/
     bootstrap/        application startup and cleanup
     cli/              CLI handlers and presenters
     event/handlers/   achievements, metrics, notifications
-    geocoding/        NominatimGeocodingService
     support/          presentation helpers
     usecase/
+      auth/
       common/
       dashboard/
       matching/
@@ -55,9 +55,12 @@ datingapp/
     matching/
     metrics/
     model/
-    profile/          LocationService + GeocodingService + local/fallback adapters
+    profile/          ProfileService, ValidationService, MatchPreferences, helpers
     storage/
     workflow/
+  location/
+    {LocationService, GeocodingService, FallbackGeocodingService,
+     LocalGeocodingService, NominatimGeocodingService, LocationModels, GeoUtils}
   storage/
     {DatabaseDialect, DatabaseManager, DevDataSeeder, StorageFactory}
     jdbi/
@@ -68,18 +71,20 @@ datingapp/
     viewmodel/        BaseViewModel, loaders, coordinators, adapters, factory
     {DatingApp, ImageCache, LocalPhotoStore, NavigationService,
      OnboardingContext, UiAnimations, UiComponents, UiConstants,
-     UiDialogs, UiFeedbackService, UiPreferencesStore, UiThemeService, UiUtils}
+     UiDialogs, UiFeedbackService, UiPreferencesStore, UiStyles,
+     UiThemeService, UiUtils}
 ```
 
 ## Current High-Signal Seams
 
 - Production composition roots are `ServiceRegistry` and `ViewModelFactory`.
-- The location selection stack is now split cleanly:
+- The location selection stack lives in the `datingapp.location` package (top-level, not under `core/`):
   - `LocationService` owns the offline country/city/ZIP dataset, reverse lookup, and label formatting.
   - `GeocodingService` provides search results for the profile location UI.
   - `ViewModelFactory` wires `FallbackGeocodingService(LocalGeocodingService, NominatimGeocodingService)`.
   - `ProfileViewModel` stores the resolved label and coordinates; it does not own search logic.
   - `LocationSelectionDialog` owns the search-and-select UX.
+- `AuthUseCases` + `AuthTokenService` (in `app/usecase/auth/`) handle login, registration, and JWT token lifecycle (HS256). Exposed via `ServiceRegistry.getAuthUseCases()`.
 - `LocationModels.Precision` now includes `ADDRESS` in addition to `CITY` and `ZIP`.
 - `BaseViewModel` + `ViewModelAsyncScope` are the standard async UI seam. Matching swipe/undo, safety verification/delete, and chat reset paths should not block the FX thread.
 - `ImageCache.getImageAsync(...)` is the controller-facing image path for user-visible loads; controllers guard stale callbacks with request ids.
@@ -131,6 +136,8 @@ nav.initialize(primaryStage);
 
 `ServiceRegistry` constructs and owns the app-layer bundles:
 
+- `getAuthUseCases()`
+- `getDashboardUseCases()`
 - `getMatchingUseCases()`
 - `getMessagingUseCases()`
 - `getProfileUseCases()` — compatibility facade; prefer the dedicated slices below for new code
@@ -177,9 +184,9 @@ When selecting multiple tests from PowerShell, prefer `mvn --% ...` so comma-sep
 
 - `src/main/java/datingapp/app/bootstrap/ApplicationStartup.java` — bootstrap and config loading
 - `src/main/java/datingapp/core/ServiceRegistry.java` — central service and use-case wiring
-- `src/main/java/datingapp/core/profile/LocationService.java` — offline location dataset and reverse lookup
-- `src/main/java/datingapp/core/profile/GeocodingService.java` and `LocalGeocodingService.java` — location search abstraction and offline adapter
-- `src/main/java/datingapp/app/geocoding/NominatimGeocodingService.java` — online geocoding adapter
+- `src/main/java/datingapp/location/LocationService.java` — offline location dataset and reverse lookup
+- `src/main/java/datingapp/location/GeocodingService.java` and `LocalGeocodingService.java` — location search abstraction and offline adapter
+- `src/main/java/datingapp/location/NominatimGeocodingService.java` — online geocoding adapter
 - `src/main/java/datingapp/ui/screen/LocationSelectionDialog.java` — profile location selection flow
 - `src/main/java/datingapp/ui/ImageCache.java` — shared async image loading and caching
 - `src/main/java/datingapp/ui/viewmodel/BaseViewModel.java` — shared ViewModel lifecycle shell
