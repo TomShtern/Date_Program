@@ -5,6 +5,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import datingapp.app.api.RestApiExceptions.ApiForbiddenException;
+import datingapp.app.api.RestApiExceptions.ApiTooManyRequestsException;
 import io.javalin.http.Context;
 import java.lang.reflect.Field;
 import java.lang.reflect.Proxy;
@@ -31,8 +33,8 @@ class RestApiRequestGuardsTest {
         assertDoesNotThrow(
                 () -> guards.enforceLocalhostOnly(context(HEALTH_PATH, "GET", LOOPBACK_IP, Map.of(), Map.of())));
         assertDoesNotThrow(() -> guards.enforceLocalhostOnly(context(HEALTH_PATH, "GET", "::1", Map.of(), Map.of())));
-        RestApiRequestGuards.ApiForbiddenException exception = assertThrows(
-                RestApiRequestGuards.ApiForbiddenException.class,
+        ApiForbiddenException exception = assertThrows(
+                ApiForbiddenException.class,
                 () -> guards.enforceLocalhostOnly(context(HEALTH_PATH, "GET", "203.0.113.10", Map.of(), Map.of())));
         assertEquals("REST API is restricted to localhost requests", exception.getMessage());
     }
@@ -60,8 +62,8 @@ class RestApiRequestGuardsTest {
         guards.enforceRateLimit(ctx);
         guards.enforceRateLimit(ctx);
 
-        RestApiRequestGuards.ApiTooManyRequestsException exception = assertThrows(
-                RestApiRequestGuards.ApiTooManyRequestsException.class, () -> guards.enforceRateLimit(ctx));
+        ApiTooManyRequestsException exception =
+                assertThrows(ApiTooManyRequestsException.class, () -> guards.enforceRateLimit(ctx));
         assertEquals(2, exception.status().limit());
         assertEquals(3, exception.status().used());
         assertTrue(exception.status().retryAfterSeconds() >= 1);
@@ -82,8 +84,8 @@ class RestApiRequestGuardsTest {
                 Map.of("Origin", "http://localhost:3000", "Access-Control-Request-Method", "GET"),
                 Map.of())));
 
-        RestApiRequestGuards.ApiForbiddenException exception = assertThrows(
-                RestApiRequestGuards.ApiForbiddenException.class,
+        ApiForbiddenException exception = assertThrows(
+                ApiForbiddenException.class,
                 () -> guards.enforceLanSharedSecret(context(USERS_PATH, "GET", "203.0.113.10", Map.of(), Map.of())));
         assertEquals("Missing or invalid LAN shared secret", exception.getMessage());
 
@@ -142,8 +144,8 @@ class RestApiRequestGuardsTest {
         Context ctx = context(USERS_PATH, "GET", LOOPBACK_IP, Map.of(), Map.of());
 
         guards.enforceRateLimit(ctx);
-        RestApiRequestGuards.ApiTooManyRequestsException blocked = assertThrows(
-                RestApiRequestGuards.ApiTooManyRequestsException.class, () -> guards.enforceRateLimit(ctx));
+        ApiTooManyRequestsException blocked =
+                assertThrows(ApiTooManyRequestsException.class, () -> guards.enforceRateLimit(ctx));
         assertEquals(2, blocked.status().used());
 
         ticker.set(Duration.ofSeconds(6).toNanos());

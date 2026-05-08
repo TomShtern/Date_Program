@@ -6,8 +6,8 @@ import datingapp.app.usecase.matching.MatchingUseCases.SwipeOutcome;
 import datingapp.core.TextUtil;
 import datingapp.core.connection.ConnectionModels.Like;
 import datingapp.core.i18n.I18n;
-import datingapp.core.matching.InterestMatcher;
 import datingapp.core.matching.MatchingService.PendingLiker;
+import datingapp.core.matching.PreferencesMatcher;
 import datingapp.core.model.User;
 import java.time.ZoneId;
 import java.util.ArrayList;
@@ -108,11 +108,11 @@ final class MatchingCliPresenter {
         lines.add(CliTextAndInput.PROFILE_BIO_FORMAT.formatted(
                 candidate.getBio() != null ? candidate.getBio() : "(no bio)"));
 
-        InterestMatcher.MatchResult matchResult =
-                InterestMatcher.compare(currentUser.getInterests(), candidate.getInterests());
+        PreferencesMatcher.MatchResult matchResult =
+                PreferencesMatcher.compare(currentUser.getInterests(), candidate.getInterests());
         if (matchResult.hasSharedInterests()) {
             String sharedInterests =
-                    InterestMatcher.formatSharedInterests(matchResult.shared(), sharedInterestsPreviewCount);
+                    PreferencesMatcher.formatSharedInterests(matchResult.shared(), sharedInterestsPreviewCount);
             lines.add("│ " + getMutualInterestsBadge(matchResult.sharedCount()) + " " + matchResult.sharedCount()
                     + " shared interest" + (matchResult.sharedCount() > 1 ? "s" : "") + ": " + sharedInterests);
         }

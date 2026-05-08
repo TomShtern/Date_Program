@@ -39,6 +39,11 @@ import datingapp.app.api.ProfileDtos.ProfileNoteUpsertRequest;
 import datingapp.app.api.ProfileDtos.ProfileUpdateRequest;
 import datingapp.app.api.ProfileDtos.ProfileUpdateResponse;
 import datingapp.app.api.RestApiDtos.ErrorResponse;
+import datingapp.app.api.RestApiExceptions.ApiConflictException;
+import datingapp.app.api.RestApiExceptions.ApiForbiddenException;
+import datingapp.app.api.RestApiExceptions.ApiTooManyRequestsException;
+import datingapp.app.api.RestApiExceptions.ApiUnauthorizedException;
+import datingapp.app.api.RestApiExceptions.RateLimitStatus;
 import datingapp.app.api.RestApiUserDtos.PendingLikerDto;
 import datingapp.app.api.RestApiUserDtos.StandoutDto;
 import datingapp.app.api.RestApiUserDtos.UserDetail;
@@ -324,7 +329,105 @@ public class RestApiServer {
     // ── Route Registration ──────────────────────────────────────────────
 
     private void registerRoutes() {
-        new RestRouteSupport(app, this).registerRoutes();
+        // ────────────────────────────────────────────────────────────────────
+        // TRANSPORT NOTE: Loopback mode remains intentionally unauthenticated for
+        // local IPC use. Non-loopback/LAN mode now requires the configured shared
+        // secret header, and browser clients additionally rely on explicit CORS
+        // allowlisting. Mutating routes still require X-User-Id; selected read
+        // routes may remain anonymous after the transport guard passes.
+        // ────────────────────────────────────────────────────────────────────
+        registerHealthRoutes();
+        registerAuthRoutes();
+        registerLocationRoutes();
+        registerUserRoutes();
+        registerPhotoRoutes();
+        registerMatchingRoutes();
+        registerSocialRoutes();
+        registerMessagingRoutes();
+        registerProfileNoteRoutes();
+    }
+
+    private void registerHealthRoutes() {
+        app.get("/api/health", ctx -> ctx.json(new RestApiDtos.HealthResponse("ok", System.currentTimeMillis())));
+    }
+
+    private void registerAuthRoutes() {
+        app.post("/api/auth/signup", this::signup);
+        app.post("/api/auth/login", this::login);
+        app.post("/api/auth/refresh", this::refresh);
+        app.post("/api/auth/logout", this::logout);
+        app.get("/api/auth/me", this::me);
+    }
+
+    private void registerUserRoutes() {
+        app.get("/api/users", this::listUsers);
+        app.get("/api/users/{id}", this::getUser);
+        app.get("/api/users/{id}/profile-edit-snapshot", this::getProfileEditSnapshot);
+        app.get("/api/users/{viewerId}/presentation-context/{targetId}", this::getPresentationContext);
+        app.get("/api/users/{id}/browse", this::browseCandidates);
+        app.put("/api/users/{id}/profile", this::updateProfile);
+        app.get("/api/users/{id}/candidates", this::getCandidates);
+        app.delete("/api/users/{id}", this::deleteUser);
+    }
+
+    private void registerPhotoRoutes() {
+        app.get("/api/users/{id}/photos", this::listPhotos);
+        app.post("/api/users/{id}/photos", this::uploadPhoto);
+        app.delete("/api/users/{id}/photos/{photoId}", this::deletePhoto);
+        app.put("/api/users/{id}/photos/order", this::reorderPhotos);
+    }
+
+    private void registerLocationRoutes() {
+        app.get("/api/location/countries", this::listLocationCountries);
+        app.get("/api/location/cities", this::listLocationCities);
+        app.post("/api/location/resolve", this::resolveLocationSelection);
+    }
+
+    private void registerMatchingRoutes() {
+        app.get("/api/users/{id}/matches", this::getMatches);
+        app.get("/api/users/{id}/pending-likers", this::getPendingLikers);
+        app.get("/api/users/{id}/standouts", this::getStandouts);
+        app.get("/api/users/{id}/match-quality/{matchId}", this::getMatchQuality);
+        app.post("/api/users/{id}/like/{targetId}", this::likeUser);
+        app.post("/api/users/{id}/pass/{targetId}", this::passUser);
+        app.post("/api/users/{id}/matches/{matchId}/archive", this::archiveMatch);
+        app.post("/api/users/{id}/undo", this::undoSwipe);
+        app.get("/api/users/{id}/stats", this::getStats);
+        app.get("/api/users/{id}/achievements", this::getAchievements);
+    }
+
+    private void registerSocialRoutes() {
+        app.get("/api/users/{id}/notifications", this::getNotifications);
+        app.post("/api/users/{id}/notifications/read-all", this::markAllNotificationsRead);
+        app.post("/api/users/{id}/notifications/{notificationId}/read", this::markNotificationRead);
+        app.get("/api/users/{id}/friend-requests", this::getFriendRequests);
+        app.post("/api/users/{id}/friend-requests/{targetId}", this::requestFriendZone);
+        app.post("/api/users/{id}/friend-requests/{requestId}/accept", this::acceptFriendRequest);
+        app.post("/api/users/{id}/friend-requests/{requestId}/decline", this::declineFriendRequest);
+        app.post("/api/users/{id}/relationships/{targetId}/graceful-exit", this::gracefulExit);
+        app.post("/api/users/{id}/relationships/{targetId}/unmatch", this::unmatch);
+        app.get("/api/users/{id}/blocked-users", this::getBlockedUsers);
+        app.post("/api/users/{id}/block/{targetId}", this::blockUser);
+        app.delete("/api/users/{id}/block/{targetId}", this::unblockUser);
+        app.post("/api/users/{id}/report/{targetId}", this::reportUser);
+        app.post("/api/users/{id}/verification/start", this::startVerification);
+        app.post("/api/users/{id}/verification/confirm", this::confirmVerification);
+    }
+
+    private void registerMessagingRoutes() {
+        app.get("/api/users/{id}/conversations", this::getConversations);
+        app.delete("/api/users/{id}/conversations/{conversationId}", this::deleteConversation);
+        app.post("/api/users/{id}/conversations/{conversationId}/archive", this::archiveConversation);
+        app.get("/api/conversations/{conversationId}/messages", this::getMessages);
+        app.delete("/api/conversations/{conversationId}/messages/{messageId}", this::deleteMessage);
+        app.post("/api/conversations/{conversationId}/messages", this::sendMessage);
+    }
+
+    private void registerProfileNoteRoutes() {
+        app.get("/api/users/{authorId}/notes", this::listProfileNotes);
+        app.get("/api/users/{authorId}/notes/{subjectId}", this::getProfileNote);
+        app.put("/api/users/{authorId}/notes/{subjectId}", this::upsertProfileNote);
+        app.delete("/api/users/{authorId}/notes/{subjectId}", this::deleteProfileNote);
     }
 
     private void registerStaticPhotoRoute() {
@@ -644,7 +747,7 @@ public class RestApiServer {
         List<String> publicUrls = photoStorage.toPublicUrls(ctx, user.getPhotoUrls());
         String primaryPublicUrl = photoStorage.primaryPublicUrl(ctx, user.getPhotoUrls());
         String publicUrl = photoStorage.toPublicUrl(ctx, storedPath);
-        ProfileCompletionView completion = ProfileCompletionView.from(user, activationPolicy);
+        ProfileCompletionDto completion = ProfileCompletionDto.of(ProfileCompletionView.from(user, activationPolicy));
         ctx.status(201)
                 .json(new PhotoUploadResponse(
                         new PhotoRef(photo.id(), publicUrl),
@@ -697,7 +800,7 @@ public class RestApiServer {
         }
         List<String> publicUrls = photoStorage.toPublicUrls(ctx, user.getPhotoUrls());
         String primaryPublicUrl = photoStorage.primaryPublicUrl(ctx, user.getPhotoUrls());
-        ProfileCompletionView completion = ProfileCompletionView.from(user, activationPolicy);
+        ProfileCompletionDto completion = ProfileCompletionDto.of(ProfileCompletionView.from(user, activationPolicy));
         ctx.json(new PhotoMutationResponse(
                 primaryPublicUrl,
                 publicUrls,
@@ -746,7 +849,7 @@ public class RestApiServer {
         }
         List<String> publicUrls = photoStorage.toPublicUrls(ctx, user.getPhotoUrls());
         String primaryPublicUrl = photoStorage.primaryPublicUrl(ctx, user.getPhotoUrls());
-        ProfileCompletionView completion = ProfileCompletionView.from(user, activationPolicy);
+        ProfileCompletionDto completion = ProfileCompletionDto.of(ProfileCompletionView.from(user, activationPolicy));
         ctx.json(new PhotoMutationResponse(
                 primaryPublicUrl,
                 publicUrls,
@@ -1379,7 +1482,7 @@ public class RestApiServer {
         }
 
         if (!actingUserId.equals(request.senderId())) {
-            throw new RestApiRequestGuards.ApiForbiddenException("Acting user does not match message sender");
+            throw new ApiForbiddenException("Acting user does not match message sender");
         }
         UUID recipientId = extractRecipientFromConversation(conversationId, actingUserId);
         var result = messagingUseCases.sendMessage(
@@ -1502,10 +1605,10 @@ public class RestApiServer {
 
     private void ensureViewerCanReadUserProfile(User viewer, User target) {
         if (trustSafetyService.isBlocked(viewer.getId(), target.getId())) {
-            throw new RestApiRequestGuards.ApiForbiddenException("Blocked users cannot view each other's profiles");
+            throw new ApiForbiddenException("Blocked users cannot view each other's profiles");
         }
         if (target.getState() != UserState.ACTIVE) {
-            throw new RestApiRequestGuards.ApiConflictException("Target user is not visible");
+            throw new ApiConflictException("Target user is not visible");
         }
     }
 
@@ -1651,7 +1754,7 @@ public class RestApiServer {
 
     private void ensureActiveCandidateBrowser(User user) {
         if (user.getState() != UserState.ACTIVE) {
-            throw new RestApiRequestGuards.ApiConflictException("User must be ACTIVE to browse candidates");
+            throw new ApiConflictException("User must be ACTIVE to browse candidates");
         }
     }
 
@@ -1725,17 +1828,17 @@ public class RestApiServer {
             ctx.json(new ErrorResponse(BAD_REQUEST, e.getMessage()));
         });
 
-        app.exception(RestApiRequestGuards.ApiForbiddenException.class, (e, ctx) -> {
+        app.exception(ApiForbiddenException.class, (e, ctx) -> {
             ctx.status(403);
             ctx.json(new ErrorResponse(FORBIDDEN, e.getMessage()));
         });
 
-        app.exception(RestApiRequestGuards.ApiUnauthorizedException.class, (e, ctx) -> {
+        app.exception(ApiUnauthorizedException.class, (e, ctx) -> {
             ctx.status(401);
             ctx.json(new ErrorResponse(UNAUTHORIZED, e.getMessage()));
         });
 
-        app.exception(RestApiRequestGuards.ApiConflictException.class, (e, ctx) -> {
+        app.exception(ApiConflictException.class, (e, ctx) -> {
             ctx.status(409);
             ctx.json(new ErrorResponse(CONFLICT, e.getMessage()));
         });
@@ -1745,8 +1848,8 @@ public class RestApiServer {
             ctx.json(new ErrorResponse(UNAUTHORIZED, e.getMessage()));
         });
 
-        app.exception(RestApiRequestGuards.ApiTooManyRequestsException.class, (e, ctx) -> {
-            RestApiRequestGuards.RateLimitStatus status = e.status();
+        app.exception(ApiTooManyRequestsException.class, (e, ctx) -> {
+            RateLimitStatus status = e.status();
             ctx.header("Retry-After", String.valueOf(status.retryAfterSeconds()));
             ctx.header("X-RateLimit-Limit", String.valueOf(status.limit()));
             ctx.header("X-RateLimit-Used", String.valueOf(status.used()));

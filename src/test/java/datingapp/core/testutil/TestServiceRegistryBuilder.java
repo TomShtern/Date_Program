@@ -12,6 +12,7 @@ import datingapp.app.usecase.profile.ProfileUseCases;
 import datingapp.core.AppConfig;
 import datingapp.core.ServiceRegistry;
 import datingapp.core.connection.ConnectionService;
+import datingapp.core.matching.BrowseRankingService;
 import datingapp.core.matching.CandidateFinder;
 import datingapp.core.matching.CompatibilityCalculator;
 import datingapp.core.matching.DailyLimitService;
@@ -19,17 +20,28 @@ import datingapp.core.matching.DailyPickService;
 import datingapp.core.matching.MatchQualityService;
 import datingapp.core.matching.MatchingService;
 import datingapp.core.matching.RecommendationService;
+import datingapp.core.matching.Standout;
 import datingapp.core.matching.StandoutService;
 import datingapp.core.matching.TrustSafetyService;
 import datingapp.core.matching.UndoService;
 import datingapp.core.metrics.AchievementService;
 import datingapp.core.metrics.ActivityMetricsService;
+import datingapp.core.metrics.SwipeState.Undo;
 import datingapp.core.profile.ProfileService;
 import datingapp.core.profile.ValidationService;
+import datingapp.core.storage.AnalyticsStorage;
+import datingapp.core.storage.CommunicationStorage;
+import datingapp.core.storage.InteractionStorage;
+import datingapp.core.storage.OperationalCommunicationStorage;
+import datingapp.core.storage.OperationalInteractionStorage;
+import datingapp.core.storage.OperationalUserStorage;
+import datingapp.core.storage.TrustSafetyStorage;
 import datingapp.core.storage.UserStorage;
 import datingapp.core.workflow.ProfileActivationPolicy;
 import datingapp.location.LocationService;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
+import java.util.Objects;
 
 /**
  * Shared test utility for building a fully-wired {@link ServiceRegistry}
@@ -48,6 +60,14 @@ public final class TestServiceRegistryBuilder {
 
     private TestServiceRegistryBuilder() {
         // utility class
+    }
+
+    /** Starts building a shared test {@link ServiceRegistry} for the supplied storages. */
+    public static Builder builder(
+            OperationalUserStorage userStorage,
+            OperationalInteractionStorage interactionStorage,
+            OperationalCommunicationStorage communicationStorage) {
+        return new Builder(userStorage, interactionStorage, communicationStorage);
     }
 
     // ── Simple one-shot factory ──────────────────────────────────────────
@@ -69,52 +89,134 @@ public final class TestServiceRegistryBuilder {
         TestStorages.Communications communications = new TestStorages.Communications();
         TestStorages.TrustSafety trustSafety = new TestStorages.TrustSafety();
         TestStorages.Analytics analytics = new TestStorages.Analytics();
+        TestStorages.Standouts standouts = new TestStorages.Standouts();
+        TestStorages.Undos undos = new TestStorages.Undos();
 
-        AppConfig config = AppConfig.defaults();
+        ServiceRegistry registry = buildRegistry(
+                users,
+                interactions,
+                communications,
+                AppConfig.defaults(),
+                analytics,
+                trustSafety,
+                standouts,
+                undos,
+                BrowseRankingService.identity(),
+                ZoneOffset.UTC);
+
+        return new RegistryWithStorages(registry, users, interactions, communications, trustSafety, analytics);
+    }
+
+    private static ServiceRegistry buildRegistry(
+            OperationalUserStorage userStorage,
+            OperationalInteractionStorage interactionStorage,
+            OperationalCommunicationStorage communicationStorage,
+            AppConfig config,
+            AnalyticsStorage analyticsStorage,
+            TrustSafetyStorage trustSafetyStorage,
+            Standout.Storage standoutStorage,
+            Undo.Storage undoStorage,
+            BrowseRankingService browseRankingService,
+            ZoneId candidateFinderZone) {
+        AppConfig resolvedConfig = Objects.requireNonNull(config, "config cannot be null");
+        OperationalUserStorage resolvedOperationalUserStorage =
+                Objects.requireNonNull(userStorage, "userStorage cannot be null");
+        UserStorage resolvedUserStorage = resolvedOperationalUserStorage;
+        OperationalInteractionStorage resolvedOperationalInteractionStorage =
+                Objects.requireNonNull(interactionStorage, "interactionStorage cannot be null");
+        InteractionStorage resolvedInteractionStorage = resolvedOperationalInteractionStorage;
+        OperationalCommunicationStorage resolvedOperationalCommunicationStorage =
+                Objects.requireNonNull(communicationStorage, "communicationStorage cannot be null");
+        CommunicationStorage resolvedCommunicationStorage = resolvedOperationalCommunicationStorage;
+        AnalyticsStorage resolvedAnalyticsStorage =
+                Objects.requireNonNull(analyticsStorage, "analyticsStorage cannot be null");
+        TrustSafetyStorage resolvedTrustSafetyStorage =
+                Objects.requireNonNull(trustSafetyStorage, "trustSafetyStorage cannot be null");
+        Standout.Storage resolvedStandoutStorage =
+                Objects.requireNonNull(standoutStorage, "standoutStorage cannot be null");
+        Undo.Storage resolvedUndoStorage = Objects.requireNonNull(undoStorage, "undoStorage cannot be null");
+        ZoneId resolvedCandidateFinderZone =
+                Objects.requireNonNull(candidateFinderZone, "candidateFinderZone cannot be null");
+
         AppEventBus eventBus = new InProcessAppEventBus();
-        ValidationService validationService = new ValidationService(config);
+        ValidationService validationService = new ValidationService(resolvedConfig);
 
-        CandidateFinder candidateFinder = new CandidateFinder(users, interactions, trustSafety, ZoneOffset.UTC);
-        ActivityMetricsService activityMetricsService =
-                new ActivityMetricsService(interactions, trustSafety, analytics, config);
-        ProfileService profileService = new ProfileService(users);
-        CompatibilityCalculator compatibilityCalculator = new CompatibilityCalculator(config);
-        DailyLimitService dailyLimitService = new DailyLimitService(interactions, config);
-        DailyPickService dailyPickService = new DailyPickService(analytics, candidateFinder, config);
+        CandidateFinder candidateFinder = new CandidateFinder(
+                resolvedOperationalUserStorage,
+                resolvedOperationalInteractionStorage,
+                resolvedTrustSafetyStorage,
+                resolvedCandidateFinderZone);
+        ActivityMetricsService activityMetricsService = new ActivityMetricsService(
+                resolvedOperationalInteractionStorage,
+                resolvedTrustSafetyStorage,
+                resolvedAnalyticsStorage,
+                resolvedConfig);
+        ProfileService profileService = new ProfileService(resolvedUserStorage);
+        CompatibilityCalculator compatibilityCalculator = new CompatibilityCalculator(resolvedConfig);
+        DailyLimitService dailyLimitService =
+                new DailyLimitService(resolvedOperationalInteractionStorage, resolvedConfig);
+        DailyPickService dailyPickService =
+                new DailyPickService(resolvedAnalyticsStorage, candidateFinder, resolvedConfig);
         StandoutService standoutService = new StandoutService(
-                compatibilityCalculator, users, candidateFinder, new TestStorages.Standouts(), profileService, config);
-        RecommendationService recommendationService =
-                new RecommendationService(dailyLimitService, dailyPickService, standoutService);
-        UndoService undoService = new UndoService(interactions, new TestStorages.Undos(), config);
+                compatibilityCalculator,
+                resolvedOperationalUserStorage,
+                candidateFinder,
+                resolvedStandoutStorage,
+                profileService,
+                resolvedConfig);
+        BrowseRankingService resolvedBrowseRankingService = browseRankingService != null
+                ? browseRankingService
+                : new BrowseRankingService(compatibilityCalculator, profileService, resolvedConfig);
+        RecommendationService recommendationService = new RecommendationService(
+                dailyLimitService, dailyPickService, standoutService, resolvedBrowseRankingService);
+        UndoService undoService =
+                new UndoService(resolvedOperationalInteractionStorage, resolvedUndoStorage, resolvedConfig);
         MatchingService matchingService = MatchingService.builder()
-                .interactionStorage(interactions)
-                .trustSafetyStorage(trustSafety)
-                .userStorage(users)
+                .interactionStorage(resolvedOperationalInteractionStorage)
+                .trustSafetyStorage(resolvedTrustSafetyStorage)
+                .userStorage(resolvedOperationalUserStorage)
                 .activityMetricsService(activityMetricsService)
                 .dailyService(recommendationService)
                 .undoService(undoService)
                 .candidateFinder(candidateFinder)
                 .build();
         TrustSafetyService trustSafetyService = TrustSafetyService.builder(
-                        trustSafety, interactions, users, config, communications)
+                        resolvedTrustSafetyStorage,
+                        resolvedOperationalInteractionStorage,
+                        resolvedOperationalUserStorage,
+                        resolvedConfig,
+                        resolvedOperationalCommunicationStorage)
                 .build();
-        ConnectionService connectionService = new ConnectionService(config, communications, interactions, users);
-        MatchQualityService matchQualityService =
-                new MatchQualityService(users, interactions, config, compatibilityCalculator);
+        ConnectionService connectionService = new ConnectionService(
+                resolvedConfig,
+                resolvedOperationalCommunicationStorage,
+                resolvedOperationalInteractionStorage,
+                resolvedOperationalUserStorage);
+        MatchQualityService matchQualityService = new MatchQualityService(
+                resolvedOperationalUserStorage,
+                resolvedOperationalInteractionStorage,
+                resolvedConfig,
+                compatibilityCalculator);
         LocationService locationService = new LocationService(validationService);
-        AchievementService achievementService =
-                new AchievementService(config, analytics, interactions, trustSafety, users, profileService);
+        AchievementService achievementService = new AchievementService(
+                resolvedConfig,
+                resolvedAnalyticsStorage,
+                resolvedOperationalInteractionStorage,
+                resolvedTrustSafetyStorage,
+                resolvedOperationalUserStorage,
+                profileService);
         TestStorages.Auth authStorage = new TestStorages.Auth();
-        AuthTokenService authTokenService = new AuthTokenService(config.auth());
-        AuthUseCases authUseCases = new AuthUseCases(config, users, authStorage, authTokenService);
+        AuthTokenService authTokenService = new AuthTokenService(resolvedConfig.auth());
+        AuthUseCases authUseCases =
+                new AuthUseCases(resolvedConfig, resolvedUserStorage, authStorage, authTokenService);
 
-        ServiceRegistry registry = ServiceRegistry.builder()
-                .config(config)
-                .userStorage(users)
-                .interactionStorage(interactions)
-                .communicationStorage(communications)
-                .analyticsStorage(analytics)
-                .trustSafetyStorage(trustSafety)
+        return ServiceRegistry.builder()
+                .config(resolvedConfig)
+                .userStorage(resolvedUserStorage)
+                .interactionStorage(resolvedInteractionStorage)
+                .communicationStorage(resolvedCommunicationStorage)
+                .analyticsStorage(resolvedAnalyticsStorage)
+                .trustSafetyStorage(resolvedTrustSafetyStorage)
                 .candidateFinder(candidateFinder)
                 .matchingService(matchingService)
                 .trustSafetyService(trustSafetyService)
@@ -133,8 +235,74 @@ public final class TestServiceRegistryBuilder {
                 .eventBus(eventBus)
                 .authUseCases(authUseCases)
                 .build();
+    }
 
-        return new RegistryWithStorages(registry, users, interactions, communications, trustSafety, analytics);
+    /** Builder for a shared test {@link ServiceRegistry} graph. */
+    public static final class Builder {
+        private final OperationalUserStorage userStorage;
+        private final OperationalInteractionStorage interactionStorage;
+        private final OperationalCommunicationStorage communicationStorage;
+        private AppConfig config = AppConfig.defaults();
+        private AnalyticsStorage analyticsStorage = new TestStorages.Analytics();
+        private TrustSafetyStorage trustSafetyStorage = new TestStorages.TrustSafety();
+        private Standout.Storage standoutStorage = new TestStorages.Standouts();
+        private Undo.Storage undoStorage = new TestStorages.Undos();
+        private BrowseRankingService browseRankingService;
+
+        private Builder(
+                OperationalUserStorage userStorage,
+                OperationalInteractionStorage interactionStorage,
+                OperationalCommunicationStorage communicationStorage) {
+            this.userStorage = Objects.requireNonNull(userStorage, "userStorage cannot be null");
+            this.interactionStorage = Objects.requireNonNull(interactionStorage, "interactionStorage cannot be null");
+            this.communicationStorage =
+                    Objects.requireNonNull(communicationStorage, "communicationStorage cannot be null");
+        }
+
+        public Builder config(AppConfig config) {
+            this.config = Objects.requireNonNull(config, "config cannot be null");
+            return this;
+        }
+
+        public Builder analyticsStorage(AnalyticsStorage analyticsStorage) {
+            this.analyticsStorage = Objects.requireNonNull(analyticsStorage, "analyticsStorage cannot be null");
+            return this;
+        }
+
+        public Builder trustSafetyStorage(TrustSafetyStorage trustSafetyStorage) {
+            this.trustSafetyStorage = Objects.requireNonNull(trustSafetyStorage, "trustSafetyStorage cannot be null");
+            return this;
+        }
+
+        public Builder standoutStorage(Standout.Storage standoutStorage) {
+            this.standoutStorage = Objects.requireNonNull(standoutStorage, "standoutStorage cannot be null");
+            return this;
+        }
+
+        public Builder undoStorage(Undo.Storage undoStorage) {
+            this.undoStorage = Objects.requireNonNull(undoStorage, "undoStorage cannot be null");
+            return this;
+        }
+
+        public Builder browseRankingService(BrowseRankingService browseRankingService) {
+            this.browseRankingService =
+                    Objects.requireNonNull(browseRankingService, "browseRankingService cannot be null");
+            return this;
+        }
+
+        public ServiceRegistry build() {
+            return buildRegistry(
+                    userStorage,
+                    interactionStorage,
+                    communicationStorage,
+                    config,
+                    analyticsStorage,
+                    trustSafetyStorage,
+                    standoutStorage,
+                    undoStorage,
+                    browseRankingService,
+                    config.safety().userTimeZone());
+        }
     }
 
     // ── ProfileUseCases helper (frequently needed in CLI tests) ─────────

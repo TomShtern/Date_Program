@@ -6,7 +6,6 @@ import datingapp.core.model.User;
 import datingapp.core.profile.MatchPreferences.Dealbreakers;
 import datingapp.core.profile.MatchPreferences.Interest;
 import datingapp.core.profile.MatchPreferences.Lifestyle;
-import datingapp.core.profile.MatchPreferences.PacePreferences;
 import datingapp.core.workflow.ProfileActivationPolicy;
 import datingapp.location.LocationModels.City;
 import datingapp.location.LocationModels.ResolvedLocation;
@@ -43,28 +42,10 @@ final class ProfileDtos {
             Set<Interest> interests,
             Dealbreakers dealbreakers,
             LocationDtos.ProfileLocationRequest location,
-            WritePacePreferencesDto pacePreferences) {
+            PacePreferencesDtos.Write pacePreferences) {
         ProfileUpdateRequest {
             interestedIn = interestedIn == null ? Set.of() : Set.copyOf(interestedIn);
             interests = interests == null ? Set.of() : Set.copyOf(interests);
-        }
-    }
-
-    /** Nested DTO for pace preferences in profile update requests. */
-    static record WritePacePreferencesDto(
-            PacePreferences.MessagingFrequency messagingFrequency,
-            PacePreferences.TimeToFirstDate timeToFirstDate,
-            PacePreferences.CommunicationStyle communicationStyle,
-            PacePreferences.DepthPreference depthPreference) {
-
-        PacePreferences toPacePreferences() {
-            if (messagingFrequency == null
-                    && timeToFirstDate == null
-                    && communicationStyle == null
-                    && depthPreference == null) {
-                return null;
-            }
-            return new PacePreferences(messagingFrequency, timeToFirstDate, communicationStyle, depthPreference);
         }
     }
 
@@ -155,8 +136,8 @@ final class ProfileDtos {
         }
 
         static ProfileEditSnapshotDto from(User user, SelectionSeed seed, ProfileActivationPolicy activationPolicy) {
-            ProfileCompletionView completion =
-                    activationPolicy != null ? ProfileCompletionView.from(user, activationPolicy) : null;
+            ProfileCompletionDto completion = ProfileCompletionDto.of(
+                    activationPolicy != null ? ProfileCompletionView.from(user, activationPolicy) : null);
             return new ProfileEditSnapshotDto(
                     user.getId(),
                     ProfileEditableDto.from(user, seed),
@@ -186,7 +167,7 @@ final class ProfileDtos {
             String education,
             List<String> interests,
             DealbreakersDto dealbreakers,
-            PacePreferencesEditableDto pacePreferences,
+            PacePreferencesDtos.Read pacePreferences,
             ProfileEditLocationDto location) {
         ProfileEditableDto {
             interestedIn = interestedIn == null ? List.of() : List.copyOf(interestedIn);
@@ -210,7 +191,7 @@ final class ProfileDtos {
                     user.getEducation() != null ? user.getEducation().name() : null,
                     enumNames(user.getInterests()),
                     DealbreakersDto.from(user.getDealbreakers()),
-                    PacePreferencesEditableDto.from(user.getPacePreferences()),
+                    PacePreferencesDtos.Read.blankWhenMissing(user.getPacePreferences()),
                     ProfileEditLocationDto.from(seed));
         }
     }
@@ -243,24 +224,6 @@ final class ProfileDtos {
                     safe.minHeightCm(),
                     safe.maxHeightCm(),
                     safe.maxAgeDifference());
-        }
-    }
-
-    static record PacePreferencesEditableDto(
-            String messagingFrequency, String timeToFirstDate, String communicationStyle, String depthPreference) {
-        static PacePreferencesEditableDto from(PacePreferences pace) {
-            if (pace == null) {
-                return new PacePreferencesEditableDto(null, null, null, null);
-            }
-            return new PacePreferencesEditableDto(
-                    pace.messagingFrequency() != null
-                            ? pace.messagingFrequency().name()
-                            : null,
-                    pace.timeToFirstDate() != null ? pace.timeToFirstDate().name() : null,
-                    pace.communicationStyle() != null
-                            ? pace.communicationStyle().name()
-                            : null,
-                    pace.depthPreference() != null ? pace.depthPreference().name() : null);
         }
     }
 
@@ -350,8 +313,8 @@ final class ProfileDtos {
                 String approximateLocation,
                 ProfileActivationPolicy activationPolicy) {
             RestApiUserDtos.UserFields fields = RestApiUserDtos.mapUserFields(user, userTimeZone, approximateLocation);
-            ProfileCompletionView completion =
-                    activationPolicy != null ? ProfileCompletionView.from(user, activationPolicy) : null;
+            ProfileCompletionDto completion = ProfileCompletionDto.of(
+                    activationPolicy != null ? ProfileCompletionView.from(user, activationPolicy) : null);
             return new ProfileUpdateResponse(
                     user.getId(),
                     user.getName(),

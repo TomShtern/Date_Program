@@ -1,7 +1,7 @@
 package datingapp.app.api;
 
-import datingapp.app.api.RestApiRequestGuards.ApiForbiddenException;
-import datingapp.app.api.RestApiRequestGuards.ApiUnauthorizedException;
+import datingapp.app.api.RestApiExceptions.ApiForbiddenException;
+import datingapp.app.api.RestApiExceptions.ApiUnauthorizedException;
 import datingapp.app.usecase.auth.AuthUseCases;
 import io.javalin.http.Context;
 import io.javalin.http.HandlerType;
@@ -17,8 +17,6 @@ final class RestApiIdentityPolicy {
     private static final String HEADER_ACTING_USER_ID = "X-User-Id";
     private static final String HEADER_AUTHORIZATION = "Authorization";
     private static final String BEARER_PREFIX = "Bearer ";
-    private static final String CONVERSATION_ROUTE_PREFIX = "/api/conversations/";
-    private static final String USER_ROUTE_PREFIX = "/api/users/";
     private static final String USER_ROUTE_MESSAGE = "Acting user does not match requested user route";
     private static final String CONVERSATION_MESSAGE = "User is not part of this conversation";
     private static final String INVALID_BEARER_MESSAGE = "Missing or invalid bearer token";
@@ -38,7 +36,7 @@ final class RestApiIdentityPolicy {
         validateActingUserMatchesPathParam(ctx, "authorId");
         validateActingUserMatchesPathParam(ctx, "viewerId");
 
-        if (ctx.path().startsWith(CONVERSATION_ROUTE_PREFIX)
+        if (ctx.path().startsWith(RestApiRequestGuards.CONVERSATION_ROUTE_PREFIX)
                 && ctx.pathParamMap().containsKey("conversationId")) {
             resolveActingUserId(ctx)
                     .ifPresent(actingUserId -> parseConversationParticipants(ctx.pathParam("conversationId"))
@@ -114,7 +112,8 @@ final class RestApiIdentityPolicy {
             return false;
         }
         String path = ctx.path();
-        return path.startsWith(USER_ROUTE_PREFIX) && path.indexOf('/', USER_ROUTE_PREFIX.length()) < 0;
+        return path.startsWith(RestApiRequestGuards.USERS_ROUTE_PREFIX)
+                && path.indexOf('/', RestApiRequestGuards.USERS_ROUTE_PREFIX.length()) < 0;
     }
 
     ConversationParticipants parseConversationParticipants(String conversationId) {

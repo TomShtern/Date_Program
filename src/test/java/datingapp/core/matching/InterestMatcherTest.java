@@ -15,11 +15,11 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 /**
- * Focused test coverage for InterestMatcher. Tests interest comparison, formatting utilities, and
+ * Focused test coverage for PreferencesMatcher. Tests interest comparison, formatting utilities, and
  * MatchResult validation constraints.
  */
-@DisplayName("InterestMatcher")
-class InterestMatcherTest {
+@DisplayName("PreferencesMatcher")
+class PreferencesMatcherTest {
 
     @Nested
     @DisplayName("compare")
@@ -28,8 +28,8 @@ class InterestMatcherTest {
         @Test
         @DisplayName("null first argument returns empty result")
         void compareNullFirstArgument() {
-            InterestMatcher.MatchResult result =
-                    InterestMatcher.compare(null, EnumSet.of(Interest.HIKING, Interest.COFFEE));
+            PreferencesMatcher.MatchResult result =
+                    PreferencesMatcher.compare(null, EnumSet.of(Interest.HIKING, Interest.COFFEE));
 
             assertNotNull(result);
             assertEquals(0, result.sharedCount());
@@ -42,7 +42,7 @@ class InterestMatcherTest {
         @Test
         @DisplayName("null second argument returns empty result")
         void compareNullSecondArgument() {
-            InterestMatcher.MatchResult result = InterestMatcher.compare(EnumSet.of(Interest.HIKING), null);
+            PreferencesMatcher.MatchResult result = PreferencesMatcher.compare(EnumSet.of(Interest.HIKING), null);
 
             assertNotNull(result);
             assertEquals(0, result.sharedCount());
@@ -55,7 +55,7 @@ class InterestMatcherTest {
         @Test
         @DisplayName("both arguments null returns empty result")
         void compareBothNull() {
-            InterestMatcher.MatchResult result = InterestMatcher.compare(null, null);
+            PreferencesMatcher.MatchResult result = PreferencesMatcher.compare(null, null);
 
             assertNotNull(result);
             assertEquals(0, result.sharedCount());
@@ -68,8 +68,8 @@ class InterestMatcherTest {
         @Test
         @DisplayName("empty first set returns empty result")
         void compareEmptyFirstSet() {
-            InterestMatcher.MatchResult result =
-                    InterestMatcher.compare(EnumSet.noneOf(Interest.class), EnumSet.of(Interest.HIKING));
+            PreferencesMatcher.MatchResult result =
+                    PreferencesMatcher.compare(EnumSet.noneOf(Interest.class), EnumSet.of(Interest.HIKING));
 
             assertNotNull(result);
             assertEquals(0, result.sharedCount());
@@ -82,8 +82,8 @@ class InterestMatcherTest {
         @Test
         @DisplayName("empty second set returns empty result")
         void compareEmptySecondSet() {
-            InterestMatcher.MatchResult result =
-                    InterestMatcher.compare(EnumSet.of(Interest.HIKING), EnumSet.noneOf(Interest.class));
+            PreferencesMatcher.MatchResult result =
+                    PreferencesMatcher.compare(EnumSet.of(Interest.HIKING), EnumSet.noneOf(Interest.class));
 
             assertNotNull(result);
             assertEquals(0, result.sharedCount());
@@ -97,7 +97,7 @@ class InterestMatcherTest {
         @DisplayName("identical sets returns perfect match")
         void compareIdenticalSets() {
             Set<Interest> interests = EnumSet.of(Interest.HIKING, Interest.COFFEE, Interest.MUSIC);
-            InterestMatcher.MatchResult result = InterestMatcher.compare(interests, interests);
+            PreferencesMatcher.MatchResult result = PreferencesMatcher.compare(interests, interests);
 
             assertNotNull(result);
             assertEquals(3, result.sharedCount());
@@ -112,7 +112,7 @@ class InterestMatcherTest {
         void comparePartialMatch() {
             Set<Interest> a = EnumSet.of(Interest.HIKING, Interest.COFFEE, Interest.MUSIC);
             Set<Interest> b = EnumSet.of(Interest.HIKING, Interest.COFFEE, Interest.GYM);
-            InterestMatcher.MatchResult result = InterestMatcher.compare(a, b);
+            PreferencesMatcher.MatchResult result = PreferencesMatcher.compare(a, b);
 
             assertNotNull(result);
             assertEquals(2, result.sharedCount());
@@ -129,7 +129,7 @@ class InterestMatcherTest {
         void compareAsymmetricSets() {
             Set<Interest> a = EnumSet.of(Interest.HIKING, Interest.COFFEE);
             Set<Interest> b = EnumSet.of(Interest.HIKING, Interest.COFFEE, Interest.MUSIC, Interest.GYM, Interest.YOGA);
-            InterestMatcher.MatchResult result = InterestMatcher.compare(a, b);
+            PreferencesMatcher.MatchResult result = PreferencesMatcher.compare(a, b);
 
             assertNotNull(result);
             assertEquals(2, result.sharedCount());
@@ -146,7 +146,7 @@ class InterestMatcherTest {
         void compareNoOverlap() {
             Set<Interest> a = EnumSet.of(Interest.HIKING, Interest.CAMPING);
             Set<Interest> b = EnumSet.of(Interest.MUSIC, Interest.THEATER);
-            InterestMatcher.MatchResult result = InterestMatcher.compare(a, b);
+            PreferencesMatcher.MatchResult result = PreferencesMatcher.compare(a, b);
 
             assertNotNull(result);
             assertEquals(0, result.sharedCount());
@@ -161,7 +161,7 @@ class InterestMatcherTest {
         void compareSingleSharedInterest() {
             Set<Interest> a = EnumSet.of(Interest.HIKING, Interest.CAMPING, Interest.CYCLING);
             Set<Interest> b = EnumSet.of(Interest.HIKING, Interest.MUSIC);
-            InterestMatcher.MatchResult result = InterestMatcher.compare(a, b);
+            PreferencesMatcher.MatchResult result = PreferencesMatcher.compare(a, b);
 
             assertNotNull(result);
             assertEquals(1, result.sharedCount());
@@ -181,7 +181,7 @@ class InterestMatcherTest {
         @Test
         @DisplayName("null returns empty string")
         void formatNullSharedInterests() {
-            String result = InterestMatcher.formatSharedInterests(null);
+            String result = PreferencesMatcher.formatSharedInterests(null);
 
             assertEquals("", result);
         }
@@ -189,7 +189,7 @@ class InterestMatcherTest {
         @Test
         @DisplayName("empty set returns empty string")
         void formatEmptySharedInterests() {
-            String result = InterestMatcher.formatSharedInterests(EnumSet.noneOf(Interest.class));
+            String result = PreferencesMatcher.formatSharedInterests(EnumSet.noneOf(Interest.class));
 
             assertEquals("", result);
         }
@@ -197,7 +197,7 @@ class InterestMatcherTest {
         @Test
         @DisplayName("single interest returns interest name")
         void formatSingleInterest() {
-            String result = InterestMatcher.formatSharedInterests(EnumSet.of(Interest.HIKING));
+            String result = PreferencesMatcher.formatSharedInterests(EnumSet.of(Interest.HIKING));
 
             assertEquals("Hiking", result);
         }
@@ -205,7 +205,7 @@ class InterestMatcherTest {
         @Test
         @DisplayName("two interests returns both with 'and'")
         void formatTwoInterests() {
-            String result = InterestMatcher.formatSharedInterests(EnumSet.of(Interest.HIKING, Interest.CAMPING));
+            String result = PreferencesMatcher.formatSharedInterests(EnumSet.of(Interest.HIKING, Interest.CAMPING));
 
             assertTrue(result.contains("and"), "Should contain 'and'");
             assertTrue(result.contains("Hiking"), "Should contain 'Hiking'");
@@ -215,7 +215,7 @@ class InterestMatcherTest {
         @Test
         @DisplayName("three interests uses oxford comma")
         void formatThreeInterests() {
-            String result = InterestMatcher.formatSharedInterests(
+            String result = PreferencesMatcher.formatSharedInterests(
                     EnumSet.of(Interest.HIKING, Interest.CAMPING, Interest.FISHING));
 
             // Result should be sorted and use oxford comma: "Camping, Fishing, and Hiking"
@@ -227,7 +227,7 @@ class InterestMatcherTest {
         @DisplayName("more than default preview count (3) shows truncation")
         void formatMoreThanDefaultPreview() {
             Set<Interest> interests = EnumSet.of(Interest.HIKING, Interest.CAMPING, Interest.FISHING, Interest.CYCLING);
-            String result = InterestMatcher.formatSharedInterests(interests);
+            String result = PreferencesMatcher.formatSharedInterests(interests);
 
             assertTrue(result.contains("and 1 more"), "Should show truncation message");
         }
@@ -236,7 +236,7 @@ class InterestMatcherTest {
         @DisplayName("exactly default preview count (3) shows all")
         void formatExactlyDefaultPreview() {
             Set<Interest> interests = EnumSet.of(Interest.HIKING, Interest.CAMPING, Interest.FISHING);
-            String result = InterestMatcher.formatSharedInterests(interests);
+            String result = PreferencesMatcher.formatSharedInterests(interests);
 
             assertTrue(result.contains("and"), "Should contain 'and'");
             assertFalse(result.contains("more"), "Should not contain 'more'");
@@ -251,7 +251,7 @@ class InterestMatcherTest {
         @DisplayName("custom preview count of 1 triggers truncation for 2+ interests")
         void formatCustomPreviewOne() {
             Set<Interest> interests = EnumSet.of(Interest.HIKING, Interest.CAMPING);
-            String result = InterestMatcher.formatSharedInterests(interests, 1);
+            String result = PreferencesMatcher.formatSharedInterests(interests, 1);
 
             assertTrue(result.contains("and 1 more"), "Should show truncation for custom preview");
         }
@@ -260,7 +260,7 @@ class InterestMatcherTest {
         @DisplayName("custom preview count of 2")
         void formatCustomPreviewTwo() {
             Set<Interest> interests = EnumSet.of(Interest.HIKING, Interest.CAMPING, Interest.FISHING, Interest.CYCLING);
-            String result = InterestMatcher.formatSharedInterests(interests, 2);
+            String result = PreferencesMatcher.formatSharedInterests(interests, 2);
 
             assertTrue(result.contains("and 2 more"), "Should show correct truncation count");
         }
@@ -269,7 +269,7 @@ class InterestMatcherTest {
         @DisplayName("custom preview count larger than set size")
         void formatCustomPreviewLargerThanSet() {
             Set<Interest> interests = EnumSet.of(Interest.HIKING, Interest.CAMPING);
-            String result = InterestMatcher.formatSharedInterests(interests, 10);
+            String result = PreferencesMatcher.formatSharedInterests(interests, 10);
 
             assertFalse(result.contains("more"), "Should not truncate when preview >= set size");
             assertTrue(result.contains("and"), "Should still format with 'and'");
@@ -282,7 +282,7 @@ class InterestMatcherTest {
 
             assertThrows(
                     IllegalArgumentException.class,
-                    () -> InterestMatcher.formatSharedInterests(interests, 0),
+                    () -> PreferencesMatcher.formatSharedInterests(interests, 0),
                     "Should throw for previewCount < 1");
         }
 
@@ -291,7 +291,7 @@ class InterestMatcherTest {
         void formatPreviewCountZero() {
             Set<Interest> interests = EnumSet.of(Interest.HIKING);
 
-            assertThrows(IllegalArgumentException.class, () -> InterestMatcher.formatSharedInterests(interests, 0));
+            assertThrows(IllegalArgumentException.class, () -> PreferencesMatcher.formatSharedInterests(interests, 0));
         }
 
         @Test
@@ -299,7 +299,7 @@ class InterestMatcherTest {
         void formatPreviewCountNegative() {
             Set<Interest> interests = EnumSet.of(Interest.HIKING);
 
-            assertThrows(IllegalArgumentException.class, () -> InterestMatcher.formatSharedInterests(interests, -1));
+            assertThrows(IllegalArgumentException.class, () -> PreferencesMatcher.formatSharedInterests(interests, -1));
         }
     }
 
@@ -310,7 +310,7 @@ class InterestMatcherTest {
         @Test
         @DisplayName("null returns empty list")
         void formatAsListNull() {
-            List<String> result = InterestMatcher.formatAsList(null);
+            List<String> result = PreferencesMatcher.formatAsList(null);
 
             assertNotNull(result);
             assertTrue(result.isEmpty());
@@ -319,7 +319,7 @@ class InterestMatcherTest {
         @Test
         @DisplayName("empty set returns empty list")
         void formatAsListEmpty() {
-            List<String> result = InterestMatcher.formatAsList(EnumSet.noneOf(Interest.class));
+            List<String> result = PreferencesMatcher.formatAsList(EnumSet.noneOf(Interest.class));
 
             assertNotNull(result);
             assertTrue(result.isEmpty());
@@ -328,7 +328,7 @@ class InterestMatcherTest {
         @Test
         @DisplayName("single interest returns single-element list")
         void formatAsListSingle() {
-            List<String> result = InterestMatcher.formatAsList(EnumSet.of(Interest.HIKING));
+            List<String> result = PreferencesMatcher.formatAsList(EnumSet.of(Interest.HIKING));
 
             assertEquals(1, result.size());
             assertEquals("Hiking", result.get(0));
@@ -338,7 +338,7 @@ class InterestMatcherTest {
         @DisplayName("multiple interests returns sorted list")
         void formatAsListMultiple() {
             Set<Interest> interests = EnumSet.of(Interest.YOGA, Interest.HIKING, Interest.COFFEE);
-            List<String> result = InterestMatcher.formatAsList(interests);
+            List<String> result = PreferencesMatcher.formatAsList(interests);
 
             assertEquals(3, result.size());
             // Should be sorted alphabetically
@@ -350,9 +350,9 @@ class InterestMatcherTest {
         void formatAsListDeterministic() {
             Set<Interest> interests = EnumSet.of(Interest.MUSIC, Interest.GYM, Interest.CAMPING, Interest.BOARD_GAMES);
 
-            List<String> result1 = InterestMatcher.formatAsList(interests);
-            List<String> result2 = InterestMatcher.formatAsList(interests);
-            List<String> result3 = InterestMatcher.formatAsList(interests);
+            List<String> result1 = PreferencesMatcher.formatAsList(interests);
+            List<String> result2 = PreferencesMatcher.formatAsList(interests);
+            List<String> result3 = PreferencesMatcher.formatAsList(interests);
 
             assertEquals(result1, result2);
             assertEquals(result2, result3);
@@ -363,7 +363,7 @@ class InterestMatcherTest {
         void formatAsListSorted() {
             Set<Interest> interests = EnumSet.of(
                     Interest.THEATER, Interest.BAKING, Interest.SWIMMING, Interest.ART_GALLERIES, Interest.READING);
-            List<String> result = InterestMatcher.formatAsList(interests);
+            List<String> result = PreferencesMatcher.formatAsList(interests);
 
             List<String> sorted = result.stream().sorted().toList();
             assertEquals(sorted, result, "Result should be already sorted");
@@ -379,7 +379,7 @@ class InterestMatcherTest {
         void constructorNullShared() {
             assertThrows(
                     NullPointerException.class,
-                    () -> new InterestMatcher.MatchResult(null, 0, 0.0, 0.0),
+                    () -> new PreferencesMatcher.MatchResult(null, 0, 0.0, 0.0),
                     "Should throw NullPointerException for null shared set");
         }
 
@@ -390,7 +390,7 @@ class InterestMatcherTest {
 
             assertThrows(
                     IllegalArgumentException.class,
-                    () -> new InterestMatcher.MatchResult(shared, -1, 0.0, 0.0),
+                    () -> new PreferencesMatcher.MatchResult(shared, -1, 0.0, 0.0),
                     "Should throw for negative sharedCount");
         }
 
@@ -401,7 +401,7 @@ class InterestMatcherTest {
 
             assertThrows(
                     IllegalArgumentException.class,
-                    () -> new InterestMatcher.MatchResult(shared, 0, -0.1, 0.0),
+                    () -> new PreferencesMatcher.MatchResult(shared, 0, -0.1, 0.0),
                     "Should throw for overlapRatio < 0");
         }
 
@@ -412,7 +412,7 @@ class InterestMatcherTest {
 
             assertThrows(
                     IllegalArgumentException.class,
-                    () -> new InterestMatcher.MatchResult(shared, 0, 1.1, 0.0),
+                    () -> new PreferencesMatcher.MatchResult(shared, 0, 1.1, 0.0),
                     "Should throw for overlapRatio > 1");
         }
 
@@ -423,7 +423,7 @@ class InterestMatcherTest {
 
             assertThrows(
                     IllegalArgumentException.class,
-                    () -> new InterestMatcher.MatchResult(shared, 0, 0.0, -0.1),
+                    () -> new PreferencesMatcher.MatchResult(shared, 0, 0.0, -0.1),
                     "Should throw for jaccardIndex < 0");
         }
 
@@ -434,7 +434,7 @@ class InterestMatcherTest {
 
             assertThrows(
                     IllegalArgumentException.class,
-                    () -> new InterestMatcher.MatchResult(shared, 0, 0.0, 1.1),
+                    () -> new PreferencesMatcher.MatchResult(shared, 0, 0.0, 1.1),
                     "Should throw for jaccardIndex > 1");
         }
 
@@ -443,7 +443,7 @@ class InterestMatcherTest {
         void constructorValid() {
             Set<Interest> shared = EnumSet.of(Interest.HIKING, Interest.COFFEE);
 
-            InterestMatcher.MatchResult result = new InterestMatcher.MatchResult(shared, 2, 0.75, 0.5);
+            PreferencesMatcher.MatchResult result = new PreferencesMatcher.MatchResult(shared, 2, 0.75, 0.5);
 
             assertNotNull(result);
             assertEquals(shared, result.shared());
@@ -457,11 +457,11 @@ class InterestMatcherTest {
         void constructorBoundaryValues() {
             Set<Interest> shared = EnumSet.noneOf(Interest.class);
 
-            InterestMatcher.MatchResult result0 = new InterestMatcher.MatchResult(shared, 0, 0.0, 0.0);
+            PreferencesMatcher.MatchResult result0 = new PreferencesMatcher.MatchResult(shared, 0, 0.0, 0.0);
             assertNotNull(result0);
 
             Set<Interest> shared1 = EnumSet.of(Interest.HIKING);
-            InterestMatcher.MatchResult result1 = new InterestMatcher.MatchResult(shared1, 1, 1.0, 1.0);
+            PreferencesMatcher.MatchResult result1 = new PreferencesMatcher.MatchResult(shared1, 1, 1.0, 1.0);
             assertNotNull(result1);
         }
 
@@ -469,11 +469,12 @@ class InterestMatcherTest {
         @DisplayName("hasSharedInterests returns true only when sharedCount > 0")
         void hasSharedInterests() {
             Set<Interest> empty = EnumSet.noneOf(Interest.class);
-            InterestMatcher.MatchResult resultEmpty = new InterestMatcher.MatchResult(empty, 0, 0.0, 0.0);
+            PreferencesMatcher.MatchResult resultEmpty = new PreferencesMatcher.MatchResult(empty, 0, 0.0, 0.0);
             assertFalse(resultEmpty.hasSharedInterests());
 
             Set<Interest> withInterest = EnumSet.of(Interest.HIKING);
-            InterestMatcher.MatchResult resultWithInterest = new InterestMatcher.MatchResult(withInterest, 1, 1.0, 1.0);
+            PreferencesMatcher.MatchResult resultWithInterest =
+                    new PreferencesMatcher.MatchResult(withInterest, 1, 1.0, 1.0);
             assertTrue(resultWithInterest.hasSharedInterests());
         }
     }
@@ -505,7 +506,7 @@ class InterestMatcherTest {
                     Interest.GYM,
                     Interest.YOGA);
 
-            InterestMatcher.MatchResult result = InterestMatcher.compare(a, b);
+            PreferencesMatcher.MatchResult result = PreferencesMatcher.compare(a, b);
 
             assertEquals(4, result.sharedCount());
             assertEquals(
@@ -520,7 +521,7 @@ class InterestMatcherTest {
         @DisplayName("formatSharedInterests maintains alphabetical order in output")
         void formatSharedInterestsAlphabetical() {
             Set<Interest> interests = EnumSet.of(Interest.YOGA, Interest.HIKING, Interest.CAMPING, Interest.BAKING);
-            String result = InterestMatcher.formatSharedInterests(interests, 4);
+            String result = PreferencesMatcher.formatSharedInterests(interests, 4);
 
             // Should be alphabetically ordered: "Baking, Camping, Hiking, and Yoga"
             assertTrue(result.toLowerCase().startsWith("baking"), "Should start with 'Baking' (alphabetical)");
@@ -533,8 +534,8 @@ class InterestMatcherTest {
             Set<Interest> a = EnumSet.of(Interest.HIKING, Interest.COFFEE);
             Set<Interest> b = EnumSet.of(Interest.HIKING, Interest.MUSIC);
 
-            InterestMatcher.MatchResult r1 = InterestMatcher.compare(a, b);
-            InterestMatcher.MatchResult r2 = InterestMatcher.compare(a, b);
+            PreferencesMatcher.MatchResult r1 = PreferencesMatcher.compare(a, b);
+            PreferencesMatcher.MatchResult r2 = PreferencesMatcher.compare(a, b);
 
             assertEquals(r1.sharedCount(), r2.sharedCount());
             assertEquals(r1.overlapRatio(), r2.overlapRatio());

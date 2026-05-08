@@ -94,7 +94,7 @@ public class CompatibilityCalculator {
     }
 
     public double calculateInterestScore(User me, User them) {
-        InterestMatcher.MatchResult match = InterestMatcher.compare(me.getInterests(), them.getInterests());
+        PreferencesMatcher.MatchResult match = PreferencesMatcher.compare(me.getInterests(), them.getInterests());
         return calculateInterestScore(
                 me.getInterests(), them.getInterests(), match.overlapRatio(), NEUTRAL_SCORE, INTEREST_MISSING_SCORE);
     }
@@ -144,18 +144,18 @@ public class CompatibilityCalculator {
 
     private int lifestyleMatchCount(User first, User second) {
         int matches = 0;
-        if (LifestyleMatcher.isMatch(first.getSmoking(), second.getSmoking())) {
+        if (PreferencesMatcher.isMatch(first.getSmoking(), second.getSmoking())) {
             matches++;
         }
-        if (LifestyleMatcher.isMatch(first.getDrinking(), second.getDrinking())) {
+        if (PreferencesMatcher.isMatch(first.getDrinking(), second.getDrinking())) {
             matches++;
         }
         if (first.getWantsKids() != null
                 && second.getWantsKids() != null
-                && LifestyleMatcher.areKidsStancesCompatible(first.getWantsKids(), second.getWantsKids())) {
+                && PreferencesMatcher.areKidsStancesCompatible(first.getWantsKids(), second.getWantsKids())) {
             matches++;
         }
-        if (LifestyleMatcher.isMatch(first.getLookingFor(), second.getLookingFor())) {
+        if (PreferencesMatcher.isMatch(first.getLookingFor(), second.getLookingFor())) {
             matches++;
         }
         return matches;

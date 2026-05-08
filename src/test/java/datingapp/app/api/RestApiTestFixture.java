@@ -1,39 +1,21 @@
 package datingapp.app.api;
 
-import datingapp.app.event.InProcessAppEventBus;
 import datingapp.app.event.handlers.AchievementEventHandler;
 import datingapp.app.event.handlers.MetricsEventHandler;
 import datingapp.app.event.handlers.NotificationEventHandler;
 import datingapp.app.usecase.auth.AuthTokenService;
-import datingapp.app.usecase.auth.AuthUseCases;
 import datingapp.app.usecase.auth.AuthUseCases.AuthIdentity;
 import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
 import datingapp.core.ServiceRegistry;
-import datingapp.core.connection.ConnectionService;
-import datingapp.core.matching.BrowseRankingService;
-import datingapp.core.matching.CandidateFinder;
-import datingapp.core.matching.CompatibilityCalculator;
-import datingapp.core.matching.DailyLimitService;
-import datingapp.core.matching.DailyPickService;
-import datingapp.core.matching.MatchQualityService;
-import datingapp.core.matching.MatchingService;
-import datingapp.core.matching.RecommendationService;
 import datingapp.core.matching.Standout;
-import datingapp.core.matching.StandoutService;
-import datingapp.core.matching.TrustSafetyService;
-import datingapp.core.matching.UndoService;
-import datingapp.core.metrics.AchievementService;
-import datingapp.core.metrics.ActivityMetricsService;
 import datingapp.core.metrics.SwipeState.Undo;
 import datingapp.core.model.User;
-import datingapp.core.profile.ProfileService;
-import datingapp.core.profile.ValidationService;
 import datingapp.core.storage.OperationalCommunicationStorage;
 import datingapp.core.storage.OperationalInteractionStorage;
 import datingapp.core.storage.OperationalUserStorage;
+import datingapp.core.testutil.TestServiceRegistryBuilder;
 import datingapp.core.testutil.TestStorages;
-import datingapp.location.LocationService;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -113,79 +95,20 @@ final class RestApiTestFixture {
         }
 
         ServiceRegistry build() {
-            InProcessAppEventBus eventBus = new InProcessAppEventBus();
-            CandidateFinder candidateFinder = new CandidateFinder(
-                    userStorage,
-                    interactionStorage,
-                    trustSafetyStorage,
-                    config.safety().userTimeZone());
-            ActivityMetricsService activityMetricsService =
-                    new ActivityMetricsService(interactionStorage, trustSafetyStorage, analyticsStorage, config);
-            ProfileService profileService = new ProfileService(userStorage);
-            CompatibilityCalculator compatibilityCalculator = new CompatibilityCalculator(config);
-            DailyLimitService dailyLimitService = new DailyLimitService(interactionStorage, config);
-            DailyPickService dailyPickService = new DailyPickService(analyticsStorage, candidateFinder, config);
-            StandoutService standoutService = new StandoutService(
-                    compatibilityCalculator, userStorage, candidateFinder, standoutStorage, profileService, config);
-            RecommendationService recommendationService = new RecommendationService(
-                    dailyLimitService,
-                    dailyPickService,
-                    standoutService,
-                    new BrowseRankingService(compatibilityCalculator, profileService, config));
-            UndoService undoService = new UndoService(interactionStorage, undoStorage, config);
-            MatchingService matchingService = MatchingService.builder()
-                    .interactionStorage(interactionStorage)
-                    .trustSafetyStorage(trustSafetyStorage)
-                    .userStorage(userStorage)
-                    .activityMetricsService(activityMetricsService)
-                    .dailyService(recommendationService)
-                    .undoService(undoService)
-                    .candidateFinder(candidateFinder)
-                    .build();
-            TrustSafetyService trustSafetyService = TrustSafetyService.builder(
-                            trustSafetyStorage, interactionStorage, userStorage, config, communicationStorage)
-                    .build();
-            ConnectionService connectionService =
-                    new ConnectionService(config, communicationStorage, interactionStorage, userStorage);
-            MatchQualityService matchQualityService =
-                    new MatchQualityService(userStorage, interactionStorage, config, compatibilityCalculator);
-            ValidationService validationService = new ValidationService(config);
-            LocationService locationService = new LocationService(validationService);
-            TestStorages.Auth authStorage = new TestStorages.Auth();
-            AuthTokenService authTokenService = new AuthTokenService(config.auth());
-            AuthUseCases authUseCases = new AuthUseCases(config, userStorage, authStorage, authTokenService);
-            AchievementService achievementService = new AchievementService(
-                    config, analyticsStorage, interactionStorage, trustSafetyStorage, userStorage, profileService);
-
-            new AchievementEventHandler(achievementService).register(eventBus);
-            new MetricsEventHandler(activityMetricsService).register(eventBus);
-            new NotificationEventHandler(communicationStorage).register(eventBus);
-
-            return ServiceRegistry.builder()
+            ServiceRegistry services = TestServiceRegistryBuilder.builder(
+                            userStorage, interactionStorage, communicationStorage)
                     .config(config)
-                    .userStorage(userStorage)
-                    .interactionStorage(interactionStorage)
-                    .communicationStorage(communicationStorage)
                     .analyticsStorage(analyticsStorage)
                     .trustSafetyStorage(trustSafetyStorage)
-                    .candidateFinder(candidateFinder)
-                    .matchingService(matchingService)
-                    .trustSafetyService(trustSafetyService)
-                    .activityMetricsService(activityMetricsService)
-                    .matchQualityService(matchQualityService)
-                    .profileService(profileService)
-                    .recommendationService(recommendationService)
-                    .dailyLimitService(dailyLimitService)
-                    .dailyPickService(dailyPickService)
-                    .standoutService(standoutService)
-                    .undoService(undoService)
-                    .achievementService(achievementService)
-                    .connectionService(connectionService)
-                    .validationService(validationService)
-                    .locationService(locationService)
-                    .eventBus(eventBus)
-                    .authUseCases(authUseCases)
+                    .standoutStorage(standoutStorage)
+                    .undoStorage(undoStorage)
                     .build();
+
+            new AchievementEventHandler(services.getAchievementService()).register(services.getEventBus());
+            new MetricsEventHandler(services.getActivityMetricsService()).register(services.getEventBus());
+            new NotificationEventHandler(services.getCommunicationStorage()).register(services.getEventBus());
+
+            return services;
         }
     }
 
