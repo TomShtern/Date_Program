@@ -31,10 +31,10 @@ import datingapp.core.connection.ConnectionModels.FriendRequest;
 import datingapp.core.connection.ConnectionModels.Like;
 import datingapp.core.connection.ConnectionModels.Notification;
 import datingapp.core.matching.DailyPickService.DailyPick;
-import datingapp.core.matching.InterestMatcher;
 import datingapp.core.matching.MatchQualityService;
 import datingapp.core.matching.MatchingService;
 import datingapp.core.matching.MatchingService.PendingLiker;
+import datingapp.core.matching.PreferencesMatcher;
 import datingapp.core.matching.RecommendationService;
 import datingapp.core.matching.Standout;
 import datingapp.core.matching.StandoutService;
@@ -588,12 +588,12 @@ public class MatchingHandler implements LoggingSupport {
             logInfo("│ 📍 {} km away", String.format("%.1f", distance));
         }
         logInfo(CliTextAndInput.PROFILE_BIO_FORMAT, candidate.getBio() != null ? candidate.getBio() : "(no bio)");
-        InterestMatcher.MatchResult matchResult =
-                InterestMatcher.compare(currentUser.getInterests(), candidate.getInterests());
+        PreferencesMatcher.MatchResult matchResult =
+                PreferencesMatcher.compare(currentUser.getInterests(), candidate.getInterests());
         if (!matchResult.shared().isEmpty() && logger.isInfoEnabled()) {
             logInfo(
                     "│ ✨ You both like: {}",
-                    InterestMatcher.formatSharedInterests(
+                    PreferencesMatcher.formatSharedInterests(
                             matchResult.shared(), config.matching().sharedInterestsPreviewCount()));
         }
         logInfo(CliTextAndInput.BOX_BOTTOM);

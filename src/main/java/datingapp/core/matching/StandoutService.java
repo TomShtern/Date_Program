@@ -139,8 +139,8 @@ public class StandoutService {
         double distanceKm = calculateDistanceKm(seeker, candidate);
         double distanceScore = calculateDistanceScore(seeker, distanceKm);
         double ageScore = calculator.calculateAgeScore(seeker, candidate);
-        InterestMatcher.MatchResult interests =
-                InterestMatcher.compare(seeker.getInterests(), candidate.getInterests());
+        PreferencesMatcher.MatchResult interests =
+                PreferencesMatcher.compare(seeker.getInterests(), candidate.getInterests());
         double interestScore = calculator.calculateInterestScore(seeker, candidate);
         double lifestyleScore = calculator.calculateLifestyleScore(seeker, candidate);
         double completenessScore = profileService.calculate(candidate).score() / 100.0;
@@ -173,7 +173,11 @@ public class StandoutService {
     }
 
     private String generateStandoutReason(
-            User seeker, User candidate, InterestMatcher.MatchResult interests, double distanceKm, double lifestyle) {
+            User seeker,
+            User candidate,
+            PreferencesMatcher.MatchResult interests,
+            double distanceKm,
+            double lifestyle) {
         requireConfig();
         List<String> reasons = new ArrayList<>();
         if (interests.sharedCount() >= config.matching().minSharedInterests()) {

@@ -269,11 +269,12 @@ public class MatchQualityService {
         int ageDiff = comparableAge ? Math.abs(meAge.get() - themAge.get()) : 0;
         double ageScore = comparableAge ? calculator.calculateAgeScore(me, them, meAge, themAge) : 0.5;
 
-        InterestMatcher.MatchResult interestMatch = InterestMatcher.compare(me.getInterests(), them.getInterests());
+        PreferencesMatcher.MatchResult interestMatch =
+                PreferencesMatcher.compare(me.getInterests(), them.getInterests());
         double interestScore = calculator.calculateInterestScore(me, them);
-        List<String> sharedInterests = InterestMatcher.formatAsList(interestMatch.shared());
+        List<String> sharedInterests = PreferencesMatcher.formatAsList(interestMatch.shared());
         String sharedInterestSummary = sharedInterests.size() > 1
-                ? InterestMatcher.formatSharedInterests(
+                ? PreferencesMatcher.formatSharedInterests(
                         interestMatch.shared(), config.matching().sharedInterestsPreviewCount())
                 : null;
 
@@ -376,7 +377,7 @@ public class MatchQualityService {
         }
         if (me.getWantsKids() == them.getWantsKids()) {
             matches.add("Same stance on kids");
-        } else if (LifestyleMatcher.areKidsStancesCompatible(me.getWantsKids(), them.getWantsKids())) {
+        } else if (PreferencesMatcher.areKidsStancesCompatible(me.getWantsKids(), them.getWantsKids())) {
             matches.add("Compatible on kids");
         }
     }

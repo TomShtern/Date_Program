@@ -1,6 +1,6 @@
 package datingapp.core.profile;
 
-import datingapp.core.matching.LifestyleMatcher;
+import datingapp.core.matching.PreferencesMatcher;
 import datingapp.core.model.User;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -644,31 +644,31 @@ public final class MatchPreferences {
             private static final List<LifestyleDimension> LIFESTYLE_DIMENSIONS = List.of(
                     new LifestyleDimension(
                             db -> !db.acceptableSmoking().isEmpty(),
-                            (db, c) -> LifestyleMatcher.isAcceptable(c.getSmoking(), db.acceptableSmoking()),
+                            (db, c) -> PreferencesMatcher.isAcceptable(c.getSmoking(), db.acceptableSmoking()),
                             (db, c) -> c.getSmoking() == null
                                     ? "Smoking status not specified"
                                     : "Smoking: " + c.getSmoking().getDisplayName()),
                     new LifestyleDimension(
                             db -> !db.acceptableDrinking().isEmpty(),
-                            (db, c) -> LifestyleMatcher.isAcceptable(c.getDrinking(), db.acceptableDrinking()),
+                            (db, c) -> PreferencesMatcher.isAcceptable(c.getDrinking(), db.acceptableDrinking()),
                             (db, c) -> c.getDrinking() == null
                                     ? "Drinking status not specified"
                                     : "Drinking: " + c.getDrinking().getDisplayName()),
                     new LifestyleDimension(
                             db -> !db.acceptableKidsStance().isEmpty(),
-                            (db, c) -> LifestyleMatcher.isAcceptable(c.getWantsKids(), db.acceptableKidsStance()),
+                            (db, c) -> PreferencesMatcher.isAcceptable(c.getWantsKids(), db.acceptableKidsStance()),
                             (db, c) -> c.getWantsKids() == null
                                     ? "Kids stance not specified"
                                     : "Kids: " + c.getWantsKids().getDisplayName()),
                     new LifestyleDimension(
                             db -> !db.acceptableLookingFor().isEmpty(),
-                            (db, c) -> LifestyleMatcher.isAcceptable(c.getLookingFor(), db.acceptableLookingFor()),
+                            (db, c) -> PreferencesMatcher.isAcceptable(c.getLookingFor(), db.acceptableLookingFor()),
                             (db, c) -> c.getLookingFor() == null
                                     ? "Relationship goal not specified"
                                     : "Looking for: " + c.getLookingFor().getDisplayName()),
                     new LifestyleDimension(
                             db -> !db.acceptableEducation().isEmpty(),
-                            (db, c) -> LifestyleMatcher.isAcceptable(c.getEducation(), db.acceptableEducation()),
+                            (db, c) -> PreferencesMatcher.isAcceptable(c.getEducation(), db.acceptableEducation()),
                             (db, c) -> c.getEducation() == null
                                     ? "Education not specified"
                                     : "Education: " + c.getEducation().getDisplayName()));

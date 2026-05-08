@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import datingapp.app.api.RestApiExceptions.ApiForbiddenException;
 import io.javalin.http.Context;
 import io.javalin.http.HandlerType;
 import java.lang.reflect.Proxy;
@@ -48,11 +49,8 @@ class RestApiIdentityPolicyTest {
                 Map.of(USER_ID_HEADER, actingUserId.toString()),
                 Map.of("authorId", UUID.randomUUID().toString()));
 
-        assertThrows(
-                RestApiRequestGuards.ApiForbiddenException.class, () -> policy.enforceScopedIdentity(mismatchedId));
-        assertThrows(
-                RestApiRequestGuards.ApiForbiddenException.class,
-                () -> policy.enforceScopedIdentity(mismatchedAuthorId));
+        assertThrows(ApiForbiddenException.class, () -> policy.enforceScopedIdentity(mismatchedId));
+        assertThrows(ApiForbiddenException.class, () -> policy.enforceScopedIdentity(mismatchedAuthorId));
     }
 
     @Test
@@ -85,7 +83,7 @@ class RestApiIdentityPolicyTest {
         assertDoesNotThrow(() -> participants.requireParticipant(second));
         assertEquals(second, participants.otherParticipant(first));
         assertEquals(first, participants.otherParticipant(second));
-        assertThrows(RestApiRequestGuards.ApiForbiddenException.class, () -> participants.requireParticipant(outsider));
+        assertThrows(ApiForbiddenException.class, () -> participants.requireParticipant(outsider));
         assertThrows(
                 IllegalArgumentException.class, () -> policy.parseConversationParticipants("not-a-conversation-id"));
     }

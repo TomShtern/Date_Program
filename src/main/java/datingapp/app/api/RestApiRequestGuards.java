@@ -1,5 +1,8 @@
 package datingapp.app.api;
 
+import datingapp.app.api.RestApiExceptions.ApiForbiddenException;
+import datingapp.app.api.RestApiExceptions.ApiTooManyRequestsException;
+import datingapp.app.api.RestApiExceptions.RateLimitStatus;
 import io.javalin.Javalin;
 import io.javalin.http.Context;
 import io.javalin.http.HandlerType;
@@ -17,9 +20,9 @@ final class RestApiRequestGuards {
     private static final String HEALTH_ROUTE = "/api/health";
     private static final String AUTH_ROUTE_PREFIX = "/api/auth/";
     private static final String AUTH_ME_ROUTE = "/api/auth/me";
-    private static final String CONVERSATION_ROUTE_PREFIX = "/api/conversations/";
+    static final String CONVERSATION_ROUTE_PREFIX = "/api/conversations/";
     private static final String LOCATION_RESOLVE_ROUTE = "/api/location/resolve";
-    private static final String USERS_ROUTE_PREFIX = "/api/users/";
+    static final String USERS_ROUTE_PREFIX = "/api/users/";
     private static final String LOCALHOST_ONLY_MESSAGE = "REST API is restricted to localhost requests";
     private static final String INVALID_LAN_SHARED_SECRET_MESSAGE = "Missing or invalid LAN shared secret";
     private final RestApiIdentityPolicy identityPolicy;
@@ -48,7 +51,7 @@ final class RestApiRequestGuards {
             LongSupplier monotonicTicker) {
         this.identityPolicy = identityPolicy;
         this.rateLimiter = new LocalRateLimiter(window, maxRequests, monotonicTicker);
-        this.lanSharedSecret = lanSharedSecret;
+        this.lanSharedSecret = lanSharedSecret == null ? null : lanSharedSecret.trim();
     }
 
     void registerRequestGuards(Javalin app, Consumer<Context> localhostOnlyGuard) {
@@ -191,37 +194,4 @@ final class RestApiRequestGuards {
     }
 
     private record RateLimitDecision(boolean allowed, RateLimitStatus status) {}
-
-    record RateLimitStatus(int limit, int used, long retryAfterSeconds) implements java.io.Serializable {}
-
-    static final class ApiForbiddenException extends RuntimeException {
-        ApiForbiddenException(String message) {
-            super(message);
-        }
-    }
-
-    static final class ApiUnauthorizedException extends RuntimeException {
-        ApiUnauthorizedException(String message) {
-            super(message);
-        }
-    }
-
-    static final class ApiConflictException extends RuntimeException {
-        ApiConflictException(String message) {
-            super(message);
-        }
-    }
-
-    static final class ApiTooManyRequestsException extends RuntimeException {
-        private final RateLimitStatus status;
-
-        ApiTooManyRequestsException(String message, RateLimitStatus status) {
-            super(message);
-            this.status = status;
-        }
-
-        RateLimitStatus status() {
-            return status;
-        }
-    }
 }

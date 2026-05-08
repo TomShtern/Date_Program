@@ -2,6 +2,7 @@ package datingapp.core.matching;
 
 import datingapp.core.EnumSetUtil;
 import datingapp.core.profile.MatchPreferences.Interest;
+import datingapp.core.profile.MatchPreferences.Lifestyle;
 import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.List;
@@ -9,24 +10,16 @@ import java.util.Objects;
 import java.util.Set;
 
 /**
- * Utility class for comparing interest sets between users. Used by MatchQualityService to compute
- * interest-based compatibility.
+ * Utility class for comparing user preferences and checking lifestyle compatibility.
  *
- * <p>This class computes two metrics:
- *
- * <ul>
- *   <li><b>Overlap Ratio</b>: shared / min(a.size, b.size) - rewards having all interests match
- *   <li><b>Jaccard Index</b>: shared / union - standard similarity metric
- * </ul>
- *
- * <p>Thread-safe: This class is stateless and all methods are static.
+ * <p>This class is stateless and all methods are static.
  */
-public final class InterestMatcher {
+public final class PreferencesMatcher {
 
     private static final int DEFAULT_SHARED_INTERESTS_PREVIEW_COUNT = 3;
 
-    private InterestMatcher() {
-        // Utility class - prevent instantiation
+    private PreferencesMatcher() {
+        // Utility class - prevent instantiation.
     }
 
     /**
@@ -148,5 +141,59 @@ public final class InterestMatcher {
             return List.of();
         }
         return shared.stream().map(Interest::getDisplayName).sorted().toList();
+    }
+
+    /** Check if a lifestyle value is acceptable given a set of allowed values. */
+    public static <E extends Enum<E>> boolean isAcceptable(E value, Set<E> allowed) {
+        if (allowed == null || allowed.isEmpty()) {
+            return true;
+        }
+        return value != null && allowed.contains(value);
+    }
+
+    /** Check if two users have the same smoking habit. */
+    public static boolean isMatch(Lifestyle.Smoking a, Lifestyle.Smoking b) {
+        return a != null && b != null && a == b;
+    }
+
+    /** Check if two users have the same drinking habit. */
+    public static boolean isMatch(Lifestyle.Drinking a, Lifestyle.Drinking b) {
+        return a != null && b != null && a == b;
+    }
+
+    /** Check if two users have the same relationship goal. */
+    public static boolean isMatch(Lifestyle.LookingFor a, Lifestyle.LookingFor b) {
+        return a != null && b != null && a == b;
+    }
+
+    /** Check if two users have the same kids stance (exact equality only; use areKidsStancesCompatible for fuzzy). */
+    public static boolean isMatch(Lifestyle.WantsKids a, Lifestyle.WantsKids b) {
+        return a != null && b != null && a == b;
+    }
+
+    /** Check if two users have the same education level. */
+    public static boolean isMatch(Lifestyle.Education a, Lifestyle.Education b) {
+        return a != null && b != null && a == b;
+    }
+
+    /**
+     * Checks if two kids stances are compatible.
+     * Logic:
+     * - Exact match is compatible
+     * - OPEN is compatible with everything
+     * - SOMEDAY and HAS_KIDS are compatible usually (mixed families)
+     */
+    public static boolean areKidsStancesCompatible(Lifestyle.WantsKids a, Lifestyle.WantsKids b) {
+        if (a == null || b == null) {
+            return false;
+        }
+        if (a == b) {
+            return true;
+        }
+        if (a == Lifestyle.WantsKids.OPEN || b == Lifestyle.WantsKids.OPEN) {
+            return true;
+        }
+        return (a == Lifestyle.WantsKids.SOMEDAY && b == Lifestyle.WantsKids.HAS_KIDS)
+                || (a == Lifestyle.WantsKids.HAS_KIDS && b == Lifestyle.WantsKids.SOMEDAY);
     }
 }

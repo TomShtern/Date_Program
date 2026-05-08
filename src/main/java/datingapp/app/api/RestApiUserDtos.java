@@ -5,7 +5,6 @@ import datingapp.core.matching.MatchingService;
 import datingapp.core.matching.Standout;
 import datingapp.core.model.User;
 import datingapp.core.profile.MatchPreferences.Interest;
-import datingapp.core.profile.MatchPreferences.PacePreferences;
 import datingapp.core.workflow.ProfileActivationPolicy;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -46,24 +45,6 @@ final class RestApiUserDtos {
             String state) {
         UserFields {
             interestedIn = interestedIn == null ? List.of() : List.copyOf(interestedIn);
-        }
-    }
-
-    static record ReadPacePreferencesDto(
-            String messagingFrequency, String timeToFirstDate, String communicationStyle, String depthPreference) {
-        static ReadPacePreferencesDto from(PacePreferences pace) {
-            if (pace == null) {
-                return null;
-            }
-            return new ReadPacePreferencesDto(
-                    pace.messagingFrequency() != null
-                            ? pace.messagingFrequency().name()
-                            : null,
-                    pace.timeToFirstDate() != null ? pace.timeToFirstDate().name() : null,
-                    pace.communicationStyle() != null
-                            ? pace.communicationStyle().name()
-                            : null,
-                    pace.depthPreference() != null ? pace.depthPreference().name() : null);
         }
     }
 
@@ -119,7 +100,7 @@ final class RestApiUserDtos {
             List<String> photoUrls,
             String primaryPhotoUrl,
             String state,
-            ReadPacePreferencesDto pacePreferences,
+            PacePreferencesDtos.Read pacePreferences,
             List<String> missingProfileFields,
             List<String> missingProfileFieldLabels,
             int requiredProfileFieldCount,
@@ -150,8 +131,8 @@ final class RestApiUserDtos {
                 UnaryOperator<String> photoUrlResolver,
                 ProfileActivationPolicy activationPolicy) {
             UserFields fields = mapUserFields(user, userTimeZone, approximateLocation);
-            ProfileCompletionView completion =
-                    activationPolicy != null ? ProfileCompletionView.from(user, activationPolicy) : null;
+            ProfileCompletionDto completion = ProfileCompletionDto.of(
+                    activationPolicy != null ? ProfileCompletionView.from(user, activationPolicy) : null);
             return new UserDetail(
                     user.getId(),
                     user.getName(),
@@ -164,7 +145,7 @@ final class RestApiUserDtos {
                     personPhotoUrls(user, photoUrlResolver),
                     personPrimaryPhotoUrl(user, photoUrlResolver),
                     fields.state(),
-                    ReadPacePreferencesDto.from(user.getPacePreferences()),
+                    PacePreferencesDtos.Read.from(user.getPacePreferences()),
                     completion != null ? completion.missingProfileFields() : null,
                     completion != null ? completion.missingProfileFieldLabels() : null,
                     completion != null ? completion.requiredProfileFieldCount() : 0,

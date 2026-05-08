@@ -6,9 +6,9 @@ import datingapp.app.cli.CliTextAndInput.InputReader;
 import datingapp.core.connection.ConnectionModels;
 import datingapp.core.connection.ConnectionService;
 import datingapp.core.matching.DailyPickService;
-import datingapp.core.matching.InterestMatcher;
 import datingapp.core.matching.MatchQualityService;
 import datingapp.core.matching.MatchingService;
+import datingapp.core.matching.PreferencesMatcher;
 import datingapp.core.model.Match.MatchArchiveReason;
 import datingapp.core.model.Match.MatchState;
 import datingapp.core.model.User.Gender;
@@ -57,8 +57,8 @@ class NestedTypeVisibilityTest {
         assertTrue(
                 Modifier.isStatic(MatchQualityService.MatchQuality.class.getModifiers()),
                 "MatchQualityService.MatchQuality must be static");
-        assertTrue(Modifier.isPublic(InterestMatcher.class.getModifiers()), "InterestMatcher must be public");
-        assertTrue(Modifier.isFinal(InterestMatcher.class.getModifiers()), "InterestMatcher must be final");
+        assertTrue(Modifier.isPublic(PreferencesMatcher.class.getModifiers()), "PreferencesMatcher must be public");
+        assertTrue(Modifier.isFinal(PreferencesMatcher.class.getModifiers()), "PreferencesMatcher must be final");
         assertTrue(
                 Modifier.isStatic(MatchingService.SwipeResult.class.getModifiers()),
                 "MatchingService.SwipeResult must be static");

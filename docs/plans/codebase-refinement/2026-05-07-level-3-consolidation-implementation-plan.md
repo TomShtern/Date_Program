@@ -1,5 +1,7 @@
 # Level 3 — Consolidation Implementation Plan
 
+✅ IMPLEMENTED
+
 > **Source:** [CODEBASE_REFINEMENT_PLAN.md](./CODEBASE_REFINEMENT_PLAN.md) §Level 3
 > **Created:** 2026-05-07
 > **Scope:** 9 actionable items (2 invalidated against current code: L3.6 schema constants, L3.11 enum values).
@@ -54,6 +56,8 @@ The implementation plan documents L3.8 as the primary path and leaves L3.7 as an
 
 ## Item 1 — Extract `RestApiExceptions.java` (L3.3)
 
+✅ IMPLEMENTED
+
 **Goal:** Move the four inner exception classes (`ApiForbiddenException`, `ApiUnauthorizedException`, `ApiConflictException`, `ApiTooManyRequestsException`) from `RestApiRequestGuards` to a standalone file.
 
 **Audit confirmed:** Inner classes at `RestApiRequestGuards.java:202–231`. Used by `RestApiServer` and `RestApiIdentityPolicy`.
@@ -100,6 +104,8 @@ mvn -Dtest=RestApiServerTest,RestApiRequestGuardsTest,RestApiIdentityPolicyTest 
 
 ## Item 2 — Centralize route classification (L3.4)
 
+✅ IMPLEMENTED
+
 **Goal:** Eliminate the duplicated `CONVERSATION_ROUTE_PREFIX` and `USERS_ROUTE_PREFIX` constants between `RestApiRequestGuards` (lines 19–23) and `RestApiIdentityPolicy` (lines 20–21). The audit found `AUTH_ROUTE_PREFIX` only in `RestApiRequestGuards`, so it's not duplicated.
 
 **Audit caveat:** Only 2 of the 3 originally claimed prefixes are actually duplicated. The discipline gate (≥3 callers per shared item) is borderline — applying it strictly suggests *not* creating a new `RestApiRouteClassifier` class. Instead, pick one file as the owner and have the other reference it.
@@ -140,6 +146,8 @@ mvn -Dtest=RestApiRequestGuardsTest,RestApiIdentityPolicyTest test
 
 ## Item 3 — Inline `RestRouteSupport` into `RestApiServer.start()` (L3.2)
 
+✅ IMPLEMENTED
+
 **Goal:** Delete `RestRouteSupport.java`. The audit confirms it's a thin wrapper around `RestApiServer.start()`-time route registration.
 
 **Audit confirmed:** `RestRouteSupport.java` (lines 6–33) — its `registerRoutes()` is called from `RestApiServer`.
@@ -167,6 +175,8 @@ mvn -Dtest=RestApiPhaseOneTest,RestApiPhaseTwoRoutesTest test
 ---
 
 ## Item 4 — Merge `InterestMatcher` + `LifestyleMatcher` → `PreferencesMatcher` (L3.1)
+
+✅ IMPLEMENTED
 
 **Goal:** Both are stateless static utility classes used by `MatchQualityService` and `CompatibilityCalculator`. Merging into a single `PreferencesMatcher` reduces matching-layer fragmentation.
 
@@ -205,6 +215,8 @@ If `InterestMatcherTest.java` and `LifestyleMatcherTest.java` exist as separate 
 
 ## Item 5 — Merge `ReadPacePreferencesDto` + `WritePacePreferencesDto` → `PacePreferencesDto` (L3.9)
 
+✅ IMPLEMENTED — Option B (`PacePreferencesDtos.Read` / `PacePreferencesDtos.Write`)
+
 **Goal:** Two DTOs with identical 4-field structure (`messagingFrequency`, `timeToFirstDate`, `communicationStyle`, `depthPreference`) but different field types (Strings vs enums).
 
 **Audit confirmed:**
@@ -229,6 +241,8 @@ If `InterestMatcherTest.java` and `LifestyleMatcherTest.java` exist as separate 
   ```
   This still reduces file count to 1 and clarifies the read/write asymmetry.
 
+**Implemented outcome:** The live code uses `src/main/java/datingapp/app/api/PacePreferencesDtos.java` as the shared namespace file. `RestApiUserDtos` consumes `PacePreferencesDtos.Read`, while `ProfileDtos` uses `PacePreferencesDtos.Write` for update requests and `PacePreferencesDtos.Read` for read/edit snapshot flows.
+
 **Steps:**
 1. Confirm wire-shape with a test: write a `Read` DTO to JSON; write a `Write` DTO to JSON; verify they would round-trip if unified. If they would, choose Option A. Otherwise Option B.
 2. Refactor accordingly. Update callers.
@@ -244,6 +258,8 @@ mvn -Dtest=ProfileDtosTest,RestApiUserDtosTest,RestApiPhaseOneTest,RestApiPhaseT
 ---
 
 ## Item 6 — Consolidate small DTO files (L3.5)
+
+✅ REVIEWED — NO CHANGE (cohesion gate rejected consolidation)
 
 **Goal:** Group the 6 smallest DTO files in `app/api/` to reduce file count.
 
@@ -273,6 +289,8 @@ For each of the 6 files, ask:
 
 **Recommendation:** Merge only where domain coherence is clear. Likely outcome: 6 files → 4 files (saving 2), not 6 → 1.
 
+**Implemented outcome:** No merge was applied. The cohesion check rejected consolidation because `AuthDtos`, `MessageDtos`, `NotificationDtos`, `VerificationDtos`, `PhotoDtos`, and `RestApiDtos` are already clean, domain-shaped files. Merging them would have created the junk-drawer structure this item was meant to avoid.
+
 **Files affected:** Up to 6 deleted, up to 3 added — exact list determined by the cohesion check.
 
 **Steps:**
@@ -301,7 +319,11 @@ mvn -Dtest=RestApiPhaseOneTest,RestApiPhaseTwoRoutesTest test
 
 ## Item 7 — Embed `ProfileCompletionView` in DTOs (L3.8) — supersedes L3.7
 
+✅ IMPLEMENTED VIA L3.7 FALLBACK — flat API contract preserved
+
 **Goal:** Stop unpacking `ProfileCompletionView`'s 8 fields into every DTO that needs them. Instead, embed the view as a single nested object (`completion: { ... }`).
+
+**Implemented outcome:** The deeper L3.8 JSON-shape change was not taken. The live code uses `ProfileCompletionDto.of(ProfileCompletionView)` to centralize the current flat completion mapping without changing the wire contract. In current source this helper mirrors the live 6-field completion contract, not the older 8-field description in the original audit text.
 
 **Audit confirmed:**
 - `UserDetail` (in `RestApiUserDtos.java:102–157`) defines its own copy of the 8 fields.
@@ -339,6 +361,8 @@ mvn -Dtest=ProfileCompletionViewTest,RestApiPhaseOneTest,RestApiPhaseTwoRoutesTe
 
 ### L3.7 Fallback — `ProfileCompletionDto.of()` helper
 
+✅ IMPLEMENTED
+
 If L3.8 is rejected (API shape must remain stable):
 
 **Goal:** Same duplication problem; smaller solution. Add a static factory method that does the 8-field unwrapping in one place.
@@ -361,6 +385,8 @@ If L3.8 is rejected (API shape must remain stable):
 
 ## Item 8 — Unify `TestServiceRegistryBuilder` + `RestApiTestFixture.Builder` (L3.10)
 
+✅ IMPLEMENTED
+
 **Goal:** Merge two test-builder classes that have overlapping responsibilities for wiring `ServiceRegistry` with test storages.
 
 **Audit confirmed:**
@@ -381,6 +407,8 @@ If L3.8 is rejected (API shape must remain stable):
 3. In `RestApiTestFixture.Builder`, replace the duplicated wiring with delegation to `TestServiceRegistryBuilder`. Keep the auth-token + REST-specific code.
 4. Confirm no test depends on the *order* of service construction (rare but possible if shutdown hooks fire in registration order).
 
+**Implemented outcome:** `RestApiTestFixture.Builder` now delegates shared service-graph creation to `TestServiceRegistryBuilder.builder(...)` while keeping the REST-facing bearer-token helper, REST-specific storage knobs, and post-build event-handler registration local.
+
 **Verification:**
 ```powershell
 mvn test
@@ -395,6 +423,8 @@ Run the full suite — both builders are touched by hundreds of tests indirectly
 
 ## Final verification gate
 
+✅ VERIFIED ON 2026-05-08
+
 After all items merged:
 
 ```powershell
@@ -403,6 +433,11 @@ mvn spotless:apply verify
 ```
 
 Expected: tests pass; ~6 files deleted; ~3 files added; LOC trimmed by ~300.
+
+**Actual result:**
+- `mvn spotless:apply verify` passed.
+- `run_postgresql_smoke.ps1` passed.
+- The small-DTO consolidation item was intentionally skipped by the cohesion gate, so the actual production-source file delta differs from the original estimate.
 
 ---
 
@@ -518,9 +553,9 @@ If implementation diverged from any draft (e.g., a discipline gate failed and th
 
 ## Definition of done
 
-- [ ] All 9 actionable items merged or explicitly invalidated.
-- [ ] L3.7 vs L3.8 decision documented in commit/PR.
-- [ ] `mvn spotless:apply verify` passes.
-- [ ] No merged DTO file mixes domains (cohesion check).
-- [ ] File count delta confirmed: ~6 deleted vs ~3 added → net –3 files.
-- [ ] If `RestApiServer.start()` exceeds 200 lines after L3.2, document why or revert.
+- [x] All 9 actionable items merged or explicitly invalidated.
+- [x] L3.7 vs L3.8 decision documented in commit/PR.
+- [x] `mvn spotless:apply verify` passes.
+- [x] No merged DTO file mixes domains (cohesion check).
+- [x] Actual production-source file delta documented: item 6 was skipped by the cohesion gate, so the shipped delta is 3 deleted vs 4 added → net +1 file.
+- [x] If `RestApiServer.start()` exceeds 200 lines after L3.2, document why or revert.

@@ -195,7 +195,7 @@ public class SocialUseCases {
                             command.targetUserId(),
                             command.reason().name(),
                             command.blockUser(),
-                            false,
+                            result.userWasBanned(),
                             AppClock.now()),
                     "Failed to publish user reported event",
                     logger);
