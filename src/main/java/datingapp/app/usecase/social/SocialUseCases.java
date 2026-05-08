@@ -2,6 +2,7 @@ package datingapp.app.usecase.social;
 
 import datingapp.app.event.AppEvent;
 import datingapp.app.event.AppEventBus;
+import datingapp.app.event.EventPublishing;
 import datingapp.app.usecase.common.UseCaseError;
 import datingapp.app.usecase.common.UseCaseResult;
 import datingapp.app.usecase.common.UserContext;
@@ -115,9 +116,11 @@ public class SocialUseCases {
                 return UseCaseResult.failure(UseCaseError.conflict(result.errorMessage()));
             }
             logModerationAction("block", command.context().userId(), command.targetUserId(), null);
-            publishEvent(
-                    "user blocked",
-                    new AppEvent.UserBlocked(command.context().userId(), command.targetUserId(), AppClock.now()));
+            EventPublishing.publishOrWarn(
+                    eventBus,
+                    new AppEvent.UserBlocked(command.context().userId(), command.targetUserId(), AppClock.now()),
+                    "Failed to publish user blocked event",
+                    logger);
             return UseCaseResult.success(result);
         } catch (Exception e) {
             return internalFailure("block user", e);
@@ -185,15 +188,17 @@ public class SocialUseCases {
                     command.context().userId(),
                     command.targetUserId(),
                     command.reason().name());
-            publishEvent(
-                    "user reported",
+            EventPublishing.publishOrWarn(
+                    eventBus,
                     new AppEvent.UserReported(
                             command.context().userId(),
                             command.targetUserId(),
                             command.reason().name(),
                             command.blockUser(),
                             false,
-                            AppClock.now()));
+                            AppClock.now()),
+                    "Failed to publish user reported event",
+                    logger);
             return UseCaseResult.success(ReportOutcome.from(result, command.blockUser()));
         } catch (Exception e) {
             return internalFailure("report user", e);
@@ -310,10 +315,12 @@ public class SocialUseCases {
             if (command.action() == FriendRequestAction.ACCEPT && result.friendRequest() != null) {
                 var req = result.friendRequest();
                 String matchId = Match.generateId(req.fromUserId(), req.toUserId());
-                publishEvent(
-                        "friend request accepted",
+                EventPublishing.publishOrWarn(
+                        eventBus,
                         new AppEvent.FriendRequestAccepted(
-                                req.id(), req.fromUserId(), req.toUserId(), matchId, AppClock.now()));
+                                req.id(), req.fromUserId(), req.toUserId(), matchId, AppClock.now()),
+                        "Failed to publish friend request accepted event",
+                        logger);
             }
             return UseCaseResult.success(RelationshipTransitionOutcome.from(result));
         } catch (Exception e) {
@@ -400,20 +407,12 @@ public class SocialUseCases {
             AppEvent.RelationshipTransitionState fromState,
             AppEvent.RelationshipTransitionState toState) {
         String matchId = Match.generateId(initiatorId, targetUserId);
-        publishEvent(
-                "relationship transition",
+        EventPublishing.publishOrWarn(
+                eventBus,
                 new AppEvent.RelationshipTransitioned(
-                        matchId, initiatorId, targetUserId, fromState, toState, AppClock.now()));
-    }
-
-    private void publishEvent(String eventName, AppEvent event) {
-        try {
-            eventBus.publish(event);
-        } catch (Exception e) {
-            if (logger.isWarnEnabled()) {
-                logger.warn("Failed to publish {} event: {}", eventName, e.getMessage(), e);
-            }
-        }
+                        matchId, initiatorId, targetUserId, fromState, toState, AppClock.now()),
+                "Failed to publish relationship transition event",
+                logger);
     }
 
     public static record RelationshipCommand(UserContext context, UUID targetUserId) {}

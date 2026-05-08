@@ -7,6 +7,7 @@ import datingapp.app.usecase.matching.MatchingUseCases.StandoutsQuery;
 import datingapp.core.AppSession;
 import datingapp.core.matching.RecommendationService;
 import datingapp.core.matching.Standout;
+import datingapp.core.matching.StandoutService;
 import datingapp.core.model.User;
 import datingapp.ui.async.JavaFxUiThreadDispatcher;
 import datingapp.ui.async.UiThreadDispatcher;
@@ -120,14 +121,14 @@ public class StandoutsViewModel extends BaseViewModel {
                     empty = useCaseResult.data().result().isEmpty();
                     resultMessage = useCaseResult.data().result().message();
                 } else {
-                    RecommendationService.Result result = recommendationService.getStandouts(user);
+                    StandoutService.Result result = recommendationService.getStandouts(user);
                     standoutItems = result.standouts();
                     resolved = recommendationService.resolveUsers(standoutItems);
                     empty = result.isEmpty();
                     resultMessage = result.message();
                 }
             } else {
-                RecommendationService.Result result = recommendationService.getStandouts(user);
+                StandoutService.Result result = recommendationService.getStandouts(user);
                 standoutItems = result.standouts();
                 resolved = recommendationService.resolveUsers(standoutItems);
                 empty = result.isEmpty();

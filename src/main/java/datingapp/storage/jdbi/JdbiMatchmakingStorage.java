@@ -283,13 +283,13 @@ public final class JdbiMatchmakingStorage implements OperationalInteractionStora
                     .bind(PARAM_CREATED_AT, match.getCreatedAt())
                     .bind(PARAM_UPDATED_AT, match.getUpdatedAt())
                     .bind(PARAM_STATE, match.getState().name());
-            bindNullableInstant(update, PARAM_ENDED_AT, match.getEndedAt());
-            bindNullableUuid(update, PARAM_ENDED_BY, match.getEndedBy());
+            JdbiTypeCodecs.bindNullableInstant(update, PARAM_ENDED_AT, match.getEndedAt());
+            JdbiTypeCodecs.bindNullableUuid(update, PARAM_ENDED_BY, match.getEndedBy());
             bindNullableString(
                     update,
                     PARAM_END_REASON,
                     match.getEndReason() != null ? match.getEndReason().name() : null);
-            bindNullableInstant(update, PARAM_DELETED_AT, match.getDeletedAt());
+            JdbiTypeCodecs.bindNullableInstant(update, PARAM_DELETED_AT, match.getDeletedAt());
             update.execute();
         }
     }
@@ -466,20 +466,7 @@ public final class JdbiMatchmakingStorage implements OperationalInteractionStora
      */
     @Override
     public PageData<Match> getPageOfMatchesFor(UUID userId, int offset, int limit) {
-        Objects.requireNonNull(userId, ERR_USER_ID_NULL);
-        if (offset < 0) {
-            throw new IllegalArgumentException("offset must be >= 0");
-        }
-        if (limit <= 0) {
-            throw new IllegalArgumentException("limit must be > 0");
-        }
-
-        int total = matchDao.countMatchesFor(userId);
-        if (offset >= total) {
-            return PageData.empty(limit, total);
-        }
-        List<Match> page = matchDao.getPageOfMatchesFor(userId, offset, limit);
-        return new PageData<>(page, total, offset, limit);
+        return loadPagedMatches(userId, offset, limit, matchDao::countMatchesFor, matchDao::getPageOfMatchesFor);
     }
 
     /**
@@ -489,6 +476,16 @@ public final class JdbiMatchmakingStorage implements OperationalInteractionStora
      */
     @Override
     public PageData<Match> getPageOfActiveMatchesFor(UUID userId, int offset, int limit) {
+        return loadPagedMatches(
+                userId, offset, limit, matchDao::countActiveMatchesFor, matchDao::getPageOfActiveMatchesFor);
+    }
+
+    private PageData<Match> loadPagedMatches(
+            UUID userId,
+            int offset,
+            int limit,
+            java.util.function.ToIntFunction<UUID> counter,
+            MatchPageFetcher pageFetcher) {
         Objects.requireNonNull(userId, ERR_USER_ID_NULL);
         if (offset < 0) {
             throw new IllegalArgumentException("offset must be >= 0");
@@ -497,12 +494,17 @@ public final class JdbiMatchmakingStorage implements OperationalInteractionStora
             throw new IllegalArgumentException("limit must be > 0");
         }
 
-        int total = matchDao.countActiveMatchesFor(userId);
+        int total = counter.applyAsInt(userId);
         if (offset >= total) {
             return PageData.empty(limit, total);
         }
-        List<Match> page = matchDao.getPageOfActiveMatchesFor(userId, offset, limit);
+        List<Match> page = pageFetcher.fetch(userId, offset, limit);
         return new PageData<>(page, total, offset, limit);
+    }
+
+    @FunctionalInterface
+    private interface MatchPageFetcher {
+        List<Match> fetch(UUID userId, int offset, int limit);
     }
 
     @Override
@@ -1124,30 +1126,14 @@ public final class JdbiMatchmakingStorage implements OperationalInteractionStora
         update.bind(PARAM_ID, match.getId())
                 .bind(PARAM_STATE, match.getState().name())
                 .bind(PARAM_UPDATED_AT, match.getUpdatedAt());
-        bindNullableInstant(update, PARAM_ENDED_AT, match.getEndedAt());
-        bindNullableUuid(update, PARAM_ENDED_BY, match.getEndedBy());
+        JdbiTypeCodecs.bindNullableInstant(update, PARAM_ENDED_AT, match.getEndedAt());
+        JdbiTypeCodecs.bindNullableUuid(update, PARAM_ENDED_BY, match.getEndedBy());
         bindNullableString(
                 update,
                 PARAM_END_REASON,
                 match.getEndReason() != null ? match.getEndReason().name() : null);
-        bindNullableInstant(update, PARAM_DELETED_AT, match.getDeletedAt());
+        JdbiTypeCodecs.bindNullableInstant(update, PARAM_DELETED_AT, match.getDeletedAt());
         return update;
-    }
-
-    private static void bindNullableUuid(Update update, String parameter, UUID value) {
-        if (value != null) {
-            update.bind(parameter, value);
-            return;
-        }
-        update.bindNull(parameter, Types.OTHER);
-    }
-
-    private static void bindNullableInstant(Update update, String parameter, Instant value) {
-        if (value != null) {
-            update.bind(parameter, value);
-            return;
-        }
-        update.bindNull(parameter, Types.TIMESTAMP);
     }
 
     private static void bindNullableString(Update update, String parameter, String value) {

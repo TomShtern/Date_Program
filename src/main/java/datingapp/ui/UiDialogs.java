@@ -2,7 +2,6 @@ package datingapp.ui;
 
 import datingapp.core.connection.ConnectionModels.Report;
 import datingapp.core.model.User;
-import java.net.URL;
 import java.util.Objects;
 import java.util.function.BiConsumer;
 import javafx.scene.control.ButtonBar;
@@ -99,10 +98,7 @@ public final class UiDialogs {
     }
 
     private static void applyTheme(Dialog<?> dialog) {
-        URL stylesheet = UiDialogs.class.getResource("/css/theme.css");
-        if (stylesheet != null) {
-            dialog.getDialogPane().getStylesheets().add(stylesheet.toExternalForm());
-        }
+        dialog.getDialogPane().getStylesheets().add(UiStyles.getThemeUrl());
         dialog.getDialogPane().getStyleClass().add("dialog-pane");
     }
 }

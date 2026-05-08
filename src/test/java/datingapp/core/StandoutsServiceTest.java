@@ -225,7 +225,7 @@ class StandoutsServiceTest {
             User seeker = createCompleteActiveUser("Seeker");
             userStorage.save(seeker);
 
-            RecommendationService.Result result = service.getStandouts(seeker);
+            StandoutService.Result result = service.getStandouts(seeker);
 
             assertTrue(result.isEmpty());
             assertEquals(0, result.count());
@@ -243,7 +243,7 @@ class StandoutsServiceTest {
             Standout cached = Standout.create(seeker.getId(), UUID.randomUUID(), today, 1, 90, "Test");
             standoutStorage.cachedStandouts.put(seeker.getId() + "_" + today, List.of(cached));
 
-            RecommendationService.Result result = service.getStandouts(seeker);
+            StandoutService.Result result = service.getStandouts(seeker);
 
             assertTrue(result.fromCache());
             assertEquals(1, result.count());
@@ -260,7 +260,7 @@ class StandoutsServiceTest {
             userStorage.save(candidate1);
             userStorage.save(candidate2);
 
-            RecommendationService.Result result = service.getStandouts(seeker);
+            StandoutService.Result result = service.getStandouts(seeker);
 
             assertFalse(result.isEmpty());
             assertFalse(result.fromCache());
@@ -305,7 +305,7 @@ class StandoutsServiceTest {
             userStorage.save(seeker);
             userStorage.save(candidate);
 
-            RecommendationService.Result result = customService.getStandouts(seeker);
+            StandoutService.Result result = customService.getStandouts(seeker);
 
             assertTrue(result.isEmpty());
             assertEquals(0, result.count());
@@ -323,7 +323,7 @@ class StandoutsServiceTest {
                 userStorage.save(candidate);
             }
 
-            RecommendationService.Result result = service.getStandouts(seeker);
+            StandoutService.Result result = service.getStandouts(seeker);
 
             assertTrue(result.count() <= 10);
         }
@@ -350,7 +350,7 @@ class StandoutsServiceTest {
             userStorage.save(seeker);
             userStorage.save(candidate);
 
-            RecommendationService.Result result = customService.getStandouts(seeker);
+            StandoutService.Result result = customService.getStandouts(seeker);
 
             assertFalse(result.isEmpty());
             assertFalse(standoutStorage.savedStandouts.isEmpty());
@@ -422,7 +422,7 @@ class StandoutsServiceTest {
         @Test
         @DisplayName("empty() should create empty result with message")
         void emptyCreatesWithMessage() {
-            RecommendationService.Result result = RecommendationService.Result.empty("Test message");
+            StandoutService.Result result = StandoutService.Result.empty("Test message");
 
             assertTrue(result.isEmpty());
             assertEquals(0, result.count());
@@ -436,7 +436,7 @@ class StandoutsServiceTest {
             List<Standout> standouts =
                     List.of(Standout.create(UUID.randomUUID(), UUID.randomUUID(), AppClock.today(), 1, 90, "Test"));
 
-            RecommendationService.Result result = RecommendationService.Result.of(standouts, 5, true);
+            StandoutService.Result result = StandoutService.Result.of(standouts, 5, true);
 
             assertFalse(result.isEmpty());
             assertEquals(1, result.count());

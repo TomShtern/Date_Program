@@ -5,6 +5,8 @@ import datingapp.app.usecase.common.UseCaseResult;
 import datingapp.app.usecase.common.UserContext;
 import datingapp.core.AppConfig;
 import datingapp.core.connection.ConnectionService;
+import datingapp.core.matching.DailyLimitService;
+import datingapp.core.matching.DailyPickService;
 import datingapp.core.matching.RecommendationService;
 import datingapp.core.metrics.AchievementService;
 import datingapp.core.metrics.EngagementDomain.Achievement;
@@ -65,8 +67,8 @@ public final class DashboardUseCases {
             }
 
             String completionText = profileService.calculate(user).getDisplayString();
-            RecommendationService.DailyStatus dailyStatus = recommendationService.getStatus(user.getId());
-            RecommendationService.DailyPick dailyPick =
+            DailyLimitService.DailyStatus dailyStatus = recommendationService.getStatus(user.getId());
+            DailyPickService.DailyPick dailyPick =
                     recommendationService.getDailyPick(user).orElse(null);
             List<UserAchievement> unlockedAchievements = achievementService.getUnlocked(user.getId());
 
@@ -139,12 +141,12 @@ public final class DashboardUseCases {
         }
     }
 
-    private DailyStatusSummary toDailyStatusSummary(RecommendationService.DailyStatus status) {
+    private DailyStatusSummary toDailyStatusSummary(DailyLimitService.DailyStatus status) {
         return new DailyStatusSummary(
                 buildLikesText(status), status.likesUsed(), status.likesRemaining(), status.hasUnlimitedLikes());
     }
 
-    private DailyPickSummary toDailyPickSummary(RecommendationService.DailyPick dailyPick) {
+    private DailyPickSummary toDailyPickSummary(DailyPickService.DailyPick dailyPick) {
         if (dailyPick == null) {
             return new DailyPickSummary(false, null, DEFAULT_PICK_TEXT, "", false, DEFAULT_PICK_EMPTY_MESSAGE);
         }
@@ -168,7 +170,7 @@ public final class DashboardUseCases {
         return new AchievementSummary(achievements);
     }
 
-    private static String buildLikesText(RecommendationService.DailyStatus status) {
+    private static String buildLikesText(DailyLimitService.DailyStatus status) {
         if (status == null) {
             return DEFAULT_LIKES_TEXT;
         }

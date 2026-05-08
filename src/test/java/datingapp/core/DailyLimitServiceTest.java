@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.core.connection.ConnectionModels.Like;
 import datingapp.core.matching.CandidateFinder;
+import datingapp.core.matching.DailyLimitService;
 import datingapp.core.matching.RecommendationService;
 import datingapp.core.profile.ProfileService;
 import datingapp.core.testutil.TestClock;
@@ -164,7 +165,7 @@ class DailyLimitServiceTest {
             interactionStorage.save(new Like(UUID.randomUUID(), userId, UUID.randomUUID(), Like.Direction.LIKE, now));
             interactionStorage.save(new Like(UUID.randomUUID(), userId, UUID.randomUUID(), Like.Direction.PASS, now));
 
-            RecommendationService.DailyStatus status = service.getStatus(userId);
+            DailyLimitService.DailyStatus status = service.getStatus(userId);
 
             assertEquals(2, status.likesUsed());
             assertEquals(1, status.likesRemaining()); // 3 - 2 = 1
@@ -181,7 +182,7 @@ class DailyLimitServiceTest {
                     .build();
             RecommendationService unlimitedService = createService(unlimitedConfig);
 
-            RecommendationService.DailyStatus status = unlimitedService.getStatus(userId);
+            DailyLimitService.DailyStatus status = unlimitedService.getStatus(userId);
 
             assertTrue(status.hasUnlimitedLikes());
             assertTrue(status.hasUnlimitedPasses());
@@ -190,7 +191,7 @@ class DailyLimitServiceTest {
         @Test
         @DisplayName("Status returns correct date")
         void getStatus_returnsCorrectDate() {
-            RecommendationService.DailyStatus status = service.getStatus(userId);
+            DailyLimitService.DailyStatus status = service.getStatus(userId);
             assertEquals(AppClock.today(ZoneOffset.UTC), status.date());
         }
     }

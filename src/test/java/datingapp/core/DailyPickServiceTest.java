@@ -5,7 +5,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import datingapp.core.connection.ConnectionModels.Block;
 import datingapp.core.connection.ConnectionModels.Like;
 import datingapp.core.matching.*;
-import datingapp.core.matching.RecommendationService.DailyPick;
+import datingapp.core.matching.DailyPickService.DailyPick;
 import datingapp.core.model.ProfileNote;
 import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;

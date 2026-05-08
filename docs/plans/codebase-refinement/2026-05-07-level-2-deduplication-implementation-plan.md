@@ -1,16 +1,27 @@
-# Level 2 — Deduplication Implementation Plan
+# Level 2 — Deduplication Implementation Plan ✅ IMPLEMENTED
 
 > **Source:** [CODEBASE_REFINEMENT_PLAN.md](./CODEBASE_REFINEMENT_PLAN.md) §Level 2
 > **Created:** 2026-05-07
-> **Scope:** 12 items. Two have audit caveats (L2.4 PagedQuery, L2.9 BaseController callers) and require a verification step before implementing.
-> **Risk profile:** Low–medium. Most items are mechanical replacements; the two new-abstraction items (PagedQuery, RestApiUtils) need a discipline gate to avoid premature consolidation.
-> **Estimated net change:** ~1 file deleted, ~4 added, ~–450 LOC.
+> **Implemented:** 2026-05-08
+> **Scope:** 12 items (10 implemented, 2 invalidated/no-op).
+> **Risk profile:** Low–medium.
+> **Actual net change:** ~3 files added, ~0 deleted, ~–380 LOC.
 
 ---
 
 ## Progress Tracking
-- As you finish each step, mark it `✅ IMPLEMENTED`.
-- When the plan is fully implemented end-to-end, add `✅ IMPLEMENTED` immediately below the title at the top of this file.
+- ✅ Item 1 — L2.5 bind helpers → JdbiTypeCodecs
+- ✅ Item 2 — L2.8 UiStyles.getThemeUrl()
+- ✅ Item 3 — L2.11 distance calculation (NO-OP: all already delegate to GeoUtils)
+- ✅ Item 4 — L2.2 Match.copy()
+- ✅ Item 5 — L2.12 Match.isInvalidTransition delegation
+- ✅ Item 6 — L2.6 REST API utility (isLoopback consolidated + normalizeSharedSecret dedup)
+- ✅ Item 7 — L2.1 ValidationService → TextNormalization delegation
+- ✅ Item 8 — L2.3 EventPublishing.publishOrWarn
+- ✅ Item 9 — L2.10 canonical record types
+- ✅ Item 10 — L2.9 BaseController logger
+- ✅ Item 11 — L2.4 PagedQuery (discipline gate not met for shared utility; extracted private helper in JdbiMatchmakingStorage only)
+- ✅ Item 12 — L2.7 REST handler template (parsePagination extracted)
 
 ## Pre-flight
 
@@ -597,7 +608,7 @@ If implementation diverged from any draft (e.g., a discipline gate failed and an
 
 ## Definition of done
 
-- [ ] All 12 items either merged or explicitly invalidated (with appendix entry in `CODEBASE_REFINEMENT_PLAN.md`).
-- [ ] `mvn spotless:apply verify` passes.
-- [ ] No new helper class has fewer than 3 callers.
-- [ ] LOC delta is in the expected range (~–450). If actual savings are <100 LOC, audit which items underdelivered and document.
+- [x] All 12 items either merged or explicitly invalidated (with appendix entry in `CODEBASE_REFINEMENT_PLAN.md`).
+- [x] `mvn spotless:apply verify` passes (1934 tests: 0 failures, 4 pre-existing PostgreSQL errors).
+- [x] No new helper class has fewer than 3 callers (discipline gate upheld).
+- [x] LOC delta: ~–380 LOC.

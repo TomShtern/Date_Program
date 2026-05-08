@@ -8,6 +8,8 @@ import javafx.fxml.FXML;
 import javafx.scene.Node;
 import javafx.scene.layout.StackPane;
 import javafx.util.Subscription;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Base class for all controllers providing common lifecycle management.
@@ -36,6 +38,31 @@ public abstract class BaseController {
     private final List<Subscription> subscriptions = new ArrayList<>();
     private final List<Node> overlays = new ArrayList<>();
     private final List<Animation> animations = new ArrayList<>();
+    protected final Logger logger = LoggerFactory.getLogger(getClass());
+
+    protected final void logDebug(String message, Object... args) {
+        if (logger.isDebugEnabled()) {
+            logger.debug(message, args);
+        }
+    }
+
+    protected final void logInfo(String message, Object... args) {
+        if (logger.isInfoEnabled()) {
+            logger.info(message, args);
+        }
+    }
+
+    protected final void logWarn(String message, Object... args) {
+        if (logger.isWarnEnabled()) {
+            logger.warn(message, args);
+        }
+    }
+
+    protected final void logError(String message, Object... args) {
+        if (logger.isErrorEnabled()) {
+            logger.error(message, args);
+        }
+    }
 
     /**
      * Registers a subscription for automatic cleanup.

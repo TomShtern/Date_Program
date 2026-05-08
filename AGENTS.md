@@ -24,6 +24,7 @@ If any markdown guidance and the code disagree, trust:
 5. Prefer the simplest complete fix, not the smallest diff. Refactor when needed to fully correct the contract, behavior, and all affected code paths, including callers, dependencies, tests, and related design.
 6. Do not dismiss compilation errors as “pre-existing” just because they appear outside your edited files. Treat every compile failure as relevant and fix it, even if it is unrelated to your current change.
  After fixing unrelated/pre-existing errors, clearly report them separately: what failed, where it was, what you changed, and that it was outside the original task scope.
+7. Do NOT suppress issues, fix them properly from the root cause, and do not leave known issues unfixed in the codebase. If you find a problem that is outside the scope of the current task, fix it properly anyway.
 
 ## Search and tool discipline
 

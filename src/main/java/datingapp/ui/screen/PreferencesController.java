@@ -16,15 +16,12 @@ import javafx.scene.control.ToggleButton;
 import javafx.scene.control.ToggleGroup;
 import javafx.scene.input.KeyCode;
 import javafx.scene.layout.BorderPane;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Controller for the Preferences/Filter screen.
  * Extends BaseController for automatic subscription cleanup.
  */
 public class PreferencesController extends BaseController implements Initializable {
-    private static final Logger logger = LoggerFactory.getLogger(PreferencesController.class);
 
     @FXML
     private BorderPane rootPane;
@@ -195,7 +192,7 @@ public class PreferencesController extends BaseController implements Initializab
             case WOMEN -> womenToggle.setSelected(true);
             case EVERYONE -> everyoneToggle.setSelected(true);
             default -> {
-                logWarn("Unknown gender preference: {}", resolvedPreference);
+                logger.warn("Unknown gender preference: {}", resolvedPreference);
                 everyoneToggle.setSelected(true);
             }
         }
@@ -203,7 +200,7 @@ public class PreferencesController extends BaseController implements Initializab
 
     @FXML
     private void handleSave() {
-        logInfo("Saving MatchPreferences...");
+        logger.info("Saving MatchPreferences...");
         viewModel.savePreferences();
         handleBack();
     }
@@ -211,20 +208,8 @@ public class PreferencesController extends BaseController implements Initializab
     @FXML
     private void handleThemeToggle() {
         ThemeMode selectedTheme = ThemeMode.fromDarkMode(themeToggle.isSelected());
-        logInfo("Toggling theme to: {}", selectedTheme);
+        logger.info("Toggling theme to: {}", selectedTheme);
         viewModel.updateThemeMode(selectedTheme);
-    }
-
-    private void logInfo(String message, Object... args) {
-        if (logger.isInfoEnabled()) {
-            logger.info(message, args);
-        }
-    }
-
-    private void logWarn(String message, Object... args) {
-        if (logger.isWarnEnabled()) {
-            logger.warn(message, args);
-        }
     }
 
     private void wireActionButtons() {

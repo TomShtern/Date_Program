@@ -5,10 +5,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import datingapp.app.cli.CliTextAndInput.InputReader;
 import datingapp.core.connection.ConnectionModels;
 import datingapp.core.connection.ConnectionService;
+import datingapp.core.matching.DailyPickService;
 import datingapp.core.matching.InterestMatcher;
 import datingapp.core.matching.MatchQualityService;
 import datingapp.core.matching.MatchingService;
-import datingapp.core.matching.RecommendationService;
 import datingapp.core.model.Match.MatchArchiveReason;
 import datingapp.core.model.Match.MatchState;
 import datingapp.core.model.User.Gender;
@@ -98,7 +98,7 @@ class NestedTypeVisibilityTest {
     @DisplayName("Cross-package nested types used by CLI/UI are accessible")
     void crossPackageNestedTypesAccessible() {
         assertTrue(Modifier.isPublic(PacePreferences.class.getModifiers()), "PacePreferences must be public");
-        assertTrue(Modifier.isPublic(RecommendationService.DailyPick.class.getModifiers()), "DailyPick must be public");
+        assertTrue(Modifier.isPublic(DailyPickService.DailyPick.class.getModifiers()), "DailyPick must be public");
         assertTrue(Modifier.isPublic(InputReader.class.getModifiers()), "InputReader must be public");
         assertTrue(
                 Modifier.isPublic(UiAnimations.ConfettiAnimation.class.getModifiers()),

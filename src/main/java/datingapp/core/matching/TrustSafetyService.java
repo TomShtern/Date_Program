@@ -414,27 +414,13 @@ public final class TrustSafetyService {
         return user.copy();
     }
 
-    private static Match copyMatch(Match match) {
-        return new Match(
-                match.getId(),
-                match.getUserA(),
-                match.getUserB(),
-                match.getCreatedAt(),
-                match.getUpdatedAt(),
-                match.getState(),
-                match.getEndedAt(),
-                match.getEndedBy(),
-                match.getEndReason(),
-                match.getDeletedAt());
-    }
-
     private record BlockTransitionData(Optional<Match> updatedMatch, Optional<Conversation> archivedConversation) {}
 
     private BlockTransitionData prepareBlockTransition(UUID blockerId, UUID blockedId) {
         Optional<Match> updatedMatch = interactionStorage
                 .getByUsers(blockerId, blockedId)
                 .filter(match -> workflowPolicy.canBlock(match).isAllowed())
-                .map(TrustSafetyService::copyMatch)
+                .map(Match::copy)
                 .map(match -> {
                     match.block(blockerId);
                     return match;

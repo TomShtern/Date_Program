@@ -11,7 +11,6 @@ import datingapp.core.storage.AnalyticsStorage;
 import datingapp.storage.DatabaseDialect;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Types;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -22,7 +21,6 @@ import java.util.UUID;
 import org.jdbi.v3.core.Jdbi;
 import org.jdbi.v3.core.mapper.RowMapper;
 import org.jdbi.v3.core.statement.PreparedBatch;
-import org.jdbi.v3.core.statement.SqlStatement;
 import org.jdbi.v3.core.statement.StatementContext;
 import org.jdbi.v3.sqlobject.config.RegisterRowMapper;
 import org.jdbi.v3.sqlobject.customizer.Bind;
@@ -253,7 +251,7 @@ public final class JdbiMetricsStorage implements AnalyticsStorage, Standout.Stor
                         .bind("likeCount", session.getLikeCount())
                         .bind("passCount", session.getPassCount())
                         .bind("matchCount", session.getMatchCount());
-                bindNullableInstant(update, "endedAt", session.getEndedAt());
+                JdbiTypeCodecs.bindNullableInstant(update, "endedAt", session.getEndedAt());
                 update.execute();
             }
         });
@@ -343,7 +341,7 @@ public final class JdbiMetricsStorage implements AnalyticsStorage, Standout.Stor
                             .bind(SCORE_COLUMN, normalized.score())
                             .bind(REASON_COLUMN, normalized.reason())
                             .bind(CREATED_AT_BIND, normalized.createdAt());
-                    bindNullableInstant(batch, "interactedAt", normalized.interactedAt());
+                    JdbiTypeCodecs.bindNullableInstant(batch, "interactedAt", normalized.interactedAt());
                     batch.add();
                 }
 
@@ -723,14 +721,6 @@ public final class JdbiMetricsStorage implements AnalyticsStorage, Standout.Stor
                     JdbiTypeCodecs.SqlRowReaders.readInstant(rs, CREATED_AT_COLUMN),
                     interactedAt);
         }
-    }
-
-    private static void bindNullableInstant(SqlStatement<?> statement, String parameter, Instant value) {
-        if (value != null) {
-            statement.bind(parameter, value);
-            return;
-        }
-        statement.bindNull(parameter, Types.TIMESTAMP);
     }
 
     private static String buildProfileViewUpsertSql(DatabaseDialect dialect) {

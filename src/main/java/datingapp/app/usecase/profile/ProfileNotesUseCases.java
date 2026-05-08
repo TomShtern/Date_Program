@@ -2,6 +2,7 @@ package datingapp.app.usecase.profile;
 
 import datingapp.app.event.AppEvent;
 import datingapp.app.event.AppEventBus;
+import datingapp.app.event.EventPublishing;
 import datingapp.app.usecase.common.UseCaseError;
 import datingapp.app.usecase.common.UseCaseResult;
 import datingapp.app.usecase.common.UserContext;
@@ -99,11 +100,13 @@ public class ProfileNotesUseCases {
                             ProfileNote.create(command.context().userId(), command.subjectId(), sanitizedContent));
             userStorage.saveProfileNote(note);
             int safeContentLength = sanitizedContent == null ? 0 : sanitizedContent.length();
-            publishEvent(
+            EventPublishing.publishOrWarn(
+                    eventBus,
                     new AppEvent.ProfileNoteSaved(
                             command.context().userId(), command.subjectId(), safeContentLength, AppClock.now()),
                     "Post-profile-note-save event publication failed for author "
-                            + command.context().userId());
+                            + command.context().userId(),
+                    logger);
             return UseCaseResult.success(note);
         } catch (IllegalArgumentException | NullPointerException e) {
             String msg = e.getMessage() != null ? e.getMessage() : "Invalid profile note input";
@@ -126,10 +129,12 @@ public class ProfileNotesUseCases {
             if (!deleted) {
                 return UseCaseResult.failure(UseCaseError.notFound("Profile note not found"));
             }
-            publishEvent(
+            EventPublishing.publishOrWarn(
+                    eventBus,
                     new AppEvent.ProfileNoteDeleted(command.context().userId(), command.subjectId(), AppClock.now()),
                     "Post-profile-note-delete event publication failed for author "
-                            + command.context().userId());
+                            + command.context().userId(),
+                    logger);
             return UseCaseResult.success(null);
         } catch (Exception e) {
             return UseCaseResult.failure(UseCaseError.internal("Failed to delete profile note: " + e.getMessage()));
@@ -164,16 +169,6 @@ public class ProfileNotesUseCases {
             return Optional.of(UseCaseError.validation(PROFILE_NOTE_TOO_LONG.formatted(maxProfileNoteLength)));
         }
         return Optional.empty();
-    }
-
-    private void publishEvent(AppEvent event, String failureMessage) {
-        try {
-            eventBus.publish(event);
-        } catch (Exception e) {
-            if (logger.isWarnEnabled()) {
-                logger.warn("{}: {}", failureMessage, e.getMessage(), e);
-            }
-        }
     }
 
     public static record ProfileNotesQuery(UserContext context) {}

@@ -555,7 +555,7 @@ public class MatchingUseCases {
             return UseCaseResult.failure(UseCaseError.forbidden("Match does not belong to current user"));
         }
         try {
-            Match archivedMatch = copyMatch(match);
+            Match archivedMatch = match.copy();
             archivedMatch.unmatch(command.context().userId());
             if (!interactionStorage.unmatchTransition(archivedMatch, Optional.empty())) {
                 return UseCaseResult.failure(UseCaseError.conflict("Failed to archive match"));
@@ -734,20 +734,6 @@ public class MatchingUseCases {
 
     public static record UndoAvailabilityResult(boolean canUndo, int secondsRemaining) {}
 
-    private static Match copyMatch(Match match) {
-        return new Match(
-                match.getId(),
-                match.getUserA(),
-                match.getUserB(),
-                match.getCreatedAt(),
-                match.getUpdatedAt(),
-                match.getState(),
-                match.getEndedAt(),
-                match.getEndedBy(),
-                match.getEndReason(),
-                match.getDeletedAt());
-    }
-
     public static DailyLimitService wrapDailyLimitService(RecommendationService recommendationService) {
         if (recommendationService == null) {
             return new DailyLimitService() {
@@ -795,7 +781,7 @@ public class MatchingUseCases {
 
             @Override
             public DailyStatus getStatus(UUID userId) {
-                RecommendationService.DailyStatus status = recommendationService.getStatus(userId);
+                DailyLimitService.DailyStatus status = recommendationService.getStatus(userId);
                 return new DailyStatus(
                         status.likesUsed(),
                         status.likesRemaining(),
@@ -870,7 +856,7 @@ public class MatchingUseCases {
         return new StandoutService() {
             @Override
             public Result getStandouts(User seeker) {
-                RecommendationService.Result result = recommendationService.getStandouts(seeker);
+                StandoutService.Result result = recommendationService.getStandouts(seeker);
                 return new Result(result.standouts(), result.totalCandidates(), result.fromCache(), result.message());
             }
 

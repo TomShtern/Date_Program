@@ -24,6 +24,7 @@ import org.jdbi.v3.core.argument.Argument;
 import org.jdbi.v3.core.argument.ArgumentFactory;
 import org.jdbi.v3.core.config.ConfigRegistry;
 import org.jdbi.v3.core.mapper.ColumnMapper;
+import org.jdbi.v3.core.statement.SqlStatement;
 import org.jdbi.v3.core.statement.StatementContext;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
@@ -45,6 +46,22 @@ public final class JdbiTypeCodecs {
 
     private static Calendar utcCalendar() {
         return Calendar.getInstance(UTC_TIME_ZONE);
+    }
+
+    public static void bindNullableUuid(SqlStatement<?> statement, String parameter, UUID value) {
+        if (value != null) {
+            statement.bind(parameter, value);
+            return;
+        }
+        statement.bindNull(parameter, Types.OTHER);
+    }
+
+    public static void bindNullableInstant(SqlStatement<?> statement, String parameter, Instant value) {
+        if (value != null) {
+            statement.bind(parameter, value);
+            return;
+        }
+        statement.bindNull(parameter, Types.TIMESTAMP);
     }
 
     /** Null-safe SQL row readers shared across storage row mappers. */

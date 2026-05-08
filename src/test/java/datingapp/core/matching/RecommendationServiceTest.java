@@ -82,7 +82,7 @@ class RecommendationServiceTest {
         dailyLimitService.statusReturn = new DailyStatus(5, 10, 0, 999, 2, 8, TODAY, RESET_AT);
         dailyLimitService.timeUntilResetReturn = Duration.ofHours(6);
 
-        RecommendationService.DailyStatus status = recommendationService.getStatus(SEEKER_ID);
+        DailyLimitService.DailyStatus status = recommendationService.getStatus(SEEKER_ID);
 
         assertEquals(5, status.likesUsed());
         assertEquals(10, status.likesRemaining());
@@ -105,7 +105,7 @@ class RecommendationServiceTest {
         dailyPickService.hasViewedReturn = true;
         dailyPickService.cleanupReturn = 3;
 
-        Optional<RecommendationService.DailyPick> result = recommendationService.getDailyPick(seeker);
+        Optional<DailyPickService.DailyPick> result = recommendationService.getDailyPick(seeker);
 
         assertTrue(result.isPresent());
         assertEquals(pickedUser, result.orElseThrow().user());
@@ -135,7 +135,7 @@ class RecommendationServiceTest {
         standoutService.resultReturn = standoutResult;
         standoutService.resolveReturn = Map.of(standoutUser.getId(), standoutUser);
 
-        RecommendationService.Result result = recommendationService.getStandouts(seeker);
+        StandoutService.Result result = recommendationService.getStandouts(seeker);
 
         assertFalse(result.isEmpty());
         assertEquals(1, result.count());

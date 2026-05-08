@@ -4,7 +4,6 @@ import io.javalin.Javalin;
 import io.javalin.http.Context;
 import io.javalin.http.HandlerType;
 import java.net.InetAddress;
-import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Duration;
@@ -49,7 +48,7 @@ final class RestApiRequestGuards {
             LongSupplier monotonicTicker) {
         this.identityPolicy = identityPolicy;
         this.rateLimiter = new LocalRateLimiter(window, maxRequests, monotonicTicker);
-        this.lanSharedSecret = normalizeSharedSecret(lanSharedSecret);
+        this.lanSharedSecret = lanSharedSecret;
     }
 
     void registerRequestGuards(Javalin app, Consumer<Context> localhostOnlyGuard) {
@@ -141,16 +140,12 @@ final class RestApiRequestGuards {
         return !remainingPath.isBlank() && remainingPath.indexOf('/') < 0;
     }
 
-    private boolean isLoopbackAddress(String host) {
+    static boolean isLoopbackAddress(String host) {
         try {
             return InetAddress.getByName(host).isLoopbackAddress();
-        } catch (UnknownHostException _) {
+        } catch (Exception _) {
             return false;
         }
-    }
-
-    private static String normalizeSharedSecret(String lanSharedSecret) {
-        return lanSharedSecret == null || lanSharedSecret.isBlank() ? null : lanSharedSecret.trim();
     }
 
     private static final class LocalRateLimiter {

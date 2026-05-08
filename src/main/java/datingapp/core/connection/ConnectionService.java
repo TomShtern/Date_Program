@@ -485,7 +485,7 @@ public class ConnectionService {
         if (matchOpt.isEmpty()) {
             return TransitionResult.failure("Could not find the associated match.");
         }
-        Match updatedMatch = copyMatch(matchOpt.get());
+        Match updatedMatch = matchOpt.get().copy();
 
         FriendRequest updated = new FriendRequest(
                 request.id(),
@@ -552,7 +552,7 @@ public class ConnectionService {
             convo.archive(convo.getUserA(), MatchArchiveReason.GRACEFUL_EXIT);
             convo.archive(convo.getUserB(), MatchArchiveReason.GRACEFUL_EXIT);
         });
-        Match updatedMatch = copyMatch(match);
+        Match updatedMatch = match.copy();
 
         try {
             updatedMatch.gracefulExit(initiatorId);
@@ -596,7 +596,7 @@ public class ConnectionService {
             convo.archive(convo.getUserA(), MatchArchiveReason.UNMATCH);
             convo.archive(convo.getUserB(), MatchArchiveReason.UNMATCH);
         });
-        Match updatedMatch = copyMatch(match);
+        Match updatedMatch = match.copy();
 
         try {
             updatedMatch.unmatch(initiatorId);
@@ -608,20 +608,6 @@ public class ConnectionService {
         } catch (Exception e) {
             return TransitionResult.failure("Failed to persist unmatch transition: " + e.getMessage());
         }
-    }
-
-    private static Match copyMatch(Match match) {
-        return new Match(
-                match.getId(),
-                match.getUserA(),
-                match.getUserB(),
-                match.getCreatedAt(),
-                match.getUpdatedAt(),
-                match.getState(),
-                match.getEndedAt(),
-                match.getEndedBy(),
-                match.getEndReason(),
-                match.getDeletedAt());
     }
 
     private static Conversation copyConversation(Conversation conversation) {

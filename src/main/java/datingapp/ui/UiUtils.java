@@ -1,6 +1,5 @@
 package datingapp.ui;
 
-import java.net.URL;
 import java.util.Set;
 import java.util.function.Function;
 import javafx.collections.FXCollections;
@@ -43,10 +42,7 @@ public final class UiUtils {
             dialog.initOwner(ownerNode.getScene().getWindow());
             dialog.getDialogPane().getStylesheets().setAll(ownerNode.getScene().getStylesheets());
         } else {
-            URL themeUrl = UiUtils.class.getResource("/css/theme.css");
-            if (themeUrl != null) {
-                dialog.getDialogPane().getStylesheets().add(themeUrl.toExternalForm());
-            }
+            dialog.getDialogPane().getStylesheets().add(UiStyles.getThemeUrl());
         }
 
         return dialog;

@@ -41,8 +41,6 @@ import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.shape.Circle;
 import javafx.util.Duration;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Controller for the Login screen (login.fxml).
@@ -50,7 +48,6 @@ import org.slf4j.LoggerFactory;
  * Extends BaseController for automatic subscription cleanup.
  */
 public class LoginController extends BaseController implements Initializable {
-    private static final Logger logger = LoggerFactory.getLogger(LoginController.class);
 
     // CSS Class Names
     private static final String CSS_LOGIN_HINT = "login-hint";
@@ -201,7 +198,7 @@ public class LoginController extends BaseController implements Initializable {
             switch (decision) {
                 case GO_TO_DASHBOARD -> {
                     NavigationService.ViewType destination = NavigationService.ViewType.DASHBOARD;
-                    logInfo(LOG_LOGIN_SUCCESS, destination);
+                    logger.info(LOG_LOGIN_SUCCESS, destination);
                     navigationService().navigateTo(destination);
                 }
                 case START_ONBOARDING -> {
@@ -210,7 +207,7 @@ public class LoginController extends BaseController implements Initializable {
                         navigateToOnboarding(OnboardingContext.incompleteLogin(selected.getId()));
                     } else {
                         NavigationService.ViewType destination = NavigationService.ViewType.PROFILE;
-                        logInfo(LOG_LOGIN_SUCCESS, destination);
+                        logger.info(LOG_LOGIN_SUCCESS, destination);
                         navigationService().navigateTo(destination);
                     }
                 }
@@ -222,7 +219,7 @@ public class LoginController extends BaseController implements Initializable {
     @SuppressWarnings("unused") // Called by FXML
     @FXML
     private void handleCreateAccount() {
-        logInfo(LOG_OPENING_DIALOG);
+        logger.info(LOG_OPENING_DIALOG);
         showCreateAccountDialog();
     }
 
@@ -297,14 +294,8 @@ public class LoginController extends BaseController implements Initializable {
     private void navigateToOnboarding(OnboardingContext context) {
         NavigationService navigationService = navigationService();
         navigationService.setNavigationContext(NavigationService.ViewType.PROFILE, context);
-        logInfo(LOG_LOGIN_SUCCESS, NavigationService.ViewType.PROFILE);
+        logger.info(LOG_LOGIN_SUCCESS, NavigationService.ViewType.PROFILE);
         navigationService.navigateTo(NavigationService.ViewType.PROFILE);
-    }
-
-    private void logInfo(String message, Object... args) {
-        if (logger.isInfoEnabled()) {
-            logger.info(message, args);
-        }
     }
 
     // --- User list cell rendering (inlined from UserListCellFactory) ---
