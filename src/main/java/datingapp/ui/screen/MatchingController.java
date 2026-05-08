@@ -9,6 +9,7 @@ import datingapp.ui.NavigationService;
 import datingapp.ui.UiAnimations;
 import datingapp.ui.UiDialogs;
 import datingapp.ui.UiFeedbackService;
+import datingapp.ui.UiStyles;
 import datingapp.ui.viewmodel.MatchingViewModel;
 import java.net.URL;
 import java.time.ZoneId;
@@ -41,8 +42,6 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.util.Duration;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Controller for the Matching screen (matching.fxml).
@@ -50,7 +49,6 @@ import org.slf4j.LoggerFactory;
  * Extends BaseController for automatic subscription cleanup.
  */
 public class MatchingController extends BaseController implements Initializable {
-    private static final Logger logger = LoggerFactory.getLogger(MatchingController.class);
 
     @FXML
     private BorderPane rootPane;
@@ -560,7 +558,7 @@ public class MatchingController extends BaseController implements Initializable 
     /** Super like action - triggered by button or UP key. */
     @FXML
     private void handleSuperLike() {
-        logInfo("Super Like triggered");
+        logger.info("Super Like triggered");
         // Pulse the card for micro-interaction feedback
         UiAnimations.pulseScale(candidateCard);
         viewModel.superLike();
@@ -601,10 +599,7 @@ public class MatchingController extends BaseController implements Initializable 
         dialog.setTitle(I18n.text("ui.match.dialog.title"));
 
         // Apply theme
-        String themeStylesheet = resolveStylesheet("/css/theme.css");
-        if (themeStylesheet != null) {
-            dialog.getDialogPane().getStylesheets().add(themeStylesheet);
-        }
+        dialog.getDialogPane().getStylesheets().add(UiStyles.getThemeUrl());
         dialog.getDialogPane().getStyleClass().add("dialog-pane");
 
         // Create content
@@ -722,21 +717,21 @@ public class MatchingController extends BaseController implements Initializable 
 
     @FXML
     private void handleExpandPreferences() {
-        logInfo("User clicked Expand Preferences - navigating to Profile settings");
+        logger.info("User clicked Expand Preferences - navigating to Profile settings");
         // Navigate to filter/preferences screen
         navigationService().navigateTo(NavigationService.ViewType.PREFERENCES);
     }
 
     @FXML
     private void handleCheckLikes() {
-        logInfo("User clicked Check Likes - navigating to Matches");
+        logger.info("User clicked Check Likes - navigating to Matches");
         // Navigate to Matches screen where they can see who liked them
         navigationService().navigateTo(NavigationService.ViewType.MATCHES);
     }
 
     @FXML
     private void handleImproveProfile() {
-        logInfo("User clicked Improve Profile - navigating to Profile");
+        logger.info("User clicked Improve Profile - navigating to Profile");
         navigationService().navigateTo(NavigationService.ViewType.PROFILE);
     }
 
@@ -750,33 +745,6 @@ public class MatchingController extends BaseController implements Initializable 
         NavigationService nav = navigationService();
         nav.setNavigationContext(NavigationService.ViewType.PROFILE_VIEW, candidate.getId());
         nav.navigateTo(NavigationService.ViewType.PROFILE_VIEW);
-    }
-
-    private String resolveStylesheet(String path) {
-        URL resource = getClass().getResource(path);
-        if (resource == null) {
-            logWarn("Stylesheet not found: {}", path);
-            return null;
-        }
-        return resource.toExternalForm();
-    }
-
-    private void logInfo(String message, Object... args) {
-        if (logger.isInfoEnabled()) {
-            logger.info(message, args);
-        }
-    }
-
-    private void logWarn(String message, Object... args) {
-        if (logger.isWarnEnabled()) {
-            logger.warn(message, args);
-        }
-    }
-
-    private void logDebug(String message, Object... args) {
-        if (logger.isDebugEnabled()) {
-            logger.debug(message, args);
-        }
     }
 
     private void playCardEntranceAnimation() {

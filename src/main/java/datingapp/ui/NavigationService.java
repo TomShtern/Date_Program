@@ -461,8 +461,7 @@ public final class NavigationService {
 
     private void applyTheme(Scene scene, UiPreferencesStore.ThemeMode themeMode) {
         Objects.requireNonNull(scene, "scene cannot be null");
-        String darkTheme =
-                Objects.requireNonNull(getClass().getResource("/css/theme.css")).toExternalForm();
+        String darkTheme = UiStyles.getThemeUrl();
         String lightTheme = Objects.requireNonNull(getClass().getResource("/css/light-theme.css"))
                 .toExternalForm();
 

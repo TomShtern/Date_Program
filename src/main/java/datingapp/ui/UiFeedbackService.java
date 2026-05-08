@@ -1,7 +1,6 @@
 package datingapp.ui;
 
 import datingapp.core.profile.ValidationService;
-import java.net.URL;
 import java.util.Locale;
 import java.util.Optional;
 import javafx.animation.FadeTransition;
@@ -61,10 +60,7 @@ public final class UiFeedbackService {
         alert.setContentText(content);
 
         DialogPane dialogPane = alert.getDialogPane();
-        URL stylesheet = UiFeedbackService.class.getResource("/css/theme.css");
-        if (stylesheet != null) {
-            dialogPane.getStylesheets().add(stylesheet.toExternalForm());
-        }
+        dialogPane.getStylesheets().add(UiStyles.getThemeUrl());
         dialogPane.getStyleClass().add("confirmation-dialog");
 
         Optional<ButtonType> result = alert.showAndWait();

@@ -1,9 +1,9 @@
 package datingapp.core.model;
 
 import datingapp.core.AppClock;
+import datingapp.core.workflow.RelationshipWorkflowPolicy;
 import java.time.Instant;
 import java.util.Objects;
-import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -141,7 +141,7 @@ public class Match {
 
     /** Unmatch - ends the match. Can be done from ACTIVE or FRIENDS state. */
     public void unmatch(UUID userId) {
-        if (isInvalidTransition(this.state, MatchState.UNMATCHED)) {
+        if (isInvalidTransition(MatchState.UNMATCHED)) {
             throw new IllegalStateException("Cannot unmatch from " + this.state + " state");
         }
         if (!involves(userId)) {
@@ -169,7 +169,7 @@ public class Match {
 
     /** transitionToFriends - transitions the match to FRIENDS state. */
     public void transitionToFriends(UUID initiatorId) {
-        if (isInvalidTransition(this.state, MatchState.FRIENDS)) {
+        if (isInvalidTransition(MatchState.FRIENDS)) {
             throw new IllegalStateException("Cannot transition to FRIENDS from " + state);
         }
         if (!involves(initiatorId)) {
@@ -208,7 +208,7 @@ public class Match {
 
     /** gracefulExit - ends the match kindly. */
     public void gracefulExit(UUID initiatorId) {
-        if (isInvalidTransition(this.state, MatchState.GRACEFUL_EXIT)) {
+        if (isInvalidTransition(MatchState.GRACEFUL_EXIT)) {
             throw new IllegalStateException("Cannot transition to GRACEFUL_EXIT from " + state);
         }
         if (!involves(initiatorId)) {
@@ -221,16 +221,8 @@ public class Match {
         touch();
     }
 
-    private boolean isInvalidTransition(MatchState from, MatchState to) {
-        return switch (from) {
-            case ACTIVE ->
-                !Set.of(MatchState.FRIENDS, MatchState.UNMATCHED, MatchState.GRACEFUL_EXIT, MatchState.BLOCKED)
-                        .contains(to);
-            case FRIENDS ->
-                !Set.of(MatchState.UNMATCHED, MatchState.GRACEFUL_EXIT, MatchState.BLOCKED)
-                        .contains(to);
-            case UNMATCHED, GRACEFUL_EXIT, BLOCKED -> true;
-        };
+    private boolean isInvalidTransition(MatchState to) {
+        return !new RelationshipWorkflowPolicy().canTransition(this, to).isAllowed();
     }
 
     /** Checks if the match allows messaging. */
@@ -333,6 +325,14 @@ public class Match {
     @Override
     public String toString() {
         return "Match{id='" + id + "', state=" + state + "}";
+    }
+
+    /**
+     * Returns a defensive copy of this match. The copy is a fully independent instance; mutations on
+     * the copy do not affect the original.
+     */
+    public Match copy() {
+        return new Match(id, userA, userB, createdAt, updatedAt, state, endedAt, endedBy, endReason, deletedAt);
     }
 
     private void touch() {

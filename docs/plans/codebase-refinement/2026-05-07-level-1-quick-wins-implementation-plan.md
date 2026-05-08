@@ -1,4 +1,4 @@
-# Level 1 — Quick Wins Implementation Plan
+# Level 1 — Quick Wins Implementation Plan ✅ IMPLEMENTED
 
 > **Source:** [CODEBASE_REFINEMENT_PLAN.md](./CODEBASE_REFINEMENT_PLAN.md) §Level 1
 > **Created:** 2026-05-07
@@ -41,7 +41,7 @@ Deletions first (items 1–5) — they remove call sites and dead surface area, 
 
 ---
 
-## Item 1 — Delete `CheckDb.java` (L1.7)
+## Item 1 — Delete `CheckDb.java` (L1.7) ✅ IMPLEMENTED
 
 **Goal:** Remove an orphaned `main()`-bearing class from the test tree that isn't a JUnit test and isn't referenced by any script.
 
@@ -72,7 +72,7 @@ Should still pass — `CheckDbTest` is independent.
 
 ---
 
-## Item 2 — Delete `AppEvent.MatchExpired` and its subscription (L1.8)
+## Item 2 — Delete `AppEvent.MatchExpired` and its subscription (L1.8) ✅ IMPLEMENTED
 
 **Goal:** Remove an event type that has zero publishers. The subscription and handler in `MetricsEventHandler` are dead receive-side code.
 
@@ -105,7 +105,7 @@ mvn -Dtest=MetricsEventHandlerTest,AppEventTest test
 
 ---
 
-## Item 3 — Delete `CandidateFinder` cache no-ops and their call sites (L1.9)
+## Item 3 — Delete `CandidateFinder` cache no-ops and their call sites (L1.9) ✅ IMPLEMENTED
 
 **Goal:** Remove `invalidateCacheFor(UUID)` and `clearCache()` — both have empty bodies labeled "No-op: candidate browsing is deliberately freshness-first" — plus the 4 call sites in `MatchingService` and `TrustSafetyService` that invoke them.
 
@@ -129,7 +129,7 @@ mvn -Dtest=CandidateFinderTest,MatchingServiceTest,TrustSafetyServiceTest test
 
 ---
 
-## Item 4 — Delete `MatchingUseCases` deprecated no-op services (L1.10)
+## Item 4 — Delete `MatchingUseCases` deprecated no-op services (L1.10) ✅ IMPLEMENTED
 
 **Goal:** Remove `NO_OP_DAILY_LIMIT_SERVICE` and `NO_OP_DAILY_PICK_SERVICE` inner static classes, both `@Deprecated` with zero call sites.
 
@@ -153,7 +153,10 @@ mvn -Dtest=MatchingUseCasesTest test
 
 ---
 
-## Item 5 — Remove unused `EnumSetUtil` overloads (L1.5)
+## Item 5 — Remove unused `EnumSetUtil` overloads (L1.5) ✅ IMPLEMENTED
+
+
+
 
 **Goal:** Delete the two `EnumSetUtil` overloads that have effectively no real callers, leaving only `safeCopy(Collection<E>, Class<E>)`.
 
@@ -185,7 +188,10 @@ mvn test-compile
 
 ---
 
-## Item 6 — Merge `ModerationAuditLogger` into `ModerationAuditEvent.log(...)` (L1.4)
+## Item 6 — Merge `ModerationAuditLogger` into `ModerationAuditEvent.log(...)` (L1.4) ✅ IMPLEMENTED
+
+
+
 
 **Goal:** Eliminate a single-method logger class by promoting the operation to a static method on the event itself, then deleting the now-empty wrapper.
 
@@ -220,7 +226,10 @@ mvn -Dtest=TrustSafetyServiceTest,ModerationAuditEventTest test
 
 ---
 
-## Item 7 — Extract `INVALID_EMAIL_FORMAT` constant in `TextNormalization` (L1.6)
+## Item 7 — Extract `INVALID_EMAIL_FORMAT` constant in `TextNormalization` (L1.6) ✅ IMPLEMENTED
+
+
+
 
 **Goal:** Replace 5 hardcoded `"Invalid email format"` string literals with a `private static final String` constant.
 
@@ -250,7 +259,10 @@ mvn -Dtest=TextNormalizationTest test
 
 ---
 
-## Item 8 — Rename `SwipeState.Session.MatchState` → `SessionState` (L1.2)
+## Item 8 — Rename `SwipeState.Session.MatchState` -> `SessionState` (L1.2) ✅ IMPLEMENTED
+
+
+
 
 **Goal:** Eliminate the type-name collision with `Match.MatchState`. The two enums live in different packages but share the simple name, which complicates IDE navigation and code review.
 
@@ -349,7 +361,7 @@ If implementation work diverged from this draft (e.g., an item was deferred or e
 
 ## Definition of done
 
-- [ ] All 8 items merged.
-- [ ] `mvn spotless:apply verify` passes.
+- [x] All 8 items merged.
+- [x] `mvn spotless:apply verify` passes.
 - [ ] [CODEBASE_REFINEMENT_PLAN.md](./CODEBASE_REFINEMENT_PLAN.md) Level 1 items are crossed off (or this plan moved from `unimplemented/` to `implemented/`).
-- [ ] No new TODO comments left behind.
+- [x] No new TODO comments left behind.

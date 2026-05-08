@@ -2,6 +2,7 @@ package datingapp.app.usecase.profile;
 
 import datingapp.app.event.AppEvent;
 import datingapp.app.event.AppEventBus;
+import datingapp.app.event.EventPublishing;
 import datingapp.app.usecase.common.UseCaseError;
 import datingapp.app.usecase.common.UseCaseResult;
 import datingapp.app.usecase.common.UserContext;
@@ -164,13 +165,17 @@ public final class ProfileMutationUseCases {
             }
         }
 
-        publishEvent(
+        EventPublishing.publishOrWarn(
+                eventBus,
                 new AppEvent.ProfileSaved(user.getId(), activated, AppClock.now()),
-                "Post-save event publication failed for user " + user.getId());
+                "Post-save event publication failed for user " + user.getId(),
+                logger);
         if (activated) {
-            publishEvent(
+            EventPublishing.publishOrWarn(
+                    eventBus,
                     new AppEvent.ProfileCompleted(user.getId(), AppClock.now()),
-                    "Post-profile-completed event failed for user " + user.getId());
+                    "Post-profile-completed event failed for user " + user.getId(),
+                    logger);
         }
 
         return UseCaseResult.success(new ProfileSaveResult(user, activated, newAchievements));
@@ -280,9 +285,11 @@ public final class ProfileMutationUseCases {
             if (logger.isInfoEnabled()) {
                 logger.info("Account soft-deleted for user {} (reasonCode={})", user.getId(), command.reason());
             }
-            publishEvent(
+            EventPublishing.publishOrWarn(
+                    eventBus,
                     new AppEvent.AccountDeleted(user.getId(), command.reason(), deletedAt),
-                    "Post-account-delete event publication failed for user " + user.getId());
+                    "Post-account-delete event publication failed for user " + user.getId(),
+                    logger);
             return UseCaseResult.success(null);
         } catch (Exception e) {
             return UseCaseResult.failure(UseCaseError.internal("Failed to delete account: " + e.getMessage()));
@@ -294,16 +301,6 @@ public final class ProfileMutationUseCases {
             return achievementService.checkAndUnlock(userId);
         }
         return List.of();
-    }
-
-    private void publishEvent(AppEvent event, String failureMessage) {
-        try {
-            eventBus.publish(event);
-        } catch (Exception e) {
-            if (logger.isWarnEnabled()) {
-                logger.warn("{}: {}", failureMessage, e.getMessage(), e);
-            }
-        }
     }
 
     private void applyProfileTextAndIdentityFields(User user, UpdateProfileCommand command) {

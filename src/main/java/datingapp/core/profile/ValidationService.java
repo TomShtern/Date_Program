@@ -4,7 +4,6 @@ import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
 import datingapp.core.model.TextNormalization;
 import datingapp.core.profile.MatchPreferences.Interest;
-import java.net.IDN;
 import java.text.Normalizer;
 import java.time.LocalDate;
 import java.time.Period;
@@ -13,7 +12,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
-import java.util.regex.Pattern;
 
 public class ValidationService {
 
@@ -28,16 +26,7 @@ public class ValidationService {
     private static final String DISTANCE_TOO_FAR = "Distance too far (max %dkm)";
     private static final String BIO_EMPTY = "Bio cannot be blank";
     private static final String BIO_TOO_LONG = "Bio too long (max %d chars)";
-    private static final String INVALID_EMAIL = "Invalid email format";
-    private static final String INVALID_PHONE = "Invalid phone format";
     private static final String INVALID_ZIP = "Israeli ZIP code must be 7 digits (e.g., 6701101)";
-    private static final int MAX_EMAIL_LENGTH = 254;
-    private static final int MIN_PHONE_DIGITS = 7;
-    private static final int MAX_PHONE_DIGITS = 15;
-    private static final Pattern EMAIL_LOCAL_PATTERN = Pattern.compile("^[^\\s@]+$");
-    private static final Pattern DOMAIN_LABEL_PATTERN =
-            Pattern.compile("^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?$");
-    private static final Pattern PHONE_ALLOWED_PATTERN = Pattern.compile("^[+0-9()\\-\\s]+$");
 
     /** Shared configuration for validation thresholds. */
     private final AppConfig config;
@@ -96,11 +85,11 @@ public class ValidationService {
     }
 
     public ValidationResult validateEmail(String email) {
-        return validateNormalized(() -> normalizeEmail(email));
+        return validateNormalized(() -> TextNormalization.normalizeEmail(email));
     }
 
     public ValidationResult validatePhone(String phone) {
-        return validateNormalized(() -> normalizePhone(phone));
+        return validateNormalized(() -> TextNormalization.normalizePhone(phone));
     }
 
     public ValidationResult validatePhotoUrl(String photoUrl) {
@@ -295,75 +284,15 @@ public class ValidationService {
     }
 
     public static String normalizeEmail(String email) {
-        if (email == null || email.isBlank()) {
-            return null;
-        }
-        String normalized = Normalizer.normalize(email.trim(), Normalizer.Form.NFKC);
-        if (normalized.length() > MAX_EMAIL_LENGTH) {
-            throw new IllegalArgumentException(INVALID_EMAIL);
-        }
-        int atIndex = normalized.lastIndexOf('@');
-        if (atIndex <= 0 || atIndex == normalized.length() - 1 || normalized.indexOf('@') != atIndex) {
-            throw new IllegalArgumentException(INVALID_EMAIL);
-        }
-
-        String localPart = normalized.substring(0, atIndex);
-        String domainPart = normalized.substring(atIndex + 1);
-        if (!EMAIL_LOCAL_PATTERN.matcher(localPart).matches()
-                || containsControlCharacters(localPart)
-                || domainPart.isBlank()) {
-            throw new IllegalArgumentException(INVALID_EMAIL);
-        }
-
-        String asciiDomain;
-        try {
-            asciiDomain = IDN.toASCII(domainPart);
-        } catch (IllegalArgumentException _) {
-            throw new IllegalArgumentException(INVALID_EMAIL);
-        }
-        if (!isValidAsciiDomain(asciiDomain)) {
-            throw new IllegalArgumentException(INVALID_EMAIL);
-        }
-
-        return localPart + "@" + asciiDomain.toLowerCase(Locale.ROOT);
+        return TextNormalization.normalizeEmail(email);
     }
 
     public static String normalizePhone(String phone) {
-        if (phone == null || phone.isBlank()) {
-            return null;
-        }
-        String normalized = phone.trim();
-        if (!PHONE_ALLOWED_PATTERN.matcher(normalized).matches()) {
-            throw new IllegalArgumentException(INVALID_PHONE);
-        }
-        long plusCount = normalized.chars().filter(ch -> ch == '+').count();
-        if (plusCount > 1 || (plusCount == 1 && !normalized.startsWith("+"))) {
-            throw new IllegalArgumentException(INVALID_PHONE);
-        }
-        String digitsOnly = normalized.replaceAll("\\D", "");
-        if (digitsOnly.length() < MIN_PHONE_DIGITS || digitsOnly.length() > MAX_PHONE_DIGITS) {
-            throw new IllegalArgumentException(INVALID_PHONE);
-        }
-        return normalized.startsWith("+") ? "+" + digitsOnly : digitsOnly;
+        return TextNormalization.normalizePhone(phone);
     }
 
     public static String normalizePhotoUrl(String photoUrl) {
         return TextNormalization.normalizePhotoUrl(photoUrl);
-    }
-
-    private static boolean containsControlCharacters(String value) {
-        return value.chars().anyMatch(ch -> Character.isISOControl(ch) || Character.isWhitespace(ch));
-    }
-
-    private ValidationResult validateAgeBounds(int age) {
-        if (age < config.validation().minAge()) {
-            return ValidationResult.failure(
-                    AGE_TOO_YOUNG.formatted(config.validation().minAge()));
-        }
-        if (age > config.validation().maxAge()) {
-            return ValidationResult.failure(AGE_INVALID);
-        }
-        return ValidationResult.success();
     }
 
     private static ValidationResult validateNormalized(Runnable normalization) {
@@ -375,21 +304,14 @@ public class ValidationService {
         }
     }
 
-    private static boolean isValidAsciiDomain(String domain) {
-        if (domain == null || domain.isBlank() || domain.length() > 253) {
-            return false;
+    private ValidationResult validateAgeBounds(int age) {
+        if (age < config.validation().minAge()) {
+            return ValidationResult.failure(
+                    AGE_TOO_YOUNG.formatted(config.validation().minAge()));
         }
-        String[] labels = domain.split("\\.");
-        if (labels.length < 2) {
-            return false;
+        if (age > config.validation().maxAge()) {
+            return ValidationResult.failure(AGE_INVALID);
         }
-        for (String label : labels) {
-            if (label.isBlank()
-                    || label.length() > 63
-                    || !DOMAIN_LABEL_PATTERN.matcher(label).matches()) {
-                return false;
-            }
-        }
-        return true;
+        return ValidationResult.success();
     }
 }

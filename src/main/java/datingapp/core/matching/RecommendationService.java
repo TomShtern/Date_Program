@@ -157,8 +157,8 @@ public final class RecommendationService {
     }
 
     /** Current daily status including counts and time to reset. */
-    public DailyStatus getStatus(UUID userId) {
-        return toDailyStatus(dailyLimitService.getStatus(userId));
+    public DailyLimitService.DailyStatus getStatus(UUID userId) {
+        return dailyLimitService.getStatus(userId);
     }
 
     /** Time remaining until next daily reset (midnight local time). */
@@ -183,8 +183,8 @@ public final class RecommendationService {
     }
 
     /** Get the daily pick for a user if available. */
-    public Optional<DailyPick> getDailyPick(User seeker) {
-        return dailyPickService.getDailyPick(seeker).map(RecommendationService::toDailyPick);
+    public Optional<DailyPickService.DailyPick> getDailyPick(User seeker) {
+        return dailyPickService.getDailyPick(seeker);
     }
 
     /** Check whether user has viewed today's daily pick. */
@@ -203,8 +203,8 @@ public final class RecommendationService {
     }
 
     /** Get today's standouts for a user. */
-    public Result getStandouts(User seeker) {
-        return toResult(standoutService.getStandouts(seeker));
+    public StandoutService.Result getStandouts(User seeker) {
+        return standoutService.getStandouts(seeker);
     }
 
     /** Mark a standout as interacted after like/pass. */
@@ -220,89 +220,5 @@ public final class RecommendationService {
     /** Rank eligible browse candidates for the normal browsing flow. */
     public List<User> rankBrowseCandidates(User seeker, List<User> candidates) {
         return browseRankingService.rankCandidates(seeker, candidates);
-    }
-
-    // Keep legacy records for backward compatibility if needed,
-    // but preferred to use the ones from the new services.
-    public static record DailyPick(User user, LocalDate date, String reason, boolean alreadySeen) {
-        public DailyPick {
-            Objects.requireNonNull(user, "user cannot be null");
-            Objects.requireNonNull(date, "date cannot be null");
-            Objects.requireNonNull(reason, "reason cannot be null");
-        }
-    }
-
-    public static record DailyStatus(
-            int likesUsed,
-            int likesRemaining,
-            int superLikesUsed,
-            int superLikesRemaining,
-            int passesUsed,
-            int passesRemaining,
-            LocalDate date,
-            java.time.Instant resetsAt) {
-        public DailyStatus {
-            if (likesUsed < 0) {
-                throw new IllegalArgumentException("likesUsed cannot be negative");
-            }
-            if (superLikesUsed < 0) {
-                throw new IllegalArgumentException("superLikesUsed cannot be negative");
-            }
-            if (passesUsed < 0) {
-                throw new IllegalArgumentException("passesUsed cannot be negative");
-            }
-            Objects.requireNonNull(date, "date cannot be null");
-            Objects.requireNonNull(resetsAt, "resetsAt cannot be null");
-        }
-
-        public boolean hasUnlimitedLikes() {
-            return likesRemaining < 0;
-        }
-
-        public boolean hasUnlimitedPasses() {
-            return passesRemaining < 0;
-        }
-
-        public boolean hasUnlimitedSuperLikes() {
-            return superLikesRemaining < 0;
-        }
-    }
-
-    public static record Result(List<Standout> standouts, int totalCandidates, boolean fromCache, String message) {
-        public boolean isEmpty() {
-            return standouts == null || standouts.isEmpty();
-        }
-
-        public int count() {
-            return standouts != null ? standouts.size() : 0;
-        }
-
-        public static Result empty(String message) {
-            return new Result(List.of(), 0, false, message);
-        }
-
-        public static Result of(List<Standout> standouts, int total, boolean cached) {
-            return new Result(standouts, total, cached, null);
-        }
-    }
-
-    private static DailyStatus toDailyStatus(DailyLimitService.DailyStatus status) {
-        return new DailyStatus(
-                status.likesUsed(),
-                status.likesRemaining(),
-                status.superLikesUsed(),
-                status.superLikesRemaining(),
-                status.passesUsed(),
-                status.passesRemaining(),
-                status.date(),
-                status.resetsAt());
-    }
-
-    private static DailyPick toDailyPick(DailyPickService.DailyPick pick) {
-        return new DailyPick(pick.user(), pick.date(), pick.reason(), pick.alreadySeen());
-    }
-
-    private static Result toResult(StandoutService.Result result) {
-        return new Result(result.standouts(), result.totalCandidates(), result.fromCache(), result.message());
     }
 }

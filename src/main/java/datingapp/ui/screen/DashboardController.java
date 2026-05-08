@@ -538,8 +538,7 @@ public class DashboardController extends BaseController
             rootStack.getChildren().add(popupRoot);
             popup.showAchievement(achievement);
         } catch (IOException e) {
-            logger.error( // NOPMD GuardLogStatement
-                    "Failed to load achievement popup for {}", achievement.getDisplayName(), e);
+            logError("Failed to load achievement popup for {}", achievement.getDisplayName(), e);
             UiFeedbackService.showWarning("We couldn\'t show an achievement popup, but your progress was saved.");
         }
     }

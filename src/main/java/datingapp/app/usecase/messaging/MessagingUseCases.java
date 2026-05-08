@@ -2,6 +2,7 @@ package datingapp.app.usecase.messaging;
 
 import datingapp.app.event.AppEvent;
 import datingapp.app.event.AppEventBus;
+import datingapp.app.event.EventPublishing;
 import datingapp.app.usecase.common.UseCaseError;
 import datingapp.app.usecase.common.UseCaseResult;
 import datingapp.app.usecase.common.UserContext;
@@ -157,13 +158,15 @@ public class MessagingUseCases {
      * Persistence is the success boundary; event publication must not retroactively fail the send.
      */
     private void publishMessageSentEvent(SendMessageCommand command, ConnectionService.SendResult result) {
-        publishEvent(
+        EventPublishing.publishOrWarn(
+                eventBus,
                 new AppEvent.MessageSent(
                         command.context().userId(),
                         command.recipientId(),
                         result.message().id(),
                         AppClock.now()),
-                "Event publish failed for message " + result.message().id());
+                "Event publish failed for message " + result.message().id(),
+                logger);
     }
 
     public UseCaseResult<Void> markConversationRead(MarkConversationReadCommand command) {
@@ -228,10 +231,12 @@ public class MessagingUseCases {
         try {
             connectionService.archiveConversation(
                     command.conversationId(), command.context().userId(), command.reason());
-            publishEvent(
+            EventPublishing.publishOrWarn(
+                    eventBus,
                     new AppEvent.ConversationArchived(
                             command.conversationId(), command.context().userId(), AppClock.now()),
-                    "Event publish failed for archived conversation " + command.conversationId());
+                    "Event publish failed for archived conversation " + command.conversationId(),
+                    logger);
             return UseCaseResult.success(null);
         } catch (IllegalArgumentException e) {
             return validationFailure(e.getMessage());
@@ -298,14 +303,4 @@ public class MessagingUseCases {
             UserContext context, String conversationId, MatchArchiveReason reason) {}
 
     public static record DeleteMessageCommand(UserContext context, String conversationId, UUID messageId) {}
-
-    private void publishEvent(AppEvent event, String failureMessage) {
-        try {
-            eventBus.publish(event);
-        } catch (Exception e) {
-            if (logger.isWarnEnabled()) {
-                logger.warn("{}: {}", failureMessage, e.getMessage(), e);
-            }
-        }
-    }
 }

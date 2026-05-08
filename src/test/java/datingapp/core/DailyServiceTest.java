@@ -4,7 +4,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import datingapp.core.connection.ConnectionModels.Like;
 import datingapp.core.matching.*;
-import datingapp.core.matching.RecommendationService.DailyPick;
+import datingapp.core.matching.DailyPickService.DailyPick;
 import datingapp.core.model.User;
 import datingapp.core.model.User.Gender;
 import datingapp.core.profile.ProfileService;
@@ -114,7 +114,7 @@ class DailyServiceTest {
             interactionStorage.save(new Like(
                     UUID.randomUUID(), userId, UUID.randomUUID(), Like.Direction.LIKE, todayStart.plusSeconds(2)));
 
-            RecommendationService.DailyStatus status = service.getStatus(userId);
+            DailyLimitService.DailyStatus status = service.getStatus(userId);
             assertEquals(2, status.likesUsed());
             assertEquals(3, status.likesRemaining());
         }
@@ -128,7 +128,7 @@ class DailyServiceTest {
                     .build();
             RecommendationService unlimitedService = createService(unlimitedConfig, fixedClock);
 
-            RecommendationService.DailyStatus status = unlimitedService.getStatus(UUID.randomUUID());
+            DailyLimitService.DailyStatus status = unlimitedService.getStatus(UUID.randomUUID());
             assertEquals(-1, status.likesRemaining());
             assertTrue(status.hasUnlimitedLikes());
         }
@@ -223,7 +223,7 @@ class DailyServiceTest {
         @Test
         @DisplayName("DailyStatus edge cases")
         void dailyStatus_edgeCases() {
-            RecommendationService.DailyStatus status = new RecommendationService.DailyStatus(
+            DailyLimitService.DailyStatus status = new DailyLimitService.DailyStatus(
                     0, 5, 0, 10, 0, 10, AppClock.today(ZoneId.of("UTC")), AppClock.now());
             assertFalse(status.hasUnlimitedLikes());
             assertFalse(status.hasUnlimitedSuperLikes());
@@ -231,7 +231,7 @@ class DailyServiceTest {
 
             assertThrows(
                     IllegalArgumentException.class,
-                    () -> new RecommendationService.DailyStatus(
+                    () -> new DailyLimitService.DailyStatus(
                             -1, 5, 0, 10, 0, 10, AppClock.today(ZoneId.of("UTC")), AppClock.now()));
         }
     }

@@ -53,8 +53,6 @@ import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.util.Duration;
 import org.kordamp.ikonli.javafx.FontIcon;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Controller for the Matches screen (matches.fxml).
@@ -67,7 +65,7 @@ public class MatchesController extends BaseController implements Initializable {
     private static final String ICON_HEART = "mdi2h-heart";
     private static final String COLOR_PINK = "#f43f5e";
     private static final String COLOR_SLATE = "#e2e8f0";
-    private static final Logger logger = LoggerFactory.getLogger(MatchesController.class);
+
     private static final Random RANDOM = new Random();
 
     private enum Section {
@@ -747,7 +745,7 @@ public class MatchesController extends BaseController implements Initializable {
 
     @FXML
     private void handleBrowse() {
-        logInfo("Navigating to browse/matching screen");
+        logger.info("Navigating to browse/matching screen");
         navigationService().navigateTo(NavigationService.ViewType.MATCHING);
     }
 
@@ -790,7 +788,7 @@ public class MatchesController extends BaseController implements Initializable {
                         String.valueOf(viewModel.likesSentCountProperty().get()));
             }
             default -> {
-                logWarn("Unknown section {}, defaulting to matches header", currentSection);
+                logger.warn("Unknown section {}, defaulting to matches header", currentSection);
                 headerTitleLabel.setText("Your Matches");
                 headerIcon.setIconLiteral("mdi2h-heart-multiple");
                 headerIcon.setIconColor(Color.web(COLOR_PINK));
@@ -830,7 +828,7 @@ public class MatchesController extends BaseController implements Initializable {
                 emptyActionButton.setText(START_BROWSING_LABEL);
             }
             default -> {
-                logWarn("Unknown section {}, defaulting to matches empty state", currentSection);
+                logger.warn("Unknown section {}, defaulting to matches empty state", currentSection);
                 emptyStateIcon.setIconLiteral("mdi2h-heart-broken");
                 emptyStateIcon.setIconColor(Color.web("#64748b"));
                 emptyTitleLabel.setText("No matches yet");
@@ -839,18 +837,6 @@ public class MatchesController extends BaseController implements Initializable {
                 emptyHintLabel.setText("Like someone and if they like you back, it's a match!");
                 emptyActionButton.setText(START_BROWSING_LABEL);
             }
-        }
-    }
-
-    private void logInfo(String message, Object... args) {
-        if (logger.isInfoEnabled()) {
-            logger.info(message, args);
-        }
-    }
-
-    private void logWarn(String message, Object... args) {
-        if (logger.isWarnEnabled()) {
-            logger.warn(message, args);
         }
     }
 

@@ -47,8 +47,6 @@ import javafx.scene.paint.Color;
 import javafx.stage.FileChooser;
 import javafx.util.StringConverter;
 import org.kordamp.ikonli.javafx.FontIcon;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Controller for the Profile Editor screen (profile.fxml).
@@ -56,7 +54,7 @@ import org.slf4j.LoggerFactory;
  */
 @SuppressWarnings("unused") // FXML-injected members and handlers are referenced from FXML.
 public class ProfileController extends BaseController implements Initializable {
-    private static final Logger logger = LoggerFactory.getLogger(ProfileController.class);
+
     private static final String GENDER_OTHER_LABEL = "Other / Non-binary";
     private static final String DEALBREAKER_HEADER = "Only show people who:";
     private static final String PRIMARY_ACCENT_COLOR = "#667eea";
@@ -1248,7 +1246,7 @@ public class ProfileController extends BaseController implements Initializable {
 
         dialog.showAndWait().ifPresent(newDealbreakers -> {
             viewModel.setDealbreakers(newDealbreakers);
-            logInfo("Dealbreakers updated");
+            logger.info("Dealbreakers updated");
             viewModel.refreshUnsavedChangesFlag();
         });
     }
@@ -1364,24 +1362,6 @@ public class ProfileController extends BaseController implements Initializable {
         });
     }
 
-    private void logInfo(String message, Object... args) {
-        if (logger.isInfoEnabled()) {
-            logger.info(message, args);
-        }
-    }
-
-    private void logWarn(String message, Object... args) {
-        if (logger.isWarnEnabled()) {
-            logger.warn(message, args);
-        }
-    }
-
-    private void logError(String message, Throwable error) {
-        if (logger.isErrorEnabled()) {
-            logger.error(message, error);
-        }
-    }
-
     @FXML
     private void handlePreview() {
         try {
@@ -1391,7 +1371,7 @@ public class ProfileController extends BaseController implements Initializable {
             UiAnimations.fadeIn(dialog.getDialogPane().getContent(), 300);
             dialog.showAndWait();
         } catch (Exception e) {
-            logError("Failed to build profile preview", e);
+            logger.error("Failed to build profile preview", e);
             UiFeedbackService.showError("Unable to build profile preview: " + e.getMessage());
         }
     }
@@ -1404,7 +1384,7 @@ public class ProfileController extends BaseController implements Initializable {
             dialog.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
             dialog.showAndWait();
         } catch (Exception e) {
-            logError("Failed to calculate profile score", e);
+            logger.error("Failed to calculate profile score", e);
             UiFeedbackService.showError("Unable to calculate profile score: " + e.getMessage());
         }
     }

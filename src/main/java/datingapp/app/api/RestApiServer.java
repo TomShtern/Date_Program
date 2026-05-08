@@ -245,7 +245,7 @@ public class RestApiServer {
         this.activationPolicy = services.getActivationPolicy();
         this.identityPolicy = new RestApiIdentityPolicy(this.authUseCases);
         this.host = normalizeHost(host);
-        this.restrictToLoopbackClients = isLoopbackHost(this.host);
+        this.restrictToLoopbackClients = RestApiRequestGuards.isLoopbackAddress(this.host);
         this.lanSharedSecret = normalizeSharedSecret(lanSharedSecret);
         this.allowedCorsOrigins = normalizeAllowedCorsOrigins(allowedCorsOrigins);
         this.requestGuards = new RestApiRequestGuards(
@@ -834,20 +834,13 @@ public class RestApiServer {
 
     void getMatches(Context ctx) {
         UUID userId = parseUuid(ctx.pathParam("id"));
-        int limit = ctx.queryParamAsClass(PARAM_LIMIT, Integer.class).getOrDefault(DEFAULT_MATCHES_LIMIT);
-        int offset = ctx.queryParamAsClass(PARAM_OFFSET, Integer.class).getOrDefault(0);
-        if (limit <= 0) {
-            throw new IllegalArgumentException("limit must be greater than 0");
-        }
-        if (offset < 0) {
-            throw new IllegalArgumentException("offset must be non-negative");
-        }
+        var p = parsePagination(ctx, DEFAULT_MATCHES_LIMIT);
         if (loadExistingUser(ctx, userId).isEmpty()) {
             return;
         }
 
-        var result =
-                matchingUseCases.listPagedMatches(new ListPagedMatchesQuery(UserContext.api(userId), limit, offset));
+        var result = matchingUseCases.listPagedMatches(
+                new ListPagedMatchesQuery(UserContext.api(userId), p.limit(), p.offset()));
         if (!result.success()) {
             handleUseCaseFailure(ctx, result.error());
             return;
@@ -858,7 +851,7 @@ public class RestApiServer {
         List<MatchSummary> items = page.items().stream()
                 .map(match -> toMatchSummary(match, userId, usersById))
                 .toList();
-        ctx.json(new PagedMatchResponse(items, page.totalCount(), offset, limit, page.hasMore()));
+        ctx.json(new PagedMatchResponse(items, page.totalCount(), p.offset(), p.limit(), page.hasMore()));
     }
 
     void getFriendRequests(Context ctx) {
@@ -1275,19 +1268,12 @@ public class RestApiServer {
 
     void getConversations(Context ctx) {
         UUID userId = parseUuid(ctx.pathParam("id"));
-        int limit = ctx.queryParamAsClass(PARAM_LIMIT, Integer.class).getOrDefault(DEFAULT_MESSAGE_LIMIT);
-        int offset = ctx.queryParamAsClass(PARAM_OFFSET, Integer.class).getOrDefault(0);
-        if (limit <= 0) {
-            throw new IllegalArgumentException("limit must be greater than 0");
-        }
-        if (offset < 0) {
-            throw new IllegalArgumentException("offset must be non-negative");
-        }
+        var p = parsePagination(ctx, DEFAULT_MESSAGE_LIMIT);
         if (loadExistingUser(ctx, userId).isEmpty()) {
             return;
         }
-        var listResult =
-                messagingUseCases.listConversations(new ListConversationsQuery(UserContext.api(userId), limit, offset));
+        var listResult = messagingUseCases.listConversations(
+                new ListConversationsQuery(UserContext.api(userId), p.limit(), p.offset()));
         if (!listResult.success()) {
             handleUseCaseFailure(ctx, listResult.error());
             return;
@@ -1351,14 +1337,7 @@ public class RestApiServer {
 
     void getMessages(Context ctx) {
         String conversationId = ctx.pathParam(PATH_CONVERSATION_ID);
-        int limit = ctx.queryParamAsClass(PARAM_LIMIT, Integer.class).getOrDefault(DEFAULT_MESSAGE_LIMIT);
-        int offset = ctx.queryParamAsClass(PARAM_OFFSET, Integer.class).getOrDefault(0);
-        if (limit <= 0) {
-            throw new IllegalArgumentException("limit must be greater than 0");
-        }
-        if (offset < 0) {
-            throw new IllegalArgumentException("offset must be non-negative");
-        }
+        var p = parsePagination(ctx, DEFAULT_MESSAGE_LIMIT);
 
         RestApiIdentityPolicy.ConversationParticipants participants = parseConversationParticipants(conversationId);
         UUID requestUserId = requireActingUserId(ctx);
@@ -1366,7 +1345,7 @@ public class RestApiServer {
         UUID otherUserId = participants.otherParticipant(requestUserId);
 
         var result = messagingUseCases.loadConversation(
-                new LoadConversationQuery(UserContext.api(requestUserId), otherUserId, limit, offset, true));
+                new LoadConversationQuery(UserContext.api(requestUserId), otherUserId, p.limit(), p.offset(), true));
         if (!result.success()) {
             handleUseCaseFailure(ctx, result.error());
             return;
@@ -1631,6 +1610,20 @@ public class RestApiServer {
         return rawSharedSecret == null || rawSharedSecret.isBlank() ? null : rawSharedSecret.trim();
     }
 
+    private static PageParams parsePagination(Context ctx, int defaultLimit) {
+        int limit = ctx.queryParamAsClass(PARAM_LIMIT, Integer.class).getOrDefault(defaultLimit);
+        int offset = ctx.queryParamAsClass(PARAM_OFFSET, Integer.class).getOrDefault(0);
+        if (limit <= 0) {
+            throw new IllegalArgumentException("limit must be greater than 0");
+        }
+        if (offset < 0) {
+            throw new IllegalArgumentException("offset must be non-negative");
+        }
+        return new PageParams(limit, offset);
+    }
+
+    private record PageParams(int limit, int offset) {}
+
     private static Set<String> normalizeAllowedCorsOrigins(Set<String> allowedCorsOrigins) {
         LinkedHashSet<String> normalizedOrigins = new LinkedHashSet<>();
         if (allowedCorsOrigins != null) {
@@ -1654,14 +1647,6 @@ public class RestApiServer {
             }
         }
         return origins;
-    }
-
-    private static boolean isLoopbackHost(String configuredHost) {
-        try {
-            return InetAddress.getByName(configuredHost).isLoopbackAddress();
-        } catch (Exception _) {
-            return false;
-        }
     }
 
     private void ensureActiveCandidateBrowser(User user) {
