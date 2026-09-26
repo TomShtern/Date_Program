@@ -1,10 +1,10 @@
 # AGENTS.md
 
-> **Updated:** 2026-05-08
+> **Updated:** 2026-05-22
 > **Role in the instruction stack:** lowest-level workflow guide for agents working in this repo.
 > **Hierarchy:** `.github/copilot-instructions.md` → `CLAUDE.md` → `AGENTS.md`.
 
-This file is intentionally not a second copy of the architecture snapshot in `CLAUDE.md`.
+This file is intentionally not a second copy of the repo map in `CLAUDE.md` and `.claude/rules/`.
 Use it for execution discipline, tool choice, validation order, and doc-maintenance rules.
 
 ## Source of truth
@@ -34,7 +34,9 @@ If any markdown guidance and the code disagree, trust:
 - Prefer symbol-aware rename/usages tools when changing names across files.
 - On Windows PowerShell, use `mvn --% ...` when Maven arguments contain commas or special characters that PowerShell might parse.
 - For local PostgreSQL setup/debugging, run `.\check_postgresql_runtime_env.ps1` before deeper app-level diagnosis; it validates CLI availability, effective env/`.env` settings, reachability, and login.
+- Treat `.\start_local_postgres.ps1` as more than a bare startup helper: it is the repo-owned local bootstrap path for PostgreSQL observability (`pg_stat_statements`, `compute_query_id`) and the local `datingapp` role defaults in the target database.
 - For PostgreSQL runtime work, prefer an already-running local PostgreSQL instance first; use Docker only as a disposable fallback when no local server is available.
+- For phone-alpha backend LAN testing, prefer `.\start_phone_alpha_backend.ps1` over manual classpath/JVM startup; it auto-compiles stale classes, builds the runtime classpath, verifies `/api/health` on localhost and LAN, and prints the Flutter `dart-define` values.
 
 ## Editing discipline
 
@@ -123,6 +125,8 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File .\src\test\powershell\ResetLocalPo
 - Treat `.\run_verify.ps1` as the canonical repo-level full local verification path; it runs the Maven quality gate and PostgreSQL smoke together.
 - For the phone-alpha backend REST API, prefer `.\start_phone_alpha_backend.ps1` as the one-command LAN startup path; it runs PostgreSQL preflight, starts local PostgreSQL if needed, verifies `/api/health`, and prints the Flutter `dart-define` values.
 - For PostgreSQL runtime changes, prefer the repo-local helpers `start_local_postgres.ps1`, `reset_local_postgres.ps1`, `run_postgresql_smoke.ps1`, and `stop_local_postgres.ps1` over ad-hoc Docker-first validation.
+- For local PostgreSQL resets where you may need to inspect or reuse the prior state, `.\reset_local_postgres.ps1` preserves the newest `reset_backup_*` schema by default; use `-RetainedAutoBackupSchemas <n>` when you intentionally want to keep more than one auto backup.
+- If you need a current PostgreSQL schema snapshot for review or backup before runtime work, run `.\export_local_postgresql_schema.ps1`; it exports the `public` schema via `pg_dump` against the resolved local PostgreSQL target.
 - Use shared test helpers when available:
   - `JavaFxTestSupport`
   - `UiAsyncTestSupport`
