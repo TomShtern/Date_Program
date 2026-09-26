@@ -69,4 +69,11 @@ finally {
     }
 }
 
-exit $overallExitCode
+# `exit` terminates the caller's PowerShell session. Only exit when invoked as
+# a child process (pwsh -File, CI, VS Code tasks), where the process exit code
+# is the only way to report failure. Interactive and in-process callers read
+# the propagated $LASTEXITCODE instead.
+if ([string]::IsNullOrEmpty($MyInvocation.Line)) {
+    exit $overallExitCode
+}
+$global:LASTEXITCODE = $overallExitCode

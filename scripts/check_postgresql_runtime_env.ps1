@@ -10,6 +10,12 @@ param(
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
+# `exit` terminates the caller's PowerShell session. Only exit when invoked as
+# a child process (pwsh -File, CI, VS Code tasks), where the process exit code
+# is the only way to report failure. Interactive and in-process callers read
+# the propagated $LASTEXITCODE instead.
+$script:PropagateViaExit = [string]::IsNullOrEmpty($MyInvocation.Line)
+
 function Exit-OrThrow {
     param(
         [int]$ExitCode,
@@ -21,7 +27,9 @@ function Exit-OrThrow {
     if ($ThrowOnFailure) {
         throw $Message
     }
-    exit $ExitCode
+    if ($script:PropagateViaExit) {
+        exit $ExitCode
+    }
 }
 
 function Parse-DotEnv {
