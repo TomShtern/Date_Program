@@ -12,17 +12,26 @@
 
 # Dating App
 
+Start with the [documentation index](docs/README.md) for current operations links and a guide to the historical material.
+
 A Java 25 dating application with shared domain logic and three adapters:
 
 - CLI (`Main.java` + `app/cli/*`)
 - JavaFX desktop UI (`ui/*`)
 - REST API (`app/api/RestApiServer.java`)
 
-## Verified snapshot (source-only)
+The Java REST backend is the primary project focus; CLI and JavaFX are supporting adapters. The Flutter Android client is a separate project and is not included in this repository.
+<!-- ChangeStamp: 10|2026-09-26 20:05:02|agent:github_copilot|scope:repo-docs-organization|Clarified backend-first project framing and separate Flutter client|README.md -->
 
+## Historical snapshot (not current verification)
+
+The figures below are retained from an earlier repository check. Their date and applicability to the current tree have not been revalidated in this documentation update; no Maven build or test suite was run for this documentation-only change.
+
+<!--ARCHIVE:11:agent:github_copilot:scope:repo-docs-organization-->
 - Java files: **140 main + 107 test = 247 total**
 - Java LOC (`tokei`): **66,698 total / 52,170 code / 9,728 blank / 4,800 comments**
 - Latest full gate run in this repo state: **BUILD SUCCESS**, tests **1026 run / 0 failed / 0 errors / 2 skipped**
+<!--/ARCHIVE-->
 
 > If this README ever conflicts with source code, trust `src/main/java`, `src/test/java`, and `pom.xml`.
 
@@ -105,11 +114,18 @@ mvn -Ptest-output-verbose test
 mvn spotless:apply verify
 
 # All scripts tag failures with category prefixes ([STARTUP], [MAVEN], [CONNECTIVITY], etc.)
-# See CI_AND_POSTGRESQL_GUIDE.md for the full error-category reference.
+# See docs/operations/ci-and-postgresql.md for the full error-category reference.
 ```
 <!-- ChangeStamp: 9|2026-04-09 22:05:00|agent:github_copilot|scope:postgres-startup-ux|Added PostgreSQL preflight/start commands so the local VS Code connection workflow is harder to miss|README.md -->
 
-## Architecture (code-verified)
+## Project structure
+
+The project separates shared domain logic from application workflows, storage, and adapters. The Java REST backend is the main integration surface; CLI and JavaFX remain supporting adapters. See [the repository map](CLAUDE.md) and [contributor guidance](AGENTS.md) for implementation details.
+
+<!--ARCHIVE:12:agent:github_copilot:scope:repo-docs-organization-->
+### Historical architecture and wiring snapshot
+
+The following package tree and wiring sketch are retained from an earlier README snapshot and have not been revalidated for this documentation update.
 
 ```text
 datingapp/
@@ -171,6 +187,7 @@ NavigationService nav = NavigationService.getInstance();
 nav.setViewModelFactory(vmFactory);
 nav.initialize(primaryStage);
 ```
+<!--/ARCHIVE-->
 
 ## Build constraints (`pom.xml`)
 
@@ -189,12 +206,15 @@ nav.initialize(primaryStage);
 - Use `AppClock.now()` in domain/service code, not `Instant.now()`
 - Use deterministic pair IDs (`generateId(UUID a, UUID b)`) for two-user aggregates
 
-## Related docs
+## Repository guide
 
-- `AGENTS.md` - development standards
-- `CLAUDE.md` - coding and architecture guardrails
-- `.github/copilot-instructions.md` - Copilot repository guidance (most up to date)
-- `architecture.md` - detailed architecture overview
+- [Documentation index](docs/README.md) - current references, operations, and historical material
+- [CI and PostgreSQL guide](docs/operations/ci-and-postgresql.md)
+- [PostgreSQL PowerShell guide](docs/operations/postgresql-powershell.md)
+- [LAN backend startup guide](docs/operations/lan-backend-startup.md)
+- `AGENTS.md`, `CLAUDE.md`, and `.github/copilot-instructions.md` - contributor and agent guidance
+- [Architecture/context snapshot](docs/internal/ai-context/architecture/architecture.md) - dated internal reference; verify against source before relying on it
+<!-- ChangeStamp: 11|2026-09-26 20:05:02|agent:github_copilot|scope:repo-docs-organization|Added repository navigation and replaced a missing architecture link|README.md -->
 
 ## Agent Changelog (append-only)
 ---AGENT-LOG-START---
@@ -210,4 +230,6 @@ example: 1|2026-01-14 16:42:11|agent:claude_code|UI-mig|JavaFX→Swing; examples
 7|2026-04-06 00:45:00|agent:github_copilot|verification-routine|Added .\run_verify.ps1 as the full local verification path and kept mvn spotless:apply verify as the Maven-only gate|README.md
 8|2026-04-06 19:35:00|agent:codex|postgres-runtime-doc-sync|Clarified the runtime storage stack after the PostgreSQL move|README.md
 9|2026-04-09 22:05:00|agent:github_copilot|postgres-startup-ux|Added PostgreSQL preflight/start commands to the main local run instructions|README.md
+10|2026-09-26 20:05:02|agent:github_copilot|repo-docs-organization|Clarified backend-first framing and separate Flutter client|README.md
+11|2026-09-26 20:05:02|agent:github_copilot|repo-docs-organization|Added categorized docs links and replaced missing architecture link|README.md
 ---AGENT-LOG-END---

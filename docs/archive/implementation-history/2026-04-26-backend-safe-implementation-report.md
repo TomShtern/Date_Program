@@ -172,7 +172,7 @@ _Status: Completed_
 - Tagged failure messages with `[STARTUP]`, `[MAVEN]`, and `[MAVEN-SMOKE]` prefixes.
 - Added `Hint:` diagnostic lines for Maven and smoke test failures.
 
-**`CI_AND_POSTGRESQL_GUIDE.md`:**
+**`docs/operations/ci-and-postgresql.md`:**
 - Added new "Error categories in local scripts" section with a reference table mapping all 8 category prefixes to their meaning and typical causes.
 - Added full documentation for `check_postgresql_runtime_env.ps1` including parameters and exit-code table.
 - Updated `start_local_postgres.ps1` docs to list database validation, pg_stat_statements, and role defaults; noted category prefixes.
@@ -182,7 +182,7 @@ _Status: Completed_
 
 **`README.md`:**
 - Added `.\run_postgresql_smoke.ps1` as a focused smoke-test entrypoint in the "Run locally" section.
-- Added a note about error-category prefixes and a cross-reference to `CI_AND_POSTGRESQL_GUIDE.md`.
+- Added a note about error-category prefixes and a cross-reference to `docs/operations/ci-and-postgresql.md`.
 
 ### Verification Results
 

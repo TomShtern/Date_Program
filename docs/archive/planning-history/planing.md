@@ -2,7 +2,7 @@
 
 This file preserves the earlier 7-plan decomposition as historical planning material only.
 
-It has been superseded by the canonical review-plan set in `codebase-review-plan-set/`, especially `P01` through `P13` plus `P04B` and `P09B`.
+It has been superseded by the canonical review-plan set in `docs/archive/planning-history/codebase-review-plan-set/`, especially `P01` through `P13` plus `P04B` and `P09B`.
 
 The archived 7-plan decomposition was:
 
@@ -14,23 +14,16 @@ The archived 7-plan decomposition was:
 - `viewmodel-and-ui-layer-consistency`
 - `cli-layer-consistency`
 
-Follow the final canonical plan IDs in `codebase-review-plan-set/` rather than this archived split.
+Follow the final canonical plan IDs in `docs/archive/planning-history/codebase-review-plan-set/` rather than this archived split.
 
 ## Historical Content
 
 Let me first read the full document to understand its contents before recommending a split strategy.
 
-Read [CODEBASE_REVIEW.md](../../../CODEBASE_REVIEW.md), lines 1 to 100
+The referenced `CODEBASE_REVIEW.md` source was not retained in this repository.
 
-Read [CODEBASE_REVIEW.md](../../../CODEBASE_REVIEW.md), lines 101 to 200
 
-Read [CODEBASE_REVIEW.md](../../../CODEBASE_REVIEW.md), lines 201 to 300
-
-Read [CODEBASE_REVIEW.md](../../../CODEBASE_REVIEW.md), lines 301 to 400
-
-Read [CODEBASE_REVIEW.md](../../../CODEBASE_REVIEW.md), lines 401 to 500
-
-Read [CODEBASE_REVIEW.md](../../../CODEBASE_REVIEW.md), lines 501 to 592
+The remaining source-review excerpts were not retained with this historical note.
 
 Now let me also check what existing implementation plans already exist to avoid overlap:
 
@@ -40,7 +33,7 @@ Searched for files matching `**/*plan*.md`, 20 matches
 
 Now I have the full picture. Let me also quickly check one existing plan to understand the naming/format convention:
 
-Read [docs/plans/implemented/completed-plans/2026-04-06-postgresql-verification-and-rest-contract-consolidation-implementation-plan.md](../../../docs/plans/implemented/completed-plans/2026-04-06-postgresql-verification-and-rest-contract-consolidation-implementation-plan.md), lines 1 to 40
+The original comparison also consulted the then-existing verification/consolidation implementation plan. That older relative path should not be used as a current reference.
 
 Good. I understand both the review document and the plan conventions. Here's my analysis:
 

@@ -109,6 +109,7 @@ $RECYCLE.BIN/
 *.sqlite
 *.db
 data/local-postgresql/
+data/photos/
 
 # Code coverage & analysis reports
 coverage/

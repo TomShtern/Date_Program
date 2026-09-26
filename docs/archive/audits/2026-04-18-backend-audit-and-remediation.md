@@ -81,7 +81,7 @@
 - LAN verification passed on `192.168.1.194:7070`:
   - `GET /api/health` returned `200` without a secret
   - `GET /api/users` returned `403` without `X-DatingApp-Shared-Secret`
-  - `GET /api/users` returned `200` with `X-DatingApp-Shared-Secret: lan-dev-secret`
+  - `GET /api/users` returned `200` with the then-configured LAN shared-secret header
   - `OPTIONS /api/users` from `http://192.168.1.194:3000` returned `200` with `Access-Control-Allow-Origin`
 - Repo-level verification passed:
   - `run_verify.ps1`
@@ -91,5 +91,5 @@
 ## Deliverables From This Pass
 
 - Backend regressions fixed in the owning code paths.
-- Verified LAN startup guide added at `REST_LAN_STARTUP.md`.
+- Verified LAN startup guide added at `docs/operations/lan-backend-startup.md`.
 - Roadmap should now treat green verification and LAN REST readiness as completed, not pending.

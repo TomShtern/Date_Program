@@ -5,7 +5,7 @@
 .DESCRIPTION
     Starts/checks local PostgreSQL, compiles if needed, builds the runtime classpath,
     detects the laptop LAN IP, starts the REST API server on 0.0.0.0:7070, verifies
-    /api/health from localhost and LAN, and prints the Flutter base URL + headers.
+    /api/health from localhost and LAN, and prints the Flutter base URL + header names.
 
     Press Ctrl+C to stop the REST server. PostgreSQL is left running.
     Run .\stop_local_postgres.ps1 to stop PostgreSQL.
@@ -15,7 +15,7 @@
 
 .PARAMETER SharedSecret
     LAN shared secret for non-loopback requests. Overrides DATING_APP_REST_SHARED_SECRET
-    env var if explicitly provided. Default: lan-dev-secret.
+    env var if explicitly provided. A secret must be supplied; no shared secret is built in.
 
 .PARAMETER AllowedOrigins
     CORS allowed origins (comma-separated or multiple values). Falls back to
@@ -42,7 +42,11 @@ $effectiveSharedSecret = if ($PSBoundParameters.ContainsKey('SharedSecret')) {
 } elseif ($env:DATING_APP_REST_SHARED_SECRET) {
     $env:DATING_APP_REST_SHARED_SECRET
 } else {
-    'lan-dev-secret'
+    $null
+}
+
+if ([string]::IsNullOrWhiteSpace($effectiveSharedSecret)) {
+    throw '[CONFIG] Set DATING_APP_REST_SHARED_SECRET in the process environment or pass -SharedSecret. Generate a fresh random value for each LAN session.'
 }
 
 $effectiveAllowedOrigins = if ($AllowedOrigins.Count -gt 0) {
@@ -223,7 +227,6 @@ $javaArgs = @(
     'datingapp.app.api.RestApiServer'
     '--host=0.0.0.0'
     "--port=$Port"
-    "--shared-secret=$effectiveSharedSecret"
 )
 
 if ($effectiveAllowedOrigins) {
@@ -232,9 +235,19 @@ if ($effectiveAllowedOrigins) {
 
 # ── 6. Start REST server ────────────────────────────────────────────────
 Write-Output "[REST] Starting REST API server on 0.0.0.0:$Port ..."
-Write-Output "[REST] Shared secret: $effectiveSharedSecret"
+Write-Output '[REST] LAN shared-secret protection is configured.'
 
-$proc = Start-Process -FilePath 'java' -ArgumentList $javaArgs -PassThru -NoNewWindow
+$previousSharedSecret = $env:DATING_APP_REST_SHARED_SECRET
+try {
+    $env:DATING_APP_REST_SHARED_SECRET = $effectiveSharedSecret
+    $proc = Start-Process -FilePath 'java' -ArgumentList $javaArgs -PassThru -NoNewWindow
+} finally {
+    if ($null -eq $previousSharedSecret) {
+        Remove-Item Env:DATING_APP_REST_SHARED_SECRET -ErrorAction SilentlyContinue
+    } else {
+        $env:DATING_APP_REST_SHARED_SECRET = $previousSharedSecret
+    }
+}
 
 # ── 7. Verify health ────────────────────────────────────────────────────
 $healthLocal = "http://localhost:$Port/api/health"
@@ -271,12 +284,12 @@ if ($lanIp) {
 }
 Write-Output ''
 Write-Output '  Required header for non-health requests:'
-Write-Output "    X-DatingApp-Shared-Secret: $effectiveSharedSecret"
+Write-Output '    X-DatingApp-Shared-Secret: <your locally configured shared secret>'
 Write-Output ''
 if ($lanIp) {
-    Write-Output '  Flutter dart-define example:'
+    Write-Output '  Configure Flutter locally with these values (do not commit the shared secret):'
     Write-Output "    --dart-define=API_BASE_URL=http://$($lanIp):$Port"
-    Write-Output "    --dart-define=API_SHARED_SECRET=$effectiveSharedSecret"
+    Write-Output '    --dart-define=API_SHARED_SECRET=<the same locally configured shared secret>'
     Write-Output ''
 }
 Write-Output '  Press Ctrl+C to stop the REST server.'

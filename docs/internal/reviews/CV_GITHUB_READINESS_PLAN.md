@@ -2,7 +2,7 @@
 
 Review dates: 14-15 September 2026. Local baseline: `d9f3cd9`.
 
-This is a review and implementation proposal. No cleanup, source changes, Git staging, commits, or publication are authorized by this document. The review preserves the existing changes to `AGENTS.md`, `CLAUDE.md`, `.claude/`, and `docs/BACKEND_STORE_RELEASE_AUDIT.md`.
+This is a dated review and implementation proposal. Its paths and findings describe the review baseline, not necessarily the current tree. The repository organization work has since moved the paths listed below; other recommendations remain unverified until separately checked against current source. The review itself is retained as public historical material.
 
 ## Assessment
 
@@ -101,15 +101,15 @@ These are proposed destinations, not a claim that they already exist. Use one na
 
 | Current material | Exact disposition to propose and review |
 |---|---|
-| `CI_AND_POSTGRESQL_GUIDE.md`, `POSTGRESQL_POWERSHELL_GUIDE.md`, `POSTGRESQL_NEXT_STEPS.md`, `REST_LAN_STARTUP.md` | Extract current setup into `docs/getting-started.md` and verification into `docs/testing.md`. Correct stale claims first, then archive the superseded originals. |
-| `FLUTTER_FRONTEND_AGENT_GUIDE.md`, `FLUTTER_PROJECT_HANDOFF.md`, `2026-04-30-phone-alpha-backend-api-requirements.md`, `docs/API-SPECIFICATION.md` | Keep one current backend API contract in `docs/api.md`. Preserve requirements and old handoffs in the archive, labeled as historical. Do not merge planned endpoints into implemented behavior. |
-| Root dated reports, `BACKEND_CODE_AUDIT_2026-05-06.md`, `PHONE_ALPHA_BACKEND_READINESS_REPORT.md`, `frontend-ui-overhaul-contract-response-2026-04-25.md`, `implementation_plan_By_opus_antigravity.md` | Move to a clearly dated history area under `docs/archive/` after checking inbound references. Distinguish reports from active work. |
-| `Audit and Suggestions/`, `current issues/`, `codebase-review-plan-set/`, historical portions of `AI_Context/` | Extract only still-valid actions into one short backlog; archive originals. Do not mechanically promote old findings to current bugs. |
-| `2026-04-05-resume-ready-project-description-options.md` and its namesake under `docs/archive/nonrelevant/` | Compare content and choose one retained historical copy. Neither should be the project's front page. |
-| `ROADMAP.md` | Keep a short active roadmap under `docs/`; archive completed or abandoned plans instead of presenting them as upcoming features. |
-| `postgresql-public-schema-snapshot.sql` | Keep only if it has an explicit purpose and provenance. Put a sanitized reference snapshot under `docs/database/` with its generation command/date, and identify migrations as the runtime authority. Check it contains no user data. |
+| `docs/operations/ci-and-postgresql.md`, `docs/operations/postgresql-powershell.md`, `docs/archive/planning-history/POSTGRESQL_NEXT_STEPS.md`, `docs/operations/lan-backend-startup.md` | Proposed categorization completed; content freshness and source accuracy remain separate review work. |
+| `docs/archive/flutter-history/FLUTTER_FRONTEND_AGENT_GUIDE.md`, `docs/archive/flutter-history/FLUTTER_PROJECT_HANDOFF.md`, `docs/archive/flutter-history/2026-04-30-phone-alpha-backend-api-requirements.md`, `docs/API-SPECIFICATION.md` | Handoffs and requirements are archived as historical. The API specification remains legacy/unverified until checked against source; do not merge planned endpoints into implemented behavior. |
+| Root dated reports, `BACKEND_CODE_AUDIT_2026-05-06.md`, `PHONE_ALPHA_BACKEND_READINESS_REPORT.md`, `frontend-ui-overhaul-contract-response-2026-04-25.md`, `implementation_plan_By_opus_antigravity.md` | Moved to categorized paths under `docs/archive/`; their findings and recommendations remain historical. |
+| `docs/archive/audits/legacy-audit-and-suggestions/`, `docs/archive/issues/current-issues/`, `docs/archive/planning-history/codebase-review-plan-set/`, `docs/internal/ai-context/` | Reorganized under history/internal categories. Do not mechanically promote old findings to current bugs. |
+| `2026-04-05-resume-ready-project-description-options.md` and its namesake under `docs/archive/nonrelevant/` | The copies were byte-identical and both are retained under `docs/archive/cv/` with distinct names. Neither is the project's front page. |
+| `docs/archive/planning-history/ROADMAP.md` | Archived roadmap; its contents are not presented as current commitments. |
+| `postgresql-public-schema-snapshot.sql` | Retained at the repository root. The reviewed statement inventory contains DDL only (28 `CREATE TABLE` statements and no `INSERT`, `COPY`, `UPDATE`, or `MERGE` statements); this is not a complete security or provenance review. |
 | `.gemini/`, `.aiassistant/`, agent-specific reports | Keep settings actually needed for collaboration; archive workstation repair notes. Do not remove working instruction files merely because an assistant uses them. |
-| This review document | Treat it as a temporary execution plan. Once actions are resolved, archive it and keep only current limitations/backlog in maintained docs. |
+| This review document | Retained in `docs/internal/reviews/` as historical review material; this directory is public and does not provide access control. |
 
 Before moving a file, search its exact basename across tracked docs, scripts, workflow files, and tests. Update those references in the same change. Preserve history with a normal move, not a repository-history rewrite. This proposal does not authorize deletion of old material.
 
@@ -143,7 +143,7 @@ The primary setup guide should explain PostgreSQL prerequisites, `.env` creation
 
 ## 5. Keep the public API description accurate
 
-`REST_LAN_STARTUP.md:97` describes `X-User-Id` as the actor identity, while `docs/API-SPECIFICATION.md` documents bearer access tokens. The running server uses the latter: `RestApiServer` supplies `AuthUseCases` to its identity policy, and `RestApiIdentityPolicy.java:47-64` resolves bearer identity in that path. Header-only identity is a legacy fallback when no auth use cases are supplied. Update the LAN guide to use bearer tokens and explain that the LAN shared secret is an additional transport guard, not a substitute for user authentication. `RestApiAuthRoutesTest.java:160-192` covers missing tokens and mismatched subjects.
+This review's earlier comparison of `docs/operations/lan-backend-startup.md` and `docs/API-SPECIFICATION.md` is a historical finding. The specification remains marked legacy/unverified in the documentation index; compare both against current code before using them as an integration contract.
 
 The API spec's password table at line 81 says the default minimum is eight characters; tracked `config/app-config.json` specifies twelve. State the effective shipped configuration and distinguish it from any code-level fallback.
 

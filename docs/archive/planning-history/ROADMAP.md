@@ -104,7 +104,7 @@ Every item below is **implemented in production code**, not stubs or placeholder
 - **PostgreSQL** — full runtime support with dialect-aware SQL, migrations, smoke tests
 - **Quality gate** — established and expected as the standard validation path
 - **Green full local verification** — `run_verify.ps1` now passes end-to-end, including PostgreSQL smoke verification
-- **LAN-ready REST adapter** — non-loopback startup now uses an explicit shared secret, supports allowlisted CORS, and has a verified startup path in `REST_LAN_STARTUP.md`
+- **LAN-ready REST adapter** — non-loopback startup now uses an explicit shared secret, supports allowlisted CORS, and has a verified startup path in `docs/operations/lan-backend-startup.md`
 
 ### What's NOT Done
 
@@ -327,9 +327,9 @@ This is a **small phase** — just a few targeted changes to the server configur
 |------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | **What**         | Use the explicit LAN startup path to run the REST server on `0.0.0.0` or a specific LAN interface when needed.                                                 |
 | **Current code** | `RestApiServer.main` now parses `--host=`, `--port=`, `--shared-secret=`, and `--allowed-origins=`. Non-loopback startup fails without a shared secret.        |
-| **Also**         | CORS is now supported for allowlisted origins, and the verified LAN startup flow is documented in `REST_LAN_STARTUP.md`.                                       |
+| **Also**         | CORS is now supported for allowlisted origins, and the verified LAN startup flow is documented in `docs/operations/lan-backend-startup.md`.                                       |
 | **Safety**       | Loopback remains the default for local unauthenticated use; LAN mode stays an explicit opt-in and requires `X-DatingApp-Shared-Secret` on non-health requests. |
-| **File**         | `src/main/java/datingapp/app/api/RestApiServer.java`, `src/main/java/datingapp/app/api/RestApiRequestGuards.java`, `REST_LAN_STARTUP.md`                       |
+| **File**         | `src/main/java/datingapp/app/api/RestApiServer.java`, `src/main/java/datingapp/app/api/RestApiRequestGuards.java`, `docs/operations/lan-backend-startup.md`                       |
 | **Effort**       | Done.                                                                                                                                                          |
 
 ### 2.2 — Verify Phone → Server Connectivity
@@ -638,7 +638,7 @@ flutter test
 ipconfig | findstr "IPv4"
 # e.g., 192.168.1.105
 
-# 2. Follow REST_LAN_STARTUP.md to build the runtime classpath and launch the REST server directly with Java
+# 2. Follow docs/operations/lan-backend-startup.md to build the runtime classpath and launch the REST server directly with Java
 #    using --host=0.0.0.0, --port=7070, --shared-secret=..., and any needed --allowed-origins=...
 
 # 3. On phone: open Chrome → http://192.168.1.105:7070/api/health

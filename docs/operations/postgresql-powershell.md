@@ -4,7 +4,7 @@ This file records the practical rules for PostgreSQL runtime work in this reposi
 
 ## What Is Canonical
 
-- Runtime storage is PostgreSQL by default through [`config/app-config.json`](./config/app-config.json).
+- Runtime storage is PostgreSQL by default through [`config/app-config.json`](../../config/app-config.json).
 - The production/runtime composition path is `StorageFactory.buildSqlDatabase(...)`.
 - `buildH2(...)` and `buildInMemory(...)` are still valid compatibility and test paths. They are not the main runtime path.
 - The canonical full local verification command is `.\run_verify.ps1`.
@@ -56,19 +56,16 @@ Production/runtime PostgreSQL sessions also set `search_path` explicitly in `Dat
 
 ## Credentials and Config
 
-- The local helper scripts default to:
-  - username: `datingapp`
-  - password: `datingapp`
-  - database: `datingapp`
-  - port: `55432`
+- Configure local credentials through your own ignored `.env` file or OS/JVM environment. Do not copy a password or shared secret from a repository example into a real deployment.
+- The checked-in PostgreSQL configuration describes the local database name and port; confirm the effective username and credential source in your local setup before connecting.
 - Runtime password can be supplied through:
   - `.env`
   - OS env var `DATING_APP_DB_PASSWORD`
   - JVM property `-Ddatingapp.db.password=...`
 - Local PostgreSQL defaults are already represented in:
-  - [`config/app-config.json`](./config/app-config.json)
-  - [`config/app-config.postgresql.local.json`](./config/app-config.postgresql.local.json)
-  - [`.env.example`](./.env.example)
+  - [`config/app-config.json`](../../config/app-config.json)
+  - [`config/app-config.postgresql.local.json`](../../config/app-config.postgresql.local.json)
+  - [`.env.example`](../../.env.example)
 
 ## Important Nuance
 

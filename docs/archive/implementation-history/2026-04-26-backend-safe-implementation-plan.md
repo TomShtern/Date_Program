@@ -284,7 +284,7 @@ The first four tasks are the best fit for immediate work because they stay fully
 - `check_postgresql_runtime_env.ps1`
 - `start_local_postgres.ps1`
 - `README.md`
-- `CI_AND_POSTGRESQL_GUIDE.md`
+- `docs/operations/ci-and-postgresql.md`
 
 **Instructions:**
 

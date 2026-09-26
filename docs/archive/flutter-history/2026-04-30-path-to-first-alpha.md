@@ -4,6 +4,8 @@ Author context: roadmap for moving from "developer-only Flutter shell + local
 Java backend + local Postgres" to "the app actually functions and I can use it
 on my phone as a real user, not as a developer."
 
+> Historical handoff for a separate Flutter checkout. Paths such as `lib/`, `test/`, and its `AGENTS.md` refer to that client repository, not this Java backend repository; the status below is from 2026-04-30 and is not current backend guidance.
+
 Today: 2026-04-30.
 
 This is not a launch plan. It does not assume Play Store, public testers,
@@ -39,10 +41,10 @@ it. **Don't do that work now**; it'll slow down getting to the first goal.
 
 - A polished, design-locked Flutter frontend covering every dating-app
   surface.
-- A working API client layer ([lib/api/](lib/api/)) with centralized headers,
+- A working API client layer (`lib/api/` in the separate Flutter checkout) with centralized headers,
   error mapping, and a `selectedUserGuard` pattern that's easy to repurpose
   into a real auth guard.
-- Per [AGENTS.md](AGENTS.md): a Java 25 backend on this machine with REST
+- Per the backend `AGENTS.md` at the time: a Java 25 backend on this machine with REST
   endpoints for users, browse, matches, conversations, messages, stats,
   achievements, notifications, blocked users, location, verification, safety.
 - Local PostgreSQL.
@@ -61,7 +63,7 @@ In priority order — these are the actual blockers, nothing else.
   one-off test but breaks the moment you walk out of the house, and Android
   release builds reject cleartext by default.
 3. **No photos.** Fixtures use unreachable `/photos/...jpg` URLs (see
-  [test/visual_inspection/fixtures/visual_fixture_catalog.dart](test/visual_inspection/fixtures/visual_fixture_catalog.dart)).
+  `test/visual_inspection/fixtures/visual_fixture_catalog.dart` in the separate Flutter checkout).
   No upload endpoint, no storage path. A dating app you can't put a real
   photo into doesn't function as the product it claims to be.
 4. **No onboarding funnel.** The app drops you straight into a populated
@@ -125,7 +127,7 @@ this once, on the right foundation, and everything else is built on top.
 
 **Flutter work (this repo):**
 
-- Replace [lib/features/auth/](lib/features/auth/) dev-user picker with a real
+- Replace the `lib/features/auth/` dev-user picker in the separate Flutter checkout with a real
   `LoginScreen` and `SignupScreen`. Hide the dev picker behind a debug-only
   flag so local development still works.
 - Add `flutter_secure_storage` (not `shared_preferences`) for the access +
@@ -387,7 +389,7 @@ This Flutter repo cannot tell you the state of the Java backend's auth, photo,
 moderation, or block/report code. Before A1 starts, do a parallel audit on
 the backend:
 
-- Inventory which of the endpoints in [AGENTS.md](AGENTS.md)'s `ApiEndpoints`
+- Inventory which of the endpoints in the Flutter checkout's `AGENTS.md` `ApiEndpoints`
   list are actually implemented vs stubbed.
 - Confirm the `verification` endpoints are wired or are no-ops.
 - Confirm block / report / unmatch endpoints actually mutate state and enforce

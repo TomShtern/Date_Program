@@ -224,13 +224,14 @@ Use this instead:
 
 ```powershell
 $cp = 'target/classes;' + (Get-Content 'target\runtime-classpath.txt' -Raw).Trim()
+$lanSecret = [Convert]::ToBase64String([System.Security.Cryptography.RandomNumberGenerator]::GetBytes(32))
 
 java --enable-preview --enable-native-access=ALL-UNNAMED `
   -cp $cp `
   datingapp.app.api.RestApiServer `
   --host=0.0.0.0 `
   --port=7070 `
-  --shared-secret=lan-dev-secret `
+  --shared-secret=$lanSecret `
   --allowed-origins=http://localhost:3000,http://192.168.1.194:3000
 ```
 
@@ -1019,9 +1020,9 @@ When starting the blank Flutter project, make sure these are true before writing
 
 If the original server repo is available, these were the main source-of-truth files behind this handoff:
 
-- `RoadMap.md`
-- `REST_LAN_STARTUP.md`
-- `2026-04-18-backend-audit-and-remediation.md`
+- `docs/archive/planning-history/ROADMAP.md` (historical)
+- `docs/operations/lan-backend-startup.md`
+- `docs/archive/audits/2026-04-18-backend-audit-and-remediation.md` (historical)
 - `src/main/java/datingapp/app/api/RestRouteSupport.java`
 - `src/main/java/datingapp/app/api/RestApiServer.java`
 - `src/main/java/datingapp/app/api/RestApiRequestGuards.java`

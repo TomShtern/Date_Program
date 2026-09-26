@@ -167,7 +167,7 @@ Also run `mvn spotless:apply && mvn verify` to confirm the 60% JaCoCo gate still
 
 ---
 
-## ROADMAP.md Cross-Reference
+## Archived ROADMAP.md Cross-Reference
 
-This task is documented in `ROADMAP.md` under **Phase 1 → P1-E Quick Wins →
+This task was documented in `docs/archive/planning-history/ROADMAP.md` under **Phase 1 → P1-E Quick Wins →
 DevDataSeeder — Disable in Non-Dev Mode**.

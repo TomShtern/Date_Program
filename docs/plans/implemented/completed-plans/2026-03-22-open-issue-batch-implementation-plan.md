@@ -164,7 +164,7 @@
 ### Task 1: Close Or Re-Scope The Stale Issue Titles
 
 **Files:**
-- Modify: `current issues/MERGED_CURRENT_ISSUES_2026-03-19.md`
+- Historical source register: `docs/archive/issues/current-issues/MERGED_CURRENT_ISSUES_2026-03-19.md`
 - Verify only: `src/main/java/datingapp/ui/screen/SocialController.java`
 - Verify only: `src/main/java/datingapp/ui/viewmodel/SocialViewModel.java`
 - Verify only: `src/main/java/datingapp/ui/screen/ProfileController.java`

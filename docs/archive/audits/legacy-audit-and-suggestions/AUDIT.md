@@ -6,18 +6,14 @@
 
 This audit has been split into problem-type files:
 
-- [AUDIT_PROBLEMS_CORE.md](AUDIT_PROBLEMS_CORE.md) — Core services, business rules, concurrency, and CLI
-- [AUDIT_PROBLEMS_UI.md](AUDIT_PROBLEMS_UI.md) — JavaFX controllers, ViewModels, navigation, and UX
-- [AUDIT_PROBLEMS_STORAGE.md](AUDIT_PROBLEMS_STORAGE.md) — JDBI, database mapping, and query efficiency
-- [AUDIT_PROBLEMS_SECURITY.md](AUDIT_PROBLEMS_SECURITY.md) — API security, auth, privacy, and crypto
+- [AUDIT_PROBLEMS_CORE.md](../../../plans/implemented/completed-plans/AUDIT_PROBLEMS_CORE.md) — historical core/services findings
+- [AUDIT_PROBLEMS_UI.md](../../../plans/implemented/completed-plans/AUDIT_PROBLEMS_UI.md) — historical JavaFX/ViewModel findings
+- [AUDIT_PROBLEMS_STORAGE.md](../../../plans/implemented/completed-plans/AUDIT_PROBLEMS_STORAGE.md) — historical storage findings
+- [AUDIT_PROBLEMS_SECURITY.md](AUDIT_PROBLEMS_SECURITY.md) — historical API/security findings
 <!-- ChangeStamp: 2|2026-02-06 17:29:51|agent:codex|scope:audit-group-index|Regroup audit index by problem type|c:/Users/tom7s/Desktopp/Claude_Folder_2/Date_Program/Audit and Suggestions/AUDIT.md -->
 
 <!--ARCHIVE:2:agent:codex:scope:audit-group-index-->
-This audit has been split into category files:
-
-- [AUDIT_FINDINGS.md](AUDIT_FINDINGS.md) — Critical/High/Medium/Low findings
-- [AUDIT_SUBSYSTEMS.md](AUDIT_SUBSYSTEMS.md) — REST API, UI/JavaFX, and Storage issues
-- [AUDIT_SUMMARY.md](AUDIT_SUMMARY.md) — Strengths, priorities, and performance targets
+The earlier proposed `AUDIT_FINDINGS.md`, `AUDIT_SUBSYSTEMS.md`, and `AUDIT_SUMMARY.md` files are not present in the retained archive.
 <!-- ChangeStamp: 1|2026-02-06 17:21:41|agent:codex|scope:audit-split-index|Split audit into category files|c:/Users/tom7s/Desktopp/Claude_Folder_2/Date_Program/Audit and Suggestions/AUDIT.md -->
 <!--/ARCHIVE-->
 

@@ -186,9 +186,9 @@ Default local PostgreSQL settings are:
 - port: `55432`
 - database: `datingapp`
 - username: `datingapp`
-- password: `datingapp`
+- password: the local helper's development-only default, unless overridden with a local credential
 
-The helper scripts and `.env.example` are aligned to these defaults.
+These defaults are for isolated localhost development only. Do not reuse the helper's default credential on a shared or remote database. The helper scripts and `.env.example` are aligned to the local defaults.
 
 ### `start_local_postgres.ps1`
 

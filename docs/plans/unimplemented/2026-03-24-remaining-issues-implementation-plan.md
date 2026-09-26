@@ -1,7 +1,7 @@
 # Remaining Issues Implementation Plan
 
 > **Created:** 2026-03-24
-> **Source:** `current issues/MERGED_CURRENT_ISSUES_2026-03-19.md` (97 valid claims)
+> **Source:** `docs/archive/issues/current-issues/MERGED_CURRENT_ISSUES_2026-03-19.md` (97 valid claims; archived register)
 > **Verified against:** current codebase as of 2026-03-24
 
 ---
