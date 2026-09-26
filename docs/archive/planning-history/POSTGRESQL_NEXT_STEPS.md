@@ -18,9 +18,9 @@ Those assumptions matter. They change the order and shape of the next work.
 
 The local PostgreSQL runtime path is working end to end on Windows based on recent manual verification:
 
-- `.\start_local_postgres.ps1` starts cleanly
-- `.\run_postgresql_smoke.ps1` passes
-- `.\run_verify.ps1` passes
+- `.\scripts/start_local_postgres.ps1` starts cleanly
+- `.\scripts/run_postgresql_smoke.ps1` passes
+- `.\scripts/run_verify.ps1` passes
 - the PowerShell popup/hang issue is gone
 
 The main remaining work is hardening, coverage, onboarding, and maintenance discipline.
@@ -70,13 +70,13 @@ Suggested action: add a focused config-loading test or a short clarifying commen
 
 Why: local failures can still come from `pg_ctl`, `pg_isready`, `psql`, or `createdb` not being reachable on PATH, especially on Windows.
 
-Suggested action: either add a helper script or extend `start_local_postgres.ps1` to fail fast with a clear message naming the missing binaries.
+Suggested action: either add a helper script or extend `scripts/start_local_postgres.ps1` to fail fast with a clear message naming the missing binaries.
 
 6. Add a one-command local environment check script.
 
 Why: local database first only stays simple if setup failures are obvious. A preflight script can confirm PowerShell, Java, Maven, PostgreSQL binaries, and the expected port before someone burns time debugging.
 
-Suggested action: add a script such as `check_postgresql_runtime_env.ps1` that reports pass/fail for the required local dependencies.
+Suggested action: add a script such as `scripts/check_postgresql_runtime_env.ps1` that reports pass/fail for the required local dependencies.
 
 7. Link the PostgreSQL/PowerShell guide from the main README and any onboarding entrypoints.
 
@@ -90,11 +90,11 @@ Why: local-first debugging is great, but it creates real local artifacts. Withou
 
 Suggested action: decide whether `data/local-postgresql/*.log` files should be retained, rotated, truncated, or cleaned by a helper script.
 
-9. Keep treating `.\run_verify.ps1` as the primary local proof path.
+9. Keep treating `.\scripts/run_verify.ps1` as the primary local proof path.
 
 Why: `mvn spotless:apply verify` proves the Maven/code-quality side, not the PostgreSQL runtime side. If local PostgreSQL is the real runtime path, the local proof command must include that runtime path.
 
-Suggested action: keep docs and habits aligned around `.\run_verify.ps1` as the canonical local “everything still works together” command.
+Suggested action: keep docs and habits aligned around `.\scripts/run_verify.ps1` as the canonical local “everything still works together” command.
 
 10. Preserve H2 compatibility/test paths intentionally.
 
@@ -158,7 +158,7 @@ Suggested action: add a short section either to the guide or a helper script des
 
 20. Add a regression test that proves smoke-script environment overrides are restored.
 
-Why: `run_postgresql_smoke.ps1` temporarily sets PostgreSQL runtime environment variables, and environment leakage can poison later commands or tests.
+Why: `scripts/run_postgresql_smoke.ps1` temporarily sets PostgreSQL runtime environment variables, and environment leakage can poison later commands or tests.
 
 Suggested action: extend the smoke-script PowerShell test to assert that preexisting env vars are restored after the script exits.
 

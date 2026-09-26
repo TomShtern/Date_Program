@@ -2,10 +2,10 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $repoRoot = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $PSScriptRoot))
-$scriptUnderTest = Join-Path $repoRoot 'run_postgresql_smoke.ps1'
+$scriptUnderTest = Join-Path $repoRoot 'scripts/run_postgresql_smoke.ps1'
 
 if (-not (Test-Path $scriptUnderTest)) {
-    throw "Could not find run_postgresql_smoke.ps1 at $scriptUnderTest"
+    throw "Could not find scripts/run_postgresql_smoke.ps1 at $scriptUnderTest"
 }
 
 function Write-StubFile {
@@ -22,9 +22,10 @@ function New-SmokeScriptSandbox {
 
     $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("run-postgresql-smoke-test-" + [System.Guid]::NewGuid())
     New-Item -ItemType Directory -Path $tempRoot | Out-Null
+    New-Item -ItemType Directory -Force -Path (Join-Path $tempRoot 'scripts') | Out-Null
 
-    $copiedScript = Join-Path $tempRoot 'run_postgresql_smoke.ps1'
-    $stubStartScript = Join-Path $tempRoot 'start_local_postgres.ps1'
+    $copiedScript = Join-Path $tempRoot 'scripts/run_postgresql_smoke.ps1'
+    $stubStartScript = Join-Path $tempRoot 'scripts/start_local_postgres.ps1'
     $startCountFile = Join-Path $tempRoot 'start-count.txt'
     $mavenCountFile = Join-Path $tempRoot 'mvn-count.txt'
     $originalPath = $env:PATH
@@ -40,7 +41,7 @@ function New-SmokeScriptSandbox {
         '    [PSCredential]$Credential,',
         '    [string]$Database',
         ')',
-        '$countFile = Join-Path $PSScriptRoot ''start-count.txt''',
+        '$countFile = Join-Path (Split-Path -Parent $PSScriptRoot) ''start-count.txt''',
         '$count = 0',
         'if (Test-Path $countFile) {',
         '    $count = [int]((Get-Content -Path $countFile -Raw).Trim())',

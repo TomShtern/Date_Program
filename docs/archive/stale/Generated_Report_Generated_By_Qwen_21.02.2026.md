@@ -52,7 +52,7 @@ Replace `<DD.MM.YYYY>` with today's date in European format (e.g., `21.02.2026`)
 ### 4. Optional Command Execution (only if adds insight)
 ```bash
 mvn pmd:check       # Preferred: static analysis
-mvn checkstyle:check  # If checkstyle.xml exists
+mvn checkstyle:check  # If config/quality/config/quality/checkstyle.xml exists
 mvn compile         # Verify compilation (optional)
 ```
 Do NOT run the application unless absolutely necessary for understanding.

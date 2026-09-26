@@ -57,7 +57,7 @@ The more durable distinction is:
 
 ### 2. Add a second smoke/verification path for an already-running PostgreSQL target
 
-Current verification is strong for the repo-local local-first path, but `run_postgresql_smoke.ps1` still assumes it should start a local PostgreSQL instance itself.
+Current verification is strong for the repo-local local-first path, but `scripts/run_postgresql_smoke.ps1` still assumes it should start a local PostgreSQL instance itself.
 
 That is ideal for current local development, but later the repo should also support a second mode:
 
@@ -126,7 +126,7 @@ The repo should eventually make this explicit:
 - **Project `.env` fallback already exists** through `RuntimeEnvironment`, which is also a useful fit for future Docker/env-file workflows.
 - **Password is already externalized** rather than stored in tracked config JSON.
 - **Schema evolution is centralized** in append-only `MigrationRunner`.
-- **There is already a live PostgreSQL proof path** through `PostgresqlRuntimeSmokeTest` and `run_postgresql_smoke.ps1`.
+- **There is already a live PostgreSQL proof path** through `PostgresqlRuntimeSmokeTest` and `scripts/run_postgresql_smoke.ps1`.
 
 ### What is still strongly local-only
 
@@ -283,8 +283,8 @@ This is one of the most important readiness items.
 
 Right now the repo has strong local proof via:
 
-- `run_postgresql_smoke.ps1`
-- `run_verify.ps1`
+- `scripts/run_postgresql_smoke.ps1`
+- `scripts/run_verify.ps1`
 - `PostgresqlRuntimeSmokeTest`
 
 That is good. It should remain the primary local proof path.
@@ -332,7 +332,7 @@ That makes debugging and rotation easier than one giant opaque URL secret.
 Before any cloud work, preserve these invariants:
 
 - local PostgreSQL remains the default development path
-- `run_verify.ps1` remains the canonical local proof command
+- `scripts/run_verify.ps1` remains the canonical local proof command
 - H2 compatibility paths stay intentional until a deliberate decision changes them
 - no secrets move into tracked config files
 - Docker remains optional and should plug into the same direct PostgreSQL contract, not a forked architecture
@@ -447,7 +447,7 @@ Planning implication: the repo should be able to support **both** of these later
 | `src/main/java/datingapp/storage/schema/MigrationRunner.java`     | migration policy and idempotence                                                                 |
 | `config/app-config.json`                                          | current default runtime profile                                                                  |
 | `config/app-config.postgresql.local.json`                         | local PostgreSQL profile template                                                                |
-| `run_postgresql_smoke.ps1`                                        | current local-first smoke path; likely future split into local-managed and external-target modes |
+| `scripts/run_postgresql_smoke.ps1`                                        | current local-first smoke path; likely future split into local-managed and external-target modes |
 | `.env.example`                                                    | env-contract starting point                                                                      |
 | `POSTGRESQL_POWERSHELL_GUIDE.md`                                  | current local operational guide                                                                  |
 | `POSTGRESQL_NEXT_STEPS.md`                                        | local-first PostgreSQL backlog and discipline                                                    |

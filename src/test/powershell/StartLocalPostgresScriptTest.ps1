@@ -2,10 +2,10 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $repoRoot = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $PSScriptRoot))
-$scriptUnderTest = Join-Path $repoRoot 'start_local_postgres.ps1'
+$scriptUnderTest = Join-Path $repoRoot 'scripts/start_local_postgres.ps1'
 
 if (-not (Test-Path $scriptUnderTest)) {
-    throw "Could not find start_local_postgres.ps1 at $scriptUnderTest"
+    throw "Could not find scripts/start_local_postgres.ps1 at $scriptUnderTest"
 }
 
 function New-StartScriptSandbox {
@@ -147,12 +147,12 @@ function Assert-StartScriptRejectsUnsafeDatabaseName {
         }
 
         if ($threw -eq $false) {
-            throw 'Expected start_local_postgres.ps1 to reject an unsafe database name.'
+            throw 'Expected scripts/start_local_postgres.ps1 to reject an unsafe database name.'
         }
 
         $allowedPattern = '^[A-Za-z_][A-Za-z0-9_]*' + [char]36
         if ($output -notmatch [regex]::Escape($allowedPattern)) {
-            throw "Expected start_local_postgres.ps1 to report the allowed database-name pattern '$allowedPattern'."
+            throw "Expected scripts/start_local_postgres.ps1 to report the allowed database-name pattern '$allowedPattern'."
         }
 
         if ((Get-CountValue -Path $sandbox.PgIsReadyCountFile) -ne 0) {
@@ -189,19 +189,19 @@ function Assert-StartScriptAcceptsAlreadyRunningDatabase {
         & $scriptUnderTest -BaseDir $sandbox.BaseDir -Database 'datingapp' | Out-Null
 
         if ($LASTEXITCODE -ne 0) {
-            throw "Expected start_local_postgres.ps1 to exit with code 0 when the server is already running, but observed $LASTEXITCODE."
+            throw "Expected scripts/start_local_postgres.ps1 to exit with code 0 when the server is already running, but observed $LASTEXITCODE."
         }
 
         if ((Get-CountValue -Path $sandbox.PgCtlCountFile) -ne 0) {
-            throw 'Expected start_local_postgres.ps1 to skip pg_ctl when the server is already running and observability config is already in place.'
+            throw 'Expected scripts/start_local_postgres.ps1 to skip pg_ctl when the server is already running and observability config is already in place.'
         }
 
         if ((Get-CountValue -Path $sandbox.PsqlCountFile) -ne 3) {
-            throw 'Expected start_local_postgres.ps1 to invoke psql for the database check, pg_stat_statements enablement, and local role defaults when the database already exists.'
+            throw 'Expected scripts/start_local_postgres.ps1 to invoke psql for the database check, pg_stat_statements enablement, and local role defaults when the database already exists.'
         }
 
         if ((Get-CountValue -Path $sandbox.CreatedbCountFile) -ne 0) {
-            throw 'Expected start_local_postgres.ps1 to skip createdb when the database already exists.'
+            throw 'Expected scripts/start_local_postgres.ps1 to skip createdb when the database already exists.'
         }
     }
     finally {
@@ -218,15 +218,15 @@ function Assert-StartScriptAcceptsSuccessfulPgCtlStartWhenDatabaseBecomesReady {
         & $scriptUnderTest -BaseDir $sandbox.BaseDir -Database 'datingapp' | Out-Null
 
         if ($LASTEXITCODE -ne 0) {
-            throw "Expected start_local_postgres.ps1 to exit with code 0 when pg_ctl start succeeds, but observed $LASTEXITCODE."
+            throw "Expected scripts/start_local_postgres.ps1 to exit with code 0 when pg_ctl start succeeds, but observed $LASTEXITCODE."
         }
 
         if ((Get-CountValue -Path $sandbox.PgCtlCountFile) -ne 1) {
-            throw 'Expected start_local_postgres.ps1 to invoke pg_ctl exactly once when startup is required.'
+            throw 'Expected scripts/start_local_postgres.ps1 to invoke pg_ctl exactly once when startup is required.'
         }
 
         if ((Get-CountValue -Path $sandbox.PsqlCountFile) -ne 3) {
-            throw 'Expected start_local_postgres.ps1 to continue to the database-exists check, pg_stat_statements enablement, and local role-default bootstrap after successful pg_ctl start.'
+            throw 'Expected scripts/start_local_postgres.ps1 to continue to the database-exists check, pg_stat_statements enablement, and local role-default bootstrap after successful pg_ctl start.'
         }
     }
     finally {
@@ -275,11 +275,11 @@ function Assert-StartScriptConfiguresPgStatStatementsDefaults {
 
         $postgresAutoConf = Get-Content -Path $sandbox.PostgresAutoConfFile -Raw
         if ($postgresAutoConf -notmatch "shared_preload_libraries = 'pg_stat_statements'") {
-            throw 'Expected start_local_postgres.ps1 to enable pg_stat_statements in postgresql.auto.conf.'
+            throw 'Expected scripts/start_local_postgres.ps1 to enable pg_stat_statements in postgresql.auto.conf.'
         }
 
         if ($postgresAutoConf -notmatch 'compute_query_id = on') {
-            throw 'Expected start_local_postgres.ps1 to enable compute_query_id in postgresql.auto.conf.'
+            throw 'Expected scripts/start_local_postgres.ps1 to enable compute_query_id in postgresql.auto.conf.'
         }
     }
     finally {
@@ -305,11 +305,11 @@ function Assert-StartScriptFailsWhenPgCtlReturnsSuccessButDatabaseNeverBecomesRe
         }
 
         if ($threw -eq $false) {
-            throw 'Expected start_local_postgres.ps1 to fail when pg_ctl returns success but PostgreSQL never becomes ready.'
+            throw 'Expected scripts/start_local_postgres.ps1 to fail when pg_ctl returns success but PostgreSQL never becomes ready.'
         }
 
         if ((Get-CountValue -Path $sandbox.PsqlCountFile) -ne 0) {
-            throw 'Expected start_local_postgres.ps1 to stop before psql when PostgreSQL never becomes ready.'
+            throw 'Expected scripts/start_local_postgres.ps1 to stop before psql when PostgreSQL never becomes ready.'
         }
     }
     finally {
@@ -335,15 +335,15 @@ function Assert-StartScriptFailsWhenStartupNeverBecomesReady {
         }
 
         if ($threw -eq $false) {
-            throw 'Expected start_local_postgres.ps1 to fail when PostgreSQL never becomes ready after startup.'
+            throw 'Expected scripts/start_local_postgres.ps1 to fail when PostgreSQL never becomes ready after startup.'
         }
 
         if ((Get-CountValue -Path $sandbox.PgCtlCountFile) -ne 1) {
-            throw 'Expected start_local_postgres.ps1 to invoke pg_ctl exactly once on startup failure.'
+            throw 'Expected scripts/start_local_postgres.ps1 to invoke pg_ctl exactly once on startup failure.'
         }
 
         if ((Get-CountValue -Path $sandbox.CreatedbCountFile) -ne 0) {
-            throw 'Expected start_local_postgres.ps1 to stop before createdb when startup fails.'
+            throw 'Expected scripts/start_local_postgres.ps1 to stop before createdb when startup fails.'
         }
     }
     finally {
@@ -389,13 +389,13 @@ exit /b 0
             $stdout = if (Test-Path $stdoutPath) { Get-Content -Path $stdoutPath -Raw } else { '' }
             $stderr = if (Test-Path $stderrPath) { Get-Content -Path $stderrPath -Raw } else { '' }
             & cmd.exe /c "taskkill /T /F /PID $($process.Id)" >$null 2>&1
-            throw "Expected start_local_postgres.ps1 to finish without hanging when pg_ctl leaves a background child attached to stdout. Stdout: $stdout`nStderr: $stderr"
+            throw "Expected scripts/start_local_postgres.ps1 to finish without hanging when pg_ctl leaves a background child attached to stdout. Stdout: $stdout`nStderr: $stderr"
         }
 
         if ($process.ExitCode -ne 0) {
             $stdout = if (Test-Path $stdoutPath) { Get-Content -Path $stdoutPath -Raw } else { '' }
             $stderr = if (Test-Path $stderrPath) { Get-Content -Path $stderrPath -Raw } else { '' }
-            throw "Expected start_local_postgres.ps1 to exit with code 0 when pg_ctl succeeds, but observed $($process.ExitCode). Stdout: $stdout`nStderr: $stderr"
+            throw "Expected scripts/start_local_postgres.ps1 to exit with code 0 when pg_ctl succeeds, but observed $($process.ExitCode). Stdout: $stdout`nStderr: $stderr"
         }
     }
     finally {

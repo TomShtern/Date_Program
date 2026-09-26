@@ -44,12 +44,12 @@ mvn javafx:run                   # desktop UI
 mvn test
 mvn -Ptest-output-verbose test
 
-.\run_verify.ps1                 # full gate: Maven quality gate + PostgreSQL smoke
+.\scripts/run_verify.ps1                 # full gate: Maven quality gate + PostgreSQL smoke
 mvn spotless:apply verify        # Maven-only quality gate
 
-.\start_local_postgres.ps1
-.\run_postgresql_smoke.ps1
-.\stop_local_postgres.ps1
+.\scripts/start_local_postgres.ps1
+.\scripts/run_postgresql_smoke.ps1
+.\scripts/stop_local_postgres.ps1
 ```
 
 - **`exec:exec`, not `exec:java`** — `exec:java` cannot pass `--enable-preview`,

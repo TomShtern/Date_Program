@@ -254,20 +254,20 @@ mvn spotless:apply verify
 ### PostgreSQL management
 
 ```powershell
-.\start_local_postgres.ps1
-.\run_postgresql_smoke.ps1
-.\stop_local_postgres.ps1
-.\reset_local_postgres.ps1
-.\check_postgresql_runtime_env.ps1
-.\export_local_postgresql_schema.ps1
+.\scripts/start_local_postgres.ps1
+.\scripts/run_postgresql_smoke.ps1
+.\scripts/stop_local_postgres.ps1
+.\scripts/reset_local_postgres.ps1
+.\scripts/check_postgresql_runtime_env.ps1
+.\scripts/export_local_postgresql_schema.ps1
 ```
 
 ### Test runners
 
 ```powershell
-.\run_test.ps1
-.\run_event_tests.ps1
-.\run_verify.ps1
+.\scripts/run_test.ps1
+.\scripts/run_event_tests.ps1
+.\scripts/run_verify.ps1
 ```
 
 ### Quality gates (pom.xml)
@@ -275,9 +275,9 @@ mvn spotless:apply verify
 | Gate | Phase | Tool | Notes |
 |------|-------|------|-------|
 | **Java** | compile | Java 25 + `--enable-preview` | Preview features enabled |
-| **Checkstyle** | validate | checkstyle.xml | Fails on error/violation |
+| **Checkstyle** | validate | config/quality/checkstyle.xml | Fails on error/violation |
 | **Spotless** | verify | Palantir Java Format 2.85.0 | 4 spaces, removes unused imports |
-| **PMD** | verify | pmd-rules.xml | Fails on violation, min tokens 100 |
+| **PMD** | verify | config/quality/pmd-rules.xml | Fails on violation, min tokens 100 |
 | **SpotBugs** | verify | Medium threshold | Report-only; strict via `spotbugs-strict` profile |
 | **JaCoCo** | verify | 60% line coverage minimum | Excludes `ui/**`, `app/cli/**`, `Main.class` |
 
@@ -375,12 +375,12 @@ mvn spotless:apply verify
 
 | Script | Purpose |
 |--------|---------|
-| `check_postgresql_runtime_env.ps1` | Check PostgreSQL runtime environment |
-| `export_local_postgresql_schema.ps1` | Export local PostgreSQL schema |
-| `reset_local_postgres.ps1` | Reset local PostgreSQL database |
-| `run_event_tests.ps1` | Run event-related tests |
-| `run_postgresql_smoke.ps1` | Run PostgreSQL smoke tests |
-| `run_test.ps1` | General test runner |
-| `run_verify.ps1` | Run Maven verify phase |
-| `start_local_postgres.ps1` | Start local PostgreSQL |
-| `stop_local_postgres.ps1` | Stop local PostgreSQL |
+| `scripts/check_postgresql_runtime_env.ps1` | Check PostgreSQL runtime environment |
+| `scripts/export_local_postgresql_schema.ps1` | Export local PostgreSQL schema |
+| `scripts/reset_local_postgres.ps1` | Reset local PostgreSQL database |
+| `scripts/run_event_tests.ps1` | Run event-related tests |
+| `scripts/run_postgresql_smoke.ps1` | Run PostgreSQL smoke tests |
+| `scripts/run_test.ps1` | General test runner |
+| `scripts/run_verify.ps1` | Run Maven verify phase |
+| `scripts/start_local_postgres.ps1` | Start local PostgreSQL |
+| `scripts/stop_local_postgres.ps1` | Stop local PostgreSQL |

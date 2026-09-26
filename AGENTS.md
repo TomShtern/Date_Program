@@ -33,10 +33,10 @@ If any markdown guidance and the code disagree, trust:
 - Use execution-oriented helpers for Maven/test runs rather than manually chaining shell commands in an interactive terminal.
 - Prefer symbol-aware rename/usages tools when changing names across files.
 - On Windows PowerShell, use `mvn --% ...` when Maven arguments contain commas or special characters that PowerShell might parse.
-- For local PostgreSQL setup/debugging, run `.\check_postgresql_runtime_env.ps1` before deeper app-level diagnosis; it validates CLI availability, effective env/`.env` settings, reachability, and login.
-- Treat `.\start_local_postgres.ps1` as more than a bare startup helper: it is the repo-owned local bootstrap path for PostgreSQL observability (`pg_stat_statements`, `compute_query_id`) and the local `datingapp` role defaults in the target database.
+- For local PostgreSQL setup/debugging, run `.\scripts/check_postgresql_runtime_env.ps1` before deeper app-level diagnosis; it validates CLI availability, effective env/`.env` settings, reachability, and login.
+- Treat `.\scripts/start_local_postgres.ps1` as more than a bare startup helper: it is the repo-owned local bootstrap path for PostgreSQL observability (`pg_stat_statements`, `compute_query_id`) and the local `datingapp` role defaults in the target database.
 - For PostgreSQL runtime work, prefer an already-running local PostgreSQL instance first; use Docker only as a disposable fallback when no local server is available.
-- For phone-alpha backend LAN testing, prefer `.\start_phone_alpha_backend.ps1` over manual classpath/JVM startup; it auto-compiles stale classes, builds the runtime classpath, verifies `/api/health` on localhost and LAN, and prints the Flutter `dart-define` values.
+- For phone-alpha backend LAN testing, prefer `.\scripts/start_phone_alpha_backend.ps1` over manual classpath/JVM startup; it auto-compiles stale classes, builds the runtime classpath, verifies `/api/health` on localhost and LAN, and prints the Flutter `dart-define` values.
 
 ## Editing discipline
 
@@ -63,7 +63,7 @@ Run verification in this order unless the task clearly needs a different sequenc
 2. Run focused tests for the changed area.
 3. Run a broader smoke suite if multiple subsystems changed.
 4. If the work touches repo-root PowerShell helpers, run the matching script test(s) under `src/test/powershell` before broader verification.
-5. If the work touches PostgreSQL runtime support, use `.\check_postgresql_runtime_env.ps1` for environment/connectivity triage and run the local smoke path (`.\run_postgresql_smoke.ps1` or equivalent property-driven `PostgresqlRuntimeSmokeTest`) during targeted validation.
+5. If the work touches PostgreSQL runtime support, use `.\scripts/check_postgresql_runtime_env.ps1` for environment/connectivity triage and run the local smoke path (`.\scripts/run_postgresql_smoke.ps1` or equivalent property-driven `PostgresqlRuntimeSmokeTest`) during targeted validation.
 6. Run the full Maven quality gate before claiming completion:
 
 ```powershell
@@ -73,7 +73,7 @@ mvn spotless:apply verify
 7. Run the repo-level full local verification path when the change is substantial or affects runtime/verification seams:
 
 ```powershell
-.\run_verify.ps1
+.\scripts/run_verify.ps1
 ```
 
 Use targeted Maven test selection for faster iteration, e.g.:
@@ -121,12 +121,12 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File .\src\test\powershell\ResetLocalPo
 - Prefer targeted tests during implementation.
 - Prefer the full quality gate before final handoff.
 - Current verified baseline: `mvn spotless:apply verify` passed on 2026-04-14.
-- Treat `.\check_postgresql_runtime_env.ps1` as the first local PostgreSQL preflight when PATH, `.env`, or login state may be the problem.
-- Treat `.\run_verify.ps1` as the canonical repo-level full local verification path; it runs the Maven quality gate and PostgreSQL smoke together.
-- For the phone-alpha backend REST API, prefer `.\start_phone_alpha_backend.ps1` as the one-command LAN startup path; it runs PostgreSQL preflight, starts local PostgreSQL if needed, verifies `/api/health`, and prints the Flutter `dart-define` values.
-- For PostgreSQL runtime changes, prefer the repo-local helpers `start_local_postgres.ps1`, `reset_local_postgres.ps1`, `run_postgresql_smoke.ps1`, and `stop_local_postgres.ps1` over ad-hoc Docker-first validation.
-- For local PostgreSQL resets where you may need to inspect or reuse the prior state, `.\reset_local_postgres.ps1` preserves the newest `reset_backup_*` schema by default; use `-RetainedAutoBackupSchemas <n>` when you intentionally want to keep more than one auto backup.
-- If you need a current PostgreSQL schema snapshot for review or backup before runtime work, run `.\export_local_postgresql_schema.ps1`; it exports the `public` schema via `pg_dump` against the resolved local PostgreSQL target.
+- Treat `.\scripts/check_postgresql_runtime_env.ps1` as the first local PostgreSQL preflight when PATH, `.env`, or login state may be the problem.
+- Treat `.\scripts/run_verify.ps1` as the canonical repo-level full local verification path; it runs the Maven quality gate and PostgreSQL smoke together.
+- For the phone-alpha backend REST API, prefer `.\scripts/start_phone_alpha_backend.ps1` as the one-command LAN startup path; it runs PostgreSQL preflight, starts local PostgreSQL if needed, verifies `/api/health`, and prints the Flutter `dart-define` values.
+- For PostgreSQL runtime changes, prefer the repo-local helpers `scripts/start_local_postgres.ps1`, `scripts/reset_local_postgres.ps1`, `scripts/run_postgresql_smoke.ps1`, and `scripts/stop_local_postgres.ps1` over ad-hoc Docker-first validation.
+- For local PostgreSQL resets where you may need to inspect or reuse the prior state, `.\scripts/reset_local_postgres.ps1` preserves the newest `reset_backup_*` schema by default; use `-RetainedAutoBackupSchemas <n>` when you intentionally want to keep more than one auto backup.
+- If you need a current PostgreSQL schema snapshot for review or backup before runtime work, run `.\scripts/export_local_postgresql_schema.ps1`; it exports the `public` schema via `pg_dump` against the resolved local PostgreSQL target.
 - Use shared test helpers when available:
   - `JavaFxTestSupport`
   - `UiAsyncTestSupport`

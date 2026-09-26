@@ -219,7 +219,7 @@ Before claiming work is complete:
 2. Run targeted tests for the changed area.
 3. Run broader smoke coverage if multiple subsystems changed.
 4. Run `mvn spotless:apply verify` before concluding substantial work.
-5. Use `.\run_verify.ps1` as the repo-level full local verification path when you need the Maven gate plus routine PostgreSQL smoke validation.
+5. Use `.\scripts/run_verify.ps1` as the repo-level full local verification path when you need the Maven gate plus routine PostgreSQL smoke validation.
 
 ## Canonical commands
 ```powershell
@@ -232,9 +232,9 @@ mvn test
 # Final repo-wide quality gate
 mvn spotless:apply verify
 # Optional direct local PostgreSQL runtime validation helpers
-.\start_local_postgres.ps1
-.\run_postgresql_smoke.ps1
-.\stop_local_postgres.ps1
+.\scripts/start_local_postgres.ps1
+.\scripts/run_postgresql_smoke.ps1
+.\scripts/stop_local_postgres.ps1
 ```
 
 

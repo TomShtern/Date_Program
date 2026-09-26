@@ -101,13 +101,13 @@ These are proposed destinations, not a claim that they already exist. Use one na
 
 | Current material | Exact disposition to propose and review |
 |---|---|
-| `docs/operations/ci-and-postgresql.md`, `docs/operations/postgresql-powershell.md`, `docs/archive/planning-history/POSTGRESQL_NEXT_STEPS.md`, `docs/operations/lan-backend-startup.md` | Proposed categorization completed; content freshness and source accuracy remain separate review work. |
-| `docs/archive/flutter-history/FLUTTER_FRONTEND_AGENT_GUIDE.md`, `docs/archive/flutter-history/FLUTTER_PROJECT_HANDOFF.md`, `docs/archive/flutter-history/2026-04-30-phone-alpha-backend-api-requirements.md`, `docs/API-SPECIFICATION.md` | Handoffs and requirements are archived as historical. The API specification remains legacy/unverified until checked against source; do not merge planned endpoints into implemented behavior. |
+| `docs/guides/ci-and-postgresql.md`, `docs/guides/postgresql-powershell.md`, `docs/archive/planning-history/POSTGRESQL_NEXT_STEPS.md`, `docs/guides/lan-backend-startup.md` | Proposed categorization completed; content freshness and source accuracy remain separate review work. |
+| `docs/archive/flutter-history/FLUTTER_FRONTEND_AGENT_GUIDE.md`, `docs/archive/flutter-history/FLUTTER_PROJECT_HANDOFF.md`, `docs/archive/flutter-history/2026-04-30-phone-alpha-backend-api-requirements.md`, `docs/api/API-SPECIFICATION.md` | Handoffs and requirements are archived as historical. The API specification remains legacy/unverified until checked against source; do not merge planned endpoints into implemented behavior. |
 | Root dated reports, `BACKEND_CODE_AUDIT_2026-05-06.md`, `PHONE_ALPHA_BACKEND_READINESS_REPORT.md`, `frontend-ui-overhaul-contract-response-2026-04-25.md`, `implementation_plan_By_opus_antigravity.md` | Moved to categorized paths under `docs/archive/`; their findings and recommendations remain historical. |
-| `docs/archive/audits/legacy-audit-and-suggestions/`, `docs/archive/issues/current-issues/`, `docs/archive/planning-history/codebase-review-plan-set/`, `docs/internal/ai-context/` | Reorganized under history/internal categories. Do not mechanically promote old findings to current bugs. |
+| `docs/archive/audits/legacy-audit-and-suggestions/`, `docs/archive/issues/current-issues/`, `docs/archive/planning-history/codebase-review-plan-set/`, `docs/reference/` | Reorganized under history/internal categories. Do not mechanically promote old findings to current bugs. |
 | `2026-04-05-resume-ready-project-description-options.md` and its namesake under `docs/archive/nonrelevant/` | The copies were byte-identical and both are retained under `docs/archive/cv/` with distinct names. Neither is the project's front page. |
 | `docs/archive/planning-history/ROADMAP.md` | Archived roadmap; its contents are not presented as current commitments. |
-| `postgresql-public-schema-snapshot.sql` | Retained at the repository root. The reviewed statement inventory contains DDL only (28 `CREATE TABLE` statements and no `INSERT`, `COPY`, `UPDATE`, or `MERGE` statements); this is not a complete security or provenance review. |
+| `scripts/postgresql-public-schema-snapshot.sql` | Retained at the repository root. The reviewed statement inventory contains DDL only (28 `CREATE TABLE` statements and no `INSERT`, `COPY`, `UPDATE`, or `MERGE` statements); this is not a complete security or provenance review. |
 | `.gemini/`, `.aiassistant/`, agent-specific reports | Keep settings actually needed for collaboration; archive workstation repair notes. Do not remove working instruction files merely because an assistant uses them. |
 | This review document | Retained in `docs/internal/reviews/` as historical review material; this directory is public and does not provide access control. |
 
@@ -131,9 +131,9 @@ Before making a previously private repository public, run a proper secret scan o
 
 ## 4. Repair setup and helper contracts
 
-**Verified problems.** `run_test.ps1:1-2` changes to your absolute workstation path and invokes `InterestMatcherTest`; that test name is absent from the current tracked tree. Current matching tests include `PreferencesMatcherTest` and `PreferencesMatcherLifestyleTest`. `run_event_tests.ps1:4` also hardcodes the checkout path, runs two Maven processes, and finishes without propagating their failures explicitly. `run_imagecache_test.ps1` already uses `$PSScriptRoot` and exits with Maven's exit code, so use it as a local convention rather than inventing another wrapper style.
+**Verified problems.** `scripts/run_test.ps1:1-2` changes to your absolute workstation path and invokes `InterestMatcherTest`; that test name is absent from the current tracked tree. Current matching tests include `PreferencesMatcherTest` and `PreferencesMatcherLifestyleTest`. `scripts/run_event_tests.ps1:4` also hardcodes the checkout path, runs two Maven processes, and finishes without propagating their failures explicitly. `scripts/run_imagecache_test.ps1` already uses `$PSScriptRoot` and exits with Maven's exit code, so use it as a local convention rather than inventing another wrapper style.
 
-**Action.** Either retire the redundant single-test wrappers through an approved cleanup, or make them supported helpers. A retained wrapper must resolve its own repository location, select existing tests, fail immediately or aggregate failures explicitly, and return a nonzero exit code if Maven fails. Do not hide failing tests by adding skip flags. For `run_event_tests.ps1`, one Maven invocation selecting both handler tests is simpler if there is no deliberate isolation requirement.
+**Action.** Either retire the redundant single-test wrappers through an approved cleanup, or make them supported helpers. A retained wrapper must resolve its own repository location, select existing tests, fail immediately or aggregate failures explicitly, and return a nonzero exit code if Maven fails. Do not hide failing tests by adding skip flags. For `scripts/run_event_tests.ps1`, one Maven invocation selecting both handler tests is simpler if there is no deliberate isolation requirement.
 
 If scripts later move under `scripts/`, introduce one consistent repository-root resolution rule and update every `$PSScriptRoot`-relative dependency, caller, README example, IDE task, and PowerShell script test. Root compatibility wrappers are a reasonable migration step. This is optional after the document cleanup, not a prerequisite to a neat repository.
 
@@ -143,7 +143,7 @@ The primary setup guide should explain PostgreSQL prerequisites, `.env` creation
 
 ## 5. Keep the public API description accurate
 
-This review's earlier comparison of `docs/operations/lan-backend-startup.md` and `docs/API-SPECIFICATION.md` is a historical finding. The specification remains marked legacy/unverified in the documentation index; compare both against current code before using them as an integration contract.
+This review's earlier comparison of `docs/guides/lan-backend-startup.md` and `docs/api/API-SPECIFICATION.md` is a historical finding. The specification remains marked legacy/unverified in the documentation index; compare both against current code before using them as an integration contract.
 
 The API spec's password table at line 81 says the default minimum is eight characters; tracked `config/app-config.json` specifies twelve. State the effective shipped configuration and distinguish it from any code-level fallback.
 
@@ -167,7 +167,7 @@ The source-preserving gate used was `mvn -B verify`. The usual local `spotless:a
 | Test stage | **1,941 run; 1 failure; 5 errors; 2 skipped** | The verification command failed. Do not describe this checkout as passing its full gate. |
 | Final Maven result | **BUILD FAILURE**, completed at `2026-09-15T00:06:19+03:00`, elapsed 9:03 | A terminal result, not an unfinished process or an older test snapshot. |
 | Verify-phase plugins after tests | Not reached | No fresh passing claim for Spotless, PMD, SpotBugs reporting, or the JaCoCo gate. |
-| PostgreSQL startup/smoke and `run_verify.ps1` | Not invoked | Starting or modifying the local database and applying formatting were outside this review. |
+| PostgreSQL startup/smoke and `scripts/run_verify.ps1` | Not invoked | Starting or modifying the local database and applying formatting were outside this review. |
 
 Detailed logs are local generated artifacts at `target/cv-readiness-validation/mvn-offline-verify.log` and `target/cv-readiness-validation/mvn-verify.log`. Individual fresh failure reports are under `target/surefire-reports/`. Keep these out of Git; the findings and command are sufficient evidence for this plan.
 
@@ -211,7 +211,7 @@ There is already meaningful verification infrastructure:
 
 Add a Maven wrapper with a pinned, tested Maven version if reducing onboarding friction is a priority. Update `.gitignore:43-44`, which currently ignores wrapper configuration, and commit the generated wrapper scripts/configuration through the normal review process. Validate Windows and the Linux CI command. Retain Java 25 preview flags unless a separate compatibility change proves they can be removed.
 
-`run_verify.ps1` remains the canonical supported local workflow, but explain its side effects: it starts PostgreSQL, applies formatting, runs verification and smoke checks, and stops PostgreSQL. Distinguish that workflow from a non-formatting check such as `mvn verify`; do not silently redefine the existing helper during a README cleanup.
+`scripts/run_verify.ps1` remains the canonical supported local workflow, but explain its side effects: it starts PostgreSQL, applies formatting, runs verification and smoke checks, and stops PostgreSQL. Distinguish that workflow from a non-formatting check such as `mvn verify`; do not silently redefine the existing helper during a README cleanup.
 
 ## 7. Address two backend contracts before claiming real-user readiness
 

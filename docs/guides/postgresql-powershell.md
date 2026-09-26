@@ -1,0 +1,125 @@
+# PostgreSQL and PowerShell Guide
+
+This file records the practical rules for PostgreSQL runtime work in this repository on Windows.
+
+## What Is Canonical
+
+- Runtime storage is PostgreSQL by default through [`config/app-config.json`](../../config/app-config.json).
+- The production/runtime composition path is `StorageFactory.buildSqlDatabase(...)`.
+- `buildH2(...)` and `buildInMemory(...)` are still valid compatibility and test paths. They are not the main runtime path.
+- The canonical full local verification command is `.\scripts/run_verify.ps1`.
+- `.\scripts/start_local_postgres.ps1` now ensures the local cluster enables `pg_stat_statements` and `compute_query_id`, then installs the `pg_stat_statements` extension in the target database.
+- `.\scripts/start_local_postgres.ps1` also applies local role defaults for the `datingapp` role in the `datingapp` database:
+  - `search_path = public`
+  - `statement_timeout = 30s`
+  - `lock_timeout = 5s`
+  - `idle_in_transaction_session_timeout = 5min`
+- `.\scripts/reset_local_postgres.ps1` now keeps the newest auto-generated backup schema by default and best-effort removes older `reset_backup_*` schemas after a successful reset. Use `-RetainedAutoBackupSchemas <n>` to retain more than one auto backup.
+- The canonical local PostgreSQL helper scripts are:
+  - `.\scripts/start_local_postgres.ps1`
+  - `.\scripts/run_postgresql_smoke.ps1`
+  - `.\scripts/stop_local_postgres.ps1`
+  - `.\scripts/reset_local_postgres.ps1` — rebuilds the local database from a preserved backup schema
+
+Production/runtime PostgreSQL sessions also set `search_path` explicitly in `DatabaseManager`, so the application does not rely only on ambient server defaults.
+
+## Daily Commands
+
+```powershell
+# Check whether the local PostgreSQL runtime is ready for VS Code or Maven
+.\scripts/check_postgresql_runtime_env.ps1
+
+# Start or reuse the local PostgreSQL instance
+.\scripts/start_local_postgres.ps1
+
+# Run only the PostgreSQL runtime smoke path
+.\scripts/run_postgresql_smoke.ps1
+
+# Reset the local PostgreSQL database with a preserved backup schema
+.\scripts/reset_local_postgres.ps1
+
+# Run the full local gate: Maven quality gate + PostgreSQL smoke + cleanup
+.\scripts/run_verify.ps1
+
+# Stop the local PostgreSQL instance
+.\scripts/stop_local_postgres.ps1
+```
+
+## PowerShell and Windows Rules
+
+- Prefer PowerShell-friendly commands and script entrypoints in this repo.
+- When Maven test selection includes commas, prefer `mvn --% ...` so PowerShell does not reinterpret arguments.
+- On Windows, do not assume `pg_ctl -w start` is a safe success boundary when launched through PowerShell wrappers.
+- Treat PostgreSQL readiness as the real success condition. In this repo, `scripts/start_local_postgres.ps1` polls `pg_isready`.
+- Keep the `pg_ctl -o` server options payload as one quoted argument. Splitting it breaks startup on Windows because `pg_ctl` can misread `-h` as its own switch.
+- If you need hidden child script execution during tests, prefer `Start-Process ... -WindowStyle Hidden` so no blank PowerShell window appears.
+
+## Credentials and Config
+
+- Configure local credentials through your own ignored `.env` file or OS/JVM environment. Do not copy a password or shared secret from a repository example into a real deployment.
+- The checked-in PostgreSQL configuration describes the local database name and port; confirm the effective username and credential source in your local setup before connecting.
+- Runtime password can be supplied through:
+  - `.env`
+  - OS env var `DATING_APP_DB_PASSWORD`
+  - JVM property `-Ddatingapp.db.password=...`
+- Local PostgreSQL defaults are already represented in:
+  - [`config/app-config.json`](../../config/app-config.json)
+  - [`config/app-config.postgresql.local.json`](../../config/app-config.postgresql.local.json)
+  - [`.env.example`](../../.env.example)
+
+## Important Nuance
+
+- `AppConfig.Builder` still defaults to H2.
+- That is intentional for compatibility and test boundaries.
+- The normal runtime path still resolves to PostgreSQL because bootstrap loads the repo config file.
+- Do not "fix" this by blindly changing every H2 default to PostgreSQL without checking the H2-backed compatibility tests.
+
+## What To Verify
+
+- For PowerShell script changes:
+  - `.\src\test\powershell\StartLocalPostgresScriptTest.ps1`
+  - `.\src\test\powershell\RunPostgresqlSmokeScriptTest.ps1`
+  - `.\src\test\powershell\RunVerifyScriptTest.ps1`
+  - `.\src\test\powershell\StopLocalPostgresScriptTest.ps1`
+- For PostgreSQL runtime changes:
+  - `.\scripts/run_postgresql_smoke.ps1`
+  - `.\scripts/run_verify.ps1`
+- For full repo verification after substantial changes:
+  - `mvn spotless:apply verify`
+  - `.\scripts/run_verify.ps1`
+
+## Do
+
+- Use the local PostgreSQL instance first.
+- Reuse the repo helper scripts instead of ad-hoc `pg_ctl` commands.
+- Keep logs and stderr/stdout redirection when launching `pg_ctl` from PowerShell.
+- Restore environment variables after PostgreSQL smoke runs.
+- Keep PowerShell script tests as the regression seam for Windows process-launch behavior.
+
+## Avoid
+
+- Do not reintroduce direct blocking waits on `pg_ctl` as the only success signal.
+- Do not split the `-o "-p ... -h localhost"` payload into separate PowerShell arguments.
+- Do not assume a passing Maven-only gate proves the PostgreSQL runtime path.
+- Do not treat Docker as the first choice here; it is only a fallback when no local PostgreSQL instance is available.
+- Do not remove H2 compatibility paths just because runtime now uses PostgreSQL.
+
+## Troubleshooting
+
+- If the VS Code PostgreSQL extension times out, run `.\scripts/check_postgresql_runtime_env.ps1` first.
+- If the preflight says PostgreSQL is unreachable, start it with `.\scripts/start_local_postgres.ps1` and retry the connection.
+
+- If `scripts/start_local_postgres.ps1` hangs, inspect:
+  - `data/local-postgresql/postgres.log`
+  - `data/local-postgresql/pg_ctl-start.stderr.log`
+  - `data/local-postgresql/pg_ctl-start.stdout.log`
+- If smoke fails but direct startup works, check the Maven properties passed by `scripts/run_postgresql_smoke.ps1`.
+- If the full verify path fails after Maven succeeds, the failure is usually in the PostgreSQL smoke path or cleanup path, not the quality gate itself.
+- If a PowerShell test opens a blank extra window again, inspect any new `Start-Process` usage first.
+- If you intentionally want to keep multiple historical `reset_backup_*` schemas for manual inspection, run `.\scripts/reset_local_postgres.ps1 -RetainedAutoBackupSchemas <n>`.
+
+## Recommended Mental Model
+
+- `mvn spotless:apply verify` proves the Maven/code-quality side.
+- `PostgresqlRuntimeSmokeTest` proves the storage/runtime side.
+- `scripts/run_verify.ps1` is the combined local proof that both sides still work together on Windows.

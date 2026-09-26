@@ -147,7 +147,7 @@ AppSession session = AppSession.getInstance();
 - `UiAsyncTestSupport` complements `JavaFxTestSupport` for async UI tests.
 - `DevDataSeeder` is environment-gated (`DATING_APP_SEED_DATA=true`) and idempotent.
 - The candidates route in `RestApiServer` remains the explicit direct-read exception.
-- Local PostgreSQL validation is now supported through `PostgresqlRuntimeSmokeTest` plus `start_local_postgres.ps1`, `run_postgresql_smoke.ps1`, and `stop_local_postgres.ps1`; Docker is fallback-only when no local PostgreSQL instance is available.
+- Local PostgreSQL validation is now supported through `PostgresqlRuntimeSmokeTest` plus `scripts/start_local_postgres.ps1`, `scripts/run_postgresql_smoke.ps1`, and `scripts/stop_local_postgres.ps1`; Docker is fallback-only when no local PostgreSQL instance is available.
 
 ## 8. Build, test, and quality commands
 
@@ -158,9 +158,9 @@ mvn test
 mvn -Ptest-output-verbose test
 mvn spotless:apply verify
 
-.\start_local_postgres.ps1
-.\run_postgresql_smoke.ps1
-.\stop_local_postgres.ps1
+.\scripts/start_local_postgres.ps1
+.\scripts/run_postgresql_smoke.ps1
+.\scripts/stop_local_postgres.ps1
 ```
 
 `pom.xml` quality gates:

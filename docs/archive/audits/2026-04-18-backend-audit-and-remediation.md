@@ -8,7 +8,7 @@
 
 - Performed a code-first backend audit across workflow, storage/runtime, and REST adapter seams.
 - Verified candidate findings against the owning source files before accepting them.
-- Ran the repo-level verification path with `run_verify.ps1` to anchor the audit in fresh execution evidence.
+- Ran the repo-level verification path with `scripts/run_verify.ps1` to anchor the audit in fresh execution evidence.
 
 ## Findings
 
@@ -84,12 +84,12 @@
   - `GET /api/users` returned `200` with the then-configured LAN shared-secret header
   - `OPTIONS /api/users` from `http://192.168.1.194:3000` returned `200` with `Access-Control-Allow-Origin`
 - Repo-level verification passed:
-  - `run_verify.ps1`
+  - `scripts/run_verify.ps1`
   - Maven quality gate: `1866` tests, `0` failures, `0` errors, `2` skipped
   - PostgreSQL smoke verification: `2` tests, `0` failures, `0` errors
 
 ## Deliverables From This Pass
 
 - Backend regressions fixed in the owning code paths.
-- Verified LAN startup guide added at `docs/operations/lan-backend-startup.md`.
+- Verified LAN startup guide added at `docs/guides/lan-backend-startup.md`.
 - Roadmap should now treat green verification and LAN REST readiness as completed, not pending.

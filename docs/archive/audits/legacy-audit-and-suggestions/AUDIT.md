@@ -6,9 +6,9 @@
 
 This audit has been split into problem-type files:
 
-- [AUDIT_PROBLEMS_CORE.md](../../../plans/implemented/completed-plans/AUDIT_PROBLEMS_CORE.md) — historical core/services findings
-- [AUDIT_PROBLEMS_UI.md](../../../plans/implemented/completed-plans/AUDIT_PROBLEMS_UI.md) — historical JavaFX/ViewModel findings
-- [AUDIT_PROBLEMS_STORAGE.md](../../../plans/implemented/completed-plans/AUDIT_PROBLEMS_STORAGE.md) — historical storage findings
+- [AUDIT_PROBLEMS_CORE.md](../../../plans/completed/AUDIT_PROBLEMS_CORE.md) — historical core/services findings
+- [AUDIT_PROBLEMS_UI.md](../../../plans/completed/AUDIT_PROBLEMS_UI.md) — historical JavaFX/ViewModel findings
+- [AUDIT_PROBLEMS_STORAGE.md](../../../plans/completed/AUDIT_PROBLEMS_STORAGE.md) — historical storage findings
 - [AUDIT_PROBLEMS_SECURITY.md](AUDIT_PROBLEMS_SECURITY.md) — historical API/security findings
 <!-- ChangeStamp: 2|2026-02-06 17:29:51|agent:codex|scope:audit-group-index|Regroup audit index by problem type|c:/Users/tom7s/Desktopp/Claude_Folder_2/Date_Program/Audit and Suggestions/AUDIT.md -->
 

@@ -2,10 +2,10 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $repoRoot = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $PSScriptRoot))
-$scriptUnderTest = Join-Path $repoRoot 'run_verify.ps1'
+$scriptUnderTest = Join-Path $repoRoot 'scripts/run_verify.ps1'
 
 if (-not (Test-Path $scriptUnderTest)) {
-    throw "Could not find run_verify.ps1 at $scriptUnderTest"
+    throw "Could not find scripts/run_verify.ps1 at $scriptUnderTest"
 }
 
 function New-VerifyScriptSandbox {
@@ -17,16 +17,17 @@ function New-VerifyScriptSandbox {
 
     $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("run-verify-test-" + [System.Guid]::NewGuid())
     New-Item -ItemType Directory -Path $tempRoot | Out-Null
+    New-Item -ItemType Directory -Force -Path (Join-Path $tempRoot 'scripts') | Out-Null
 
-    $copiedScript = Join-Path $tempRoot 'run_verify.ps1'
+    $copiedScript = Join-Path $tempRoot 'scripts/run_verify.ps1'
     $startCountFile = Join-Path $tempRoot 'start-count.txt'
     $mavenCountFile = Join-Path $tempRoot 'mvn-count.txt'
     $smokeCountFile = Join-Path $tempRoot 'smoke-count.txt'
     $stopCountFile = Join-Path $tempRoot 'stop-count.txt'
-    $stubStart = Join-Path $tempRoot 'start_local_postgres.ps1'
+    $stubStart = Join-Path $tempRoot 'scripts/start_local_postgres.ps1'
     $stubMaven = Join-Path $tempRoot 'mvn.cmd'
-    $stubSmoke = Join-Path $tempRoot 'run_postgresql_smoke.ps1'
-    $stubStop = Join-Path $tempRoot 'stop_local_postgres.ps1'
+    $stubSmoke = Join-Path $tempRoot 'scripts/run_postgresql_smoke.ps1'
+    $stubStop = Join-Path $tempRoot 'scripts/stop_local_postgres.ps1'
 
     Copy-Item -Path $scriptUnderTest -Destination $copiedScript
 
@@ -38,7 +39,7 @@ function New-VerifyScriptSandbox {
     Set-Content -Path $stubStart -Value @"
 Set-StrictMode -Version Latest
 
-`$countFile = Join-Path `$PSScriptRoot 'start-count.txt'
+`$countFile = Join-Path (Split-Path -Parent `$PSScriptRoot) 'start-count.txt'
 `$count = 0
 if (Test-Path `$countFile) {
     `$count = [int]((Get-Content -Path `$countFile -Raw).Trim())
@@ -63,7 +64,7 @@ exit /b $MavenExitCode
 param([switch]`$ThrowOnFailure)
 Set-StrictMode -Version Latest
 
-`$countFile = Join-Path `$PSScriptRoot 'smoke-count.txt'
+`$countFile = Join-Path (Split-Path -Parent `$PSScriptRoot) 'smoke-count.txt'
 
 `$count = 0
 if (Test-Path `$countFile) {
@@ -83,7 +84,7 @@ exit $SmokeExitCode
     Set-Content -Path $stubStop -Value @"
 Set-StrictMode -Version Latest
 
-`$countFile = Join-Path `$PSScriptRoot 'stop-count.txt'
+`$countFile = Join-Path (Split-Path -Parent `$PSScriptRoot) 'stop-count.txt'
 
 `$count = 0
 if (Test-Path `$countFile) {
@@ -132,23 +133,23 @@ function Assert-VerifyScriptSuccess {
         & pwsh -NoProfile -ExecutionPolicy Bypass -File $sandbox.CopiedScript | Out-Null
 
         if ($LASTEXITCODE -ne 0) {
-            throw "Expected run_verify.ps1 to exit with code 0 on the happy path, but observed $LASTEXITCODE."
+            throw "Expected scripts/run_verify.ps1 to exit with code 0 on the happy path, but observed $LASTEXITCODE."
         }
 
         if ((Get-CountValue -Path $sandbox.StartCountFile) -ne 1) {
-            throw 'Expected run_verify.ps1 to invoke start_local_postgres.ps1 exactly once on the happy path.'
+            throw 'Expected scripts/run_verify.ps1 to invoke scripts/start_local_postgres.ps1 exactly once on the happy path.'
         }
 
         if ((Get-CountValue -Path $sandbox.MavenCountFile) -ne 1) {
-            throw 'Expected run_verify.ps1 to invoke Maven exactly once on the happy path.'
+            throw 'Expected scripts/run_verify.ps1 to invoke Maven exactly once on the happy path.'
         }
 
         if ((Get-CountValue -Path $sandbox.SmokeCountFile) -ne 1) {
-            throw 'Expected run_verify.ps1 to invoke PostgreSQL smoke exactly once on the happy path.'
+            throw 'Expected scripts/run_verify.ps1 to invoke PostgreSQL smoke exactly once on the happy path.'
         }
 
         if ((Get-CountValue -Path $sandbox.StopCountFile) -ne 1) {
-            throw 'Expected run_verify.ps1 to invoke stop_local_postgres.ps1 exactly once on the happy path.'
+            throw 'Expected scripts/run_verify.ps1 to invoke scripts/stop_local_postgres.ps1 exactly once on the happy path.'
         }
     }
     finally {
@@ -166,23 +167,23 @@ function Assert-VerifyScriptPropagatesMavenFailure {
         & pwsh -NoProfile -ExecutionPolicy Bypass -File $sandbox.CopiedScript | Out-Null
 
         if ($LASTEXITCODE -ne 19) {
-            throw "Expected run_verify.ps1 to exit with code 19 when Maven fails, but observed $LASTEXITCODE."
+            throw "Expected scripts/run_verify.ps1 to exit with code 19 when Maven fails, but observed $LASTEXITCODE."
         }
 
         if ((Get-CountValue -Path $sandbox.StartCountFile) -ne 1) {
-            throw 'Expected run_verify.ps1 to invoke start_local_postgres.ps1 before Maven fails.'
+            throw 'Expected scripts/run_verify.ps1 to invoke scripts/start_local_postgres.ps1 before Maven fails.'
         }
 
         if ((Get-CountValue -Path $sandbox.MavenCountFile) -ne 1) {
-            throw 'Expected run_verify.ps1 to invoke Maven exactly once when Maven fails.'
+            throw 'Expected scripts/run_verify.ps1 to invoke Maven exactly once when Maven fails.'
         }
 
         if ((Get-CountValue -Path $sandbox.SmokeCountFile) -ne 0) {
-            throw 'Expected run_verify.ps1 to skip PostgreSQL smoke when Maven fails.'
+            throw 'Expected scripts/run_verify.ps1 to skip PostgreSQL smoke when Maven fails.'
         }
 
         if ((Get-CountValue -Path $sandbox.StopCountFile) -ne 1) {
-            throw 'Expected run_verify.ps1 to still invoke stop_local_postgres.ps1 when Maven fails.'
+            throw 'Expected scripts/run_verify.ps1 to still invoke scripts/stop_local_postgres.ps1 when Maven fails.'
         }
     }
     finally {
@@ -200,23 +201,23 @@ function Assert-VerifyScriptPropagatesSmokeFailure {
         & pwsh -NoProfile -ExecutionPolicy Bypass -File $sandbox.CopiedScript | Out-Null
 
         if ($LASTEXITCODE -ne 23) {
-            throw "Expected run_verify.ps1 to exit with code 23 when smoke fails, but observed $LASTEXITCODE."
+            throw "Expected scripts/run_verify.ps1 to exit with code 23 when smoke fails, but observed $LASTEXITCODE."
         }
 
         if ((Get-CountValue -Path $sandbox.StartCountFile) -ne 1) {
-            throw 'Expected run_verify.ps1 to invoke start_local_postgres.ps1 before smoke fails.'
+            throw 'Expected scripts/run_verify.ps1 to invoke scripts/start_local_postgres.ps1 before smoke fails.'
         }
 
         if ((Get-CountValue -Path $sandbox.MavenCountFile) -ne 1) {
-            throw 'Expected run_verify.ps1 to invoke Maven exactly once when smoke fails.'
+            throw 'Expected scripts/run_verify.ps1 to invoke Maven exactly once when smoke fails.'
         }
 
         if ((Get-CountValue -Path $sandbox.SmokeCountFile) -ne 1) {
-            throw 'Expected run_verify.ps1 to invoke PostgreSQL smoke exactly once when smoke fails.'
+            throw 'Expected scripts/run_verify.ps1 to invoke PostgreSQL smoke exactly once when smoke fails.'
         }
 
         if ((Get-CountValue -Path $sandbox.StopCountFile) -ne 1) {
-            throw 'Expected run_verify.ps1 to invoke stop_local_postgres.ps1 when smoke fails.'
+            throw 'Expected scripts/run_verify.ps1 to invoke scripts/stop_local_postgres.ps1 when smoke fails.'
         }
     }
     finally {
@@ -234,23 +235,23 @@ function Assert-VerifyScriptPropagatesStartupFailure {
         & pwsh -NoProfile -ExecutionPolicy Bypass -File $sandbox.CopiedScript | Out-Null
 
         if ($LASTEXITCODE -ne 17) {
-            throw "Expected run_verify.ps1 to exit with code 17 when startup fails, but observed $LASTEXITCODE."
+            throw "Expected scripts/run_verify.ps1 to exit with code 17 when startup fails, but observed $LASTEXITCODE."
         }
 
         if ((Get-CountValue -Path $sandbox.StartCountFile) -ne 1) {
-            throw 'Expected run_verify.ps1 to invoke start_local_postgres.ps1 exactly once when startup fails.'
+            throw 'Expected scripts/run_verify.ps1 to invoke scripts/start_local_postgres.ps1 exactly once when startup fails.'
         }
 
         if ((Get-CountValue -Path $sandbox.MavenCountFile) -ne 0) {
-            throw 'Expected run_verify.ps1 to skip Maven when startup fails.'
+            throw 'Expected scripts/run_verify.ps1 to skip Maven when startup fails.'
         }
 
         if ((Get-CountValue -Path $sandbox.SmokeCountFile) -ne 0) {
-            throw 'Expected run_verify.ps1 to skip PostgreSQL smoke when startup fails.'
+            throw 'Expected scripts/run_verify.ps1 to skip PostgreSQL smoke when startup fails.'
         }
 
         if ((Get-CountValue -Path $sandbox.StopCountFile) -ne 1) {
-            throw 'Expected run_verify.ps1 to still invoke stop_local_postgres.ps1 when startup fails.'
+            throw 'Expected scripts/run_verify.ps1 to still invoke scripts/stop_local_postgres.ps1 when startup fails.'
         }
     }
     finally {

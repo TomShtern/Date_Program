@@ -2,10 +2,10 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $repoRoot = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $PSScriptRoot))
-$scriptUnderTest = Join-Path $repoRoot 'check_postgresql_runtime_env.ps1'
+$scriptUnderTest = Join-Path $repoRoot 'scripts/check_postgresql_runtime_env.ps1'
 
 if (-not (Test-Path $scriptUnderTest)) {
-    throw "Could not find check_postgresql_runtime_env.ps1 at $scriptUnderTest"
+    throw "Could not find scripts/check_postgresql_runtime_env.ps1 at $scriptUnderTest"
 }
 
 $pwshExe = (Get-Command pwsh -ErrorAction Stop).Source
@@ -26,8 +26,9 @@ function New-PreflightSandbox {
 
     $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ('check-postgresql-runtime-env-test-' + [System.Guid]::NewGuid())
     New-Item -ItemType Directory -Path $tempRoot | Out-Null
+    New-Item -ItemType Directory -Force -Path (Join-Path $tempRoot 'scripts') | Out-Null
 
-    $copiedScript = Join-Path $tempRoot 'check_postgresql_runtime_env.ps1'
+    $copiedScript = Join-Path $tempRoot 'scripts/check_postgresql_runtime_env.ps1'
     $pgIsReadyCountFile = Join-Path $tempRoot 'pg-isready-count.txt'
     $psqlCountFile = Join-Path $tempRoot 'psql-count.txt'
 
@@ -144,7 +145,7 @@ function Assert-PreflightFailsWhenServerIsNotReachable {
         }
 
         if ($result.Output -notmatch 'start_local_postgres\.ps1') {
-            throw 'Expected unreachable-server output to point at start_local_postgres.ps1.'
+            throw 'Expected unreachable-server output to point at scripts/start_local_postgres.ps1.'
         }
 
         if ((Get-CountValue -Path $pgIsReadyCountFile) -ne 1) {

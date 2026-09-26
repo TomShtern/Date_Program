@@ -197,8 +197,8 @@ The current default app configuration expects the local PostgreSQL runtime.
 Server repo commands:
 
 ```powershell
-.\check_postgresql_runtime_env.ps1
-.\start_local_postgres.ps1
+.\scripts/check_postgresql_runtime_env.ps1
+.\scripts/start_local_postgres.ps1
 ```
 
 ### 7.2 Compile and build the runtime classpath
@@ -1021,7 +1021,7 @@ When starting the blank Flutter project, make sure these are true before writing
 If the original server repo is available, these were the main source-of-truth files behind this handoff:
 
 - `docs/archive/planning-history/ROADMAP.md` (historical)
-- `docs/operations/lan-backend-startup.md`
+- `docs/guides/lan-backend-startup.md`
 - `docs/archive/audits/2026-04-18-backend-audit-and-remediation.md` (historical)
 - `src/main/java/datingapp/app/api/RestRouteSupport.java`
 - `src/main/java/datingapp/app/api/RestApiServer.java`

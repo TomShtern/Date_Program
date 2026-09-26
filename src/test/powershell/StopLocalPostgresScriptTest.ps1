@@ -2,10 +2,10 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $repoRoot = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $PSScriptRoot))
-$scriptUnderTest = Join-Path $repoRoot 'stop_local_postgres.ps1'
+$scriptUnderTest = Join-Path $repoRoot 'scripts/stop_local_postgres.ps1'
 
 if (-not (Test-Path $scriptUnderTest)) {
-    throw "Could not find stop_local_postgres.ps1 at $scriptUnderTest"
+    throw "Could not find scripts/stop_local_postgres.ps1 at $scriptUnderTest"
 }
 
 $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("stop-local-postgres-test-" + [System.Guid]::NewGuid())
@@ -35,15 +35,15 @@ try {
     $output = & pwsh -NoProfile -ExecutionPolicy Bypass -File $scriptUnderTest -BaseDir $baseDir 2>&1 | Out-String
 
     if ($LASTEXITCODE -ne 0) {
-        throw "Expected stop_local_postgres.ps1 to exit with code 0 when PostgreSQL is already stopped, but observed $LASTEXITCODE."
+        throw "Expected scripts/stop_local_postgres.ps1 to exit with code 0 when PostgreSQL is already stopped, but observed $LASTEXITCODE."
     }
 
     if ($output -notmatch 'Local PostgreSQL is not running\.') {
-        throw 'Expected stop_local_postgres.ps1 to report that PostgreSQL is not running.'
+        throw 'Expected scripts/stop_local_postgres.ps1 to report that PostgreSQL is not running.'
     }
 
     if ([int]((Get-Content -Path $pgCtlCountFile -Raw).Trim()) -ne 1) {
-        throw 'Expected stop_local_postgres.ps1 to check status exactly once on the no-op stop path.'
+        throw 'Expected scripts/stop_local_postgres.ps1 to check status exactly once on the no-op stop path.'
     }
 }
 finally {

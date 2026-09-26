@@ -2,7 +2,7 @@
 paths:
   - "src/main/java/datingapp/app/api/**"
   - "src/test/java/datingapp/app/api/**"
-  - "start_phone_alpha_backend.ps1"
+  - "scripts/start_phone_alpha_backend.ps1"
 ---
 
 ## REST transport and the Flutter frontend
@@ -42,7 +42,7 @@ allowed CORS origin list; a blank host falls back to loopback.
 
 ### The phone-alpha path
 
-`start_phone_alpha_backend.ps1` detects the laptop LAN IP, starts the server on
+`scripts/start_phone_alpha_backend.ps1` detects the laptop LAN IP, starts the server on
 `0.0.0.0:7070`, health-checks `/api/health` on loopback **and** LAN, and prints
 the Flutter `dart-define` values:
 

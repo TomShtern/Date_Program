@@ -328,7 +328,7 @@
                 <artifactId>maven-checkstyle-plugin</artifactId>
                 <version>3.6.0</version>
                 <configuration>
-                    <configLocation>checkstyle.xml</configLocation>
+                    <configLocation>${project.basedir}/config/quality/checkstyle.xml</configLocation>
                     <consoleOutput>true</consoleOutput>
                     <failsOnError>true</failsOnError>
                     <failOnViolation>true</failOnViolation>
@@ -358,7 +358,7 @@
                 <version>3.28.0</version>
                 <configuration>
                     <rulesets>
-                        <ruleset>pmd-rules.xml</ruleset>
+                        <ruleset>${project.basedir}/config/quality/pmd-rules.xml</ruleset>
                     </rulesets>
                     <minimumTokens>100</minimumTokens>
                     <linkXRef>false</linkXRef>
@@ -386,7 +386,7 @@
                     <maxHeap>1024</maxHeap>
                     <xmlOutput>true</xmlOutput>
                     <htmlOutput>true</htmlOutput>
-                    <excludeFilterFile>${project.basedir}/spotbugs-exclude.xml</excludeFilterFile>
+                    <excludeFilterFile>${project.basedir}/config/quality/spotbugs-exclude.xml</excludeFilterFile>
                 </configuration>
                 <executions>
                     <execution>

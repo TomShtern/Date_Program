@@ -2,10 +2,10 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $repoRoot = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $PSScriptRoot))
-$scriptUnderTest = Join-Path $repoRoot 'reset_local_postgres.ps1'
+$scriptUnderTest = Join-Path $repoRoot 'scripts/reset_local_postgres.ps1'
 
 if (-not (Test-Path $scriptUnderTest)) {
-    throw "Could not find reset_local_postgres.ps1 at $scriptUnderTest"
+    throw "Could not find scripts/reset_local_postgres.ps1 at $scriptUnderTest"
 }
 
 function Write-StubFile {
@@ -26,8 +26,9 @@ function New-ResetScriptSandbox {
 
     $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("reset-local-postgres-test-" + [System.Guid]::NewGuid())
     New-Item -ItemType Directory -Path $tempRoot | Out-Null
+    New-Item -ItemType Directory -Force -Path (Join-Path $tempRoot 'scripts') | Out-Null
 
-    $copiedScript = Join-Path $tempRoot 'reset_local_postgres.ps1'
+    $copiedScript = Join-Path $tempRoot 'scripts/reset_local_postgres.ps1'
     $originalPath = $env:PATH
 
     $startCountFile = Join-Path $tempRoot 'start-count.txt'
@@ -51,7 +52,7 @@ function New-ResetScriptSandbox {
     Set-Content -Path $mavenEnvFile -Value ''
     Set-Content -Path $smokeArgsFile -Value ''
 
-    Write-StubFile -Path (Join-Path $tempRoot 'start_local_postgres.ps1') -Content @"
+    Write-StubFile -Path (Join-Path $tempRoot 'scripts/start_local_postgres.ps1') -Content @"
 param(
     [int]`$Port,
     [string]`$BaseDir,
@@ -61,10 +62,10 @@ param(
     [int]`$StartupTimeoutSeconds
 )
 Set-StrictMode -Version Latest
-`$countFile = Join-Path `$PSScriptRoot 'start-count.txt'
+`$countFile = Join-Path (Split-Path -Parent `$PSScriptRoot) 'start-count.txt'
 `$count = [int]((Get-Content -Path `$countFile -Raw).Trim())
 Set-Content -Path `$countFile -Value ([string](`$count + 1))
-Set-Content -Path (Join-Path `$PSScriptRoot 'start-args.txt') -Value @(
+Set-Content -Path (Join-Path (Split-Path -Parent `$PSScriptRoot) 'start-args.txt') -Value @(
     "Port=`$Port"
     "BaseDir=`$BaseDir"
     "Superuser=`$Superuser"
@@ -75,7 +76,7 @@ Set-Content -Path (Join-Path `$PSScriptRoot 'start-args.txt') -Value @(
 return
 "@
 
-    Write-StubFile -Path (Join-Path $tempRoot 'run_postgresql_smoke.ps1') -Content @"
+    Write-StubFile -Path (Join-Path $tempRoot 'scripts/run_postgresql_smoke.ps1') -Content @"
 param(
     [int]`$Port,
     [string]`$Username,
@@ -84,10 +85,10 @@ param(
     [switch]`$ThrowOnFailure
 )
 Set-StrictMode -Version Latest
-`$countFile = Join-Path `$PSScriptRoot 'smoke-count.txt'
+`$countFile = Join-Path (Split-Path -Parent `$PSScriptRoot) 'smoke-count.txt'
 `$count = [int]((Get-Content -Path `$countFile -Raw).Trim())
 Set-Content -Path `$countFile -Value ([string](`$count + 1))
-Add-Content -Path (Join-Path `$PSScriptRoot 'smoke-args.log') -Value ("Port={0};Username={1};Database={2};ThrowOnFailure={3}" -f `$Port, `$Username, `$Database, `$ThrowOnFailure.IsPresent)
+Add-Content -Path (Join-Path (Split-Path -Parent `$PSScriptRoot) 'smoke-args.log') -Value ("Port={0};Username={1};Database={2};ThrowOnFailure={3}" -f `$Port, `$Username, `$Database, `$ThrowOnFailure.IsPresent)
 if (`$ThrowOnFailure -and $SmokeExitCode -ne 0) {
     `$global:LASTEXITCODE = $SmokeExitCode
     throw 'Smoke failed.'
@@ -269,7 +270,7 @@ function Assert-ResetScriptHappyPath {
             }
 
             if ($result.ExitCode -ne 0) {
-                throw "Expected reset_local_postgres.ps1 to exit with code 0 on the happy path, but observed $($result.ExitCode)."
+                throw "Expected scripts/reset_local_postgres.ps1 to exit with code 0 on the happy path, but observed $($result.ExitCode)."
             }
 
             if ((Get-CountValue -Path $sandbox.StartCountFile) -ne 1) {
@@ -380,7 +381,7 @@ function Assert-ResetScriptShortCircuitsWhenStartFails {
             }
 
             if ($result.ExitCode -ne 17) {
-                throw "Expected reset_local_postgres.ps1 to propagate exit code 17, but observed $($result.ExitCode)."
+                throw "Expected scripts/reset_local_postgres.ps1 to propagate exit code 17, but observed $($result.ExitCode)."
             }
 
             if ((Get-CountValue -Path $sandbox.StartCountFile) -ne 1) {
@@ -416,7 +417,7 @@ function Assert-ResetScriptStopsAfterMavenFailure {
             }
 
             if ($result.ExitCode -ne 23) {
-                throw "Expected reset_local_postgres.ps1 to propagate exit code 23, but observed $($result.ExitCode)."
+                throw "Expected scripts/reset_local_postgres.ps1 to propagate exit code 23, but observed $($result.ExitCode)."
             }
 
             if ((Get-CountValue -Path $sandbox.StartCountFile) -ne 1) {
@@ -501,7 +502,7 @@ function Assert-ResetScriptRejectsUnsafeDatabaseName {
             $result = Invoke-ResetScript -Sandbox $sandbox -Database "bad-name';DROP DATABASE postgres;--"
 
             if (-not $result.Threw) {
-                throw 'Expected reset_local_postgres.ps1 to reject an unsafe database name.'
+                throw 'Expected scripts/reset_local_postgres.ps1 to reject an unsafe database name.'
             }
 
             if ($result.Message -notmatch 'Database name must match') {

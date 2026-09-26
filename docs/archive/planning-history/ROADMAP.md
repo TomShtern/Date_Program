@@ -103,8 +103,8 @@ Every item below is **implemented in production code**, not stubs or placeholder
 - **REST API** — ~45+ routes covering every feature through the use-case layer
 - **PostgreSQL** — full runtime support with dialect-aware SQL, migrations, smoke tests
 - **Quality gate** — established and expected as the standard validation path
-- **Green full local verification** — `run_verify.ps1` now passes end-to-end, including PostgreSQL smoke verification
-- **LAN-ready REST adapter** — non-loopback startup now uses an explicit shared secret, supports allowlisted CORS, and has a verified startup path in `docs/operations/lan-backend-startup.md`
+- **Green full local verification** — `scripts/run_verify.ps1` now passes end-to-end, including PostgreSQL smoke verification
+- **LAN-ready REST adapter** — non-loopback startup now uses an explicit shared secret, supports allowlisted CORS, and has a verified startup path in `docs/guides/lan-backend-startup.md`
 
 ### What's NOT Done
 
@@ -290,7 +290,7 @@ The point of this phase is not to endlessly redesign JavaFX. It is to close the 
 |---------------|---------------------------------------------------------------------------------------------------------------------------|
 | **What**      | Keep PostgreSQL in the normal local verification loop instead of treating it as an occasional side path.                  |
 | **Why**       | The runtime storage seam is PostgreSQL-first, so local confidence should follow the real runtime path.                    |
-| **Done**      | `run_verify.ps1` already starts local PostgreSQL, runs `mvn spotless:apply verify`, then runs `run_postgresql_smoke.ps1`. |
+| **Done**      | `scripts/run_verify.ps1` already starts local PostgreSQL, runs `mvn spotless:apply verify`, then runs `scripts/run_postgresql_smoke.ps1`. |
 | **Remaining** | Keep reducing H2-first assumptions where they hide runtime differences, and keep the local PostgreSQL path easy to run.   |
 
 ### 1.6 — Targeted Hardening & Consistency Pass
@@ -327,9 +327,9 @@ This is a **small phase** — just a few targeted changes to the server configur
 |------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | **What**         | Use the explicit LAN startup path to run the REST server on `0.0.0.0` or a specific LAN interface when needed.                                                 |
 | **Current code** | `RestApiServer.main` now parses `--host=`, `--port=`, `--shared-secret=`, and `--allowed-origins=`. Non-loopback startup fails without a shared secret.        |
-| **Also**         | CORS is now supported for allowlisted origins, and the verified LAN startup flow is documented in `docs/operations/lan-backend-startup.md`.                                       |
+| **Also**         | CORS is now supported for allowlisted origins, and the verified LAN startup flow is documented in `docs/guides/lan-backend-startup.md`.                                       |
 | **Safety**       | Loopback remains the default for local unauthenticated use; LAN mode stays an explicit opt-in and requires `X-DatingApp-Shared-Secret` on non-health requests. |
-| **File**         | `src/main/java/datingapp/app/api/RestApiServer.java`, `src/main/java/datingapp/app/api/RestApiRequestGuards.java`, `docs/operations/lan-backend-startup.md`                       |
+| **File**         | `src/main/java/datingapp/app/api/RestApiServer.java`, `src/main/java/datingapp/app/api/RestApiRequestGuards.java`, `docs/guides/lan-backend-startup.md`                       |
 | **Effort**       | Done.                                                                                                                                                          |
 
 ### 2.2 — Verify Phone → Server Connectivity
@@ -608,11 +608,11 @@ mvn javafx:run
 mvn compile && mvn exec:exec
 
 # Start local PostgreSQL + run smoke test
-.\start_local_postgres.ps1
-.\run_postgresql_smoke.ps1
+.\scripts/start_local_postgres.ps1
+.\scripts/run_postgresql_smoke.ps1
 
 # Full local verification (Maven + PostgreSQL)
-.\run_verify.ps1
+.\scripts/run_verify.ps1
 ```
 
 ### Flutter commands (new project, when started)
@@ -638,7 +638,7 @@ flutter test
 ipconfig | findstr "IPv4"
 # e.g., 192.168.1.105
 
-# 2. Follow docs/operations/lan-backend-startup.md to build the runtime classpath and launch the REST server directly with Java
+# 2. Follow docs/guides/lan-backend-startup.md to build the runtime classpath and launch the REST server directly with Java
 #    using --host=0.0.0.0, --port=7070, --shared-secret=..., and any needed --allowed-origins=...
 
 # 3. On phone: open Chrome → http://192.168.1.105:7070/api/health

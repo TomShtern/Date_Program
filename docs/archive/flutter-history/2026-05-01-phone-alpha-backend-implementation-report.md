@@ -48,7 +48,7 @@ Scope: Fix only the verified backend issues listed in the 2026-05-01 remediation
 
 10. Docs
 - `2026-04-30-phone-alpha-backend-api-requirements.md` now explicitly states phone-alpha account deletion must allow email reuse.
-- Added acceptance checklist line requiring `docs/API-SPECIFICATION.md` update for new/modified endpoints.
+- Added acceptance checklist line requiring `docs/api/API-SPECIFICATION.md` update for new/modified endpoints.
 - `2026-04-30-path-to-first-alpha.md` now explicitly states JWT is the identity mechanism and `X-DatingApp-Shared-Secret` is only temporary LAN/dev transport guard if retained.
 
 ## 2. Intentionally Deferred
@@ -109,7 +109,7 @@ Result
 - Tests run: **91**, Failures: **0**, Errors: **0**, Skipped: **0**
 
 4. PostgreSQL runtime check
-`check_postgresql_runtime_env.ps1`
+`scripts/check_postgresql_runtime_env.ps1`
 
 Result
 - PostgreSQL tools found.

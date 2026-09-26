@@ -22,7 +22,7 @@ After starting the repo-local PostgreSQL instance, the connection path worked:
 
 - the profile `Local DatingApp` connected successfully
 - direct `psql` access succeeded
-- `run_postgresql_smoke.ps1` passed with `BUILD SUCCESS`
+- `scripts/run_postgresql_smoke.ps1` passed with `BUILD SUCCESS`
 
 The highest-value follow-up work is:
 
@@ -71,12 +71,12 @@ This is consistent across:
 - `config/app-config.postgresql.local.json`
 - `.env`
 - `.env.example`
-- `start_local_postgres.ps1`
+- `scripts/start_local_postgres.ps1`
 - `POSTGRESQL_POWERSHELL_GUIDE.md`
 
 #### After startup
 
-Running `start_local_postgres.ps1` produced a live listener and readiness:
+Running `scripts/start_local_postgres.ps1` produced a live listener and readiness:
 
 - `localhost:55432 - accepting connections`
 - `Local PostgreSQL ready at localhost:55432`
@@ -88,7 +88,7 @@ Direct SQL access then succeeded:
 
 The repo’s runtime smoke path also passed:
 
-- `run_postgresql_smoke.ps1`
+- `scripts/run_postgresql_smoke.ps1`
 - `Tests run: 2, Failures: 0, Errors: 0, Skipped: 0`
 - `BUILD SUCCESS`
 
@@ -121,9 +121,9 @@ If the PostgreSQL side panel still shows the old failure state, retry or refresh
 | Username               | `datingapp`                                   |
 | Password source        | `.env`, OS env var, or JVM property           |
 | Local default password | `datingapp`                                   |
-| Start script           | `start_local_postgres.ps1`                    |
-| Smoke script           | `run_postgresql_smoke.ps1`                    |
-| Full local verify      | `run_verify.ps1`                              |
+| Start script           | `scripts/start_local_postgres.ps1`                    |
+| Smoke script           | `scripts/run_postgresql_smoke.ps1`                    |
+| Full local verify      | `scripts/run_verify.ps1`                              |
 
 ## Java runtime path
 
@@ -265,8 +265,8 @@ The VS Code connection timeout happened because the local PostgreSQL server was 
 
 - no listener was present on `localhost:55432` before startup
 - the saved profile `Local DatingApp` exists and connects successfully once the server is up
-- `start_local_postgres.ps1` made the server reachable
-- `psql` and `run_postgresql_smoke.ps1` both succeeded
+- `scripts/start_local_postgres.ps1` made the server reachable
+- `psql` and `scripts/run_postgresql_smoke.ps1` both succeeded
 
 **Why it matters**
 
@@ -290,7 +290,7 @@ Much faster recovery from the exact problem that happened here.
 
 **Implemented on 2026-04-09**
 
-- added `check_postgresql_runtime_env.ps1` to validate tools, listener state, and login before IDE/runtime use
+- added `scripts/check_postgresql_runtime_env.ps1` to validate tools, listener state, and login before IDE/runtime use
 - added repo-local VS Code tasks in `.vscode/tasks.json` for preflight/start/stop
 - updated `README.md` and `POSTGRESQL_POWERSHELL_GUIDE.md` so the startup requirement is visible in the main local workflow
 - added `src/test/powershell/CheckPostgresqlRuntimeEnvScriptTest.ps1`
@@ -363,7 +363,7 @@ Much better temporal correctness and far less future migration pain.
 - updated schema tests to the new latest migration version and added focused V17 coverage
 - verified:
   - `SchemaInitializerTest` passes on the H2 compatibility path
-  - `run_postgresql_smoke.ps1` still passes on the live PostgreSQL runtime path
+  - `scripts/run_postgresql_smoke.ps1` still passes on the live PostgreSQL runtime path
   - live PostgreSQL columns now report `timestamp with time zone` for representative fields including:
     - `users.created_at`
     - `users.updated_at`
@@ -422,7 +422,7 @@ A major observability upgrade with low conceptual cost.
 
 **Implemented on 2026-04-09**
 
-- updated `start_local_postgres.ps1` to write local cluster settings for `shared_preload_libraries = 'pg_stat_statements'` and `compute_query_id = on`
+- updated `scripts/start_local_postgres.ps1` to write local cluster settings for `shared_preload_libraries = 'pg_stat_statements'` and `compute_query_id = on`
 - the startup script now installs `pg_stat_statements` in the target database automatically after the database exists
 - extended `src/test/powershell/StartLocalPostgresScriptTest.ps1` to cover the new observability bootstrap behavior
 - verified live local state after startup:
@@ -472,7 +472,7 @@ Safer schema resolution and fewer “works locally, weird elsewhere” surprises
 **Implemented on 2026-04-09**
 
 - `DatabaseManager.applySessionQueryTimeout(...)` now pins PostgreSQL application sessions to `SET search_path TO public` before applying the session timeout
-- `start_local_postgres.ps1` now applies `ALTER ROLE ... IN DATABASE ... SET search_path = public` for the local `datingapp` role
+- `scripts/start_local_postgres.ps1` now applies `ALTER ROLE ... IN DATABASE ... SET search_path = public` for the local `datingapp` role
 - verified live local state: `SHOW search_path` now returns `public` for the `datingapp` role
 
 ---
@@ -596,7 +596,7 @@ Lower risk of runaway manual queries without misconfiguring the whole server glo
 
 **Implemented on 2026-04-09**
 
-- `start_local_postgres.ps1` now applies local role defaults for the `datingapp` role in the `datingapp` database:
+- `scripts/start_local_postgres.ps1` now applies local role defaults for the `datingapp` role in the `datingapp` database:
   - `statement_timeout = 30s`
   - `lock_timeout = 5s`
   - `idle_in_transaction_session_timeout = 5min`
@@ -647,7 +647,7 @@ Cleaner operational signals and less debugging confusion.
 
 **Implemented on 2026-04-09**
 
-- `reset_local_postgres.ps1` now keeps only the newest auto-generated `reset_backup_*` schema by default after a successful reset and best-effort removes older ones
+- `scripts/reset_local_postgres.ps1` now keeps only the newest auto-generated `reset_backup_*` schema by default after a successful reset and best-effort removes older ones
 - added `-RetainedAutoBackupSchemas` to allow intentionally keeping more than one auto backup
 - extended `ResetLocalPostgresScriptTest.ps1` to cover the new backup-schema retention cleanup query path
 
@@ -856,8 +856,8 @@ Faster review and easier diffing of schema changes.
 
 **Implemented on 2026-04-09**
 
-- added `export_local_postgresql_schema.ps1` to export a fresh `public`-schema snapshot from the local PostgreSQL instance via `pg_dump`
-- added a checked-in SQL-first reference file at `postgresql-public-schema-snapshot.sql`
+- added `scripts/export_local_postgresql_schema.ps1` to export a fresh `public`-schema snapshot from the local PostgreSQL instance via `pg_dump`
+- added a checked-in SQL-first reference file at `scripts/postgresql-public-schema-snapshot.sql`
 - verified the exporter runs successfully against the local database and writes a reproducible schema-only snapshot
 
 ---
@@ -896,7 +896,7 @@ Right now it behaves like opaque serialized metadata, which is acceptable.
 
 **Likely files:**
 
-- `start_local_postgres.ps1`
+- `scripts/start_local_postgres.ps1`
 - `POSTGRESQL_POWERSHELL_GUIDE.md`
 - `README.md`
 - optional `.vscode/tasks.json`
@@ -976,9 +976,9 @@ Right now it behaves like opaque serialized metadata, which is acceptable.
 ## Validation commands for future work
 
 ```powershell
-.\start_local_postgres.ps1
-.\run_postgresql_smoke.ps1
-.\run_verify.ps1
+.\scripts/start_local_postgres.ps1
+.\scripts/run_postgresql_smoke.ps1
+.\scripts/run_verify.ps1
 mvn spotless:apply verify
 ```
 
@@ -1061,8 +1061,8 @@ The most important improvements from here are not a full redesign. They are:
 After the main PostgreSQL fixes were in place, a second pass focused only on cleanup/polish work:
 
 - refactored large assertion-heavy test methods in `AppConfigTest` and `SchemaInitializerTest` into helper-based checks
-- refreshed `postgresql-public-schema-snapshot.sql` from the live post-migration local PostgreSQL state
-- kept the schema export path reproducible through `export_local_postgresql_schema.ps1`
+- refreshed `scripts/postgresql-public-schema-snapshot.sql` from the live post-migration local PostgreSQL state
+- kept the schema export path reproducible through `scripts/export_local_postgresql_schema.ps1`
 - aligned `RunVerifyScriptTest.ps1` and `ResetLocalPostgresScriptTest.ps1` with the current local PostgreSQL workflow
 - re-ran the full local verification path after the cleanup pass
 

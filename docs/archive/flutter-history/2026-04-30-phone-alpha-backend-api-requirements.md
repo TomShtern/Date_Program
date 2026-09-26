@@ -454,7 +454,7 @@ Backend is ready for Flutter phone-alpha integration when all of this is true:
 - Account delete works and lets the tester start over.
 - Block/report/unmatch behavior is persisted and enforced, not just acknowledged.
 - Local DB and photo backups are documented and tested once.
-- `docs/API-SPECIFICATION.md` has been updated with all new/modified endpoints.
+- `docs/api/API-SPECIFICATION.md` has been updated with all new/modified endpoints.
 
 ## 14. Suggested Execution Order
 

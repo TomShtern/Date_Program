@@ -280,11 +280,11 @@ The first four tasks are the best fit for immediate work because they stay fully
 
 **Modify:**
 
-- `run_postgresql_smoke.ps1`
-- `check_postgresql_runtime_env.ps1`
-- `start_local_postgres.ps1`
+- `scripts/run_postgresql_smoke.ps1`
+- `scripts/check_postgresql_runtime_env.ps1`
+- `scripts/start_local_postgres.ps1`
 - `README.md`
-- `docs/operations/ci-and-postgresql.md`
+- `docs/guides/ci-and-postgresql.md`
 
 **Instructions:**
 
@@ -300,8 +300,8 @@ The first four tasks are the best fit for immediate work because they stay fully
 
 **Verification:**
 
-- Run: `.\check_postgresql_runtime_env.ps1`
-- Run: `.\run_postgresql_smoke.ps1`
+- Run: `.\scripts/check_postgresql_runtime_env.ps1`
+- Run: `.\scripts/run_postgresql_smoke.ps1`
 - Confirm the docs describe the same commands and failure modes that the scripts actually use.
 
 **Done when:**
@@ -330,6 +330,6 @@ The first four tasks are the best fit for immediate work because they stay fully
 - Before declaring the overall work complete, run:
   - `mvn spotless:apply verify`
 - If a task touched local PostgreSQL helper scripts, also run:
-  - `.\run_postgresql_smoke.ps1`
+  - `.\scripts/run_postgresql_smoke.ps1`
 
 The backend engineer should not claim success based on “internal cleanup only.” The final state still needs evidence that behavior stayed compatible with the protected REST contract.

@@ -153,42 +153,42 @@ _Status: Completed_
 
 ### Changes Made
 
-**`run_postgresql_smoke.ps1`:**
+**`scripts/run_postgresql_smoke.ps1`:**
 - Tagged failure messages with `[STARTUP]` prefix for PostgreSQL startup failures and `[MAVEN-SMOKE]` prefix for Maven smoke test failures.
 - Added `Hint:` diagnostic lines after each failure category pointing to the next diagnostic step.
 
-**`check_postgresql_runtime_env.ps1`:**
+**`scripts/check_postgresql_runtime_env.ps1`:**
 - Tagged all failure messages with category prefixes: `[ENV]` (missing tools), `[CONNECTIVITY]` (server not reachable), `[AUTH]` (password/login).
 - Added `Hint:` lines with actionable next steps for each failure category.
 
-**`start_local_postgres.ps1`:**
+**`scripts/start_local_postgres.ps1`:**
 - Tagged all failure messages with category prefixes: `[CONFIG]` (invalid parameters), `[STARTUP]` (pg_ctl failures), `[DATABASE]` (psql/createdb failures).
 - No behavioral changes — only message formatting improvements.
 
-**`stop_local_postgres.ps1`:**
+**`scripts/stop_local_postgres.ps1`:**
 - Tagged failure message with `[STARTUP]` prefix.
 
-**`run_verify.ps1`:**
+**`scripts/run_verify.ps1`:**
 - Tagged failure messages with `[STARTUP]`, `[MAVEN]`, and `[MAVEN-SMOKE]` prefixes.
 - Added `Hint:` diagnostic lines for Maven and smoke test failures.
 
-**`docs/operations/ci-and-postgresql.md`:**
+**`docs/guides/ci-and-postgresql.md`:**
 - Added new "Error categories in local scripts" section with a reference table mapping all 8 category prefixes to their meaning and typical causes.
-- Added full documentation for `check_postgresql_runtime_env.ps1` including parameters and exit-code table.
-- Updated `start_local_postgres.ps1` docs to list database validation, pg_stat_statements, and role defaults; noted category prefixes.
-- Updated `stop_local_postgres.ps1` docs to note `[STARTUP]` prefix.
-- Updated `run_postgresql_smoke.ps1` docs to note `[STARTUP]`/`[MAVEN-SMOKE]` prefixes and hint lines.
-- Updated `run_verify.ps1` docs to note `[STARTUP]`/`[MAVEN]`/`[MAVEN-SMOKE]` prefixes and hint lines.
+- Added full documentation for `scripts/check_postgresql_runtime_env.ps1` including parameters and exit-code table.
+- Updated `scripts/start_local_postgres.ps1` docs to list database validation, pg_stat_statements, and role defaults; noted category prefixes.
+- Updated `scripts/stop_local_postgres.ps1` docs to note `[STARTUP]` prefix.
+- Updated `scripts/run_postgresql_smoke.ps1` docs to note `[STARTUP]`/`[MAVEN-SMOKE]` prefixes and hint lines.
+- Updated `scripts/run_verify.ps1` docs to note `[STARTUP]`/`[MAVEN]`/`[MAVEN-SMOKE]` prefixes and hint lines.
 
 **`README.md`:**
-- Added `.\run_postgresql_smoke.ps1` as a focused smoke-test entrypoint in the "Run locally" section.
-- Added a note about error-category prefixes and a cross-reference to `docs/operations/ci-and-postgresql.md`.
+- Added `.\scripts/run_postgresql_smoke.ps1` as a focused smoke-test entrypoint in the "Run locally" section.
+- Added a note about error-category prefixes and a cross-reference to `docs/guides/ci-and-postgresql.md`.
 
 ### Verification Results
 
-- `check_postgresql_runtime_env.ps1`: Script structure verified (no functional changes to logic, only message formatting)
-- `run_postgresql_smoke.ps1`: Script structure verified
-- `start_local_postgres.ps1`: Script structure verified
+- `scripts/check_postgresql_runtime_env.ps1`: Script structure verified (no functional changes to logic, only message formatting)
+- `scripts/run_postgresql_smoke.ps1`: Script structure verified
+- `scripts/start_local_postgres.ps1`: Script structure verified
 - Documentation alignment confirmed against actual script behavior
 
 ---

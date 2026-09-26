@@ -191,14 +191,14 @@ Use the repository’s canonical verification path:
 
 1. start local PostgreSQL if needed
 2. run targeted storage/runtime tests
-3. use `./run_verify.ps1` for repo-level validation when the change is substantial
+3. use `./scripts/run_verify.ps1` for repo-level validation when the change is substantial
 
 Relevant helpers in this repo:
 
-- `start_local_postgres.ps1`
-- `run_postgresql_smoke.ps1`
-- `stop_local_postgres.ps1`
-- `run_verify.ps1`
+- `scripts/start_local_postgres.ps1`
+- `scripts/run_postgresql_smoke.ps1`
+- `scripts/stop_local_postgres.ps1`
+- `scripts/run_verify.ps1`
 
 ## Reporting back to the coordinator
 

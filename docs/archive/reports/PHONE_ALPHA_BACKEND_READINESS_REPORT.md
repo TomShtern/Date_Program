@@ -59,7 +59,7 @@ mvn --% test -Dtest=RestApiAuthRoutesTest -Dcheckstyle.skip=true
 
 ## 3. API contract documentation
 
-Created `docs/API-SPECIFICATION.md` covering:
+Created `docs/api/API-SPECIFICATION.md` covering:
 
 - `POST /api/auth/signup`
 - `POST /api/auth/login`
@@ -109,7 +109,7 @@ No PostgreSQL connection error occurred; the suite ran against the default H2 in
 |------|--------|------|
 | Full-suite stability | Resolved | Timeout increased; verify passes cleanly. |
 | Deleted-account email reuse | Resolved | Code + tests in place; live PG verification recommended but not blocking. |
-| API contract docs | Resolved | `docs/API-SPECIFICATION.md` created and complete. |
+| API contract docs | Resolved | `docs/api/API-SPECIFICATION.md` created and complete. |
 | **Live PostgreSQL smoke** | Open | Run `FindAllDiagnosticTest` or targeted auth tests against a real PG instance to confirm NULL-unique behavior in production dialect. |
 | **Spotless pre-commit** | Resolved | `mvn spotless:apply` applied; no formatting debt. |
 
