@@ -1,6 +1,10 @@
 # Date_Program Source-of-Truth Audit (Code-Only)
 
 _Date: 2026-03-25_
+_Status (checked 2026-09-27): dated snapshot — build/test counts (1361 tests)
+and file totals (296) refer to the March tree. Current source keeps the same
+gate shape (`mvn spotless:apply verify`: Spotless/Checkstyle/PMD/JaCoCo 0.60)
+but counts have moved. Do not quote its numbers as current._
 
 ## Scope and method
 

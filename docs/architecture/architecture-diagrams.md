@@ -5,6 +5,23 @@
 **Generated:** 2026-02-22
 **ChangeStamp:** 3|2026-02-22 00:00:00|agent:qwen_code|docs|enhance-architecture-diagrams|ARCHITECTURE_DIAGRAMS.md
 
+> **Status (verified 2026-09-27):** dated diagram set — layer shape is still
+> accurate, but details below predate the current tree. Source
+> (`src/main/java`, `src/test/java`, `pom.xml`) wins on every conflict.
+> Known-stale details: storage is **PostgreSQL runtime** via
+> `StorageFactory.buildSqlDatabase(...)` (H2/in-memory are compat/test paths),
+> `AppConfig` is a **7-group record** (matching/validation/algorithm/storage/
+> safety/media/auth), messaging lives in
+> `core.connection.ConnectionModels` (no `core/Conversation.java`,
+> `core/Message.java`, `core/ConversationStorage.java`, `core/MessageStorage.java`),
+> `core/storage/` holds **11 files** (not 5), `storage/jdbi/` holds **14 files**
+> (not 6), `core/matching/` holds **16 files** (not 8), `ui/screen/` holds **18**
+> files and `ui/viewmodel/` holds **25** (not 12/10), `app/usecase/` spans
+> **auth/common/dashboard/matching/messaging/profile/social** (not 4 groups),
+> and there is no `PerformanceMonitor`, `TimePolicy`, or `app/error/` in current
+> source. For the current package snapshot see
+> `docs/architecture/architecture.md` and the `modules/` overviews.
+
 > **Source of Truth:** All diagrams are derived from the actual codebase. Code is the only source of truth.
 
 ---

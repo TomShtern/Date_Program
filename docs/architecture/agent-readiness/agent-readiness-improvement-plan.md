@@ -3,6 +3,10 @@
 **Current Level:** Level 2 (7/21 criteria, 33%)
 **Target Level:** Level 3 (17/21 criteria, 81%)
 **Created:** 2026-01-10
+**Status (verified 2026-09-27):** dated plan — several cited gaps are already
+closed in current source (`.env.example` exists, JaCoCo 0.60 line gate in
+`pom.xml`, GitHub Actions `verify.yml` + CircleCI PostgreSQL lane exist).
+Treat the body as history; verify each item against current source before acting.
 **Estimated Time:** 2 hours (Phase 1)
 
 ---

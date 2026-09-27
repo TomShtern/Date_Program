@@ -1,8 +1,8 @@
 # Dating App Architecture
 
-> **Last verified against source code:** 2026-03-21
-> **Java files:** 140 main + 107 test = 247
-> **Java LOC (`tokei`):** 66,698 total / 52,170 code / 8,217 blank / 6,311 comments
+> **Status:** package layout verified against `src/main/java` (2026-09-27).
+> Counts and LOC are intentionally omitted — they rot on every commit.
+> Run `tokei src` when you need a number.
 
 This document describes current architecture from source (`src/main/java`, `src/test/java`, `pom.xml`).
 
@@ -16,10 +16,12 @@ This document describes current architecture from source (`src/main/java`, `src/
 │   CLI (app/cli), JavaFX UI (ui), REST API (app/api)         │
 ├──────────────────────────────────────────────────────────────┤
 │ APPLICATION ORCHESTRATION                                   │
-│   app/usecase/* (matching, messaging, profile, social)      │
+│   app/usecase/* (auth, common, dashboard, matching,          │
+│                  messaging, profile, social)                 │
 ├──────────────────────────────────────────────────────────────┤
 │ DOMAIN                                                       │
 │   core/* (models, services, storage interfaces, utilities)  │
+│   location/* (top-level: LocationService + geocoding)        │
 ├──────────────────────────────────────────────────────────────┤
 │ INFRASTRUCTURE                                               │
 │   storage/* (JDBI implementations, schema, DB manager)      │
@@ -29,49 +31,54 @@ This document describes current architecture from source (`src/main/java`, `src/
 Key constraints:
 
 - `core/` contains domain logic and storage interfaces.
+- `location/` is top-level, not under `core/` (owns offline
+  country/city/ZIP dataset, `LocationService`, `GeocodingService`,
+  `Fallback/Local/Nominatim` implementations, `LocationModels`, `GeoUtils`).
 - Infrastructure adapters live in `storage/`.
 - UI and CLI adapters consume `ServiceRegistry` and use-case bundles.
 
 ---
 
-## 2. Package Layout (Code-Verified)
+## 2. Package Layout (verified 2026-09-27)
+
+Package-level snapshot. Do not expand into exhaustive class lists here —
+they rot on every commit. Run `list_dir` on a package when you need
+the current files.
 
 ```text
 datingapp/
-  Main.java
+  Main.java                       # CLI entry point
   app/
-    api/RestApiServer.java
-    bootstrap/ApplicationStartup.java
-    cli/{CliTextAndInput,MainMenuRegistry,MatchingHandler,MessagingHandler,ProfileHandler,SafetyHandler,StatsHandler}.java
-    event/{AppEvent,AppEventBus,InProcessAppEventBus}.java
-    event/handlers/{AchievementEventHandler,MetricsEventHandler,NotificationEventHandler}.java
-    usecase/
-      common/{UseCaseError,UseCaseResult,UserContext}.java
-      matching/MatchingUseCases.java
-      messaging/MessagingUseCases.java
-      profile/ProfileUseCases.java
-      social/SocialUseCases.java
+    api/                          # RestApiServer + DTOs, guards, identity policy
+    bootstrap/                    # ApplicationStartup, CleanupScheduler
+    cli/                          # CLI handlers + MatchingCliPresenter
+    event/ + event/handlers/      # AppEventBus + achievement/metrics/notification
+    support/                      # UserPresentationSupport
+    usecase/auth|common|dashboard|matching|messaging|profile|social/
   core/
-    AppClock,AppConfig,AppConfigValidator,AppSession,EnumSetUtil,LoggingSupport,ServiceRegistry,TextUtil
-    i18n/I18n.java
-    model/{User,Match,ProfileNote}
-    connection/{ConnectionModels,ConnectionService}
-    matching/{CandidateFinder,CompatibilityCalculator,DailyLimitService,DailyPickService,DefaultCompatibilityCalculator,DefaultDailyLimitService,DefaultDailyPickService,DefaultStandoutService,InterestMatcher,LifestyleMatcher,MatchingService,MatchQualityService,RecommendationService,Standout,StandoutService,TrustSafetyService,UndoService}
-    metrics/{AchievementService,ActivityMetricsService,DefaultAchievementService,EngagementDomain,SwipeState}
-    profile/{MatchPreferences,ProfileService,ValidationService}
-    storage/{AnalyticsStorage,CommunicationStorage,InteractionStorage,PageData,TrustSafetyStorage,UserStorage}
-    workflow/{ProfileActivationPolicy,RelationshipWorkflowPolicy}
+    {AppClock, AppConfig, AppConfigValidator, AppSession, EnumSetUtil,
+     LoggingSupport, RuntimeEnvironment, ServiceRegistry, TextUtil}
+    connection/ i18n/ matching/ metrics/ model/ profile/ storage/ workflow/
+  location/                       # LocationService, GeocodingService + impls
   storage/
-    DatabaseManager.java
-    StorageFactory.java
-    jdbi/{JdbiConnectionStorage,JdbiMatchmakingStorage,JdbiMetricsStorage,JdbiTrustSafetyStorage,JdbiTypeCodecs,JdbiUserStorage}.java
-    schema/{MigrationRunner,SchemaInitializer}.java
+    {DatabaseDialect, DatabaseManager, DevDataSeeder, StorageFactory}
+    jdbi/ schema/
   ui/
-    DatingApp,ImageCache,LocalPhotoStore,NavigationService,UiAnimations,UiComponents,UiConstants,UiDialogs,UiFeedbackService,UiPreferencesStore,UiUtils
-    async/{AsyncErrorRouter,JavaFxUiThreadDispatcher,TaskHandle,TaskPolicy,UiThreadDispatcher,ViewModelAsyncScope}
-    screen/{BaseController,ChatController,DashboardController,LoginController,MatchesController,MatchingController,MilestonePopupController,NotesController,PreferencesController,ProfileController,ProfileFormValidator,ProfileViewController,SafetyController,SocialController,StandoutsController,StatsController}
-    viewmodel/{ChatViewModel,DashboardViewModel,LoginViewModel,MatchesViewModel,MatchingViewModel,NotesViewModel,PreferencesViewModel,ProfileViewModel,SafetyViewModel,SocialViewModel,StandoutsViewModel,StatsViewModel,UiDataAdapters,ViewModelErrorSink,ViewModelFactory}
+    {DatingApp, ImageCache, LocalPhotoStore, NavigationService, ...}
+    async/ screen/ viewmodel/
 ```
+
+Notes grounded in `src/main/java`:
+
+- `app/api/` has no `RestRouteSupport` or `UserDtoMapper`.
+- `core/model/` is `{Match, ProfileNote, TextNormalization, User}` —
+  `LocationModels` lives in `location/`, not `core/model/`.
+- `core/matching/` has no `Default*` classes and no
+  `InterestMatcher`/`LifestyleMatcher`; it has `PreferencesMatcher`.
+- `core/metrics/` has no `DefaultAchievementService`.
+- `core/storage/` includes `AuthStorage` plus `Operational*` variants.
+- `location/` is the single location engine; only `IL` is
+  `available=true` (`LocationService.resolveSelection` rejects the rest).
 
 ---
 

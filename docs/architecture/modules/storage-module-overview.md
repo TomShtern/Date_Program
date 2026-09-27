@@ -1,113 +1,86 @@
 # Storage Module Overview
 
-> Persistence layer for the Dating App - JDBI-based database access.
+> Verified against `src/main/java/datingapp/storage` (2026-09-27).
+> Package-level snapshot only — run `list_dir` on a subpackage for the current files.
 
-## Package Purpose
+## Package purpose
 
-The `datingapp.storage` package implements all storage interfaces defined in `datingapp.core.storage`. It provides H2 database persistence using JDBI declarative SQL.
+`datingapp.storage` implements the storage interfaces in
+`datingapp.core.storage` over PostgreSQL (runtime) and H2 (compat/test),
+using JDBI plus HikariCP pooling. Schema is code-owned and idempotent
+(`IF NOT EXISTS`); fresh installs land on `SchemaInitializer`, older
+databases upgrade via `MigrationRunner`.
 
-## Key Design Principles
+## Layout
 
-1. **Declarative SQL** - Use JDBI annotations (`@SqlQuery`, `@SqlUpdate`, `@RegisterRowMapper`)
-2. **Inlined Mappers** - Row mappers are inner classes within JDBI interfaces
-3. **Error Wrapping** - Wrap `SQLException` in `StorageException`
-4. **Schema in Code** - `DatabaseManager.initSchema()` creates tables with `IF NOT EXISTS`
-
-## Module Structure
-
-```
+```text
 storage/
-├── DatabaseManager.java          # H2 connection + schema initialization
-├── StorageException.java         # Checked exception wrapper
-├── jdbi/                         # JDBI interface implementations
-│   ├── JdbiBlockStorage.java
-│   ├── JdbiConversationStorage.java
-│   ├── JdbiDailyPickStorage.java
-│   ├── JdbiFriendRequestStorage.java
-│   ├── JdbiLikeStorage.java
-│   ├── JdbiMatchStorage.java
-│   ├── JdbiMessageStorage.java
-│   ├── JdbiNotificationStorage.java
-│   ├── JdbiPlatformStatsStorage.java
-│   ├── JdbiProfileNoteStorage.java
-│   ├── JdbiProfileViewStorage.java
-│   ├── JdbiReportStorage.java
-│   ├── JdbiSwipeSessionStorage.java
-│   ├── JdbiUserAchievementStorage.java
-│   ├── JdbiUserStatsStorage.java
-│   ├── JdbiUserStorage.java
-│   ├── JdbiUserStorageAdapter.java  # Adapts JdbiUserStorage to UserStorage interface
-│   ├── UserBindingHelper.java       # Serializes User fields for SQL binding
-│   ├── EnumSetArgumentFactory.java  # JDBI argument factory for EnumSet
-│   └── EnumSetColumnMapper.java     # JDBI column mapper for EnumSet
-└── mapper/
-    └── MapperHelper.java            # Utility methods for null-safe ResultSet reading
+  DatabaseDialect.java        # POSTGRESQL/H2 detection (fromJdbcUrl/fromConfig)
+  DatabaseManager.java        # HikariCP pool + lifecycle; nested StorageException (RuntimeException);
+                              # per-connection session setup (PG: search_path public, TIME ZONE UTC, statement_timeout;
+                              # H2: TIME ZONE UTC + QUERY_TIMEOUT); schema via MigrationRunner
+  DevDataSeeder.java          # env-gated (DATING_APP_SEED_DATA=true), idempotent seed data
+  StorageFactory.java         # buildSqlDatabase(...) = runtime; buildH2(...)/buildInMemory(...) = compat/test
+  jdbi/
+    JdbiUserStorage.java            # OperationalUserStorage
+    JdbiMatchmakingStorage.java     # OperationalInteractionStorage (atomic like→match, unmatch/block transitions)
+    JdbiConnectionStorage.java      # OperationalCommunicationStorage (conversations/messages)
+    JdbiMetricsStorage.java         # AnalyticsStorage + Standout.Storage (incl. SwipeSessionMapper → metrics Session)
+    JdbiTrustSafetyStorage.java     # TrustSafetyStorage (blocks/reports)
+    JdbiAuthStorage.java            # AuthStorage (user_credentials / auth_refresh_tokens)
+    JdbiAccountCleanupStorage.java  # AccountCleanupStorage (transactional soft-delete graph)
+    DealbreakerAssembler.java       # dealbreaker query assembly
+    JdbiNotificationJson.java       # notification JSON codec
+    JdbiTypeCodecs.java             # Instant codec + EnumSetSqlCodec (EnumSetArgumentFactory, InterestColumnMapper)
+    NormalizedEnumParser.java / NormalizedProfileHydrator.java / NormalizedProfileRepository.java
+    SqlDialectSupport.java          # dialect detection for StorageFactory
+  schema/
+    SchemaInitializer.java    # createAllTables: users → auth → likes/matches/swipe_sessions → stats →
+                              # daily_picks/views → achievements → messaging/social/moderation/profile/standouts/undo/normalized
+    MigrationRunner.java      # pending-migration runner for existing databases
 ```
 
-## JDBI Interface Pattern
+## Patterns
 
-All storage implementations follow this pattern:
+- JDBI is used as concrete implementation classes over injected `Jdbi`
+  handles (not one-interface-per-table `@SqlObject` declarations).
+- Record-typed parameters bind with `@BindMethods`, not `@BindBean`
+  (records have no bean accessors); entity classes such as `Match` /
+  `Conversation` keep `@BindBean`.
+- Errors surface as `DatabaseManager.StorageException` (unchecked), not a
+  standalone checked `StorageException`.
+- There is no `storage/mapper/MapperHelper`, `UserBindingHelper`,
+  standalone `EnumSetArgumentFactory`/`EnumSetColumnMapper`, or
+  `JdbiUserStorageAdapter` in current source — enum-set binding lives in
+  `JdbiTypeCodecs.EnumSetSqlCodec`.
+
+## Schema (from `SchemaInitializer.createAllTables`)
+
+29 `CREATE TABLE IF NOT EXISTS` tables: `users`, `user_credentials`,
+`auth_refresh_tokens`, `likes`, `matches`, `swipe_sessions`, `user_stats`,
+`platform_stats`, `daily_picks`, `daily_pick_views`, `user_achievements`,
+`conversations`, `messages`, `friend_requests`, `notifications`, `blocks`,
+`reports`, `profile_notes`, `profile_views`, `standouts`, `user_photos`,
+`user_interests`, `user_interested_in`, `user_db_{smoking,drinking,wants_kids,looking_for,education}`,
+`undo_states`.
+
+Key constraints (verified): `likes` has FKs to `users` + `uk_likes`
+pair uniqueness + direction/distinct-user checks; `matches` has FKs to
+`users` + `uk_matches` pair uniqueness + state/end-reason/73-char pair-ID
+checks; `users` carries gender/lifestyle/verification/pace value checks
+plus unique email/phone.
+
+## Wiring
 
 ```java
-@RegisterRowMapper(JdbiBlockStorage.Mapper.class)
-public interface JdbiBlockStorage extends BlockStorage {
-
-    @SqlQuery("SELECT * FROM blocks WHERE id = :id")
-    Block get(@Bind("id") UUID id);
-
-    @SqlUpdate("INSERT INTO blocks (...) VALUES (...)")
-    void save(@BindBean Block block);
-
-    // Inlined row mapper
-    class Mapper implements RowMapper<Block> {
-        @Override
-        public Block map(ResultSet rs, StatementContext ctx) throws SQLException {
-            // Use MapperHelper for null-safe reading
-            return new Block(
-                MapperHelper.readUuid(rs, "id"),
-                MapperHelper.readInstant(rs, "created_at")
-            );
-        }
-    }
-}
+ServiceRegistry services = StorageFactory.buildSqlDatabase(dbManager, config); // runtime
+ServiceRegistry compat = StorageFactory.buildH2(dbManager, config);            // compat/test
 ```
 
-## MapperHelper Utilities
-
-| Method | Purpose |
-|--------|---------|
-| `readUuid(rs, column)` | Null-safe UUID reading |
-| `readInstant(rs, column)` | TIMESTAMP → Instant conversion |
-| `readLocalDate(rs, column)` | DATE → LocalDate conversion |
-| `readEnum(rs, column, enumClass)` | VARCHAR → Enum conversion |
-| `readInteger(rs, column)` | Null-safe int with wasNull() |
-| `readDouble(rs, column)` | Null-safe double with wasNull() |
-
-## Database Schema
-
-Schema is defined in `DatabaseManager.initSchema()`. Key tables:
-
-| Table | Primary Key | Foreign Keys |
-|-------|-------------|--------------|
-| `users` | `id` (UUID) | - |
-| `likes` | `id` (UUID) | `who_likes`, `who_got_liked` → users |
-| `matches` | `id` (VARCHAR) | `user_a`, `user_b` → users |
-| `blocks` | `id` (UUID) | `blocker_id`, `blocked_id` → users |
-| `messages` | `id` (UUID) | `conversation_id`, `sender_id` → users |
-| `conversations` | `id` (VARCHAR) | `user_a`, `user_b` → users |
-
-## Wiring (Dependency Injection)
-
-Storage implementations are wired in `ServiceRegistry.Builder`:
-
-```java
-public static ServiceRegistry buildH2(DatabaseManager dbManager, AppConfig config) {
-    Jdbi jdbi = dbManager.getJdbi();
-
-    BlockStorage blockStorage = jdbi.onDemand(JdbiBlockStorage.class);
-    LikeStorage likeStorage = jdbi.onDemand(JdbiLikeStorage.class);
-    // ... etc
-
-    return new ServiceRegistry(blockStorage, likeStorage, ...);
-}
-```
+`StorageFactory` configures storage + pool + query timeout from
+`AppConfig.storage()`, creates one shared `Jdbi` (with `SqlObjectPlugin`
+and the type codecs), detects the dialect via `SqlDialectSupport`, builds
+the persistence components, registers the event handlers, and assembles
+the `ServiceRegistry`. Never construct the graph inside a controller —
+`ServiceRegistry` (app-wide) and `ViewModelFactory` (JavaFX) are the
+composition roots.

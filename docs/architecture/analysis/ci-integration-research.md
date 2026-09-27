@@ -1,6 +1,12 @@
 # CI/CD Integration Research for Dating App
 
 > **Research Date:** January 20, 2026
+> **Status (verified 2026-09-27):** dated research — written before the current
+> split-CI model existed. Current source: GitHub Actions `verify.yml`
+> (`github-fast-feedback`: `spotless:check test` on `ubuntu-latest`, Java 25)
+> plus CircleCI `postgresql-integration` (`postgres-verify` →
+> `postgres-runtime-smoke`). JavaFX is 25.0.2 and JUnit is 5.14.2 in `pom.xml`
+> (not 25.0.1 as listed below). Treat the comparison below as history.
 > **Project:** Java 25 + JavaFX 25 Dating Application
 > **Build Tool:** Maven (with Spotless, Checkstyle, PMD, JaCoCo)
 

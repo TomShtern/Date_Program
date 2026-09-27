@@ -1,6 +1,11 @@
 # Inner Structure Analysis & Refactoring Plan
 
 **Date**: 2026-01-10
+**Status (verified 2026-09-27):** dated snapshot — file sizes, line counts, and
+class names (e.g. `H2UserStorage`, flat `SwipeSession.java`) predate the current
+tree (JDBI classes are now `Jdbi*Storage`, swipe sessions map via
+`JdbiMetricsStorage.SwipeSessionMapper`). Treat findings as history; verify
+against current source before acting.
 **Phase**: 1.5
 **Focus**: Internal code organization, method structure, class responsibilities
 **Total Files Analyzed**: 62 source files

@@ -1,6 +1,11 @@
 # Dating App: Big Picture Analysis & Strategic Roadmap
 
 **Generated:** 2026-01-12
+**Status (verified 2026-09-27):** dated prototype-era analysis — several "missing"
+claims are now implemented in current source (HS256 JWT + refresh rotation in
+`app/usecase/auth/`, persisted `user_credentials`/`auth_refresh_tokens`, location
+engine + REST location routes, photo DTOs/storage). Treat the body as history;
+verify each claim against current source before acting.
 **Purpose:** Comprehensive analysis of what's missing, logic gaps, and the path to a production-ready dating app
 **Scope:** Architecture, feature completeness, console UX, and reasoning flaws
 

@@ -2,6 +2,19 @@
 
 > Auto-generated from source code analysis (2026-03-01).
 > All diagrams use [Mermaid](https://mermaid.js.org/) syntax — renderable in GitHub, VS Code, IntelliJ, and most markdown viewers.
+>
+> **Status (verified 2026-09-27):** dated diagram set — layer shape is still
+> accurate, but counts and several node names predate the current tree. Source
+> (`src/main/java`, `src/test/java`, `pom.xml`) wins on every conflict.
+> Known-stale details: storage is **PostgreSQL runtime** via
+> `StorageFactory.buildSqlDatabase(...)` (not H2 file DB),
+> `AppConfig` is a **7-group record**, `core/storage/` holds **11 files**,
+> `storage/jdbi/` holds **14 files**, `core/matching/` holds **16 files**,
+> `ui/screen/` holds **18** files and `ui/viewmodel/` holds **25**,
+> `app/usecase/` spans **auth/common/dashboard/matching/messaging/profile/social**,
+> `app/cli/` holds **8 files**, and there is no `PerformanceMonitor`,
+> `TimePolicy`, or `app/error/` in current source. For the current package
+> snapshot see `docs/architecture/architecture.md` and the `modules/` overviews.
 
 ---
 

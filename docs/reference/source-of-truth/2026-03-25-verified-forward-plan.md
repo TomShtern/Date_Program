@@ -1,5 +1,12 @@
 # Multi-Device and Postgres Readiness Implementation Plan
 
+> **Status (checked 2026-09-27):** dated plan — its "starting point" section
+> predates the current tree. Already landed: PostgreSQL is the runtime path
+> (`StorageFactory.buildSqlDatabase` via `ApplicationStartup.initialize()`),
+> REST auth is HS256 JWT + rotating refresh (not localhost-only/unauthenticated),
+> and location/photo REST surfaces exist. Treat tasks as history; verify each
+> against current source before acting.
+
 > **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development (if subagents available) or superpowers:executing-plans to implement this plan. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Move the project forward using repo-verified priorities, starting from the reality that the current app is still prototype-stage and missing several core product foundations.

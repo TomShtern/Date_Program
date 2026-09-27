@@ -1,6 +1,11 @@
 # Source Code Structure Analysis & Improvement Plan
 
 **Date**: 2026-01-10
+**Status (verified 2026-09-27):** dated snapshot — counts (83 files, 62 main,
+29 tests) and the flat `core/` file list predate the current tree (current
+`core/` is subpackaged: connection/matching/metrics/model/profile/storage/
+workflow; `app/usecase/` spans 7 groups; `storage/jdbi/` holds 14 files).
+Treat findings as history; verify against current source before acting.
 **Phase**: 1.5
 **Analyzed Directory**: `src/`
 **Total Files**: 83 (62 main source, 29 tests, 2 resources)

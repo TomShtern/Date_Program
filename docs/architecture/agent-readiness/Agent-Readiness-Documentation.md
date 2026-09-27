@@ -1,5 +1,10 @@
 # Overview
 
+> **Status (verified 2026-09-27):** external Factory AI readiness-model reference,
+> not a description of this repository. Do not cite its levels or criteria as
+> repo status. For repo status see `docs/internal/reviews/CV_GITHUB_READINESS_PLAN.md`
+> (dated review) and the verified entry points (`README.md`, `CLAUDE.md`, `AGENTS.md`).
+
 Autonomous software organizations build systems that maintain and improve themselves with minimal human intervention. Developers describe what they want built through whatever medium makes sense, and the system executes that vision with quality and precision.
 
 The **Agent Readiness Model** measures how close your organization is to this state, and helps remediate gaps to get you there faster.

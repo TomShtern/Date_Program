@@ -1,7 +1,16 @@
 # Phone-Alpha REST API Specification
 
-> **Scope:** This document covers the phone-alpha auth and photo endpoints that the Flutter frontend will consume.  
-> **Auth model:** The backend runs a phone-alpha auth shim (email + password, no Clerk/OAuth). Tokens are short-lived JWT access tokens plus opaque refresh tokens.
+> **Status (2026-09-27):** auth + photo sections verified against
+> `RestApiServer`, `AuthUseCases`, `AuthTokenService`, `AppConfig`, and
+> `config/app-config.json`. This spec still covers only the phone-alpha
+> auth/photo surface — for the full route list (users, location,
+> matching, social, messaging, notes) read the route registration in
+> `RestApiServer` (`app.get/post/put/delete` under `/api/`), which is
+> authoritative.
+> **Scope:** This document covers the phone-alpha auth and photo endpoints that the Flutter frontend will consume.
+> **Auth model:** email + password (no Clerk/OAuth). Short-lived HS256 JWT
+> access tokens plus single-use-rotated opaque refresh tokens
+> (`AuthUseCases` + `AuthTokenService`).
 
 ---
 
@@ -34,11 +43,12 @@ Access tokens expire after `expiresInSeconds` (default 900s). Use the refresh en
 
 ## Error format
 
-All errors return a JSON body:
+All errors return a JSON body (`RestApiDtos.ErrorResponse` — note the
+`code` key, not `error`):
 
 ```json
 {
-  "error": "ERROR_CODE",
+  "code": "ERROR_CODE",
   "message": "Human-readable description"
 }
 ```
@@ -49,9 +59,10 @@ Common status codes:
 |--------|---------|
 | 400    | Bad request (malformed JSON, missing field, invalid value) |
 | 401    | Unauthorized (missing/invalid token, revoked refresh, deleted/banned user) |
-| 403    | Forbidden (mismatched user-scoped route, spoofed sender ID) |
+| 403    | Forbidden (mismatched user-scoped route, spoofed sender ID, bad LAN secret) |
 | 404    | Not found |
 | 409    | Conflict (duplicate email on signup) |
+| 429    | Too many requests (per-IP+method rate limit, 240/min default; `X-RateLimit-*` headers) |
 | 500    | Internal server error |
 
 ---
@@ -77,9 +88,9 @@ Create a new incomplete user account.
 
 | Field | Type | Required | Constraints |
 |-------|------|----------|-------------|
-| email | string | yes | Trimmed, lower-cased, IDN-normalized |
-| password | string | yes | Min length from config (default 8) |
-| dateOfBirth | string (ISO date) | yes | User must be >= minAge (default 18) |
+| email | string | yes | Trimmed, lower-cased, IDN-normalized (`TextNormalization`) |
+| password | string | yes | Min length from config (`minPasswordLength = 12` in `config/app-config.json`) |
+| dateOfBirth | string (ISO date) | yes | User must be >= minAge (`minAge = 18` in config) |
 
 **Responses:**
 
@@ -236,7 +247,8 @@ Upload a new photo for the user.
 
 **Responses:**
 
-- **201 Created**
+- **201 Created** (`PhotoDtos.PhotoUploadResponse` — note the
+  `primaryPhotoUrl` / `photoUrls` keys plus profile-completion fields):
 
 ```json
 {
@@ -244,10 +256,14 @@ Upload a new photo for the user.
     "id": "photo-uuid",
     "url": "http://localhost:7070/photos/550e8400-e29b-41d4-a716-446655440000/img_1234567890.jpg"
   },
-  "primaryUrl": "http://localhost:7070/photos/550e8400-e29b-41d4-a716-446655440000/img_1234567890.jpg",
-  "photos": [
+  "primaryPhotoUrl": "http://localhost:7070/photos/550e8400-e29b-41d4-a716-446655440000/img_1234567890.jpg",
+  "photoUrls": [
     "http://localhost:7070/photos/550e8400-e29b-41d4-a716-446655440000/img_1234567890.jpg"
-  ]
+  ],
+  "missingProfileFields": [],
+  "profileComplete": false,
+  "canActivate": false,
+  "canBrowse": false
 }
 ```
 
@@ -256,8 +272,9 @@ Upload a new photo for the user.
 - **404 Not Found** — user does not exist.
 
 **Notes:**
-- The uploaded file is validated (safe filename, size limit from config).
-- EXIF orientation is handled automatically.
+- The uploaded file is validated (safe filename, size limit
+  `maxPhotoUploadBytes = 5 MiB` from config). No EXIF-orientation
+  handling exists in `RestApiPhotoStorage` — verified by search.
 
 ---
 
@@ -272,12 +289,13 @@ Remove a specific photo.
 
 **Responses:**
 
-- **200 OK**
+- **200 OK** (`PhotoDtos.PhotoMutationResponse` — `primaryPhotoUrl` /
+  `photoUrls` plus profile-completion fields, no `photo` wrapper):
 
 ```json
 {
-  "primaryUrl": null,
-  "photos": []
+  "primaryPhotoUrl": null,
+  "photoUrls": []
 }
 ```
 
@@ -310,7 +328,9 @@ Rules:
 
 **Responses:**
 
-- **200 OK** — same shape as `POST /api/users/{id}/photos` 201 (without the `photo` wrapper).
+- **200 OK** — `PhotoDtos.PhotoMutationResponse` (same shape as
+  `POST /api/users/{id}/photos` 201 without the `photo` wrapper:
+  `primaryPhotoUrl` / `photoUrls` plus profile-completion fields).
 - **400 Bad Request** — missing/unknown photo IDs, or incomplete list.
 - **401 Unauthorized** / **403 Forbidden**
 
@@ -354,7 +374,9 @@ Every `id` returned by this endpoint is valid for use with `DELETE /api/users/{i
 - **401 Unauthorized** — missing or invalid bearer token.
 - **403 Forbidden** — bearer token subject does not match `{id}`.
 - **404 Not Found** — user does not exist.
-- **409 Conflict** — deleted or banned account.
+- Deleted/banned users cannot use photo routes at all:
+  `requirePhotoEligibleUser` throws (mapped to 500 `INTERNAL_ERROR`),
+  it does not return 409.
 
 ---
 
@@ -379,13 +401,26 @@ Serve a photo file directly. No authentication required.
 
 ## Phone-alpha deleted-account behavior
 
-When a user deletes their account:
+Verified against `ProfileMutationUseCases.deleteAccount`,
+`User.markDeleted`, and `JdbiAccountCleanupStorage.softDeleteAccount`
+(one transaction):
 
-1. The `users` row is **soft-deleted** (`deleted_at` set, `state` set to `BANNED`).
-2. The user's `email` and `phone` are **nulled out** in the `users` row so the unique constraints (`uk_users_email`, `uk_users_phone`) do **not** block reuse.
-3. All `user_credentials` rows for that user are **hard-deleted**.
-4. All active `auth_refresh_tokens` for that user are **revoked**.
-5. The old access token becomes invalid on the next `me` or protected-route call.
+1. The `users` row is **soft-deleted** (`deleted_at` set, `state` set to
+   `BANNED`); the in-memory `User` is also paused when it was `ACTIVE`
+   (`applyDeletionState`: `markDeleted` + `pause` + `email/phone = null`).
+2. The user's `email` and `phone` are **nulled out** in the `users` row so
+   reuse is not blocked (verified in `softDeleteUser` SQL; unique
+   constraint names are not asserted in source — do not cite
+   `uk_users_email` / `uk_users_phone` as verified).
+3. All `user_credentials` rows for that user are **hard-deleted**
+   (`deleteUserCredentials`).
+4. All active `auth_refresh_tokens` for that user are **revoked**
+   (`revokeUserRefreshTokens` sets `revoked_at`).
+5. Related graph rows are soft-deleted / deleted in the same transaction
+   (likes, matches, conversations, messages, blocks, reports, notes,
+   photos, interests, stats, achievements, picks, swipes, friend
+   requests, notifications, undo state).
+6. The old access token becomes invalid on the next `me` or protected-route call.
 
 This means:
 - A new signup with the same email **succeeds** after deletion.
@@ -405,4 +440,5 @@ This means:
 Flutter should:
 - Persist the public URLs from API responses.
 - Use `GET /photos/{userId}/{filename}` for image rendering.
-- Re-fetch the profile after photo mutations to get updated `primaryUrl` and `photos` arrays.
+- Re-fetch the profile after photo mutations to get updated
+  `primaryPhotoUrl` and `photoUrls` arrays.

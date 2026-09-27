@@ -3,6 +3,10 @@
 **Branch:** main
 **Commit:** 2cb7003616a061662d9377b7fd0e715893261472
 **Evaluation Date:** 2026-01-10
+**Status (verified 2026-09-27):** dated snapshot — pinned to commit `2cb7003`,
+not current `main`. Several cited gaps are already closed (`.env.example`
+exists, JaCoCo gate + CI lanes exist, Java 25 + current dependency versions in
+`pom.xml`). Do not quote its counts or fail-items as current status.
 **Report ID:** 136ace71-9f40-41d5-901c-0890d074c7ee
 
 ---

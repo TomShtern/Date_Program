@@ -1,7 +1,12 @@
 # Location Feature Parity Design
 
 **Date:** 2026-03-29
-**Status:** Approved in chat
+**Status:** Approved in chat. **Landed (verified 2026-09-27):** the REST location
+surface exists (`GET /api/location/countries`, `GET /api/location/cities`,
+`POST /api/location/resolve` in `RestApiServer`), `LocationService` owns the
+offline dataset + `resolveSelection`, and `LocationSelectionDialog` +
+`ProfileViewModel` own the JavaFX flow. Read the requirements below as the
+design record; trust the code for current behavior.
 
 ## Goal
 

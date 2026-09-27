@@ -1,6 +1,14 @@
 # COMPREHENSIVE AUDIT REPORT (VERIFIED-ONLY)
 
 **Verification date:** 2026-03-26
+**Status (checked 2026-09-27):** dated snapshot — line-number evidence and
+counts (296 files, `AppEvent` 16 types) refer to the March tree. Current source
+has 13 `AppEvent` record types and the handler subscriptions listed in
+`app/event/handlers/` cover more than the four types named below
+(`AchievementEventHandler`: swipe/profile/note/completed/reported;
+`MetricsEventHandler`: swipe/message/profile/note/account/block/reported;
+`NotificationEventHandler`: friend-request/message/match/account). Verify line
+numbers against current source before citing.
 **Source of truth used:** local code only (`src/main/java`, `src/test/java`, `pom.xml`)
 **Documentation used as truth:** none
 

@@ -8,7 +8,7 @@ This page separates current entry points from operational references and histori
 - [CI and PostgreSQL operations](guides/ci-and-postgresql.md)
 - [PostgreSQL PowerShell guide](guides/postgresql-powershell.md)
 - [LAN backend startup](guides/lan-backend-startup.md)
-- [REST API specification](api/API-SPECIFICATION.md) — **legacy/unverified**. Its error response and password minimum claims are known to differ from current implementation/configuration. Do not use as an integration contract until reconciled against source.
+- [REST API specification](api/API-SPECIFICATION.md) — phone-alpha auth/photo surface, verified 2026-09-27 against `RestApiServer`/`AuthUseCases`/`AppConfig`. Still scoped to auth/photos only; the full route list lives in `RestApiServer` route registration.
 
 ## Flutter integration
 

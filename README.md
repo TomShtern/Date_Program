@@ -1,235 +1,111 @@
-<!--AGENT-DOCSYNC:ON-->
-# ChangeStamp format: SEQ|YYYY-MM-DD HH:MM:SS|agent:<id>|scope:<tag>|summary|files
-# SEQ: file-local increasing int. If collision after 3 retries append "<SEQ>:CONFLICT".
-# Agents MAY NOT use git. After code changes they MUST:
-# 1) pick SEQ = highestSEQ+1 (recheck before write),
-# 2) locate affected doc fragment using prioritized search (see below),
-# 3) archive replaced text with <!--ARCHIVE:SEQ:agent:scope-->...<!--/ARCHIVE-->,
-# 4) apply minimal precise edits (edit only nearest matching fragment),
-# 5) append one ChangeStamp line to the file-end changelog and inside the edited fragment (immediately after the edited paragraph or code fence),
-# 6) if uncertain to auto-edit, append TODO+ChangeStamp next to nearest heading.
-<!--/AGENT-DOCSYNC-->
-
 # Dating App
 
-Start with the [documentation index](docs/README.md) for current operations links and a guide to the historical material.
+Java 25 (preview) backend with shared domain logic and three adapters: a CLI, a
+JavaFX desktop UI, and a Javalin REST API that backs a separate Flutter client
+(not in this repository).
 
-A Java 25 dating application with shared domain logic and three adapters:
+- CLI — `src/main/java/datingapp/Main.java` + `src/main/java/datingapp/app/cli/*`
+- JavaFX desktop UI — `src/main/java/datingapp/ui/*`
+  (`DatingApp.java` entry point, `ViewModelFactory` composition root)
+- REST API — `src/main/java/datingapp/app/api/RestApiServer.java` (default
+  `http://localhost:7070`, health at `GET /api/health`)
 
-- CLI (`Main.java` + `app/cli/*`)
-- JavaFX desktop UI (`ui/*`)
-- REST API (`app/api/RestApiServer.java`)
+The REST backend is the primary integration surface; CLI and JavaFX are
+supporting adapters. All three share `ApplicationStartup.initialize()` (in
+`src/main/java/datingapp/app/bootstrap/`) to build the app-wide
+`ServiceRegistry` (`src/main/java/datingapp/core/ServiceRegistry.java`);
+runtime storage is assembled in
+`src/main/java/datingapp/storage/StorageFactory.java`.
 
-The Java REST backend is the primary project focus; CLI and JavaFX are supporting adapters. The Flutter Android client is a separate project and is not included in this repository.
-<!-- ChangeStamp: 10|2026-09-26 20:05:02|agent:github_copilot|scope:repo-docs-organization|Clarified backend-first project framing and separate Flutter client|README.md -->
-
-## Historical snapshot (not current verification)
-
-The figures below are retained from an earlier repository check. Their date and applicability to the current tree have not been revalidated in this documentation update; no Maven build or test suite was run for this documentation-only change.
-
-<!--ARCHIVE:11:agent:github_copilot:scope:repo-docs-organization-->
-- Java files: **140 main + 107 test = 247 total**
-- Java LOC (`tokei`): **66,698 total / 52,170 code / 9,728 blank / 4,800 comments**
-- Latest full gate run in this repo state: **BUILD SUCCESS**, tests **1026 run / 0 failed / 0 errors / 2 skipped**
-<!--/ARCHIVE-->
-
-> If this README ever conflicts with source code, trust `src/main/java`, `src/test/java`, and `pom.xml`.
+> Source of truth is `src/main/java`, `src/test/java`, and `pom.xml`.
+> If any document disagrees with code, the code wins.
 
 ## Tech stack
 
-- Java 25 (preview enabled)
-- JavaFX 25.0.2
-- Maven
-<!--ARCHIVE:8:agent:codex:scope:postgres-runtime-doc-sync-->
-- H2 + JDBI
-<!--/ARCHIVE-->
-- PostgreSQL + JDBI for runtime, H2 for compatibility/test paths
-<!-- ChangeStamp: 8|2026-04-06 19:35:00|agent:codex|scope:postgres-runtime-doc-sync|Clarified the runtime storage stack after the PostgreSQL move|README.md -->
-- SLF4J + Logback
-- Spotless (Palantir Java Format), Checkstyle, PMD, JaCoCo
+- Java 25 (preview enabled) + Maven
+- JavaFX 25.0.2 desktop UI (AtlantaFX 2.1.0 theme, Ikonli 12.4.0 icons)
+- Javalin 6.7.0 REST API + Jackson 2.21.0
+- PostgreSQL 42.7.8 + JDBI 3.51.0 + HikariCP 6.3.0 for runtime;
+  H2 and in-memory paths exist for compatibility/tests
+  (`StorageFactory.buildSqlDatabase` is the runtime path)
+- SLF4J 2.0.17 + Logback 1.5.28
+- Quality gate: Spotless (Palantir Java Format), Checkstyle, PMD, SpotBugs,
+  JaCoCo line coverage minimum `0.60`
 
 ## Run locally
 
-<!--ARCHIVE:7:agent:github_copilot:scope:verification-routine-->
-```bash
-# CLI
-mvn compile && mvn exec:exec
-
-# JavaFX GUI
-mvn javafx:run
-
-# Tests
-mvn test
-mvn -Ptest-output-verbose test
-
-# Full quality gate
-mvn spotless:apply verify
-```
-<!--/ARCHIVE-->
-
-<!--ARCHIVE:9:agent:github_copilot:scope:postgres-startup-ux-->
-```bash
-# CLI
-mvn compile && mvn exec:exec
-
-# JavaFX GUI
-mvn javafx:run
-
-# Tests
-mvn test
-mvn -Ptest-output-verbose test
-
-# Full local verification (Maven quality gate + PostgreSQL smoke)
-.\scripts/run_verify.ps1
-
-# Maven quality gate only
-mvn spotless:apply verify
-```
-<!--/ARCHIVE-->
-
 ```powershell
-# PostgreSQL preflight (checks tools, listener, login, and shows next step if the server is down)
+# PostgreSQL preflight, then start local PostgreSQL
 .\scripts/check_postgresql_runtime_env.ps1
-
-# Start local PostgreSQL before using the VS Code PostgreSQL connection profile
 .\scripts/start_local_postgres.ps1
 
-# CLI
+# CLI (exec:exec — exec:java cannot pass --enable-preview)
 mvn compile && mvn exec:exec
 
-# JavaFX GUI
+# JavaFX desktop UI
 mvn javafx:run
 
 # Tests
 mvn test
-mvn -Ptest-output-verbose test
 
 # Full local verification (Maven quality gate + PostgreSQL smoke)
 .\scripts/run_verify.ps1
 
-# Focused PostgreSQL smoke test only
-.\scripts/run_postgresql_smoke.ps1
-
 # Maven quality gate only
 mvn spotless:apply verify
-
-# All scripts tag failures with category prefixes ([STARTUP], [MAVEN], [CONNECTIVITY], etc.)
-# See docs/guides/ci-and-postgresql.md for the full error-category reference.
 ```
-<!-- ChangeStamp: 9|2026-04-09 22:05:00|agent:github_copilot|scope:postgres-startup-ux|Added PostgreSQL preflight/start commands so the local VS Code connection workflow is harder to miss|README.md -->
+
+Copy `.env.example` to `.env` for local settings (`.env` is gitignored).
+Config loads from `config/app-config.json` with `DATING_APP_*` environment
+overrides (`ApplicationStartup`). Local PostgreSQL runs on port 55432
+(`start_local_postgres.ps1` default). For phone-alpha LAN testing against the
+Flutter client,
+use `.\scripts/start_phone_alpha_backend.ps1` — it binds `0.0.0.0:7070`,
+health-checks `/api/health` on loopback and LAN, and prints the Flutter
+`dart-define` values. A non-loopback bind requires a LAN shared secret
+(`DATING_APP_REST_SHARED_SECRET`); never commit a real secret.
 
 ## Project structure
 
-The project separates shared domain logic from application workflows, storage, and adapters. The Java REST backend is the main integration surface; CLI and JavaFX remain supporting adapters. See [the repository map](CLAUDE.md) and [contributor guidance](AGENTS.md) for implementation details.
-
-<!--ARCHIVE:12:agent:github_copilot:scope:repo-docs-organization-->
-### Historical architecture and wiring snapshot
-
-The following package tree and wiring sketch are retained from an earlier README snapshot and have not been revalidated for this documentation update.
-
 ```text
-datingapp/
-  Main.java
+src/main/java/datingapp/
+  Main.java                 # CLI entry point
   app/
-    api/RestApiServer.java
-    bootstrap/ApplicationStartup.java
-    cli/{CliTextAndInput,MainMenuRegistry,MatchingHandler,MessagingHandler,ProfileHandler,SafetyHandler,StatsHandler}.java
-    error/{AppError,AppResult}.java
-    event/{AppEvent,AppEventBus,InProcessAppEventBus}.java
-    usecase/
-      common/{UseCaseError,UseCaseResult,UserContext}.java
-      matching/MatchingUseCases.java
-      messaging/MessagingUseCases.java
-      profile/ProfileUseCases.java
-      social/SocialUseCases.java
-  core/
-    AppClock,AppConfig,AppSession,EnumSetUtil,LoggingSupport,PerformanceMonitor,ServiceRegistry,TextUtil
-    model/{User,Match,ProfileNote}
-    connection/{ConnectionModels,ConnectionService}
-    matching/{CandidateFinder,CompatibilityScoring,LifestyleMatcher,MatchingService,MatchQualityService,RecommendationService,Standout,TrustSafetyService,UndoService}
-    metrics/{ActivityMetricsService,EngagementDomain,SwipeState}
-    profile/{MatchPreferences,ProfileService,ValidationService}
-    storage/{AnalyticsStorage,CommunicationStorage,InteractionStorage,PageData,TrustSafetyStorage,UserStorage}
-    time/{DefaultTimePolicy,TimePolicy}
-    workflow/{ProfileActivationPolicy,RelationshipWorkflowPolicy,WorkflowDecision}
-  storage/
-    DatabaseManager.java
-    StorageFactory.java
-    jdbi/{JdbiConnectionStorage,JdbiMatchmakingStorage,JdbiMetricsStorage,JdbiTrustSafetyStorage,JdbiTypeCodecs,JdbiUserStorage}.java
-    schema/{MigrationRunner,SchemaInitializer}.java
+    api/                    # RestApiServer + DTOs, guards, identity policy
+    bootstrap/              # ApplicationStartup (config + ServiceRegistry wiring)
+    cli/                    # CLI handlers and presenters
+    event/                  # AppEventBus + handlers (achievements, metrics, notifications)
+    support/                # presentation helpers
+    usecase/                # auth, common, dashboard, matching, messaging, profile, social
+  core/                     # framework-free domain: AppClock, AppConfig,
+                            # ServiceRegistry + connection, i18n, matching,
+                            # metrics, model, profile, storage, workflow
+  location/                 # LocationService, GeocodingService + local/Nominatim
+  storage/                  # StorageFactory, DatabaseManager, DevDataSeeder + jdbi/, schema/
   ui/
-    DatingApp,NavigationService,ImageCache,UiAnimations,UiComponents,UiConstants,UiFeedbackService,UiUtils
-    async/{AsyncErrorRouter,JavaFxUiThreadDispatcher,TaskHandle,TaskPolicy,UiThreadDispatcher,ViewModelAsyncScope}
-    popup/{MatchPopupController,MilestonePopupController}
-    screen/{BaseController,ChatController,DashboardController,LoginController,MatchesController,MatchingController,MilestonePopupController,PreferencesController,ProfileController,SocialController,StandoutsController,StatsController}
-    viewmodel/{ChatViewModel,DashboardViewModel,LoginViewModel,MatchesViewModel,MatchingViewModel,PreferencesViewModel,ProfileViewModel,SocialViewModel,StandoutsViewModel,StatsViewModel,UiDataAdapters,ViewModelErrorSink,ViewModelFactory}
+    DatingApp.java          # JavaFX entry point
+    async/                  # ViewModelAsyncScope
+    screen/                 # controllers + dialogs
+    viewmodel/              # ViewModels + ViewModelFactory
 ```
 
-## Entrypoint wiring
+`core/` stays framework-free; `app/usecase/*` is the application boundary;
+`StorageFactory.buildSqlDatabase(...)` is the runtime storage path.
+Contributors: see `AGENTS.md` (workflow) and `CLAUDE.md` (repo map + gotchas).
 
-```java
-// shared bootstrap
-ServiceRegistry services = ApplicationStartup.initialize();
-AppSession session = AppSession.getInstance();
+## API
 
-// CLI
-InputReader inputReader = new CliTextAndInput.InputReader(scanner);
-ProfileHandler profile = ProfileHandler.fromServices(services, session, inputReader);
-MatchingHandler matching = new MatchingHandler(
-  MatchingHandler.Dependencies.fromServices(services, session, inputReader, profile::completeProfile));
-SafetyHandler safety = SafetyHandler.fromServices(services, session, inputReader);
-StatsHandler stats = StatsHandler.fromServices(services, session, inputReader);
-MessagingHandler messaging = MessagingHandler.fromServices(services, session, inputReader);
-
-// JavaFX
-ViewModelFactory vmFactory = new ViewModelFactory(services);
-NavigationService nav = NavigationService.getInstance();
-nav.setViewModelFactory(vmFactory);
-nav.initialize(primaryStage);
-```
-<!--/ARCHIVE-->
-
-## Build constraints (`pom.xml`)
-
-- Java release 25 + preview flags enabled
-- Spotless check in `verify`
-- Checkstyle in `validate`
-- PMD in `verify`
-- JaCoCo line coverage check in `verify` with minimum `0.60`
-
-## Core domain ownership rules
-
-- Use nested enums from owner models:
-  - `User.Gender`, `User.UserState`, `User.VerificationMethod`
-  - `Match.MatchState`, `Match.MatchArchiveReason`
-- `ProfileNote` is standalone: `datingapp.core.model.ProfileNote`
-- Use `AppClock.now()` in domain/service code, not `Instant.now()`
-- Use deterministic pair IDs (`generateId(UUID a, UUID b)`) for two-user aggregates
+`GET /api/health` plus auth, users, photos, location, matching, social,
+messaging, and notes routes — see `RestApiServer` route registration
+(`app.get/post/put/delete` under `/api/`). The phone-alpha auth/photo
+contract in `docs/api/API-SPECIFICATION.md` was verified 2026-09-27
+against `RestApiServer`/`AuthUseCases`/`AppConfig`; it is still scoped
+to auth/photos only, so treat the server source as authoritative for
+everything else.
 
 ## Repository guide
 
-- [Documentation index](docs/README.md) - current references, operations, and historical material
+- [Documentation index](docs/README.md)
 - [CI and PostgreSQL guide](docs/guides/ci-and-postgresql.md)
 - [PostgreSQL PowerShell guide](docs/guides/postgresql-powershell.md)
 - [LAN backend startup guide](docs/guides/lan-backend-startup.md)
-- `AGENTS.md`, `CLAUDE.md`, and `.github/copilot-instructions.md` - contributor and agent guidance
-- [Architecture/context snapshot](docs/architecture/architecture.md) - dated internal reference; verify against source before relying on it
-<!-- ChangeStamp: 11|2026-09-26 20:05:02|agent:github_copilot|scope:repo-docs-organization|Added repository navigation and replaced a missing architecture link|README.md -->
-
-## Agent Changelog (append-only)
----AGENT-LOG-START---
-# Format: SEQ|TS|agent|scope|summary|files
-# Append-only. Do not edit past entries. If SEQ conflict after 3 tries append ":CONFLICT".
-example: 1|2026-01-14 16:42:11|agent:claude_code|UI-mig|JavaFX→Swing; examples regen|src/ui/*
-1|2026-01-30 20:45:00|agent:antigravity|docs|Complete README rewrite: updated title, tech stack, architecture, test count (99→576), formatting tool (Google→Palantir), added GUI docs, removed stale Recent Changes|README.md
-2|2026-02-08 11:15:00|agent:claude_code|docs|Fixed stale CLI commands (removed shade/fat JAR), updated stats (182 files, 820 tests, 8 handlers), Checkstyle+PMD now blocking|README.md
-3|2026-02-19 20:30:00|agent:gemini|docs|Updated README to reflect Java 25, Phase 2.1 architecture, and latest file counts|README.md
-4|2026-02-28 13:35:00|agent:github_copilot|docs-source-truth-sync|Rewrote README from current source: 179 Java files, ui/async + app/usecase layers, updated entry wiring and quality gates|README.md
-5|2026-03-01 01:21:00|agent:github_copilot|docs-source-truth-sync|Updated README snapshot, package tree, and Main wiring callback using current source and verify results|README.md
-6|2026-03-01 03:20:00|agent:github_copilot|docs-metrics-refresh|Updated README LOC snapshot to current tokei values|README.md
-7|2026-04-06 00:45:00|agent:github_copilot|verification-routine|Added .\scripts/run_verify.ps1 as the full local verification path and kept mvn spotless:apply verify as the Maven-only gate|README.md
-8|2026-04-06 19:35:00|agent:codex|postgres-runtime-doc-sync|Clarified the runtime storage stack after the PostgreSQL move|README.md
-9|2026-04-09 22:05:00|agent:github_copilot|postgres-startup-ux|Added PostgreSQL preflight/start commands to the main local run instructions|README.md
-10|2026-09-26 20:05:02|agent:github_copilot|repo-docs-organization|Clarified backend-first framing and separate Flutter client|README.md
-11|2026-09-26 20:05:02|agent:github_copilot|repo-docs-organization|Added categorized docs links and replaced missing architecture link|README.md
----AGENT-LOG-END---

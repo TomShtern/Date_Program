@@ -2,7 +2,7 @@
 
 **Version:** 1.0
 **Date:** 2026-01-10
-**Status:** Ready for Review
+**Status:** Dated design doc — implementation now lives in `core.connection.ConnectionModels` (`Conversation` + `Message` + `Like`/`Block`/`Report`/`FriendRequest` records), not in `core/Conversation.java`, `core/Message.java`, `core/ConversationStorage.java`, or `core/MessageStorage.java` (verified 2026-09-27; those paths do not exist in current source). Storage contracts are `CommunicationStorage`/`OperationalCommunicationStorage` (`core/storage/`) implemented by `JdbiConnectionStorage`. Message validation (`MAX_LENGTH = 1000`, blank-reject, trim) matches `ConnectionModels.Message`. Read this doc for intent; trust the code for behavior.
 **Estimated Effort:** 17 hours (~2-3 focused days)
 
 ---
