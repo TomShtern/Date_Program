@@ -150,8 +150,8 @@ class TrustSafetyServiceTest {
         class AutoBanLogic {
 
             @Test
-            @DisplayName("User is banned after 3 reports")
-            void userBannedAfterThreeReports() {
+            @DisplayName("User is flagged for review after 3 distinct reporters")
+            void userFlaggedForReviewAfterThreeReports() {
                 User reporter2 = createActiveUser("Reporter2");
                 User reporter3 = createActiveUser("Reporter3");
                 userStorage.save(reporter2);
@@ -166,15 +166,46 @@ class TrustSafetyServiceTest {
                         userStorage.get(reportedUser.getId()).orElseThrow().getState(),
                         "User should still be ACTIVE after 2 reports");
 
-                // Third report - triggers ban
+                // Third report - flags the account for review, but does not ban it
                 var result = trustSafetyService.report(
                         reporter3.getId(), reportedUser.getId(), Report.Reason.SPAM, null, true);
 
-                assertTrue(result.userWasBanned(), "Third report should trigger ban");
+                assertTrue(result.userWasBanned(), "Third report should flag the account");
                 assertEquals(
-                        UserState.BANNED,
+                        UserState.UNDER_REVIEW,
                         userStorage.get(reportedUser.getId()).orElseThrow().getState(),
-                        "User should be BANNED after 3 reports");
+                        "User should be UNDER_REVIEW after 3 reports, not banned");
+            }
+
+            @Test
+            @DisplayName("Reports after the flag do not flag again")
+            void reportsAfterTheFlagDoNotFlagAgain() {
+                AppConfig customConfig = AppConfig.builder().autoBanThreshold(1).build();
+                TrustSafetyService customService = TrustSafetyService.builder(
+                                trustSafetyStorage, interactionStorage, userStorage, customConfig)
+                        .build();
+                User reporter2 = createActiveUser("Reporter2");
+                userStorage.save(reporter2);
+
+                var first = customService.report(
+                        activeReporter.getId(), reportedUser.getId(), Report.Reason.SPAM, null, true);
+                var second =
+                        customService.report(reporter2.getId(), reportedUser.getId(), Report.Reason.SPAM, null, true);
+
+                assertTrue(first.userWasBanned());
+                assertFalse(second.userWasBanned(), "Already under review: the second report must not re-flag");
+                assertEquals(
+                        UserState.UNDER_REVIEW,
+                        userStorage.get(reportedUser.getId()).orElseThrow().getState());
+            }
+
+            @Test
+            @DisplayName("An account under review cannot reactivate itself")
+            void underReviewAccountCannotReactivate() {
+                reportedUser.flagForReview();
+
+                org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class, reportedUser::activate);
+                assertEquals(UserState.UNDER_REVIEW, reportedUser.getState());
             }
 
             @Test
@@ -192,7 +223,7 @@ class TrustSafetyServiceTest {
                 var result =
                         customService.report(reporter2.getId(), reportedUser.getId(), Report.Reason.SPAM, null, true);
 
-                assertTrue(result.userWasBanned(), "Should ban at custom threshold of 2");
+                assertTrue(result.userWasBanned(), "Should flag at custom threshold of 2");
             }
 
             @Test
@@ -212,11 +243,11 @@ class TrustSafetyServiceTest {
                         reporter3.getId(), reportedUser.getId(), Report.Reason.SPAM, null, true);
 
                 assertTrue(result.success(), "The report itself should still succeed");
-                assertFalse(result.userWasBanned(), "A failed save must not be reported as a successful ban");
+                assertFalse(result.userWasBanned(), "A failed save must not be reported as a successful flag");
                 assertEquals(
                         UserState.ACTIVE,
                         userStorage.get(reportedUser.getId()).orElseThrow().getState(),
-                        "Stored user must remain ACTIVE when the ban save fails");
+                        "Stored user must remain ACTIVE when the review-flag save fails");
                 assertEquals(3, trustSafetyStorage.countReportsAgainst(reportedUser.getId()));
             }
 
@@ -248,7 +279,7 @@ class TrustSafetyServiceTest {
                 var result = trustSafetyService.report(
                         reporter3.getId(), reportedUser.getId(), Report.Reason.SPAM, null, true);
 
-                assertTrue(result.userWasBanned(), "Third report should trigger ban");
+                assertTrue(result.userWasBanned(), "Third report should flag the account");
                 assertEquals(
                         lockCountBeforeBan + 1,
                         userStorage.getLockInvocationCount(),

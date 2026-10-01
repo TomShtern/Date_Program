@@ -76,10 +76,82 @@ class ActivityMetricsServiceTest {
         assertEquals(1L, snapshot.velocityWarningCount());
     }
 
+    @Test
+    @DisplayName("a burst inside the first second counts as fast, not as N per minute")
+    void burstInsideFirstSecondIsSuspicious() {
+        ActivityMetricsService service = createService(true, 100, 30.0);
+        UUID userId = UUID.randomUUID();
+
+        for (int i = 0; i < 9; i++) {
+            assertTrue(service.recordSwipe(userId, Like.Direction.LIKE, false).allowed());
+        }
+
+        // Clock is frozen, so the session lasted 0 seconds: 10 swipes must not slip under a 30/min threshold.
+        assertFalse(service.recordSwipe(userId, Like.Direction.LIKE, false).allowed());
+    }
+
+    @Test
+    @DisplayName("checkSwipeAllowed refuses at the session limit without counting anything")
+    void checkSwipeAllowedRefusesAtSessionLimitWithoutCounting() {
+        ActivityMetricsService service = createService(false, 3, 5.0);
+        UUID userId = UUID.randomUUID();
+
+        assertTrue(service.checkSwipeAllowed(userId).allowed(), "no session yet means nothing to refuse");
+        for (int i = 0; i < 3; i++) {
+            assertTrue(service.recordSwipe(userId, Like.Direction.LIKE, false).allowed());
+        }
+
+        ActivityMetricsService.SwipeGateResult gate = service.checkSwipeAllowed(userId);
+
+        assertFalse(gate.allowed());
+        assertNotNull(gate.blockedReason());
+        assertEquals(3, service.getCurrentSession(userId).orElseThrow().getSwipeCount());
+    }
+
+    @Test
+    @DisplayName("checkSwipeAllowed refuses a velocity burst only when blocking is enabled")
+    void checkSwipeAllowedHonoursVelocityBlockingSwitch() {
+        for (boolean blocking : new boolean[] {true, false}) {
+            ActivityMetricsService service = createService(blocking, 100, 5.0);
+            UUID userId = UUID.randomUUID();
+            for (int i = 0; i < 9; i++) {
+                service.recordSwipe(userId, Like.Direction.LIKE, false);
+            }
+
+            assertEquals(!blocking, service.checkSwipeAllowed(userId).allowed());
+        }
+    }
+
+    @Test
+    @DisplayName("stats count a super like as a like given")
+    void statsCountSuperLikesAsLikes() {
+        TestStorages.Interactions interactions = new TestStorages.Interactions();
+        ActivityMetricsService service = new ActivityMetricsService(
+                new TestStorages.Users(),
+                interactions,
+                new TestStorages.TrustSafety(),
+                new TestStorages.Analytics(),
+                AppConfig.defaults());
+        UUID userId = UUID.randomUUID();
+        interactions.save(Like.create(userId, UUID.randomUUID(), Like.Direction.LIKE));
+        interactions.save(Like.create(userId, UUID.randomUUID(), Like.Direction.SUPER_LIKE));
+        interactions.save(Like.create(userId, UUID.randomUUID(), Like.Direction.PASS));
+
+        var stats = service.computeAndSaveStats(userId);
+
+        assertEquals(2, stats.likesGiven());
+        assertEquals(3, stats.totalSwipesGiven());
+    }
+
     private static ActivityMetricsService createService(boolean blockingEnabled) {
+        return createService(blockingEnabled, 100, 5.0);
+    }
+
+    private static ActivityMetricsService createService(
+            boolean blockingEnabled, int maxSwipesPerSession, double velocityThreshold) {
         AppConfig config = AppConfig.builder()
-                .maxSwipesPerSession(100)
-                .suspiciousSwipeVelocity(5.0)
+                .maxSwipesPerSession(maxSwipesPerSession)
+                .suspiciousSwipeVelocity(velocityThreshold)
                 .suspiciousSwipeVelocityBlockingEnabled(blockingEnabled)
                 .build();
         return new ActivityMetricsService(

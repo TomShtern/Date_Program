@@ -1,14 +1,16 @@
+# CI and PostgreSQL guide
+
 ## Overview
 
-This document describes the current verified CI and local PostgreSQL setup for this repository.
+This document describes the CI and local PostgreSQL setup for this repository.
 
-The repository intentionally uses a split CI model:
+The repository uses a split CI model:
 
-- **GitHub Actions** provides the fast feedback lane for formatting, compile, and test feedback.
+- **GitHub Actions** provides the fast feedback lane for formatting, compile, and test feedback (`verify.yml`). A second workflow, `build.yml`, runs `mvn verify` plus SonarQube analysis and needs a `SONAR_TOKEN` repository secret.
 - **CircleCI** provides the full PostgreSQL-backed integration lane.
 - **Local PostgreSQL helper scripts** provide a Windows/PowerShell-first developer workflow that mirrors the runtime storage path.
 
-This file is the operational companion to `README.md`, `.circleci/config.yml`, `.github/workflows/verify.yml`, and the PostgreSQL helper scripts in the repo root.
+This file is the operational companion to `README.md`, `.circleci/config.yml`, `.github/workflows/verify.yml`, `.github/workflows/build.yml`, and the PostgreSQL helper scripts in `scripts/`.
 
 ## CircleCI
 

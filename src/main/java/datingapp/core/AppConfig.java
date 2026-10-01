@@ -6,6 +6,7 @@ import datingapp.core.model.User;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.ZoneId;
+import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 
@@ -24,7 +25,6 @@ public record AppConfig(
         AuthConfig auth) {
 
     public static final int DEFAULT_REMATCH_COOLDOWN_HOURS = 168;
-    public static final String DEVELOPMENT_ONLY_JWT_SECRET_PLACEHOLDER = "development-only-jwt-secret-change-me-please";
 
     // ========================================================================
     // Sub-record: MatchingConfig
@@ -201,17 +201,26 @@ public record AppConfig(
     // Sub-record: AuthConfig
     // ========================================================================
 
+    /**
+     * Settings for verifying Clerk session tokens. A blank {@code clerkIssuer} means "no Clerk instance
+     * configured": that is valid for the CLI and desktop app, and the REST server refuses to start with it.
+     */
     public static record AuthConfig(
-            String tokenIssuer,
-            String jwtSecret,
-            int accessTokenTtlSeconds,
-            int refreshTokenTtlDays,
-            int minPasswordLength) {
+            String clerkIssuer, String clerkJwksUrl, List<String> clerkAuthorizedParties, int clockSkewSeconds) {
         public AuthConfig {
-            AppConfigValidator.validateAuth(
-                    tokenIssuer, jwtSecret, accessTokenTtlSeconds, refreshTokenTtlDays, minPasswordLength);
-            tokenIssuer = tokenIssuer.trim();
-            jwtSecret = jwtSecret.trim();
+            AppConfigValidator.validateAuth(clerkIssuer, clerkJwksUrl, clerkAuthorizedParties, clockSkewSeconds);
+            clerkIssuer = clerkIssuer.trim().replaceAll("/+$", "");
+            clerkJwksUrl = clerkJwksUrl.isBlank() && !clerkIssuer.isEmpty()
+                    ? clerkIssuer + "/.well-known/jwks.json"
+                    : clerkJwksUrl.trim();
+            clerkAuthorizedParties = clerkAuthorizedParties.stream()
+                    .map(String::trim)
+                    .filter(party -> !party.isEmpty())
+                    .toList();
+        }
+
+        public boolean clerkConfigured() {
+            return !clerkIssuer.isEmpty();
         }
     }
 
@@ -401,11 +410,10 @@ public record AppConfig(
         private int cleanupRetentionDays = 30;
         private int softDeleteRetentionDays = 90;
         // AuthConfig fields
-        private String tokenIssuer = "dating-app-phone-alpha";
-        private String jwtSecret = DEVELOPMENT_ONLY_JWT_SECRET_PLACEHOLDER;
-        private int accessTokenTtlSeconds = 900;
-        private int refreshTokenTtlDays = 30;
-        private int minPasswordLength = 12;
+        private String clerkIssuer = "";
+        private String clerkJwksUrl = "";
+        private List<String> clerkAuthorizedParties = List.of();
+        private int clockSkewSeconds = 5;
 
         public Builder autoBanThreshold(int v) {
             this.autoBanThreshold = v;
@@ -527,28 +535,23 @@ public record AppConfig(
             return this;
         }
 
-        public Builder tokenIssuer(String v) {
-            this.tokenIssuer = v;
+        public Builder clerkIssuer(String v) {
+            this.clerkIssuer = v;
             return this;
         }
 
-        public Builder jwtSecret(String v) {
-            this.jwtSecret = v;
+        public Builder clerkJwksUrl(String v) {
+            this.clerkJwksUrl = v;
             return this;
         }
 
-        public Builder accessTokenTtlSeconds(int v) {
-            this.accessTokenTtlSeconds = v;
+        public Builder clerkAuthorizedParties(List<String> v) {
+            this.clerkAuthorizedParties = v;
             return this;
         }
 
-        public Builder refreshTokenTtlDays(int v) {
-            this.refreshTokenTtlDays = v;
-            return this;
-        }
-
-        public Builder minPasswordLength(int v) {
-            this.minPasswordLength = v;
+        public Builder clockSkewSeconds(int v) {
+            this.clockSkewSeconds = v;
             return this;
         }
 
@@ -976,8 +979,7 @@ public record AppConfig(
         }
 
         private AuthConfig buildAuthConfig() {
-            return new AuthConfig(
-                    tokenIssuer, jwtSecret, accessTokenTtlSeconds, refreshTokenTtlDays, minPasswordLength);
+            return new AuthConfig(clerkIssuer, clerkJwksUrl, clerkAuthorizedParties, clockSkewSeconds);
         }
     }
 }

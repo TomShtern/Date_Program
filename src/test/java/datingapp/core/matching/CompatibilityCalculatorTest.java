@@ -68,6 +68,34 @@ class CompatibilityCalculatorTest {
     }
 
     @Test
+    @DisplayName("WILDCARD messaging and first-date answers score the same against every value")
+    void calculatePaceScoreTreatsWildcardAnswersEvenly() {
+        CompatibilityCalculator calculator =
+                new CompatibilityCalculator(AppConfig.defaults(), Clock.fixed(FIXED_INSTANT, ZoneId.of("UTC")));
+
+        PacePreferences wildcard =
+                pace(PacePreferences.MessagingFrequency.WILDCARD, PacePreferences.TimeToFirstDate.WILDCARD);
+        PacePreferences rarelyQuickly =
+                pace(PacePreferences.MessagingFrequency.RARELY, PacePreferences.TimeToFirstDate.QUICKLY);
+        PacePreferences constantlyMonths =
+                pace(PacePreferences.MessagingFrequency.CONSTANTLY, PacePreferences.TimeToFirstDate.MONTHS);
+
+        assertEquals(
+                calculator.calculatePaceScore(wildcard, rarelyQuickly),
+                calculator.calculatePaceScore(wildcard, constantlyMonths),
+                0.0001);
+    }
+
+    private static PacePreferences pace(
+            PacePreferences.MessagingFrequency frequency, PacePreferences.TimeToFirstDate firstDate) {
+        return new PacePreferences(
+                frequency,
+                firstDate,
+                PacePreferences.CommunicationStyle.TEXT_ONLY,
+                PacePreferences.DepthPreference.DEEP_CHAT);
+    }
+
+    @Test
     @DisplayName("interest score rewards overlap")
     void calculateInterestScoreRewardsOverlap() {
         CompatibilityCalculator calculator =

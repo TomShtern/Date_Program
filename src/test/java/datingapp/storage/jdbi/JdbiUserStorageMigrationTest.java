@@ -133,6 +133,35 @@ class JdbiUserStorageMigrationTest {
         assertEquals(0, results.size());
     }
 
+    @Test
+    @DisplayName("findCandidates includes everyone aged exactly maxAge and excludes the next year up")
+    void findCandidatesIncludesCandidatesAtExactlyMaxAge() {
+        AppClock.setFixed(Instant.parse("2026-03-25T12:00:00Z"));
+
+        User seeker = createUser();
+        seeker.setAgeRange(26, 30, 18, 120);
+        storage.save(seeker);
+
+        User turnedThirtyToday = createCandidate("TurnedThirtyToday", Gender.FEMALE, 40.7228, -74.0060);
+        turnedThirtyToday.setBirthDate(LocalDate.of(1996, 3, 25));
+        User thirtyEarlierThisYear = createCandidate("ThirtyEarlierThisYear", Gender.FEMALE, 40.7228, -74.0060);
+        thirtyEarlierThisYear.setBirthDate(LocalDate.of(1996, 1, 1));
+        User thirtyUntilTomorrow = createCandidate("ThirtyUntilTomorrow", Gender.FEMALE, 40.7228, -74.0060);
+        thirtyUntilTomorrow.setBirthDate(LocalDate.of(1995, 3, 26));
+        User thirtyOneToday = createCandidate("ThirtyOneToday", Gender.FEMALE, 40.7228, -74.0060);
+        thirtyOneToday.setBirthDate(LocalDate.of(1995, 3, 25));
+        storage.save(turnedThirtyToday);
+        storage.save(thirtyEarlierThisYear);
+        storage.save(thirtyUntilTomorrow);
+        storage.save(thirtyOneToday);
+
+        List<User> results = storage.findCandidates(userId, EnumSet.of(Gender.FEMALE), 26, 30, 40.7128, -74.0060, 25);
+
+        assertEquals(
+                java.util.Set.of(turnedThirtyToday.getId(), thirtyEarlierThisYear.getId(), thirtyUntilTomorrow.getId()),
+                results.stream().map(User::getId).collect(java.util.stream.Collectors.toSet()));
+    }
+
     private User createUser() {
         User user = new User(userId, "MigrationUser");
         user.setBirthDate(AppClock.today().minusYears(28));

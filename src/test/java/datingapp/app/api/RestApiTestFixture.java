@@ -3,9 +3,6 @@ package datingapp.app.api;
 import datingapp.app.event.handlers.AchievementEventHandler;
 import datingapp.app.event.handlers.MetricsEventHandler;
 import datingapp.app.event.handlers.NotificationEventHandler;
-import datingapp.app.usecase.auth.AuthTokenService;
-import datingapp.app.usecase.auth.AuthUseCases.AuthIdentity;
-import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
 import datingapp.core.ServiceRegistry;
 import datingapp.core.matching.Standout;
@@ -14,6 +11,7 @@ import datingapp.core.model.User;
 import datingapp.core.storage.OperationalCommunicationStorage;
 import datingapp.core.storage.OperationalInteractionStorage;
 import datingapp.core.storage.OperationalUserStorage;
+import datingapp.core.testutil.TestAccessTokenVerifier;
 import datingapp.core.testutil.TestServiceRegistryBuilder;
 import datingapp.core.testutil.TestStorages;
 import java.time.Instant;
@@ -35,11 +33,9 @@ final class RestApiTestFixture {
         return bearerToken(services, user.getId(), user.getEmail());
     }
 
+    /** Authorization header value for a pre-seeded user; verified by {@link TestAccessTokenVerifier}. */
     static String bearerToken(ServiceRegistry services, UUID userId, String email) {
-        String resolvedEmail = email == null || email.isBlank() ? userId + "@example.com" : email;
-        String accessToken = new AuthTokenService(services.getConfig().auth())
-                .issueAccessToken(new AuthIdentity(userId, resolvedEmail), AppClock.now());
-        return "Bearer " + accessToken;
+        return "Bearer " + TestAccessTokenVerifier.tokenFor(userId);
     }
 
     static Builder builder(

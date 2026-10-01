@@ -6,6 +6,7 @@ import datingapp.core.model.User;
 import datingapp.core.profile.MatchPreferences.Interest;
 import datingapp.storage.DatabaseDialect;
 import java.time.ZoneId;
+import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 
@@ -193,6 +194,17 @@ final class AppConfigValidator {
         requireNonNegative("standoutLifestyleWeight", standoutLifestyleWeight);
         requireNonNegative("standoutCompletenessWeight", standoutCompletenessWeight);
         requireNonNegative("standoutActivityWeight", standoutActivityWeight);
+
+        double weightSum = standoutDistanceWeight
+                + standoutAgeWeight
+                + standoutInterestWeight
+                + standoutLifestyleWeight
+                + standoutCompletenessWeight
+                + standoutActivityWeight;
+        if (Math.abs(weightSum - 1.0) > 0.01) {
+            throw new IllegalArgumentException(
+                    "Standout weights must sum to 1.0 within +/- 0.01 tolerance, got: " + weightSum);
+        }
     }
 
     static void validateStorage(
@@ -210,16 +222,23 @@ final class AppConfigValidator {
     }
 
     static void validateAuth(
-            String tokenIssuer,
-            String jwtSecret,
-            int accessTokenTtlSeconds,
-            int refreshTokenTtlDays,
-            int minPasswordLength) {
-        requireNonBlank("tokenIssuer", tokenIssuer);
-        requireNonBlank("jwtSecret", jwtSecret);
-        requireInRange(accessTokenTtlSeconds, 60, 86_400, "accessTokenTtlSeconds");
-        requireInRange(refreshTokenTtlDays, 1, 365, "refreshTokenTtlDays");
-        requireInRange(minPasswordLength, 8, 512, "minPasswordLength");
+            String clerkIssuer, String clerkJwksUrl, List<String> clerkAuthorizedParties, int clockSkewSeconds) {
+        Objects.requireNonNull(clerkIssuer, "clerkIssuer cannot be null");
+        Objects.requireNonNull(clerkJwksUrl, "clerkJwksUrl cannot be null");
+        Objects.requireNonNull(clerkAuthorizedParties, "clerkAuthorizedParties cannot be null");
+        requireHttpUrlWhenPresent("clerkIssuer", clerkIssuer);
+        requireHttpUrlWhenPresent("clerkJwksUrl", clerkJwksUrl);
+        if (clerkAuthorizedParties.stream().anyMatch(Objects::isNull)) {
+            throw new IllegalArgumentException("clerkAuthorizedParties cannot contain null entries");
+        }
+        requireInRange(clockSkewSeconds, 0, 300, "clockSkewSeconds");
+    }
+
+    private static void requireHttpUrlWhenPresent(String name, String value) {
+        String trimmed = value.trim();
+        if (!trimmed.isEmpty() && !(trimmed.startsWith("https://") || trimmed.startsWith("http://"))) {
+            throw new IllegalArgumentException(name + " must start with http:// or https:// when provided");
+        }
     }
 
     static void validateMedia(String photoStorageRoot, String photoPublicBaseUrl, long maxPhotoUploadBytes) {
@@ -265,7 +284,7 @@ final class AppConfigValidator {
     static void validateSafetySession(
             int autoBanThreshold, ZoneId userTimeZone, int sessionTimeoutMinutes, int undoWindowSeconds) {
         Objects.requireNonNull(userTimeZone, "userTimeZone cannot be null");
-        requireNonNegative("autoBanThreshold", autoBanThreshold);
+        requirePositive("autoBanThreshold", autoBanThreshold);
         requireNonNegative("sessionTimeoutMinutes", sessionTimeoutMinutes);
         requireNonNegative("undoWindowSeconds", undoWindowSeconds);
     }

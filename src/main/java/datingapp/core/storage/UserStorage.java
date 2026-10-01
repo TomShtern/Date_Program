@@ -275,6 +275,27 @@ public interface UserStorage {
                 "executeWithUserLock must be implemented with database-level locking by the storage implementation");
     }
 
+    /**
+     * Executes an operation while holding the row locks of both users. Locks are always taken in
+     * sorted-ID order, so two operations touching the same pair can never wait on each other in a
+     * cycle (A holds one and wants the other while the other holds that one and wants A).
+     *
+     * <p>Use this whenever an operation writes a row that references a second user, such as a like
+     * that may create a match: the foreign-key check touches the other user's row.
+     */
+    default void executeWithUserPairLock(UUID userA, UUID userB, Runnable operation) {
+        Objects.requireNonNull(userA, "userA cannot be null");
+        Objects.requireNonNull(userB, "userB cannot be null");
+        Objects.requireNonNull(operation, "operation cannot be null");
+        if (userA.equals(userB)) {
+            executeWithUserLock(userA, operation);
+            return;
+        }
+        UUID first = userA.toString().compareTo(userB.toString()) < 0 ? userA : userB;
+        UUID second = first.equals(userA) ? userB : userA;
+        executeWithUserLock(first, () -> executeWithUserLock(second, operation));
+    }
+
     default <T> T withUserLock(UUID userId, Function<LockedUserAccess, T> operation) {
         Objects.requireNonNull(userId, "userId cannot be null");
         Objects.requireNonNull(operation, "operation cannot be null");

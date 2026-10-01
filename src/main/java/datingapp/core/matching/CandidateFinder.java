@@ -122,8 +122,8 @@ public class CandidateFinder implements LoggingSupport {
      * already interacted
      * (liked/passed) 3. Mutual gender preferences (both ways) 4. Mutual age
      * preferences (both ways)
-     * 5. Within seeker's distance preference 6. Passes seeker's dealbreakers (Phase
-     * 0.5b)
+     * 5. Within seeker's distance preference 6. Passes dealbreakers both ways (the
+     * seeker's against the candidate, and the candidate's against the seeker)
      *
      * <p>
      * Results are sorted by distance (closest first).
@@ -131,6 +131,7 @@ public class CandidateFinder implements LoggingSupport {
     public List<User> findCandidates(User seeker, List<User> allActive, Set<UUID> alreadyInteracted) {
         Set<Gender> seekerInterestedIn = seeker.getInterestedIn();
         Set<UUID> recentlyUnmatchedCounterpartIds = recentlyUnmatchedCounterpartIds(seeker.getId());
+        Set<UUID> blockedEitherDirection = trustSafetyStorage.getBlockedUserIds(seeker.getId());
         Map<UUID, Double> distanceCache = new HashMap<>();
         logDebug(
                 "Finding candidates for {} (state={}, gender={}, interestedIn={}, age={}, minAge={}, maxAge={})",
@@ -148,7 +149,7 @@ public class CandidateFinder implements LoggingSupport {
                 .filter(candidate -> isNotSelf(seeker, candidate))
                 .filter(this::isActiveCandidate)
                 .filter(candidate -> notAlreadyInteracted(candidate, alreadyInteracted))
-                .filter(candidate -> notBlockedEitherDirection(seeker, candidate))
+                .filter(candidate -> notBlockedEitherDirection(candidate, blockedEitherDirection))
                 .filter(candidate -> notInRecentUnmatchCooldown(candidate, recentlyUnmatchedCounterpartIds))
                 .filter(candidate -> matchesGenderPreferences(seeker, candidate, seekerInterestedIn))
                 .filter(candidate -> matchesAgePreferences(seeker, candidate))
@@ -253,8 +254,8 @@ public class CandidateFinder implements LoggingSupport {
         return notInteracted;
     }
 
-    private boolean notBlockedEitherDirection(User seeker, User candidate) {
-        boolean notBlocked = !trustSafetyStorage.isBlocked(seeker.getId(), candidate.getId());
+    private boolean notBlockedEitherDirection(User candidate, Set<UUID> blockedEitherDirection) {
+        boolean notBlocked = !blockedEitherDirection.contains(candidate.getId());
         if (!notBlocked) {
             logDebug("Rejecting {}: BLOCKED IN EITHER DIRECTION", userRef(candidate));
         }
@@ -318,12 +319,18 @@ public class CandidateFinder implements LoggingSupport {
         return true;
     }
 
+    /** Dealbreakers protect both sides: the seeker's against the candidate, and the candidate's against the seeker. */
     private boolean passesDealbreakers(User seeker, User candidate) {
-        boolean passesDb = Dealbreakers.Evaluator.passes(seeker, candidate, timezone);
-        if (!passesDb) {
-            logDebug("Rejecting {}: DEALBREAKER HIT", userRef(candidate));
+        boolean seekerAccepts = Dealbreakers.Evaluator.passes(seeker, candidate, timezone);
+        if (!seekerAccepts) {
+            logDebug("Rejecting {}: SEEKER DEALBREAKER HIT", userRef(candidate));
+            return false;
         }
-        return passesDb;
+        boolean candidateAccepts = Dealbreakers.Evaluator.passes(candidate, seeker, timezone);
+        if (!candidateAccepts) {
+            logDebug("Rejecting {}: CANDIDATE DEALBREAKER HIT", userRef(candidate));
+        }
+        return candidateAccepts;
     }
 
     /**

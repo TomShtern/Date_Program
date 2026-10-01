@@ -143,8 +143,12 @@ public final class MatchingService {
     public RecordLikeOutcome recordLike(Like like) {
         Objects.requireNonNull(like, LIKE_REQUIRED);
         final RecordLikeOutcome[] resultHolder = new RecordLikeOutcome[1];
-        userStorage.executeWithUserLock(
-                like.whoLikes(), () -> storeRecordLikeOutcome(resultHolder, recordLikeWithinLock(like)));
+        // The like row references the target user too, so lock both users in a fixed order (see
+        // executeWithUserPairLock).
+        userStorage.executeWithUserPairLock(
+                like.whoLikes(),
+                like.whoGotLiked(),
+                () -> storeRecordLikeOutcome(resultHolder, recordLikeWithinLock(like)));
         return resultHolder[0];
     }
 
@@ -161,6 +165,9 @@ public final class MatchingService {
             return RecordLikeOutcome.duplicate(persistedLike);
         }
         invalidateCandidateCaches(like.whoLikes(), like.whoGotLiked());
+        // Same as processSwipe: keep undo state inside the lock so the REST like/pass routes can be undone too.
+        undoService.recordSwipe(
+                like.whoLikes(), like, writeResult.createdMatch().orElse(null));
         return RecordLikeOutcome.persisted(like, writeResult.createdMatch());
     }
 
@@ -175,6 +182,10 @@ public final class MatchingService {
         }
         if (interactionStorage.getLike(like.whoLikes(), like.whoGotLiked()).isPresent()) {
             return Optional.empty();
+        }
+        Optional<String> gateBlock = swipeGateBlockReason(like.whoLikes());
+        if (gateBlock.isPresent()) {
+            return gateBlock;
         }
         return switch (like.direction()) {
             case LIKE ->
@@ -252,8 +263,9 @@ public final class MatchingService {
         }
         try {
             final SwipeResult[] resultHolder = new SwipeResult[1];
-            userStorage.executeWithUserLock(
+            userStorage.executeWithUserPairLock(
                     currentUser.getId(),
+                    candidate.getId(),
                     () -> storeSwipeResult(
                             resultHolder, processSwipeWithinLock(currentUser, candidate, liked, superLike)));
             return resultHolder[0];
@@ -279,6 +291,11 @@ public final class MatchingService {
 
         if (interactionStorage.getLike(currentUser.getId(), candidate.getId()).isPresent()) {
             return SwipeResult.alreadySwiped();
+        }
+
+        Optional<String> gateBlock = swipeGateBlockReason(currentUser.getId());
+        if (gateBlock.isPresent()) {
+            return SwipeResult.configError(gateBlock.orElseThrow());
         }
 
         if (superLike && !dailyService.canSuperLike(currentUser.getId())) {
@@ -310,6 +327,14 @@ public final class MatchingService {
             return SwipeResult.matched(match.get(), like);
         }
         return liked ? SwipeResult.liked(like) : SwipeResult.passed(like);
+    }
+
+    /** Session-limit and velocity gate, checked before a swipe is written so a blocked swipe is never stored. */
+    private Optional<String> swipeGateBlockReason(UUID userId) {
+        return activityMetricsService
+                .map(service -> service.checkSwipeAllowed(userId))
+                .filter(gate -> !gate.allowed())
+                .map(ActivityMetricsService.SwipeGateResult::blockedReason);
     }
 
     private Optional<String> validatePersistedSwipeEligibility(UUID currentUserId, UUID candidateId) {

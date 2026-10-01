@@ -11,6 +11,7 @@ import datingapp.core.AppConfig;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.function.UnaryOperator;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -293,31 +294,63 @@ class ConfigLoaderTest {
         }
 
         @Test
-        @DisplayName("Should fail fast in production when JWT secret remains the development placeholder")
-        void failsFastInProductionWhenJwtSecretIsDefaultPlaceholder() {
-            UnaryOperator<String> envLookup = name -> switch (name) {
-                case "DATING_APP_ENV" -> "production";
-                default -> null;
-            };
+        @DisplayName("Should leave Clerk unconfigured by default so the CLI and desktop app still start")
+        void clerkIsUnconfiguredByDefault() {
+            AppConfig config = ApplicationStartup.fromJson("{}", name -> null);
 
-            IllegalStateException error =
-                    assertThrows(IllegalStateException.class, () -> ApplicationStartup.fromJson("{}", envLookup));
-
-            assertTrue(error.getMessage().contains("DATING_APP_AUTH_JWT_SECRET"));
+            assertFalse(config.auth().clerkConfigured());
+            assertEquals("", config.auth().clerkJwksUrl());
         }
 
         @Test
-        @DisplayName("Should allow production config when JWT secret is provided via environment override")
-        void allowsProductionWhenJwtSecretProvidedViaEnvironmentOverride() {
+        @DisplayName("Should read Clerk settings from environment overrides and derive the JWKS URL")
+        void readsClerkSettingsFromEnvironment() {
             UnaryOperator<String> envLookup = name -> switch (name) {
-                case "DATING_APP_ENV" -> "production";
-                case "DATING_APP_AUTH_JWT_SECRET" -> "prod-secret-123456789";
+                case "DATING_APP_AUTH_CLERK_ISSUER" -> "https://example.clerk.accounts.dev/";
+                case "DATING_APP_AUTH_CLERK_AUTHORIZED_PARTIES" -> "http://localhost:3000, https://app.example.com";
                 default -> null;
             };
 
             AppConfig config = ApplicationStartup.fromJson("{}", envLookup);
 
-            assertEquals("prod-secret-123456789", config.auth().jwtSecret());
+            assertTrue(config.auth().clerkConfigured());
+            assertEquals("https://example.clerk.accounts.dev", config.auth().clerkIssuer());
+            assertEquals(
+                    "https://example.clerk.accounts.dev/.well-known/jwks.json",
+                    config.auth().clerkJwksUrl());
+            assertEquals(
+                    List.of("http://localhost:3000", "https://app.example.com"),
+                    config.auth().clerkAuthorizedParties());
+        }
+
+        @Test
+        @DisplayName("Should keep an explicit JWKS URL instead of deriving one")
+        void keepsExplicitJwksUrl() {
+            String json = """
+                {"clerkIssuer": "https://example.clerk.accounts.dev", "clerkJwksUrl": "http://localhost:9999/jwks"}
+                """;
+
+            AppConfig config = ApplicationStartup.fromJson(json, name -> null);
+
+            assertEquals("http://localhost:9999/jwks", config.auth().clerkJwksUrl());
+        }
+
+        @Test
+        @DisplayName("Should reject a Clerk issuer that is not an http(s) URL")
+        void rejectsNonUrlIssuer() {
+            String json = "{\"clerkIssuer\": \"example.clerk.accounts.dev\"}";
+
+            assertThrows(IllegalArgumentException.class, () -> ApplicationStartup.fromJson(json, name -> null));
+        }
+
+        @Test
+        @DisplayName("Should reject the removed password-era auth keys as unknown")
+        void rejectsRemovedAuthKeys() {
+            IllegalStateException error = assertThrows(
+                    IllegalStateException.class,
+                    () -> ApplicationStartup.fromJson("{\"jwtSecret\": \"x\"}", name -> null));
+
+            assertTrue(error.getMessage().contains("jwtSecret"));
         }
     }
 

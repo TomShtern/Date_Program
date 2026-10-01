@@ -33,6 +33,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
 
 /** Candidate browsing, swiping, undo, and standout/match orchestration use-cases. */
 @SuppressWarnings("java:S6539")
@@ -318,18 +319,25 @@ public class MatchingUseCases {
         }
 
         UUID userId = command.context().userId();
-        if (!undoService.canUndo(userId)) {
-            return UseCaseResult.failure(UseCaseError.conflict("No recent swipe to undo"));
-        }
         try {
-            UndoService.UndoResult result = undoService.undo(userId);
-            if (!result.success()) {
-                return UseCaseResult.failure(UseCaseError.conflict(result.message()));
-            }
-            return UseCaseResult.success(UndoOutcome.from(result));
+            // Hold the user's row lock so a concurrent swipe cannot replace the undo state mid-undo.
+            AtomicReference<UseCaseResult<UndoOutcome>> outcome = new AtomicReference<>();
+            userStorage.executeWithUserLock(userId, () -> outcome.set(undoSwipeWithinLock(userId)));
+            return outcome.get();
         } catch (Exception e) {
             return UseCaseResult.failure(UseCaseError.internal("Failed to undo swipe: " + e.getMessage()));
         }
+    }
+
+    private UseCaseResult<UndoOutcome> undoSwipeWithinLock(UUID userId) {
+        if (!undoService.canUndo(userId)) {
+            return UseCaseResult.failure(UseCaseError.conflict("No recent swipe to undo"));
+        }
+        UndoService.UndoResult result = undoService.undo(userId);
+        if (!result.success()) {
+            return UseCaseResult.failure(UseCaseError.conflict(result.message()));
+        }
+        return UseCaseResult.success(UndoOutcome.from(result));
     }
 
     public UseCaseResult<ActiveMatchesResult> listActiveMatches(ListActiveMatchesQuery query) {

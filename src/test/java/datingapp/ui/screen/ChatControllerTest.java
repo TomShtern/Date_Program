@@ -471,7 +471,7 @@ class ChatControllerTest {
         private java.util.Optional<String> latestMessageContent() {
             String conversationId = datingapp.core.connection.ConnectionModels.Conversation.generateId(
                     currentUser.getId(), otherUser.getId());
-            var result = connectionService.getMessages(conversationId, 50, 0);
+            var result = connectionService.getMessages(currentUser.getId(), conversationId, 50, 0);
             if (!result.success() || result.messages().isEmpty()) {
                 return java.util.Optional.empty();
             }
@@ -482,7 +482,7 @@ class ChatControllerTest {
         private int messageCount() {
             String conversationId = datingapp.core.connection.ConnectionModels.Conversation.generateId(
                     currentUser.getId(), otherUser.getId());
-            var result = connectionService.getMessages(conversationId, 50, 0);
+            var result = connectionService.getMessages(currentUser.getId(), conversationId, 50, 0);
             return result.success() ? result.messages().size() : 0;
         }
 

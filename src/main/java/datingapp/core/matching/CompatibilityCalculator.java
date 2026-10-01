@@ -203,8 +203,12 @@ public class CompatibilityCalculator {
             return NEUTRAL_SCORE;
         }
         int score = 0;
-        score += dimensionScore(a.messagingFrequency(), b.messagingFrequency(), false);
-        score += dimensionScore(a.timeToFirstDate(), b.timeToFirstDate(), false);
+        boolean messagingWildcard = a.messagingFrequency() == PacePreferences.MessagingFrequency.WILDCARD
+                || b.messagingFrequency() == PacePreferences.MessagingFrequency.WILDCARD;
+        score += dimensionScore(a.messagingFrequency(), b.messagingFrequency(), messagingWildcard);
+        boolean firstDateWildcard = a.timeToFirstDate() == PacePreferences.TimeToFirstDate.WILDCARD
+                || b.timeToFirstDate() == PacePreferences.TimeToFirstDate.WILDCARD;
+        score += dimensionScore(a.timeToFirstDate(), b.timeToFirstDate(), firstDateWildcard);
         boolean commStyleWildcard = isCommunicationStyleWildcard(a.communicationStyle())
                 || isCommunicationStyleWildcard(b.communicationStyle());
         score += dimensionScore(a.communicationStyle(), b.communicationStyle(), commStyleWildcard);

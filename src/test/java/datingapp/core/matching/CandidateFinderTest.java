@@ -93,6 +93,22 @@ class CandidateFinderTest {
     }
 
     @Test
+    @DisplayName("Candidate dealbreakers exclude a seeker who violates them")
+    void candidateDealbreakersExcludeViolatingSeeker() {
+        seeker.setSmoking(Lifestyle.Smoking.REGULARLY);
+
+        User picky = createUser("Picky", Gender.FEMALE, EnumSet.of(Gender.MALE), 28, 32.0, 34.0);
+        picky.setDealbreakers(
+                Dealbreakers.builder().acceptSmoking(Lifestyle.Smoking.NEVER).build());
+        User relaxed = createUser("Relaxed", Gender.FEMALE, EnumSet.of(Gender.MALE), 28, 32.0, 34.0);
+
+        List<User> result = finder.findCandidates(seeker, List.of(picky, relaxed), Set.of());
+
+        assertEquals(1, result.size());
+        assertEquals("Relaxed", result.get(0).getName());
+    }
+
+    @Test
     @DisplayName("Filters by mutual age preferences")
     void filtersByMutualAgePreferences() {
         // Seeker is 30, looking for 25-35

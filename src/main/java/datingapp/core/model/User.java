@@ -69,12 +69,15 @@ public class User {
 
     /**
      * Lifecycle state of a user account.
-     * Valid transitions: INCOMPLETE → ACTIVE ↔ PAUSED → BANNED
+     * Valid transitions: INCOMPLETE → ACTIVE ↔ PAUSED → UNDER_REVIEW → BANNED.
+     * UNDER_REVIEW is entered when enough distinct users report an account; the account stops
+     * being discoverable and cannot swipe until a moderator bans it.
      */
     public static enum UserState {
         INCOMPLETE,
         ACTIVE,
         PAUSED,
+        UNDER_REVIEW,
         BANNED
     }
 
@@ -783,6 +786,9 @@ public class User {
         if (state == UserState.BANNED) {
             throw new IllegalStateException("Cannot activate a banned user");
         }
+        if (state == UserState.UNDER_REVIEW) {
+            throw new IllegalStateException("Cannot activate a user who is under review");
+        }
         if (!isComplete()) {
             throw new IllegalStateException("Cannot activate an incomplete profile");
         }
@@ -796,6 +802,15 @@ public class User {
             throw new IllegalStateException("Can only pause an active user");
         }
         this.state = UserState.PAUSED;
+        touch();
+    }
+
+    /** Flags the user for moderator review. No-op when already under review or banned. */
+    public void flagForReview() {
+        if (state == UserState.UNDER_REVIEW || state == UserState.BANNED) {
+            return;
+        }
+        this.state = UserState.UNDER_REVIEW;
         touch();
     }
 

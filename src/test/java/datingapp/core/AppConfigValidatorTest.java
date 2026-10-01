@@ -377,6 +377,25 @@ class AppConfigValidatorTest {
     }
 
     @Test
+    @DisplayName("validateAlgorithm rejects standout weights that do not sum to 1.0")
+    void validateAlgorithmRejectsStandoutWeightsThatDoNotSumToOne() {
+        IllegalArgumentException ex = assertThrows(
+                IllegalArgumentException.class,
+                () -> new AppConfig.AlgorithmConfig(
+                        5, 10, 2, 5, 50, 1, 24, 72, 168, 720, 3, 40, 90, 75, 60, 40, 0.50, 0.50, 0.50, 0.0, 0.0, 0.0));
+        org.junit.jupiter.api.Assertions.assertTrue(ex.getMessage().contains("sum to 1.0"));
+    }
+
+    @Test
+    @DisplayName("validateSafety rejects an auto-ban threshold below 1")
+    void validateSafetyRejectsZeroAutoBanThreshold() {
+        ZoneId utc = ZoneId.of("UTC");
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> new AppConfig.SafetyConfig(0, utc, 30, 60, 1, 5, 10, 25, 50, 20, 0.35, 0.65, 100, 4, 30, 90));
+    }
+
+    @Test
     @DisplayName("validateSafety accepts valid safety parameters")
     void validateSafetyAcceptsValidValues() {
         ZoneId utc = ZoneId.of("UTC");

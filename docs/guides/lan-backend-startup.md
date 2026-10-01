@@ -32,8 +32,49 @@ do not put a real LAN secret in a tracked file.
 |---|---|---|
 | `DATING_APP_DB_PASSWORD` | PostgreSQL password | local helper's development-only default |
 | `DATING_APP_DB_URL` | JDBC URL | `jdbc:postgresql://localhost:55432/datingapp` |
+| `DATING_APP_AUTH_CLERK_ISSUER` | Clerk Frontend API URL, e.g. `https://<name>.clerk.accounts.dev`. **Required**: the REST server refuses to start without it | *(empty)* |
 | `DATING_APP_REST_SHARED_SECRET` | LAN shared secret | supply a fresh random value for each LAN session |
 | `DATING_APP_REST_ALLOWED_ORIGINS` | CORS origins (Flutter web only) | *(empty)* |
+
+The Clerk issuer is a public URL, so it can live in `.env`. The server needs no
+Clerk secret key; it checks session tokens against `<issuer>/.well-known/jwks.json`
+and therefore needs outbound HTTPS to Clerk. The optional
+`DATING_APP_AUTH_CLERK_JWKS_URL`, `DATING_APP_AUTH_CLERK_AUTHORIZED_PARTIES` and
+`DATING_APP_AUTH_CLOCK_SKEW_SECONDS` are described in `.env.example`.
+
+### Finding your Clerk issuer
+
+The issuer is your instance's Frontend API URL. It is public. Either route works:
+
+- **Dashboard:** open your application in the Clerk dashboard, go to **Domains**, and copy the
+  Frontend API URL.
+- **Clerk CLI:** `npx clerk@latest auth login`, then `npx clerk@latest apps list --json`. Take the
+  entry in `instances` whose `environment_type` is development and read its `publishable_key`
+  (`pk_test_...`). Everything after `pk_test_` is base64 of
+  `<frontend-api-host>$`; decode it and prefix `https://`.
+
+Check it before starting the server. This should return HTTP 200 with a `keys` array:
+
+```powershell
+Invoke-RestMethod "https://<name>.clerk.accounts.dev/.well-known/jwks.json"
+```
+
+### Trying a real session token without a client
+
+Useful to prove the setup before the Flutter app exists. This creates a user in your Clerk **dev**
+instance, so delete it afterwards.
+
+1. Start the REST server with `DATING_APP_AUTH_CLERK_ISSUER` set.
+2. With the Clerk CLI logged in, create a test user, a session for it (`POST /sessions`) and a token
+   for that session (`POST /sessions/{session_id}/tokens`), using `npx clerk@latest api ... --app <app-id> --instance dev`.
+   Keep the returned `jwt` in a local variable. Do not paste it into chat, files or logs.
+3. `POST /api/auth/session` with `Authorization: Bearer <jwt>`. Expect 201 the first time and 200 after.
+4. Delete the test user (`DELETE /users/{user_id}`).
+
+Expect these properties from a dev-instance token: it is valid for 60 seconds, it is signed
+RS256, and by default it has no `azp` and no `email` claim. The server accepts both absences.
+To get an `email` echoed in the session response, add it as a custom claim in the dashboard's
+session token settings. The backend does not need it.
 
 Native mobile clients (Flutter Android/iOS) do **not** need CORS. The allowlist is only for Flutter web or browser-based tools.
 
@@ -71,6 +112,10 @@ All non-health requests must include the header:
 X-DatingApp-Shared-Secret: <the same locally configured shared secret>
 ```
 
+Requests under `/api/users/...` also need `Authorization: Bearer <Clerk session token>`.
+Sign in with Clerk first, then call `POST /api/auth/session` once to get the local
+user id. See `docs/api/API-SPECIFICATION.md`.
+
 ## Advanced: manual startup
 
 If you prefer to run each step manually:
@@ -103,5 +148,5 @@ Equivalent environment variables are also supported:
 
 - `GET /api/health` does **not** require the shared secret.
 - All other LAN requests must send `X-DatingApp-Shared-Secret`.
-- Mutating/scoped routes still use `X-User-Id` as the acting-user header.
+- Scoped routes identify the caller from the `Authorization: Bearer` token. If an `X-User-Id` header is also sent, it must match the token subject. `X-User-Id` alone is accepted only when no auth use cases are wired (`RestApiIdentityPolicy.resolveActingUserId`).
 - CORS matters only for browser-based clients; native mobile clients do not need it.

@@ -149,7 +149,8 @@ public class ConnectionService {
         return MessageLoadResult.success(communicationStorage.getMessages(conversationId, limit, offset));
     }
 
-    public MessageLoadResult getMessages(String conversationId, int limit, int offset) {
+    public MessageLoadResult getMessages(UUID userId, String conversationId, int limit, int offset) {
+        Objects.requireNonNull(userId, USER_ID_REQUIRED);
         if (conversationId == null || conversationId.isBlank()) {
             return MessageLoadResult.failure("Conversation ID cannot be empty");
         }
@@ -157,7 +158,9 @@ public class ConnectionService {
         if (invalidPageRequest != null) {
             return invalidPageRequest;
         }
-        if (communicationStorage.getConversation(conversationId).isEmpty()) {
+        // findAuthorizedConversation only returns a conversation the user takes part in.
+        Optional<Conversation> convoOpt = findAuthorizedConversation(userId, conversationId);
+        if (convoOpt.isEmpty()) {
             return MessageLoadResult.failure(CONVERSATION_NOT_FOUND);
         }
         return MessageLoadResult.success(communicationStorage.getMessages(conversationId, limit, offset));

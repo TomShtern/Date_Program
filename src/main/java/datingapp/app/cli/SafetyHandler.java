@@ -278,7 +278,7 @@ public class SafetyHandler implements LoggingSupport {
             logInfo("\n✅ Report submitted for {}.", reportedUser.getName());
         }
         if (reportResult.userWasBanned()) {
-            logInfo("⚠️  This user has been automatically BANNED due to multiple reports.");
+            logInfo("⚠️  This user has been flagged for moderator review due to multiple reports.");
         }
         logInfo("");
     }

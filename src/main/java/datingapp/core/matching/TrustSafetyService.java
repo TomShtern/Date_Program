@@ -20,6 +20,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -314,8 +315,10 @@ public final class TrustSafetyService {
     }
 
     /**
-     * Applies auto-ban decision under distributed lock to coordinate concurrent
-     * reports across multiple instances.
+     * Flags the reported user for moderator review once enough distinct reporters have
+     * filed against them, under a user lock to coordinate concurrent reports. The account
+     * is not banned automatically: {@code UNDER_REVIEW} removes it from discovery and
+     * swiping, and a human decides the ban. Returns true only when this call flagged it.
      */
     private boolean applyAutoBanIfThreshold(UUID reportedUserId) {
         return userStorage.withUserLock(reportedUserId, lockedUsers -> {
@@ -340,7 +343,9 @@ public final class TrustSafetyService {
                     .get(reportedUserId)
                     .map(TrustSafetyService::copyUser)
                     .orElse(null);
-            if (latestReported == null || latestReported.getState() == UserState.BANNED) {
+            if (latestReported == null
+                    || latestReported.getState() == UserState.BANNED
+                    || latestReported.getState() == UserState.UNDER_REVIEW) {
                 auditModeration(
                         ModerationAuditEvent.Action.AUTO_BAN,
                         ModerationAuditEvent.Outcome.FAILURE,
@@ -352,11 +357,15 @@ public final class TrustSafetyService {
                                 AUDIT_KEY_THRESHOLD,
                                 config.safety().autoBanThreshold(),
                                 AUDIT_KEY_MODERATION_REASON_CODE,
-                                latestReported == null ? "user_missing" : "already_banned"));
+                                latestReported == null
+                                        ? "user_missing"
+                                        : latestReported.getState() == UserState.BANNED
+                                                ? "already_banned"
+                                                : "already_under_review"));
                 return false;
             }
 
-            latestReported.ban();
+            latestReported.flagForReview();
             try {
                 lockedUsers.save(latestReported);
                 auditModeration(
@@ -374,7 +383,7 @@ public final class TrustSafetyService {
                 return true;
             } catch (RuntimeException exception) {
                 logger.error(
-                        "Auto-ban save failed for user {} after {} reports; ban was not persisted",
+                        "Review flag save failed for user {} after {} reports; state was not persisted",
                         reportedUserId,
                         reportCount,
                         exception);
@@ -401,9 +410,12 @@ public final class TrustSafetyService {
             String message = cause.getMessage();
             if (message != null) {
                 String upper = message.toUpperCase(Locale.ROOT);
-                if (upper.contains("UNIQUE") || upper.contains("DUPLICATE") || upper.contains("CONSTRAINT")) {
+                if (upper.contains("UNIQUE") || upper.contains("DUPLICATE")) {
                     return true;
                 }
+            }
+            if (cause instanceof java.sql.SQLException sqlException && "23505".equals(sqlException.getSQLState())) {
+                return true;
             }
             cause = cause.getCause();
         }
@@ -642,6 +654,12 @@ public final class TrustSafetyService {
                 .map(block -> userStorage.get(block.blockedId()).orElse(null))
                 .filter(Objects::nonNull)
                 .toList();
+    }
+
+    /** IDs of every user who blocked {@code userId} or was blocked by them. */
+    public Set<UUID> getBlockedUserIds(UUID userId) {
+        Objects.requireNonNull(userId, "userId cannot be null");
+        return trustSafetyStorage.getBlockedUserIds(userId);
     }
 
     public boolean isBlocked(UUID userA, UUID userB) {

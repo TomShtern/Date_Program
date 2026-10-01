@@ -1,7 +1,7 @@
 # Core Module Overview
 
 > Verified against `src/main/java/datingapp/core` (2026-09-27).
-> Package-level snapshot only — run `list_dir` on a subpackage for the current files.
+> Package-level snapshot only — list the subpackage directory for the current files.
 
 ## Package purpose
 

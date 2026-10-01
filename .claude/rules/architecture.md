@@ -55,9 +55,12 @@ All share `ServiceRegistry services = ApplicationStartup.initialize();` and
   logic; `LocationSelectionDialog` owns the search-and-select UX. Keep those five
   aligned — ad-hoc geocoding in a controller breaks the fallback chain.
   `LocationModels.Precision` covers `ADDRESS`, `CITY` and `ZIP`.
-- `AuthUseCases` + `AuthTokenService` (`app/usecase/auth/`) own login,
-  registration and the HS256 JWT lifecycle, via
-  `ServiceRegistry.getAuthUseCases()`.
+- `AuthUseCases` + `AccessTokenVerifier` (`app/usecase/auth/`) own Clerk session
+  handling, via `ServiceRegistry.getAuthUseCases()`. `ClerkJwtVerifier` checks
+  the RS256 signature against Clerk's JWKS; `AuthStorage` maps a Clerk `sub` to
+  the local UUID in `clerk_identities`. With no `clerkIssuer`,
+  `StorageFactory` wires `AccessTokenVerifier.rejectAll()` and only
+  `RestApiServer.main()` refuses to start. Tests use `TestAccessTokenVerifier`.
 - `StorageFactory.buildSqlDatabase(...)` is the runtime path; `buildH2(...)` and
   `buildInMemory(...)` are compatibility/test paths.
 - `DevDataSeeder` is env-gated on `DATING_APP_SEED_DATA=true` and idempotent.

@@ -64,6 +64,7 @@ public final class SchemaInitializer {
         createProfileSchema(stmt);
         createStandoutsSchema(stmt);
         createUndoStateSchema(stmt);
+        createSwipeQuotaSchema(stmt);
         createNormalizedProfileSchema(stmt);
 
         // Indexes & FKs
@@ -115,7 +116,7 @@ public final class SchemaInitializer {
                     pace_depth_preference VARCHAR(30),
                     deleted_at TIMESTAMP WITH TIME ZONE,
                     CONSTRAINT ck_users_state_values CHECK (
-                        state IN ('INCOMPLETE', 'ACTIVE', 'PAUSED', 'BANNED')
+                        state IN ('INCOMPLETE', 'ACTIVE', 'PAUSED', 'UNDER_REVIEW', 'BANNED')
                     ),
                     CONSTRAINT ck_users_gender_values CHECK (
                         gender IS NULL OR gender IN ('MALE', 'FEMALE', 'OTHER')
@@ -189,39 +190,19 @@ public final class SchemaInitializer {
                 """);
     }
 
+    /** Maps a Clerk user id (the token's {@code sub}) to the local user row. One identity per user. */
     static void createAuthSchema(Statement stmt) throws SQLException {
         stmt.execute("""
-                CREATE TABLE IF NOT EXISTS user_credentials (
-                    user_id UUID PRIMARY KEY,
-                    password_hash VARCHAR(200) NOT NULL,
-                    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
-                    updated_at TIMESTAMP WITH TIME ZONE NOT NULL,
-                    CONSTRAINT fk_user_credentials_user FOREIGN KEY (user_id)
-                        REFERENCES users(id) ON DELETE CASCADE,
-                    CONSTRAINT ck_user_credentials_password_hash_nonblank CHECK (TRIM(password_hash) <> '')
-                )
-                """);
-        stmt.execute("""
-                CREATE TABLE IF NOT EXISTS auth_refresh_tokens (
-                    token_id UUID PRIMARY KEY,
+                CREATE TABLE IF NOT EXISTS clerk_identities (
+                    clerk_user_id VARCHAR(255) PRIMARY KEY,
                     user_id UUID NOT NULL,
-                    token_hash VARCHAR(128) NOT NULL,
-                    issued_at TIMESTAMP WITH TIME ZONE NOT NULL,
-                    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
-                    revoked_at TIMESTAMP WITH TIME ZONE,
-                    replaced_by_token_id UUID,
-                    CONSTRAINT fk_auth_refresh_tokens_user FOREIGN KEY (user_id)
+                    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+                    CONSTRAINT uk_clerk_identities_user UNIQUE (user_id),
+                    CONSTRAINT fk_clerk_identities_user FOREIGN KEY (user_id)
                         REFERENCES users(id) ON DELETE CASCADE,
-                    CONSTRAINT fk_auth_refresh_tokens_replaced_by FOREIGN KEY (replaced_by_token_id)
-                        REFERENCES auth_refresh_tokens(token_id) ON DELETE SET NULL,
-                    CONSTRAINT uk_auth_refresh_tokens_hash UNIQUE (token_hash),
-                    CONSTRAINT ck_auth_refresh_tokens_hash_nonblank CHECK (TRIM(token_hash) <> ''),
-                    CONSTRAINT ck_auth_refresh_tokens_expiry CHECK (expires_at > issued_at)
+                    CONSTRAINT ck_clerk_identities_id_nonblank CHECK (TRIM(clerk_user_id) <> '')
                 )
                 """);
-        stmt.execute("CREATE INDEX IF NOT EXISTS idx_auth_refresh_tokens_user_id ON auth_refresh_tokens(user_id)");
-        stmt.execute(
-                "CREATE INDEX IF NOT EXISTS idx_auth_refresh_tokens_expires_at ON auth_refresh_tokens(expires_at)");
     }
 
     static void createLikesTable(Statement stmt) throws SQLException {
@@ -752,6 +733,25 @@ public final class SchemaInitializer {
         stmt.execute("CREATE INDEX IF NOT EXISTS idx_undo_states_expires ON undo_states(expires_at)");
     }
 
+    /**
+     * Append-only ledger of daily swipe quota spent. Unlike {@code likes}, rows are never soft-deleted, so an undo
+     * does not hand a like back to the user.
+     */
+    static void createSwipeQuotaSchema(Statement stmt) throws SQLException {
+        stmt.execute("""
+                CREATE TABLE IF NOT EXISTS swipe_quota_uses (
+                    id UUID PRIMARY KEY,
+                    user_id UUID NOT NULL,
+                    direction VARCHAR(10) NOT NULL,
+                    used_at TIMESTAMP WITH TIME ZONE NOT NULL,
+                    CONSTRAINT ck_swipe_quota_uses_direction_values CHECK (direction IN ('LIKE', 'SUPER_LIKE', 'PASS')),
+                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+                )
+                """);
+
+        stmt.execute("CREATE INDEX IF NOT EXISTS idx_swipe_quota_uses_user_used ON swipe_quota_uses(user_id, used_at)");
+    }
+
     // ═══════════════════════════════════════════════════════════════
     // Indexes
     // ═══════════════════════════════════════════════════════════════
@@ -787,6 +787,16 @@ public final class SchemaInitializer {
                 "CREATE INDEX IF NOT EXISTS idx_users_location_state "
                         + "ON users(lat, lon, state) WHERE state = 'ACTIVE' AND deleted_at IS NULL",
                 "CREATE INDEX IF NOT EXISTS idx_users_location_state ON users(lat, lon, state)");
+    }
+
+    /**
+     * Indexes for the candidate query (age filter on users, per-user swipe history on likes). Kept out of
+     * {@link #createAllTables} because that method doubles as migration V1 and also runs against legacy schemas
+     * that predate these columns; fresh databases get them from the baseline path and upgraded ones from V21.
+     */
+    static void createCandidateQueryIndexes(Statement stmt) throws SQLException {
+        stmt.execute("CREATE INDEX IF NOT EXISTS idx_users_birth_date ON users(birth_date)");
+        stmt.execute("CREATE INDEX IF NOT EXISTS idx_likes_who_likes_created ON likes(who_likes, created_at)");
     }
 
     static void createStatsIndexes(Statement stmt) throws SQLException {

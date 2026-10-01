@@ -115,6 +115,62 @@ class MatchingServiceTest {
         }
 
         @Test
+        @DisplayName("recordLike saves undo state so the REST path can be undone")
+        void recordLikeSavesUndoState() {
+            UUID alice = UUID.randomUUID();
+            UUID bob = UUID.randomUUID();
+
+            userStorage.save(activeUser(alice, "Alice"));
+            userStorage.save(activeUser(bob, "Bob"));
+
+            MatchingService.RecordLikeOutcome result =
+                    matchingService.recordLike(Like.create(alice, bob, Like.Direction.LIKE));
+
+            assertTrue(result.persisted());
+            var undoState = undoStorage.findByUserId(alice).orElseThrow();
+            assertEquals(result.like().orElseThrow().id(), undoState.like().id());
+        }
+
+        @Test
+        @DisplayName("session swipe limit refuses recordLike and processSwipe before anything is stored")
+        void sessionSwipeLimitRefusesBeforeStoring() {
+            ActivityMetricsService metrics = new ActivityMetricsService(
+                    userStorage,
+                    interactionStorage,
+                    trustSafetyStorage,
+                    new TestStorages.Analytics(),
+                    AppConfig.builder().maxSwipesPerSession(1).build());
+            MatchingService gated = MatchingService.builder()
+                    .interactionStorage(interactionStorage)
+                    .trustSafetyStorage(trustSafetyStorage)
+                    .userStorage(userStorage)
+                    .activityMetricsService(metrics)
+                    .undoService(new UndoService(interactionStorage, undoStorage, AppConfig.defaults()))
+                    .dailyService(new RecommendationService(
+                            alwaysAllowDailyLimitService(), noDailyPickService(), noStandoutService()))
+                    .candidateFinder(candidateFinder)
+                    .build();
+            User alice = activeUser(UUID.randomUUID(), "Alice");
+            User bob = activeUser(UUID.randomUUID(), "Bob");
+            User carol = activeUser(UUID.randomUUID(), "Carol");
+            userStorage.save(alice);
+            userStorage.save(bob);
+            userStorage.save(carol);
+
+            assertTrue(metrics.recordSwipe(alice.getId(), Like.Direction.LIKE, false)
+                    .allowed());
+
+            MatchingService.RecordLikeOutcome rest =
+                    gated.recordLike(Like.create(alice.getId(), bob.getId(), Like.Direction.LIKE));
+            MatchingService.SwipeResult swipe = gated.processSwipe(alice, carol, true);
+
+            assertTrue(rest.rejected());
+            assertFalse(swipe.success());
+            assertFalse(interactionStorage.exists(alice.getId(), bob.getId()));
+            assertFalse(interactionStorage.exists(alice.getId(), carol.getId()));
+        }
+
+        @Test
         @DisplayName("recordLike rejects blocked users without persisting")
         void recordLikeRejectsBlockedUsersWithoutPersisting() {
             UUID alice = UUID.randomUUID();

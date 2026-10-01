@@ -189,8 +189,16 @@ public final class MigrationRunner {
                     MigrationRunner::applyV18),
             new VersionedMigration(
                     19,
-                    "Add user credential and refresh-token tables for REST authentication",
-                    MigrationRunner::applyV19));
+                    "Superseded by V20 (the password-era credential and refresh-token tables it added are dropped there)",
+                    MigrationRunner::applyV19),
+            new VersionedMigration(
+                    20,
+                    "Replace password-era auth tables with clerk_identities (irreversible; no credential data is kept)",
+                    MigrationRunner::applyV20),
+            new VersionedMigration(
+                    21,
+                    "Add UNDER_REVIEW user state, swipe_quota_uses ledger, and candidate-query indexes",
+                    MigrationRunner::applyV21));
 
     // ═══════════════════════════════════════════════════════════════
     // Public entry point
@@ -225,6 +233,7 @@ public final class MigrationRunner {
             LOG.info("Applying current fresh baseline schema without replaying historical migrations");
         }
         applyV1(stmt);
+        SchemaInitializer.createCandidateQueryIndexes(stmt);
         recordFreshBaselineCoverage(stmt);
     }
 
@@ -676,8 +685,39 @@ public final class MigrationRunner {
         }
     }
 
-    private static void applyV19(Statement stmt) throws SQLException {
+    private static void applyV19(Statement stmt) { // NOPMD UnusedFormalParameter - every applyVn shares one signature
+        // Intentionally empty. V19 once created user_credentials and auth_refresh_tokens; V20 drops them, so
+        // creating them here only to drop them again would be wasted work. Databases that already ran the old
+        // V19 still get cleaned up by V20.
+    }
+
+    private static void applyV20(Statement stmt) throws SQLException {
         SchemaInitializer.createAuthSchema(stmt);
+        stmt.execute("DROP TABLE IF EXISTS auth_refresh_tokens");
+        stmt.execute("DROP TABLE IF EXISTS user_credentials");
+    }
+
+    private static void applyV21(Statement stmt) throws SQLException {
+        if (hasColumn(stmt, SQL_TABLE_USERS, COLUMN_STATE)) {
+            stmt.execute(SQL_ALTER_TABLE_PREFIX + SQL_TABLE_USERS + " DROP CONSTRAINT IF EXISTS ck_users_state_values");
+            addAllowedValuesConstraint(
+                    stmt,
+                    SQL_TABLE_USERS,
+                    COLUMN_STATE,
+                    "ck_users_state_values",
+                    false,
+                    "INCOMPLETE",
+                    VALUE_ACTIVE,
+                    "PAUSED",
+                    "UNDER_REVIEW",
+                    "BANNED");
+        }
+        SchemaInitializer.createSwipeQuotaSchema(stmt);
+        if (hasColumn(stmt, SQL_TABLE_USERS, "birth_date")
+                && hasColumn(stmt, "likes", "who_likes")
+                && hasColumn(stmt, "likes", "created_at")) {
+            SchemaInitializer.createCandidateQueryIndexes(stmt);
+        }
     }
 
     private static void rebuildConversationActivityIndexes(Statement stmt) throws SQLException {

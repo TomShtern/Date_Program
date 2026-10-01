@@ -4,24 +4,18 @@ import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 
+/** Maps Clerk user ids (the session token's {@code sub}) to local user ids. */
 public interface AuthStorage {
 
-    Optional<String> findPasswordHash(UUID userId);
+    Optional<UUID> findUserIdByClerkId(String clerkUserId);
 
-    void savePasswordHash(UUID userId, String passwordHash, Instant createdAt, Instant updatedAt);
+    /**
+     * Links a Clerk user to a local user.
+     *
+     * @return {@code true} if the link was created, {@code false} if that Clerk id (or that local user) is already
+     *     linked, in which case the caller should re-read with {@link #findUserIdByClerkId}
+     */
+    boolean linkClerkId(String clerkUserId, UUID userId, Instant createdAt);
 
-    Optional<RefreshTokenRecord> findRefreshTokenByHash(String tokenHash);
-
-    void insertRefreshToken(RefreshTokenRecord refreshToken);
-
-    void revokeRefreshToken(UUID tokenId, Instant revokedAt, UUID replacedByTokenId);
-
-    record RefreshTokenRecord(
-            UUID tokenId,
-            UUID userId,
-            String tokenHash,
-            Instant issuedAt,
-            Instant expiresAt,
-            Instant revokedAt,
-            UUID replacedByTokenId) {}
+    void deleteIdentityForUser(UUID userId);
 }

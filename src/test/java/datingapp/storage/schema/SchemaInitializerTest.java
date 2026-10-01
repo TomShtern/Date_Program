@@ -1314,6 +1314,137 @@ class SchemaInitializerTest {
                 assertEquals(0, rs.getInt(1), "Schema version 18 must not be recorded when migration fails");
             }
         }
+
+        @Test
+        @DisplayName("should replace the password-era auth tables with clerk_identities in V20")
+        void v20MigrationReplacesPasswordAuthTablesWithClerkIdentities() throws SQLException {
+            try (Statement stmt = connection.createStatement()) {
+                stmt.execute("CREATE TABLE users ("
+                        + "id UUID PRIMARY KEY, "
+                        + "name VARCHAR(100) NOT NULL, "
+                        + "created_at TIMESTAMP WITH TIME ZONE NOT NULL, "
+                        + "updated_at TIMESTAMP WITH TIME ZONE NOT NULL, "
+                        + "state VARCHAR(20) NOT NULL"
+                        + ")");
+                // What the old V19 left behind on a database that already ran it.
+                stmt.execute("CREATE TABLE user_credentials ("
+                        + "user_id UUID PRIMARY KEY REFERENCES users(id), "
+                        + "password_hash VARCHAR(255) NOT NULL"
+                        + ")");
+                stmt.execute("CREATE TABLE auth_refresh_tokens ("
+                        + "id UUID PRIMARY KEY, "
+                        + "user_id UUID NOT NULL REFERENCES users(id), "
+                        + "token_hash VARCHAR(255) NOT NULL"
+                        + ")");
+                stmt.execute("CREATE TABLE schema_version ("
+                        + "version INT PRIMARY KEY, "
+                        + "applied_at TIMESTAMP WITH TIME ZONE NOT NULL, "
+                        + "description VARCHAR(255)"
+                        + ")");
+                StringBuilder versions = new StringBuilder();
+                for (int version = 1; version <= 19; version++) {
+                    versions.append(version > 1 ? ", " : "")
+                            .append("(")
+                            .append(version)
+                            .append(", CURRENT_TIMESTAMP(), 'V")
+                            .append(version)
+                            .append(" legacy')");
+                }
+                stmt.execute("INSERT INTO schema_version(version, applied_at, description) VALUES " + versions);
+                stmt.execute(
+                        "INSERT INTO users (id, name, created_at, updated_at, state) VALUES "
+                                + "('11111111-1111-1111-1111-111111111111', 'Alice', CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP(), 'ACTIVE')");
+                stmt.execute("INSERT INTO user_credentials (user_id, password_hash) VALUES "
+                        + "('11111111-1111-1111-1111-111111111111', 'old-hash')");
+
+                MigrationRunner.runAllPending(stmt);
+            }
+
+            Set<String> tables = getTableNames();
+            assertTrue(tables.contains("CLERK_IDENTITIES"), "V20 should create clerk_identities");
+            assertFalse(tables.contains("USER_CREDENTIALS"), "V20 should drop user_credentials");
+            assertFalse(tables.contains("AUTH_REFRESH_TOKENS"), "V20 should drop auth_refresh_tokens");
+
+            try (Statement stmt = connection.createStatement()) {
+                stmt.execute("INSERT INTO clerk_identities (clerk_user_id, user_id, created_at) VALUES "
+                        + "('user_clerk_1', '11111111-1111-1111-1111-111111111111', CURRENT_TIMESTAMP())");
+                assertThrows(
+                        SQLException.class,
+                        () -> stmt.execute("INSERT INTO clerk_identities (clerk_user_id, user_id, created_at) VALUES "
+                                + "('user_clerk_2', '11111111-1111-1111-1111-111111111111', CURRENT_TIMESTAMP())"),
+                        "one local user may be linked to only one Clerk user");
+            }
+
+            try (Statement stmt = connection.createStatement();
+                    ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM schema_version WHERE version = 20")) {
+                assertTrue(rs.next());
+                assertEquals(1, rs.getInt(1), "Schema version 20 should be recorded");
+            }
+        }
+
+        @Test
+        @DisplayName("should add UNDER_REVIEW to the user state check and create the quota ledger in V21")
+        void v21MigrationAddsReviewStateAndQuotaLedger() throws SQLException {
+            try (Statement stmt = connection.createStatement()) {
+                stmt.execute("CREATE TABLE users ("
+                        + "id UUID PRIMARY KEY, "
+                        + "name VARCHAR(100) NOT NULL, "
+                        + "birth_date DATE, "
+                        + "created_at TIMESTAMP WITH TIME ZONE NOT NULL, "
+                        + "updated_at TIMESTAMP WITH TIME ZONE NOT NULL, "
+                        + "state VARCHAR(20) NOT NULL, "
+                        + "CONSTRAINT ck_users_state_values CHECK (state IN "
+                        + "('INCOMPLETE', 'ACTIVE', 'PAUSED', 'BANNED'))"
+                        + ")");
+                stmt.execute("CREATE TABLE likes ("
+                        + "id UUID PRIMARY KEY, "
+                        + "who_likes UUID NOT NULL, "
+                        + "who_got_liked UUID NOT NULL, "
+                        + "created_at TIMESTAMP WITH TIME ZONE NOT NULL"
+                        + ")");
+                stmt.execute("CREATE TABLE schema_version ("
+                        + "version INT PRIMARY KEY, "
+                        + "applied_at TIMESTAMP WITH TIME ZONE NOT NULL, "
+                        + "description VARCHAR(255)"
+                        + ")");
+                StringBuilder versions = new StringBuilder();
+                for (int version = 1; version <= 20; version++) {
+                    versions.append(version > 1 ? ", " : "")
+                            .append("(")
+                            .append(version)
+                            .append(", CURRENT_TIMESTAMP(), 'V")
+                            .append(version)
+                            .append(" legacy')");
+                }
+                stmt.execute("INSERT INTO schema_version(version, applied_at, description) VALUES " + versions);
+                stmt.execute(
+                        "INSERT INTO users (id, name, created_at, updated_at, state) VALUES "
+                                + "('11111111-1111-1111-1111-111111111111', 'Alice', CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP(), 'ACTIVE')");
+
+                assertThrows(
+                        SQLException.class,
+                        () -> stmt.execute("UPDATE users SET state = 'UNDER_REVIEW'"),
+                        "the pre-V21 check must reject the new state");
+
+                MigrationRunner.runAllPending(stmt);
+
+                stmt.execute("UPDATE users SET state = 'UNDER_REVIEW'");
+                assertThrows(
+                        SQLException.class,
+                        () -> stmt.execute("UPDATE users SET state = 'NONSENSE'"),
+                        "the check must still reject unknown states");
+                stmt.execute(
+                        "INSERT INTO swipe_quota_uses (id, user_id, direction, used_at) VALUES "
+                                + "('22222222-2222-2222-2222-222222222222', '11111111-1111-1111-1111-111111111111', 'LIKE', CURRENT_TIMESTAMP())");
+            }
+
+            assertTrue(getTableNames().contains("SWIPE_QUOTA_USES"), "V21 should create swipe_quota_uses");
+            try (Statement stmt = connection.createStatement();
+                    ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM schema_version WHERE version = 21")) {
+                assertTrue(rs.next());
+                assertEquals(1, rs.getInt(1), "Schema version 21 should be recorded");
+            }
+        }
     }
 
     // ═══════════════════════════════════════════════════════════════

@@ -158,7 +158,11 @@ class RestApiDailyLimitTest {
         TestStorages.Interactions interactionStorage = new TestStorages.Interactions();
         TestStorages.Communications communicationStorage = new TestStorages.Communications();
         // Create config with unlimited likes (dailyLikeLimit = -1)
-        AppConfig customConfig = AppConfig.builder().dailyLikeLimit(-1).build();
+        // Velocity blocking is off so this 50-swipe burst exercises only the daily limit.
+        AppConfig customConfig = AppConfig.builder()
+                .dailyLikeLimit(-1)
+                .suspiciousSwipeVelocityBlockingEnabled(false)
+                .build();
 
         ServiceRegistry services = createServices(customConfig, userStorage, interactionStorage, communicationStorage);
 

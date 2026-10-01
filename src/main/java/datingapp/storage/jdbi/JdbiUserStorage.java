@@ -20,6 +20,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -29,6 +30,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.function.ToIntFunction;
+import java.util.stream.Stream;
 import org.jdbi.v3.core.Handle;
 import org.jdbi.v3.core.Jdbi;
 import org.jdbi.v3.core.mapper.RowMapper;
@@ -145,7 +147,8 @@ public final class JdbiUserStorage implements OperationalUserStorage {
         }
         List<String> genderNames = genders.stream().map(Enum::name).toList();
         LocalDate today = AppClock.today(ZoneOffset.UTC);
-        LocalDate oldestBirthDate = today.minusYears(maxAge);
+        // Someone aged exactly maxAge was born after (today - (maxAge + 1) years); that day is already age maxAge + 1.
+        LocalDate oldestBirthDate = today.minusYears(maxAge + 1L).plusDays(1);
         LocalDate youngestBirthDate = today.minusYears(minAge);
 
         return jdbi.withHandle(handle -> {
@@ -292,6 +295,27 @@ public final class JdbiUserStorage implements OperationalUserStorage {
         withLockedHandle(userId, handle -> {
             operation.run();
             return null;
+        });
+    }
+
+    @Override
+    public void executeWithUserPairLock(UUID userA, UUID userB, Runnable operation) {
+        Objects.requireNonNull(userA, "userA cannot be null");
+        Objects.requireNonNull(userB, "userB cannot be null");
+        Objects.requireNonNull(operation, "operation cannot be null");
+        // One transaction, rows locked one statement at a time in sorted-ID order (same order as Match.generateId).
+        List<UUID> ordered = Stream.of(userA, userB)
+                .distinct()
+                .sorted(Comparator.comparing(UUID::toString))
+                .toList();
+        jdbi.useTransaction(handle -> {
+            for (UUID userId : ordered) {
+                handle.createQuery("SELECT id FROM users WHERE id = :userId FOR UPDATE")
+                        .bind("userId", userId)
+                        .mapTo(UUID.class)
+                        .first();
+            }
+            operation.run();
         });
     }
 

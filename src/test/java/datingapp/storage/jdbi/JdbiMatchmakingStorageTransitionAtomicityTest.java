@@ -122,6 +122,26 @@ class JdbiMatchmakingStorageTransitionAtomicityTest {
     }
 
     @Test
+    @DisplayName("daily quota is not refunded when a like is deleted, and a duplicate swipe is not double-counted")
+    void dailyQuotaIsNotRefundedByDeletingTheLike() {
+        Instant startOfDay = AppClock.now().minus(Duration.ofHours(1));
+        Like like = Like.create(userA, userB, Like.Direction.LIKE);
+
+        interactionStorage.saveLikeAndMaybeCreateMatch(like);
+        interactionStorage.saveLikeAndMaybeCreateMatch(Like.create(userA, userB, Like.Direction.LIKE));
+        assertEquals(1, interactionStorage.countLikesToday(userA, startOfDay), "duplicate must not count twice");
+
+        assertTrue(interactionStorage.deleteLikeOwnedBy(userA, like.id()));
+        assertEquals(1, interactionStorage.countLikesToday(userA, startOfDay), "undo must not refund the like");
+
+        interactionStorage.saveLikeAndMaybeCreateMatch(Like.create(userA, userB, Like.Direction.LIKE));
+        assertEquals(2, interactionStorage.countLikesToday(userA, startOfDay), "re-liking spends quota again");
+        assertEquals(0, interactionStorage.countSuperLikesToday(userA, startOfDay));
+        assertEquals(0, interactionStorage.countPassesToday(userA, startOfDay));
+        assertEquals(0, interactionStorage.countLikesToday(userB, startOfDay));
+    }
+
+    @Test
     @DisplayName("undoStorage saves and reads back an undo state")
     void undoStorageSavesAndReadsBackUndoState() {
         Like like = Like.create(userA, userB, Like.Direction.LIKE);
@@ -293,6 +313,40 @@ class JdbiMatchmakingStorageTransitionAtomicityTest {
         assertTrue(persisted.getEndedAt() == null
                 || persisted.getEndedBy() == null
                 || !persisted.getEndedBy().equals(userA));
+    }
+
+    @Test
+    @DisplayName("a stale unmatch cannot overwrite a match that was blocked in the meantime")
+    void staleUnmatchDoesNotOverwriteBlockedMatch() {
+        Match stored = createPersistedActiveMatchWithOldTimestamp();
+        Match staleCopy = stored.copy();
+
+        stored.block(userB);
+        assertTrue(interactionStorage.blockTransition(userB, userA, Optional.of(stored), Optional.empty()));
+
+        staleCopy.unmatch(userA);
+        assertFalse(interactionStorage.unmatchTransition(staleCopy, Optional.empty()));
+
+        Match persisted = interactionStorage.get(stored.getId()).orElseThrow();
+        assertEquals(MatchState.BLOCKED, persisted.getState());
+        assertEquals(userB, persisted.getEndedBy());
+    }
+
+    @Test
+    @DisplayName("blocking an already blocked pair is an idempotent success and keeps the first blocker")
+    void secondBlockOfSamePairIsIdempotent() {
+        Match stored = createPersistedActiveMatchWithOldTimestamp();
+        Match otherSide = stored.copy();
+
+        stored.block(userA);
+        assertTrue(interactionStorage.blockTransition(userA, userB, Optional.of(stored), Optional.empty()));
+
+        otherSide.block(userB);
+        assertTrue(interactionStorage.blockTransition(userB, userA, Optional.of(otherSide), Optional.empty()));
+
+        Match persisted = interactionStorage.get(stored.getId()).orElseThrow();
+        assertEquals(MatchState.BLOCKED, persisted.getState());
+        assertEquals(userA, persisted.getEndedBy());
     }
 
     private Match createPersistedActiveMatchWithOldTimestamp() {

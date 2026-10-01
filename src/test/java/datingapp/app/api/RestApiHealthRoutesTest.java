@@ -8,7 +8,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import datingapp.core.ServiceRegistry;
+import datingapp.core.model.User;
 import datingapp.core.testutil.TestStorages;
+import datingapp.core.testutil.TestUserFactory;
 import io.javalin.http.Context;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -75,6 +77,8 @@ class RestApiHealthRoutesTest {
     @Test
     @DisplayName("invalid UUID route returns bad request")
     void invalidUuidRouteReturnsBadRequest() throws Exception {
+        User viewer = TestUserFactory.createActiveUser("Viewer");
+        userStorage.save(viewer);
         server = new RestApiServer(services, 0);
         server.start();
 
@@ -82,6 +86,7 @@ class RestApiHealthRoutesTest {
         HttpResponse<String> response = HttpClient.newHttpClient()
                 .send(
                         HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/users/not-a-uuid"))
+                                .header("Authorization", RestApiTestFixture.bearerToken(services, viewer))
                                 .GET()
                                 .build(),
                         HttpResponse.BodyHandlers.ofString());

@@ -42,7 +42,7 @@ Key constraints:
 ## 2. Package Layout (verified 2026-09-27)
 
 Package-level snapshot. Do not expand into exhaustive class lists here —
-they rot on every commit. Run `list_dir` on a package when you need
+they rot on every commit. List the package directory when you need
 the current files.
 
 ```text

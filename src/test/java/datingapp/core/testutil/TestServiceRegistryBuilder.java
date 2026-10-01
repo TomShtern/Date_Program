@@ -3,7 +3,6 @@ package datingapp.core.testutil;
 import datingapp.app.event.AppEventBus;
 import datingapp.app.event.InProcessAppEventBus;
 import datingapp.app.testutil.TestEventBus;
-import datingapp.app.usecase.auth.AuthTokenService;
 import datingapp.app.usecase.auth.AuthUseCases;
 import datingapp.app.usecase.profile.ProfileInsightsUseCases;
 import datingapp.app.usecase.profile.ProfileMutationUseCases;
@@ -206,9 +205,7 @@ public final class TestServiceRegistryBuilder {
                 resolvedOperationalUserStorage,
                 profileService);
         TestStorages.Auth authStorage = new TestStorages.Auth();
-        AuthTokenService authTokenService = new AuthTokenService(resolvedConfig.auth());
-        AuthUseCases authUseCases =
-                new AuthUseCases(resolvedConfig, resolvedUserStorage, authStorage, authTokenService);
+        AuthUseCases authUseCases = new AuthUseCases(resolvedUserStorage, authStorage, new TestAccessTokenVerifier());
 
         return ServiceRegistry.builder()
                 .config(resolvedConfig)

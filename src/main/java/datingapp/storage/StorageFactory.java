@@ -5,8 +5,9 @@ import datingapp.app.event.InProcessAppEventBus;
 import datingapp.app.event.handlers.AchievementEventHandler;
 import datingapp.app.event.handlers.MetricsEventHandler;
 import datingapp.app.event.handlers.NotificationEventHandler;
-import datingapp.app.usecase.auth.AuthTokenService;
+import datingapp.app.usecase.auth.AccessTokenVerifier;
 import datingapp.app.usecase.auth.AuthUseCases;
+import datingapp.app.usecase.auth.ClerkJwtVerifier;
 import datingapp.core.AppConfig;
 import datingapp.core.ServiceRegistry;
 import datingapp.core.connection.ConnectionService;
@@ -129,7 +130,7 @@ public final class StorageFactory {
         JdbiMetricsStorage metricsStorage = new JdbiMetricsStorage(jdbi, dialect);
         TrustSafetyStorage trustSafetyStorage = new JdbiTrustSafetyStorage(jdbi);
         AccountCleanupStorage accountCleanupStorage = new JdbiAccountCleanupStorage(jdbi);
-        AuthStorage authStorage = new JdbiAuthStorage(jdbi, dialect);
+        AuthStorage authStorage = new JdbiAuthStorage(jdbi);
 
         return new PersistenceComponents(
                 userStorage,
@@ -209,9 +210,10 @@ public final class StorageFactory {
 
         ValidationService validationService = new ValidationService(config);
         LocationService locationService = new LocationService(validationService);
-        AuthTokenService authTokenService = new AuthTokenService(config.auth());
+        AccessTokenVerifier tokenVerifier =
+                config.auth().clerkConfigured() ? new ClerkJwtVerifier(config.auth()) : AccessTokenVerifier.rejectAll();
         AuthUseCases authUseCases =
-                new AuthUseCases(config, persistence.userStorage(), persistence.authStorage(), authTokenService);
+                new AuthUseCases(persistence.userStorage(), persistence.authStorage(), tokenVerifier);
         AppEventBus eventBus = new InProcessAppEventBus();
 
         return new DomainServices(

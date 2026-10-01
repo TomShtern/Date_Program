@@ -58,27 +58,38 @@ not a guarantee:
   Flutter `--dart-define=API_BASE_URL` / `API_SHARED_SECRET`.
   See `docs/guides/lan-backend-startup.md`.
 
-### Authentication model (HS256 JWT + opaque refresh, not simulated)
+### Authentication model (Clerk session tokens, verified offline)
 
-- `AuthUseCases` + `AuthTokenService` (`app/usecase/auth/`) own the flow.
-- Access tokens are HS256 JWTs (`alg HS256`, HMAC-SHA256 over
-  `jwtSecret`), carrying `sub`/`email`/`iss`/`iat`/`exp`;
-  issuer `dating-app-phone-alpha` by default, TTL
-  `accessTokenTtlSeconds = 900` (15 min).
-- Refresh tokens are opaque 32-byte random values, SHA-256-hashed at
-  rest (`AuthStorage`), TTL `refreshTokenTtlDays = 30`.
-  Refresh is **single-use rotation**: each success inserts a new token
-  and revokes the old one (`revoked_at` + `replaced_by_token_id`).
-- Passwords are BCrypt-hashed (12 rounds); minimum length
-  `minPasswordLength = 12`; signup also enforces
-  `validation.minAge = 18` via `AppClock.today()`.
-- Deleted (`deleted_at != null`) or `BANNED` users are rejected at
-  login, refresh, `me`, and every protected route
-  (`isDeletedOrBanned`).
-- Protected routes use `Authorization: Bearer <accessToken>`
+- Clerk owns sign-up, sign-in, passwords and sessions. The backend issues no
+  tokens and stores no credentials.
+- `AuthUseCases` + `AccessTokenVerifier` (`app/usecase/auth/`) own the flow.
+  `ClerkJwtVerifier` (Nimbus JOSE+JWT) checks the RS256 signature against the
+  issuer's JWKS, exact `iss`, `exp`/`nbf` against `AppClock` with
+  `clockSkewSeconds` of leeway (default 5), and a non-blank `sub`.
+  `azp` must match `clerkAuthorizedParties` only when that list is set
+  and the token carries an `azp`.
+- Config (`AppConfig.AuthConfig`): `clerkIssuer` (Clerk Frontend API URL, e.g.
+  `https://<name>.clerk.accounts.dev`), `clerkJwksUrl` (defaults to
+  `<issuer>/.well-known/jwks.json`), `clerkAuthorizedParties`,
+  `clockSkewSeconds`. Env overrides: `DATING_APP_AUTH_CLERK_ISSUER`,
+  `DATING_APP_AUTH_CLERK_JWKS_URL`, `DATING_APP_AUTH_CLERK_AUTHORIZED_PARTIES`,
+  `DATING_APP_AUTH_CLOCK_SKEW_SECONDS`.
+- A blank issuer is legal for the CLI and desktop. `RestApiServer.main()`
+  refuses to start without one, and with none configured the verifier rejects
+  every token.
+- A Clerk `sub` maps to the local user UUID through the `clerk_identities`
+  table (`AuthStorage`). `POST /api/auth/session` creates the local profile on
+  first use (`INCOMPLETE`, no email, no birth date). `validation.minAge` is
+  enforced later, when the client sets a birth date on the profile.
+- Deleted (`deleted_at != null`) or `BANNED` users are rejected at the
+  session route and every protected route (`isDeletedOrBanned`). A valid token
+  with no live profile gets 401 `NOT_PROVISIONED`.
+- Protected routes use `Authorization: Bearer <Clerk session token>`
   (`RestApiIdentityPolicy`); `X-User-Id` is only the legacy fallback
   when no `AuthUseCases` is wired, plus a spoof-check against the
   token subject. Scoped routes reject subject/path mismatches with 403.
+  The resolved user id is memoized per request in the ctx attribute
+  `RestApiIdentityPolicy.ATTR_ACTING_USER_ID`.
 - Error bodies are `{"code": "...", "message": "..."}`
   (`RestApiDtos.ErrorResponse`), e.g. `BAD_REQUEST`/`UNAUTHORIZED`/
   `FORBIDDEN`/`NOT_FOUND`/`CONFLICT`/`TOO_MANY_REQUESTS`/`INTERNAL_ERROR`.
@@ -89,12 +100,13 @@ not a guarantee:
   `StorageFactory.buildSqlDatabase(...)` (bootstrap path in
   `ApplicationStartup.initialize()`); `buildH2(...)` / `buildInMemory(...)`
   are compatibility/test paths.
-- Auth state is persisted: password hashes in `user_credentials`,
-  refresh tokens in `auth_refresh_tokens` (hashed, revocable).
+- Auth state is persisted in one table, `clerk_identities` (Clerk user id to
+  local user UUID). Migration V20 drops the old `user_credentials` and
+  `auth_refresh_tokens` tables; that drop is irreversible.
 - Account deletion soft-deletes the graph in one transaction
   (`JdbiAccountCleanupStorage`): user row gets `deleted_at`,
   `state = BANNED`, `email/phone = NULL` (so unique constraints allow
-  reuse); credentials are hard-deleted; refresh tokens revoked.
+  reuse); the `clerk_identities` row is hard-deleted.
 
 ## Desktop Session Model (`AppSession`)
 
@@ -119,7 +131,7 @@ per request with Bearer JWTs, not via `AppSession`.
 
 ### Related Components
 - `AppSession` (singleton session holder for desktop/CLI)
-- `RestApiServer` + `AuthUseCases` (Bearer JWT auth for the Flutter client)
+- `RestApiServer` + `AuthUseCases` (Clerk session-token auth for the Flutter client)
 - `SafetyHandler` / `SafetyViewModel` (block/report/verify flows; no
   `[SIMULATED]` marker exists in current source — verified by search)
 

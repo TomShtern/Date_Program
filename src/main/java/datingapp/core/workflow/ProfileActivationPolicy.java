@@ -21,6 +21,9 @@ public final class ProfileActivationPolicy {
         if (state == UserState.BANNED) {
             return WorkflowDecision.deny("BANNED", "Banned users cannot activate");
         }
+        if (state == UserState.UNDER_REVIEW) {
+            return WorkflowDecision.deny("UNDER_REVIEW", "Accounts under review cannot activate");
+        }
         if (state == UserState.ACTIVE) {
             return WorkflowDecision.deny(REASON_ALREADY_ACTIVE, "User is already active");
         }

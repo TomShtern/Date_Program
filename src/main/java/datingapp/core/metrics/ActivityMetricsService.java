@@ -32,6 +32,7 @@ public class ActivityMetricsService {
     private static final String SUSPICIOUS_VELOCITY_WARNING =
             "Unusually fast swiping detected. Take a moment to review profiles!";
     private static final String SUSPICIOUS_VELOCITY_BLOCKED = "Unusually fast swiping detected. Swipe blocked for now.";
+    private static final String SESSION_LIMIT_BLOCKED = "Session swipe limit reached. Take a break!";
 
     private final OperationalUserStorage userStorage;
     private final OperationalInteractionStorage interactionStorage;
@@ -112,7 +113,7 @@ public class ActivityMetricsService {
 
             if (session.getSwipeCount() >= config.matching().maxSwipesPerSession()) {
                 swipeLimitBlockedCount.increment();
-                return SwipeGateResult.blocked(session, "Session swipe limit reached. Take a break!");
+                return SwipeGateResult.blocked(session, SESSION_LIMIT_BLOCKED);
             }
 
             int projectedSwipeCount = session.getSwipeCount() + 1;
@@ -132,6 +133,34 @@ public class ActivityMetricsService {
         }
     }
 
+    /**
+     * Read-only twin of {@link #recordSwipe}: tells a caller that is about to write a swipe whether the
+     * session limit or the velocity block would refuse it, without counting it. Check before the like is
+     * stored; {@code recordSwipe} still does the counting afterwards.
+     */
+    public SwipeGateResult checkSwipeAllowed(UUID userId) {
+        Object lock = lockStripes[Math.floorMod(userId.hashCode(), LOCK_STRIPE_COUNT)];
+        synchronized (lock) {
+            Optional<Session> current = analyticsStorage
+                    .getActiveSession(userId)
+                    .filter(session -> !session.isTimedOut(config.getSessionTimeout()));
+            if (current.isEmpty()) {
+                return SwipeGateResult.success(null, null);
+            }
+            Session session = current.get();
+            if (session.getSwipeCount() >= config.matching().maxSwipesPerSession()) {
+                swipeLimitBlockedCount.increment();
+                return SwipeGateResult.blocked(session, SESSION_LIMIT_BLOCKED);
+            }
+            if (config.matching().suspiciousSwipeVelocityBlockingEnabled()
+                    && isSuspiciousSwipeVelocity(session, session.getSwipeCount() + 1)) {
+                velocityBlockedCount.increment();
+                return SwipeGateResult.blocked(session, SUSPICIOUS_VELOCITY_BLOCKED);
+            }
+            return SwipeGateResult.success(session, null);
+        }
+    }
+
     private void persistSwipe(Session session, Like.Direction direction, boolean matched) {
         session.recordSwipe(direction, matched);
         analyticsStorage.saveSession(session);
@@ -144,10 +173,8 @@ public class ActivityMetricsService {
     }
 
     private static double getProjectedSwipesPerMinute(Session session, int projectedSwipeCount) {
-        long durationSeconds = session.getDurationSeconds();
-        if (durationSeconds == 0) {
-            return projectedSwipeCount;
-        }
+        // A burst inside the first second must read as very fast, not as "N per minute".
+        long durationSeconds = Math.max(1L, session.getDurationSeconds());
         return projectedSwipeCount * 60.0 / durationSeconds;
     }
 
@@ -234,12 +261,15 @@ public class ActivityMetricsService {
     public UserStats computeAndSaveStats(UUID userId) {
         UserStats.StatsBuilder builder = new UserStats.StatsBuilder();
 
-        builder.likesGiven = interactionStorage.countByDirection(userId, Like.Direction.LIKE);
+        // A super like is still a like, so it counts toward likes given and the match rate.
+        builder.likesGiven = interactionStorage.countByDirection(userId, Like.Direction.LIKE)
+                + interactionStorage.countByDirection(userId, Like.Direction.SUPER_LIKE);
         builder.passesGiven = interactionStorage.countByDirection(userId, Like.Direction.PASS);
         builder.totalSwipesGiven = builder.likesGiven + builder.passesGiven;
         builder.likeRatio = builder.totalSwipesGiven > 0 ? (double) builder.likesGiven / builder.totalSwipesGiven : 0.0;
 
-        builder.likesReceived = interactionStorage.countReceivedByDirection(userId, Like.Direction.LIKE);
+        builder.likesReceived = interactionStorage.countReceivedByDirection(userId, Like.Direction.LIKE)
+                + interactionStorage.countReceivedByDirection(userId, Like.Direction.SUPER_LIKE);
         builder.passesReceived = interactionStorage.countReceivedByDirection(userId, Like.Direction.PASS);
         builder.totalSwipesReceived = builder.likesReceived + builder.passesReceived;
         builder.incomingLikeRatio =

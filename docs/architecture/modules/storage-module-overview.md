@@ -1,7 +1,7 @@
 # Storage Module Overview
 
 > Verified against `src/main/java/datingapp/storage` (2026-09-27).
-> Package-level snapshot only — run `list_dir` on a subpackage for the current files.
+> Package-level snapshot only — list the subpackage directory for the current files.
 
 ## Package purpose
 
@@ -27,7 +27,7 @@ storage/
     JdbiConnectionStorage.java      # OperationalCommunicationStorage (conversations/messages)
     JdbiMetricsStorage.java         # AnalyticsStorage + Standout.Storage (incl. SwipeSessionMapper → metrics Session)
     JdbiTrustSafetyStorage.java     # TrustSafetyStorage (blocks/reports)
-    JdbiAuthStorage.java            # AuthStorage (user_credentials / auth_refresh_tokens)
+    JdbiAuthStorage.java            # AuthStorage (clerk_identities: Clerk user id -> local user UUID)
     JdbiAccountCleanupStorage.java  # AccountCleanupStorage (transactional soft-delete graph)
     DealbreakerAssembler.java       # dealbreaker query assembly
     JdbiNotificationJson.java       # notification JSON codec
@@ -56,8 +56,7 @@ storage/
 
 ## Schema (from `SchemaInitializer.createAllTables`)
 
-29 `CREATE TABLE IF NOT EXISTS` tables: `users`, `user_credentials`,
-`auth_refresh_tokens`, `likes`, `matches`, `swipe_sessions`, `user_stats`,
+`CREATE TABLE IF NOT EXISTS` tables: `users`, `clerk_identities`, `likes`, `matches`, `swipe_sessions`, `user_stats`,
 `platform_stats`, `daily_picks`, `daily_pick_views`, `user_achievements`,
 `conversations`, `messages`, `friend_requests`, `notifications`, `blocks`,
 `reports`, `profile_notes`, `profile_views`, `standouts`, `user_photos`,

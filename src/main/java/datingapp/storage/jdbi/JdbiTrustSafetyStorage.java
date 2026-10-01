@@ -96,7 +96,7 @@ public final class JdbiTrustSafetyStorage implements TrustSafetyStorage {
             """;
 
     private static final String COUNT_REPORTS_AGAINST_SQL =
-            "SELECT COUNT(*) FROM reports WHERE reported_user_id = :userId AND deleted_at IS NULL";
+            "SELECT COUNT(DISTINCT reporter_id) FROM reports WHERE reported_user_id = :userId AND deleted_at IS NULL";
 
     private static final String HAS_REPORTED_SQL = """
             SELECT EXISTS (

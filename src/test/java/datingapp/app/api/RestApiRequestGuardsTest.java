@@ -40,8 +40,8 @@ class RestApiRequestGuardsTest {
     }
 
     @Test
-    @DisplayName("requiresActingUserIdentity marks mutating and some read routes")
-    void requiresActingUserIdentityMarksMutatingAndSomeReadRoutes() {
+    @DisplayName("requiresActingUserIdentity marks mutating routes and every user read route")
+    void requiresActingUserIdentityMarksMutatingAndUserReadRoutes() {
         RestApiRequestGuards guards = new RestApiRequestGuards(new RestApiIdentityPolicy(), Duration.ofMinutes(1), 5);
 
         assertTrue(guards.requiresActingUserIdentity(
@@ -49,7 +49,8 @@ class RestApiRequestGuardsTest {
         assertTrue(!guards.requiresActingUserIdentity(context(HEALTH_PATH, "POST", LOOPBACK_IP, Map.of(), Map.of())));
         assertTrue(!guards.requiresActingUserIdentity(
                 context("/api/location/resolve", "POST", LOOPBACK_IP, Map.of(), Map.of())));
-        assertTrue(!guards.requiresActingUserIdentity(context("/api/users/1", "GET", LOOPBACK_IP, Map.of(), Map.of())));
+        assertTrue(guards.requiresActingUserIdentity(context("/api/users/1", "GET", LOOPBACK_IP, Map.of(), Map.of())));
+        assertTrue(guards.requiresActingUserIdentity(context("/api/users", "GET", LOOPBACK_IP, Map.of(), Map.of())));
         assertTrue(guards.requiresActingUserIdentity(context("/api/users/", "GET", LOOPBACK_IP, Map.of(), Map.of())));
     }
 

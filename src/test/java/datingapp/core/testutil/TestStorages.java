@@ -44,6 +44,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -210,48 +211,42 @@ public final class TestStorages {
         }
     }
 
-    public static final class Auth implements AuthStorage {
-        private final Map<UUID, String> passwordHashesByUserId = new HashMap<>();
-        private final Map<String, RefreshTokenRecord> refreshTokensByHash = new HashMap<>();
+    public static class Auth implements AuthStorage {
+        private final Map<String, UUID> userIdsByClerkId = new ConcurrentHashMap<>();
 
+        /**
+         * Besides explicit links, any {@code user_test_<uuid>} Clerk id resolves to that UUID. That lets REST tests
+         * authenticate a pre-seeded user without a provisioning call (see {@link TestAccessTokenVerifier}).
+         */
         @Override
-        public Optional<String> findPasswordHash(UUID userId) {
-            return Optional.ofNullable(passwordHashesByUserId.get(userId));
+        public Optional<UUID> findUserIdByClerkId(String clerkUserId) {
+            UUID linked = userIdsByClerkId.get(clerkUserId);
+            if (linked != null) {
+                return Optional.of(linked);
+            }
+            return TestAccessTokenVerifier.implicitUserId(clerkUserId);
         }
 
         @Override
-        public void savePasswordHash(UUID userId, String passwordHash, Instant createdAt, Instant updatedAt) {
-            passwordHashesByUserId.put(userId, passwordHash);
+        public synchronized boolean linkClerkId(String clerkUserId, UUID userId, Instant createdAt) {
+            if (userIdsByClerkId.containsKey(clerkUserId) || userIdsByClerkId.containsValue(userId)) {
+                return false;
+            }
+            userIdsByClerkId.put(clerkUserId, userId);
+            return true;
         }
 
         @Override
-        public Optional<RefreshTokenRecord> findRefreshTokenByHash(String tokenHash) {
-            return Optional.ofNullable(refreshTokensByHash.get(tokenHash));
-        }
-
-        @Override
-        public void insertRefreshToken(RefreshTokenRecord refreshToken) {
-            refreshTokensByHash.put(refreshToken.tokenHash(), refreshToken);
-        }
-
-        @Override
-        public void revokeRefreshToken(UUID tokenId, Instant revokedAt, UUID replacedByTokenId) {
-            refreshTokensByHash.replaceAll(
-                    (ignored, existing) -> existing.tokenId().equals(tokenId)
-                            ? new RefreshTokenRecord(
-                                    existing.tokenId(),
-                                    existing.userId(),
-                                    existing.tokenHash(),
-                                    existing.issuedAt(),
-                                    existing.expiresAt(),
-                                    revokedAt,
-                                    replacedByTokenId)
-                            : existing);
+        public synchronized void deleteIdentityForUser(UUID userId) {
+            userIdsByClerkId.values().removeIf(userId::equals);
         }
     }
 
     public static class Interactions implements OperationalInteractionStorage {
         private final Map<UUID, Like> likes = new HashMap<>();
+        /** Append-only, like production's swipe_quota_uses: deleting a like (undo) does not refund quota. */
+        private final List<Like> quotaUses = new ArrayList<>();
+
         private final Map<String, Match> matches = new HashMap<>();
         private final OperationalCommunicationStorage communicationStorage;
         private Instant lastPurgeCutoff;
@@ -280,6 +275,7 @@ public final class TestStorages {
         @Override
         public void save(Like like) {
             likes.put(like.id(), like);
+            quotaUses.add(like);
         }
 
         @Override
@@ -361,27 +357,23 @@ public final class TestStorages {
 
         @Override
         public int countLikesToday(UUID userId, Instant startOfDay) {
-            return (int) likes.values().stream()
-                    .filter(like -> like.whoLikes().equals(userId))
-                    .filter(like -> like.direction() == Like.Direction.LIKE)
-                    .filter(like -> !like.createdAt().isBefore(startOfDay))
-                    .count();
+            return countQuotaUses(userId, Like.Direction.LIKE, startOfDay);
         }
 
         @Override
         public int countSuperLikesToday(UUID userId, Instant startOfDay) {
-            return (int) likes.values().stream()
-                    .filter(like -> like.whoLikes().equals(userId))
-                    .filter(like -> like.direction() == Like.Direction.SUPER_LIKE)
-                    .filter(like -> !like.createdAt().isBefore(startOfDay))
-                    .count();
+            return countQuotaUses(userId, Like.Direction.SUPER_LIKE, startOfDay);
         }
 
         @Override
         public int countPassesToday(UUID userId, Instant startOfDay) {
-            return (int) likes.values().stream()
+            return countQuotaUses(userId, Like.Direction.PASS, startOfDay);
+        }
+
+        private int countQuotaUses(UUID userId, Like.Direction direction, Instant startOfDay) {
+            return (int) quotaUses.stream()
                     .filter(like -> like.whoLikes().equals(userId))
-                    .filter(like -> like.direction() == Like.Direction.PASS)
+                    .filter(like -> like.direction() == direction)
                     .filter(like -> !like.createdAt().isBefore(startOfDay))
                     .count();
         }
@@ -1338,9 +1330,11 @@ public final class TestStorages {
 
         @Override
         public Set<UUID> getBlockedUserIds(UUID userId) {
+            // Matches the production contract: blocks hide users in both directions.
             return blocks.values().stream()
-                    .filter(block -> block.blockerId().equals(userId))
-                    .map(Block::blockedId)
+                    .filter(block -> block.blockerId().equals(userId)
+                            || block.blockedId().equals(userId))
+                    .map(block -> block.blockerId().equals(userId) ? block.blockedId() : block.blockerId())
                     .collect(Collectors.toSet());
         }
 
@@ -1388,6 +1382,8 @@ public final class TestStorages {
         public int countReportsAgainst(UUID userId) {
             return (int) reports.values().stream()
                     .filter(report -> report.reportedUserId().equals(userId))
+                    .map(Report::reporterId)
+                    .distinct()
                     .count();
         }
 

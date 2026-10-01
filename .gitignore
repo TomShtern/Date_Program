@@ -128,12 +128,8 @@ site/
 *.tmp
 *.orig
 
-# Claude Artifacts
-cUserstom7sAppDataLocalTempclaude-*
-
 # Agent Skills
 .agent/
-2026-02-01-static-nested-types-claude.txt
 
 # Verification script output artifacts
 verify*.out
@@ -143,8 +139,8 @@ verify*.err
 .claude/settings.local.json
 
 
-#Ignore insiders AI rules
-.github\instructions\codacy.instructions.md
+# Local AI rules
+.github/instructions/codacy.instructions.md
 telemetry-id
 
 # Kilo Code configuration folder

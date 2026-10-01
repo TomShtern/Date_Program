@@ -113,18 +113,32 @@ class ConnectionServiceTest {
     }
 
     @Test
-    @DisplayName("getMessages(String, limit, offset) rejects invalid paging")
+    @DisplayName("getMessages(UUID, String, limit, offset) rejects invalid paging")
     void getMessagesByConversationIdRejectsInvalidPaging() {
         service.sendMessage(sender.getId(), recipient.getId(), "First message");
         String conversationId = Conversation.generateId(sender.getId(), recipient.getId());
 
-        MessageLoadResult invalidLimit = service.getMessages(conversationId, 0, 0);
-        MessageLoadResult invalidOffset = service.getMessages(conversationId, 1, -1);
+        MessageLoadResult invalidLimit = service.getMessages(sender.getId(), conversationId, 0, 0);
+        MessageLoadResult invalidOffset = service.getMessages(sender.getId(), conversationId, 1, -1);
 
         assertFalse(invalidLimit.success());
         assertEquals("Invalid limit", invalidLimit.errorMessage());
         assertFalse(invalidOffset.success());
         assertEquals("Invalid offset", invalidOffset.errorMessage());
+    }
+
+    @Test
+    @DisplayName("getMessages(UUID, String, limit, offset) refuses a user outside the conversation")
+    void getMessagesByConversationIdRefusesNonParticipant() {
+        service.sendMessage(sender.getId(), recipient.getId(), "Private message");
+        String conversationId = Conversation.generateId(sender.getId(), recipient.getId());
+
+        MessageLoadResult asParticipant = service.getMessages(recipient.getId(), conversationId, 10, 0);
+        MessageLoadResult asOutsider = service.getMessages(UUID.randomUUID(), conversationId, 10, 0);
+
+        assertTrue(asParticipant.success());
+        assertEquals(1, asParticipant.messages().size());
+        assertFalse(asOutsider.success());
     }
 
     @Test

@@ -3,11 +3,7 @@ package datingapp.app.api;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-import datingapp.app.api.AuthDtos.AuthResponse;
 import datingapp.app.api.AuthDtos.AuthUserDto;
-import datingapp.app.api.AuthDtos.LoginRequest;
-import datingapp.app.api.AuthDtos.RefreshTokenRequest;
-import datingapp.app.api.AuthDtos.SignupRequest;
 import datingapp.app.api.LocationDtos.LocationCityDto;
 import datingapp.app.api.LocationDtos.LocationCountryDto;
 import datingapp.app.api.LocationDtos.LocationResolveRequest;
@@ -333,8 +329,8 @@ public class RestApiServer {
         // TRANSPORT NOTE: Loopback mode remains intentionally unauthenticated for
         // local IPC use. Non-loopback/LAN mode now requires the configured shared
         // secret header, and browser clients additionally rely on explicit CORS
-        // allowlisting. Mutating routes still require X-User-Id; selected read
-        // routes may remain anonymous after the transport guard passes.
+        // allowlisting. Every /api/users route, reads included, requires a verified
+        // acting user so block and visibility checks always run.
         // ────────────────────────────────────────────────────────────────────
         registerHealthRoutes();
         registerAuthRoutes();
@@ -352,11 +348,7 @@ public class RestApiServer {
     }
 
     private void registerAuthRoutes() {
-        app.post("/api/auth/signup", this::signup);
-        app.post("/api/auth/login", this::login);
-        app.post("/api/auth/refresh", this::refresh);
-        app.post("/api/auth/logout", this::logout);
-        app.get("/api/auth/me", this::me);
+        app.post("/api/auth/session", this::createSession);
     }
 
     private void registerUserRoutes() {
@@ -488,54 +480,15 @@ public class RestApiServer {
 
     // ── Auth Handlers ───────────────────────────────────────────────────
 
-    void signup(Context ctx) {
-        SignupRequest request = ctx.bodyAsClass(SignupRequest.class);
-        var result = authUseCases.signup(new AuthUseCases.SignupCommand(
-                request.email(), request.password(), request.dateOfBirth(), request.name()));
+    /** Find-or-create the local profile for the signed-in Clerk user: 201 when created, 200 when it existed. */
+    void createSession(Context ctx) {
+        var result = authUseCases.provisionSession(identityPolicy.requireBearerToken(ctx));
         if (!result.success()) {
             handleUseCaseFailure(ctx, result.error());
             return;
         }
-        ctx.status(201).json(AuthResponse.from(result.data()));
-    }
-
-    void login(Context ctx) {
-        LoginRequest request = ctx.bodyAsClass(LoginRequest.class);
-        var result = authUseCases.login(new AuthUseCases.LoginCommand(request.email(), request.password()));
-        if (!result.success()) {
-            handleUseCaseFailure(ctx, result.error());
-            return;
-        }
-        ctx.json(AuthResponse.from(result.data()));
-    }
-
-    void refresh(Context ctx) {
-        RefreshTokenRequest request = ctx.bodyAsClass(RefreshTokenRequest.class);
-        var result = authUseCases.refresh(request.refreshToken());
-        if (!result.success()) {
-            handleUseCaseFailure(ctx, result.error());
-            return;
-        }
-        ctx.json(AuthResponse.from(result.data()));
-    }
-
-    void logout(Context ctx) {
-        RefreshTokenRequest request = ctx.bodyAsClass(RefreshTokenRequest.class);
-        var result = authUseCases.logout(request.refreshToken());
-        if (!result.success()) {
-            handleUseCaseFailure(ctx, result.error());
-            return;
-        }
-        ctx.status(204);
-    }
-
-    void me(Context ctx) {
-        var result = authUseCases.requireAuthenticatedUser(requireActingUserId(ctx));
-        if (!result.success()) {
-            handleUseCaseFailure(ctx, result.error());
-            return;
-        }
-        ctx.json(AuthUserDto.from(result.data()));
+        ctx.status(result.data().created() ? 201 : 200)
+                .json(AuthUserDto.from(result.data().user()));
     }
 
     // ── User Handlers ───────────────────────────────────────────────────
@@ -546,7 +499,11 @@ public class RestApiServer {
         if (usersResult.isEmpty()) {
             return;
         }
+        UUID viewerId = identityPolicy.requireActingUserId(ctx);
+        Set<UUID> blockedIds = trustSafetyService.getBlockedUserIds(viewerId);
         List<UserSummary> users = usersResult.get().stream()
+                .filter(user -> user.getId().equals(viewerId)
+                        || (user.getState() == UserState.ACTIVE && !blockedIds.contains(user.getId())))
                 .map(user -> UserSummary.from(user, userTimeZone))
                 .toList();
         ctx.json(users);
@@ -1589,12 +1546,12 @@ public class RestApiServer {
             return Optional.empty();
         }
 
-        Optional<UUID> viewerId = resolveActingUserId(ctx);
-        if (viewerId.isEmpty() || viewerId.get().equals(targetUserId)) {
+        UUID viewerId = identityPolicy.requireActingUserId(ctx);
+        if (viewerId.equals(targetUserId)) {
             return target;
         }
 
-        Optional<User> viewer = loadExistingUser(ctx, viewerId.get());
+        Optional<User> viewer = loadExistingUser(ctx, viewerId);
         if (viewer.isEmpty()) {
             return Optional.empty();
         }
@@ -1763,10 +1720,6 @@ public class RestApiServer {
         ctx.header("Link", "</api/users/" + userId + "/browse>; rel=\"successor-version\"");
     }
 
-    private Optional<UUID> resolveActingUserId(Context ctx) {
-        return identityPolicy.resolveActingUserId(ctx);
-    }
-
     private UUID requireActingUserId(Context ctx) {
         return identityPolicy.requireActingUserId(ctx);
     }
@@ -1843,9 +1796,9 @@ public class RestApiServer {
             ctx.json(new ErrorResponse(CONFLICT, e.getMessage()));
         });
 
-        app.exception(AuthUseCases.UnauthorizedException.class, (e, ctx) -> {
+        app.exception(AuthUseCases.NotProvisionedException.class, (e, ctx) -> {
             ctx.status(401);
-            ctx.json(new ErrorResponse(UNAUTHORIZED, e.getMessage()));
+            ctx.json(new ErrorResponse("NOT_PROVISIONED", e.getMessage()));
         });
 
         app.exception(ApiTooManyRequestsException.class, (e, ctx) -> {
@@ -1855,11 +1808,6 @@ public class RestApiServer {
             ctx.header("X-RateLimit-Used", String.valueOf(status.used()));
             ctx.status(429);
             ctx.json(new ErrorResponse(TOO_MANY_REQUESTS, e.getMessage()));
-        });
-
-        app.exception(AuthUseCases.DuplicateAccountException.class, (e, ctx) -> {
-            ctx.status(409);
-            ctx.json(new ErrorResponse(CONFLICT, e.getMessage()));
         });
 
         app.exception(IllegalStateException.class, (e, ctx) -> {
@@ -1889,6 +1837,11 @@ public class RestApiServer {
     /** Main entry point for standalone REST API server. */
     public static void main(String[] args) {
         ServiceRegistry services = ApplicationStartup.initialize();
+        if (!services.getConfig().auth().clerkConfigured()) {
+            ApplicationStartup.shutdown();
+            throw new IllegalStateException("The REST server needs a Clerk issuer to verify session tokens. "
+                    + "Set DATING_APP_AUTH_CLERK_ISSUER (see .env.example) or clerkIssuer in the config JSON.");
+        }
         StartupOptions options = parseStartupOptions(args);
         RestApiServer server = new RestApiServer(
                 services, options.host(), options.port(), options.lanSharedSecret(), options.allowedCorsOrigins());

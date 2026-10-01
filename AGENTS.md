@@ -111,7 +111,6 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File .\src\test\powershell\ResetLocalPo
   - `copilot-instructions.md` = highest-level always-on rules
   - `CLAUDE.md` = verified repo map and current gotchas
   - `AGENTS.md` = execution workflow and verification discipline
-- `GEMINI.md` and `QWEN.md` are merged model-specific guides; both are dated snapshots — verify every claim in them against current source before use.
 - Update counts, package snapshots, commands, and gotchas only from current source/build output.
 - Prefer package-level snapshots over brittle exhaustive class lists when a file map changes quickly.
 - If a doc stops matching the code, fix the doc or remove the stale claim.

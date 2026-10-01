@@ -40,7 +40,11 @@ final class RestApiRequestContext {
                 authUseCases
                         .authenticateAccessToken(bearerToken.get())
                         .map(AuthIdentity::userId)
-                        .ifPresent(userId -> MDC.put(MDC_USER_ID, userId.toString()));
+                        .ifPresent(userId -> {
+                            MDC.put(MDC_USER_ID, userId.toString());
+                            // Saves the identity policy from verifying the same token again later in this request.
+                            ctx.attribute(RestApiIdentityPolicy.ATTR_ACTING_USER_ID, userId);
+                        });
             }
             String legacyHeader = ctx.header("X-User-Id");
             if (legacyHeader != null && !legacyHeader.isBlank() && MDC.get(MDC_USER_ID) == null) {

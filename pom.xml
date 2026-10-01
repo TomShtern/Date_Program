@@ -10,7 +10,7 @@
     <packaging>jar</packaging>
 
     <name>Dating App</name>
-    <description>Dating application with JavaFX GUI and CLI</description>
+    <description>Dating backend with a Javalin REST API, a JavaFX desktop app and a CLI</description>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -28,7 +28,7 @@
         <atlantafx.version>2.1.0</atlantafx.version>
         <javalin.version>6.7.0</javalin.version>
         <hikaricp.version>6.3.0</hikaricp.version>
-        <jbcrypt.version>0.4</jbcrypt.version>
+        <nimbus.jose.version>10.10</nimbus.jose.version>
         <jetbrains.annotations.version>24.1.0</jetbrains.annotations.version>
         <spotbugs.maven.plugin.version>4.9.8.3</spotbugs.maven.plugin.version>
     </properties>
@@ -99,10 +99,11 @@
             <version>20240325.1</version>
         </dependency>
 
+        <!-- Auth: verifies Clerk session JWTs (RS256) against Clerk's published JWKS -->
         <dependency>
-            <groupId>org.mindrot</groupId>
-            <artifactId>jbcrypt</artifactId>
-            <version>${jbcrypt.version}</version>
+            <groupId>com.nimbusds</groupId>
+            <artifactId>nimbus-jose-jwt</artifactId>
+            <version>${nimbus.jose.version}</version>
         </dependency>
 
         <!-- JavaFX -->

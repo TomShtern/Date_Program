@@ -1,111 +1,133 @@
 # Dating App
 
-Java 25 (preview) backend with shared domain logic and three adapters: a CLI, a
-JavaFX desktop UI, and a Javalin REST API that backs a separate Flutter client
-(not in this repository).
+A dating backend in Java 25. One framework-free domain core serves three front
+ends: a Javalin REST API, a JavaFX desktop app, and a CLI. The REST API is the
+main one. It backs a separate Flutter client that lives outside this repository.
 
-- CLI — `src/main/java/datingapp/Main.java` + `src/main/java/datingapp/app/cli/*`
-- JavaFX desktop UI — `src/main/java/datingapp/ui/*`
-  (`DatingApp.java` entry point, `ViewModelFactory` composition root)
-- REST API — `src/main/java/datingapp/app/api/RestApiServer.java` (default
-  `http://localhost:7070`, health at `GET /api/health`)
+Profiles, browsing and ranking, likes and matches, messaging, friend requests,
+notes, blocking and reporting, achievements and notifications all run through
+the same use cases, whichever front end calls them.
 
-The REST backend is the primary integration surface; CLI and JavaFX are
-supporting adapters. All three share `ApplicationStartup.initialize()` (in
-`src/main/java/datingapp/app/bootstrap/`) to build the app-wide
-`ServiceRegistry` (`src/main/java/datingapp/core/ServiceRegistry.java`);
-runtime storage is assembled in
-`src/main/java/datingapp/storage/StorageFactory.java`.
+## What to look at first
 
-> Source of truth is `src/main/java`, `src/test/java`, and `pom.xml`.
-> If any document disagrees with code, the code wins.
+- **Layering that the build enforces.** `core/` imports no framework and no
+  storage code. Architecture tests in `src/test/java/datingapp/architecture/`
+  fail `mvn test` if `core/` imports a framework, if a ViewModel imports
+  `core.storage` outside the `UiDataAdapters` types, or if feature code calls
+  `ZoneId.systemDefault()` or `AppConfig.defaults()`.
+- **One use-case layer, three adapters.** REST, CLI and JavaFX call the same
+  `app/usecase/*` classes. Wiring happens in `ApplicationStartup.initialize()`.
+- **Clerk auth, verified offline.** Clerk handles sign-in. The REST server checks
+  each Clerk session token (RS256) against Clerk's public keys and maps the Clerk
+  user to a local profile through `POST /api/auth/session`. It stores no
+  passwords and holds no Clerk secret key. Requests under `/api/` are rate
+  limited per IP and method.
+- **Domain rules in plain classes.** Compatibility scoring, daily limits, undo,
+  match quality and trust and safety live in `core/matching`. Relationship
+  state changes go through `RelationshipWorkflowPolicy` in `core/workflow`.
+- **Controllable time.** Domain code reads time through `AppClock`, and tests
+  can fix or replace its clock instead of sleeping.
+- **JavaFX threading in one place.** ViewModels run async work through
+  `ViewModelAsyncScope` with latest-wins task semantics.
+- **A real quality gate.** `mvn verify` runs Spotless, Checkstyle, PMD, SpotBugs
+  and a JaCoCo line-coverage check at 0.60. The coverage check excludes the
+  JavaFX UI, the CLI and `Main`.
+
+## Architecture
+
+```mermaid
+flowchart TD
+    REST["REST API<br/>app/api"] --> UC
+    CLI["CLI<br/>app/cli"] --> UC
+    FX["JavaFX UI<br/>ui"] --> UC
+    UC["Use cases<br/>app/usecase/*"] --> CORE
+    CORE["Domain core<br/>core/*, location/*"]
+    STORE["Storage<br/>storage/* (JDBI, PostgreSQL)"] -- implements core/storage interfaces --> CORE
+```
+
+`ServiceRegistry` holds the services. `StorageFactory.buildSqlDatabase(...)`
+builds the PostgreSQL-backed storage that the app uses at runtime. H2 and
+in-memory storage exist for tests. More detail is in
+[docs/architecture/architecture.md](docs/architecture/architecture.md).
 
 ## Tech stack
 
-- Java 25 (preview enabled) + Maven
-- JavaFX 25.0.2 desktop UI (AtlantaFX 2.1.0 theme, Ikonli 12.4.0 icons)
-- Javalin 6.7.0 REST API + Jackson 2.21.0
-- PostgreSQL 42.7.8 + JDBI 3.51.0 + HikariCP 6.3.0 for runtime;
-  H2 and in-memory paths exist for compatibility/tests
-  (`StorageFactory.buildSqlDatabase` is the runtime path)
-- SLF4J 2.0.17 + Logback 1.5.28
-- Quality gate: Spotless (Palantir Java Format), Checkstyle, PMD, SpotBugs,
-  JaCoCo line coverage minimum `0.60`
+- Java 25 with preview features, Maven
+- Javalin 6.7.0 and Jackson 2.21.0 for REST
+- JavaFX 25.0.2 with AtlantaFX and Ikonli for the desktop UI
+- PostgreSQL, JDBI 3.51.0 and HikariCP for storage
+- SLF4J and Logback for logging
 
-## Run locally
+## Run it
+
+You need a JDK 25 and Maven. The runtime database is PostgreSQL. The scripts
+below start a local instance on port 55432. They are PowerShell scripts.
 
 ```powershell
-# PostgreSQL preflight, then start local PostgreSQL
+Copy-Item .env.example .env
 .\scripts/check_postgresql_runtime_env.ps1
 .\scripts/start_local_postgres.ps1
 
-# CLI (exec:exec — exec:java cannot pass --enable-preview)
-mvn compile && mvn exec:exec
-
-# JavaFX desktop UI
-mvn javafx:run
-
-# Tests
-mvn test
-
-# Full local verification (Maven quality gate + PostgreSQL smoke)
-.\scripts/run_verify.ps1
-
-# Maven quality gate only
-mvn spotless:apply verify
+mvn compile
+mvn exec:exec          # CLI
+mvn javafx:run         # desktop UI
 ```
 
-Copy `.env.example` to `.env` for local settings (`.env` is gitignored).
-Config loads from `config/app-config.json` with `DATING_APP_*` environment
-overrides (`ApplicationStartup`). Local PostgreSQL runs on port 55432
-(`start_local_postgres.ps1` default). For phone-alpha LAN testing against the
-Flutter client,
-use `.\scripts/start_phone_alpha_backend.ps1` — it binds `0.0.0.0:7070`,
-health-checks `/api/health` on loopback and LAN, and prints the Flutter
-`dart-define` values. A non-loopback bind requires a LAN shared secret
-(`DATING_APP_REST_SHARED_SECRET`); never commit a real secret.
+The CLI starts with `exec:exec` because `exec:java` cannot pass
+`--enable-preview`.
 
-## Project structure
+To start only the REST server on `http://localhost:7070`, run
+`datingapp.app.api.RestApiServer` with the runtime classpath and
+`--enable-preview`. `GET /api/health` answers without auth. The manual
+command is in [docs/guides/lan-backend-startup.md](docs/guides/lan-backend-startup.md).
+Binding to a non-loopback address throws unless you supply
+`DATING_APP_REST_SHARED_SECRET`.
 
-```text
-src/main/java/datingapp/
-  Main.java                 # CLI entry point
-  app/
-    api/                    # RestApiServer + DTOs, guards, identity policy
-    bootstrap/              # ApplicationStartup (config + ServiceRegistry wiring)
-    cli/                    # CLI handlers and presenters
-    event/                  # AppEventBus + handlers (achievements, metrics, notifications)
-    support/                # presentation helpers
-    usecase/                # auth, common, dashboard, matching, messaging, profile, social
-  core/                     # framework-free domain: AppClock, AppConfig,
-                            # ServiceRegistry + connection, i18n, matching,
-                            # metrics, model, profile, storage, workflow
-  location/                 # LocationService, GeocodingService + local/Nominatim
-  storage/                  # StorageFactory, DatabaseManager, DevDataSeeder + jdbi/, schema/
-  ui/
-    DatingApp.java          # JavaFX entry point
-    async/                  # ViewModelAsyncScope
-    screen/                 # controllers + dialogs
-    viewmodel/              # ViewModels + ViewModelFactory
+Set `DATING_APP_SEED_DATA=true` to seed sample users at startup
+(`ApplicationStartup` calls `DevDataSeeder`).
+
+### Tests and checks
+
+```powershell
+mvn test                      # unit and architecture tests
+mvn spotless:apply verify     # formatting plus the full quality gate
+.\scripts/run_verify.ps1      # quality gate plus a PostgreSQL smoke run
 ```
 
-`core/` stays framework-free; `app/usecase/*` is the application boundary;
-`StorageFactory.buildSqlDatabase(...)` is the runtime storage path.
-Contributors: see `AGENTS.md` (workflow) and `CLAUDE.md` (repo map + gotchas).
+CI definitions are in `.github/workflows/` and `.circleci/`. The
+[CI and PostgreSQL guide](docs/guides/ci-and-postgresql.md) describes both.
 
 ## API
 
-`GET /api/health` plus auth, users, photos, location, matching, social,
-messaging, and notes routes — see `RestApiServer` route registration
-(`app.get/post/put/delete` under `/api/`). The phone-alpha auth/photo
-contract in `docs/api/API-SPECIFICATION.md` was verified 2026-09-27
-against `RestApiServer`/`AuthUseCases`/`AppConfig`; it is still scoped
-to auth/photos only, so treat the server source as authoritative for
-everything else.
+Routes cover auth, users and profiles, photos, location, browsing and
+candidates, likes and matches, conversations and messages, friend requests,
+notes, notifications, blocking and reporting. The route table is in
+`RestApiServer`. The auth and photo contract is written up in
+[docs/api/API-SPECIFICATION.md](docs/api/API-SPECIFICATION.md). That document
+covers only auth and photos, so read the server source for the rest.
 
-## Repository guide
+## Known limitations
 
-- [Documentation index](docs/README.md)
-- [CI and PostgreSQL guide](docs/guides/ci-and-postgresql.md)
-- [PostgreSQL PowerShell guide](docs/guides/postgresql-powershell.md)
-- [LAN backend startup guide](docs/guides/lan-backend-startup.md)
+This started as a phone-alpha backend, and it shows in a few places. Photo files
+are served without auth, only Israel is a selectable location, and the dev
+config ships placeholder secrets that the production guard rejects. The full
+list is in [docs/known-limitations.md](docs/known-limitations.md).
+
+## Docs
+
+Start at the [documentation index](docs/README.md).
+
+## How this was built
+
+I used AI coding assistants on this project. The instruction files they read are
+in the repo, so you can see how they were steered: `CLAUDE.md`, `AGENTS.md`,
+`.claude/rules/` and `.github/copilot-instructions.md`. The source code is the
+reference for what the system does. Where a document disagrees with the code, the
+document is wrong.
+
+<!-- TODO(Tom): add your own sentence or two here about what you designed and
+decided yourself versus what the assistants drafted. -->
+
+## License
+
+MIT. See [LICENSE](LICENSE).

@@ -85,8 +85,11 @@ class RestApiReadRoutesTest {
         int port = server.getApp().port();
         HttpClient client = HttpClient.newHttpClient();
 
+        String aliceToken = RestApiTestFixture.bearerToken(services, aliceId, alice.getEmail());
+
         HttpResponse<String> usersResponse = client.send(
                 HttpRequest.newBuilder(URI.create(BASE_URL + port + "/api/users"))
+                        .header(AUTHORIZATION_HEADER, aliceToken)
                         .GET()
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
@@ -95,6 +98,7 @@ class RestApiReadRoutesTest {
 
         HttpResponse<String> userResponse = client.send(
                 HttpRequest.newBuilder(URI.create(BASE_URL + port + USERS_PATH + aliceId))
+                        .header(AUTHORIZATION_HEADER, aliceToken)
                         .GET()
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
@@ -104,6 +108,7 @@ class RestApiReadRoutesTest {
 
         HttpResponse<String> missingUserResponse = client.send(
                 HttpRequest.newBuilder(URI.create(BASE_URL + port + USERS_PATH + UUID.randomUUID()))
+                        .header(AUTHORIZATION_HEADER, aliceToken)
                         .GET()
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
@@ -237,6 +242,85 @@ class RestApiReadRoutesTest {
                         HttpResponse.BodyHandlers.ofString());
 
         assertEquals(409, response.statusCode(), response.body());
+    }
+
+    @Test
+    @DisplayName("user profile reads without a bearer token are rejected")
+    void userProfileReadsWithoutBearerTokenAreRejected() throws Exception {
+        TestStorages.Users userStorage = new TestStorages.Users();
+        TestStorages.Communications communicationStorage = new TestStorages.Communications();
+        TestStorages.Interactions interactionStorage = new TestStorages.Interactions(communicationStorage);
+        ServiceRegistry services = createServices(userStorage, interactionStorage, communicationStorage);
+
+        UUID targetId = UUID.randomUUID();
+        userStorage.save(activeUser(targetId, "Target", Gender.FEMALE, EnumSet.of(Gender.MALE)));
+
+        server = new RestApiServer(services, 0);
+        server.start();
+        int port = server.getApp().port();
+        HttpClient client = HttpClient.newHttpClient();
+
+        for (String path : List.of("/api/users", USERS_PATH + targetId)) {
+            HttpResponse<String> response = client.send(
+                    HttpRequest.newBuilder(URI.create(BASE_URL + port + path))
+                            .GET()
+                            .build(),
+                    HttpResponse.BodyHandlers.ofString());
+            assertEquals(401, response.statusCode(), path + " -> " + response.body());
+        }
+    }
+
+    @Test
+    @DisplayName("user list hides inactive and blocked users but keeps the viewer")
+    void userListHidesInactiveAndBlockedUsersButKeepsTheViewer() throws Exception {
+        TestStorages.Users userStorage = new TestStorages.Users();
+        TestStorages.Communications communicationStorage = new TestStorages.Communications();
+        TestStorages.Interactions interactionStorage = new TestStorages.Interactions(communicationStorage);
+        TestStorages.TrustSafety trustSafetyStorage = new TestStorages.TrustSafety();
+        ServiceRegistry services = RestApiTestFixture.builder(userStorage, interactionStorage, communicationStorage)
+                .trustSafetyStorage(trustSafetyStorage)
+                .build();
+
+        UUID viewerId = UUID.randomUUID();
+        UUID visibleId = UUID.randomUUID();
+        UUID pausedId = UUID.randomUUID();
+        UUID bannedId = UUID.randomUUID();
+        UUID blockedByViewerId = UUID.randomUUID();
+        UUID blockedViewerId = UUID.randomUUID();
+        User viewer = activeUser(viewerId, "Viewer", Gender.MALE, EnumSet.of(Gender.FEMALE));
+        User paused = activeUser(pausedId, "Paused", Gender.FEMALE, EnumSet.of(Gender.MALE));
+        paused.pause();
+        User banned = activeUser(bannedId, "Banned", Gender.FEMALE, EnumSet.of(Gender.MALE));
+        banned.ban();
+        userStorage.save(viewer);
+        userStorage.save(activeUser(visibleId, "Visible", Gender.FEMALE, EnumSet.of(Gender.MALE)));
+        userStorage.save(paused);
+        userStorage.save(banned);
+        userStorage.save(activeUser(blockedByViewerId, "Blockedbyviewer", Gender.FEMALE, EnumSet.of(Gender.MALE)));
+        userStorage.save(activeUser(blockedViewerId, "Blockedviewer", Gender.FEMALE, EnumSet.of(Gender.MALE)));
+        trustSafetyStorage.save(ConnectionModels.Block.create(viewerId, blockedByViewerId));
+        trustSafetyStorage.save(ConnectionModels.Block.create(blockedViewerId, viewerId));
+
+        server = new RestApiServer(services, 0);
+        server.start();
+        int port = server.getApp().port();
+
+        HttpResponse<String> response = HttpClient.newHttpClient()
+                .send(
+                        HttpRequest.newBuilder(URI.create(BASE_URL + port + "/api/users"))
+                                .header(
+                                        AUTHORIZATION_HEADER,
+                                        RestApiTestFixture.bearerToken(services, viewerId, viewer.getEmail()))
+                                .GET()
+                                .build(),
+                        HttpResponse.BodyHandlers.ofString());
+
+        assertEquals(200, response.statusCode(), response.body());
+        List<String> ids = new ArrayList<>();
+        MAPPER.readTree(response.body()).forEach(node -> ids.add(node.get("id").asText()));
+        assertEquals(2, ids.size(), ids.toString());
+        assertTrue(ids.contains(viewerId.toString()));
+        assertTrue(ids.contains(visibleId.toString()));
     }
 
     @Test

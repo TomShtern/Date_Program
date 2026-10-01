@@ -14,6 +14,9 @@ final class RestApiIdentityPolicy {
 
     private static final Logger logger = LoggerFactory.getLogger(RestApiIdentityPolicy.class);
 
+    /** Ctx attribute holding the authenticated local user id once resolved for the current request. */
+    static final String ATTR_ACTING_USER_ID = "auth.actingUserId";
+
     private static final String HEADER_ACTING_USER_ID = "X-User-Id";
     private static final String HEADER_AUTHORIZATION = "Authorization";
     private static final String BEARER_PREFIX = "Bearer ";
@@ -48,20 +51,35 @@ final class RestApiIdentityPolicy {
         if (authUseCases == null) {
             return resolveLegacyHeader(ctx);
         }
-        Optional<String> bearerToken = resolveBearerToken(ctx);
-        if (bearerToken.isEmpty()) {
-            return Optional.empty();
+        // Verifying a Clerk token and loading the user is the expensive part, so do it once per request.
+        UUID userId = ctx.attribute(ATTR_ACTING_USER_ID);
+        if (userId == null) {
+            Optional<String> bearerToken = resolveBearerToken(ctx);
+            if (bearerToken.isEmpty()) {
+                return Optional.empty();
+            }
+            userId = authenticate(ctx, bearerToken.get());
+            ctx.attribute(ATTR_ACTING_USER_ID, userId);
         }
+        validateLegacyHeaderMatchesSubject(ctx, userId);
+        return Optional.of(userId);
+    }
+
+    /** The raw Clerk session token from the {@code Authorization} header; 401 when it is missing or malformed. */
+    String requireBearerToken(Context ctx) {
+        return resolveBearerToken(ctx).orElseThrow(() -> new ApiUnauthorizedException(INVALID_BEARER_MESSAGE));
+    }
+
+    private UUID authenticate(Context ctx, String bearerToken) {
         AuthUseCases.AuthIdentity identity =
-                authUseCases.authenticateAccessToken(bearerToken.get()).orElse(null);
+                authUseCases.authenticateAccessToken(bearerToken).orElse(null);
         if (identity == null) {
             if (logger.isWarnEnabled()) {
                 logger.warn("auth.expired path={} method={}", ctx.path(), ctx.method());
             }
             throw new ApiUnauthorizedException(INVALID_BEARER_MESSAGE);
         }
-        validateLegacyHeaderMatchesSubject(ctx, identity.userId());
-        return Optional.of(identity.userId());
+        return identity.userId();
     }
 
     private Optional<UUID> resolveLegacyHeader(Context ctx) {

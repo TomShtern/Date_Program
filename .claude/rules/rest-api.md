@@ -40,6 +40,24 @@ Two consequences that are easy to get backwards:
 Startup options are parsed from `--host=`, `--port=`, `--shared-secret` and the
 allowed CORS origin list; a blank host falls back to loopback.
 
+### Auth: Clerk session tokens
+
+Clerk owns sign-in; the backend only verifies. Every `/api/users/{id}/...` call
+carries `Authorization: Bearer <Clerk session token>`, and the first call after
+sign-in is `POST /api/auth/session`, which creates the local profile and returns
+its `id`. Two things to keep straight:
+
+- **No issuer, no REST server.** `RestApiServer.main()` throws without
+  `clerkIssuer` (`DATING_APP_AUTH_CLERK_ISSUER`). The constructor must not,
+  because the REST tests build `new RestApiServer(services, 0)` with default
+  config and a test verifier.
+- **Client tokens are short-lived.** The Flutter app must fetch a fresh token per
+  request. Do not "fix" 401s by lengthening anything server-side; the lifetime is
+  set in the Clerk dashboard.
+
+The old signup/login/refresh/logout/`me` routes are gone. The full contract is in
+`docs/api/API-SPECIFICATION.md`.
+
 ### The phone-alpha path
 
 `scripts/start_phone_alpha_backend.ps1` detects the laptop LAN IP, starts the server on

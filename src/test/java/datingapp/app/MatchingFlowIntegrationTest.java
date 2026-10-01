@@ -5,7 +5,6 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.app.event.InProcessAppEventBus;
-import datingapp.app.usecase.auth.AuthTokenService;
 import datingapp.app.usecase.auth.AuthUseCases;
 import datingapp.app.usecase.common.UserContext;
 import datingapp.app.usecase.matching.MatchingUseCases;
@@ -38,6 +37,7 @@ import datingapp.core.model.User.Gender;
 import datingapp.core.model.User.UserState;
 import datingapp.core.profile.ProfileService;
 import datingapp.core.profile.ValidationService;
+import datingapp.core.testutil.TestAccessTokenVerifier;
 import datingapp.core.testutil.TestStorages;
 import datingapp.location.LocationService;
 import java.time.Duration;
@@ -218,8 +218,8 @@ class MatchingFlowIntegrationTest {
         LocationService locationService = new LocationService(validationService);
         AchievementService achievementService = new AchievementService(
                 config, analyticsStorage, interactionStorage, trustSafetyStorage, userStorage, profileService);
-        AuthTokenService authTokenService = new AuthTokenService(config.auth());
-        AuthUseCases authUseCases = new AuthUseCases(config, userStorage, new TestStorages.Auth(), authTokenService);
+        AuthUseCases authUseCases =
+                new AuthUseCases(userStorage, new TestStorages.Auth(), new TestAccessTokenVerifier());
 
         return ServiceRegistry.builder()
                 .config(config)

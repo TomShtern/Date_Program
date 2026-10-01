@@ -19,10 +19,10 @@ final class RestApiRequestGuards {
     static final String HEADER_LAN_SHARED_SECRET = "X-DatingApp-Shared-Secret";
     private static final String HEALTH_ROUTE = "/api/health";
     private static final String AUTH_ROUTE_PREFIX = "/api/auth/";
-    private static final String AUTH_ME_ROUTE = "/api/auth/me";
     static final String CONVERSATION_ROUTE_PREFIX = "/api/conversations/";
     private static final String LOCATION_RESOLVE_ROUTE = "/api/location/resolve";
     static final String USERS_ROUTE_PREFIX = "/api/users/";
+    private static final String USERS_LIST_ROUTE = "/api/users";
     private static final String LOCALHOST_ONLY_MESSAGE = "REST API is restricted to localhost requests";
     private static final String INVALID_LAN_SHARED_SECRET_MESSAGE = "Missing or invalid LAN shared secret";
     private final RestApiIdentityPolicy identityPolicy;
@@ -118,29 +118,20 @@ final class RestApiRequestGuards {
             return false;
         }
         if (path.startsWith(AUTH_ROUTE_PREFIX)) {
-            return AUTH_ME_ROUTE.equals(path);
+            // Auth routes verify the Clerk token themselves; there is no local acting user yet on first sign-in.
+            return false;
         }
         if (path.startsWith(CONVERSATION_ROUTE_PREFIX)) {
             return true;
         }
-        if (path.startsWith(USERS_ROUTE_PREFIX)) {
-            return ctx.method() != HandlerType.GET || !isAnonymousUserReadRoute(path);
+        if (path.startsWith(USERS_ROUTE_PREFIX) || USERS_LIST_ROUTE.equals(path)) {
+            // Profile reads need a viewer too: block and visibility checks cannot run for an anonymous caller.
+            return true;
         }
         return switch (ctx.method()) {
             case POST, PUT, DELETE -> true;
             default -> false;
         };
-    }
-
-    private boolean isAnonymousUserReadRoute(String path) {
-        if ("/api/users".equals(path)) {
-            return true;
-        }
-        if (!path.startsWith(USERS_ROUTE_PREFIX)) {
-            return false;
-        }
-        String remainingPath = path.substring(USERS_ROUTE_PREFIX.length());
-        return !remainingPath.isBlank() && remainingPath.indexOf('/') < 0;
     }
 
     static boolean isLoopbackAddress(String host) {

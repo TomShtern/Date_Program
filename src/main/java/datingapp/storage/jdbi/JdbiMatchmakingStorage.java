@@ -71,6 +71,11 @@ public final class JdbiMatchmakingStorage implements OperationalInteractionStora
     private static final String ERR_UPDATED_MATCH_NULL = "updatedMatch cannot be null";
     private static final String ERR_ARCHIVED_CONVERSATION_NULL = "archivedConversation cannot be null";
 
+    private static final String SQL_RECORD_QUOTA_USE = """
+            INSERT INTO swipe_quota_uses (id, user_id, direction, used_at)
+            VALUES (:id, :whoLikes, :direction, :createdAt)
+            """;
+
     private static final String SQL_ACTIVE_LIKE_EXISTS = """
             SELECT EXISTS (
             SELECT 1
@@ -122,7 +127,7 @@ public final class JdbiMatchmakingStorage implements OperationalInteractionStora
             ended_by = :endedBy,
             end_reason = :endReason,
             deleted_at = :deletedAt
-            WHERE id = :id AND deleted_at IS NULL
+            WHERE id = :id AND deleted_at IS NULL AND state IN (<fromStates>)
             """;
 
     private static final String SQL_ACTIVE_MATCH_STATE =
@@ -271,6 +276,14 @@ public final class JdbiMatchmakingStorage implements OperationalInteractionStora
                     .bind(PARAM_DIRECTION, like.direction().name())
                     .bind(PARAM_CREATED_AT, like.createdAt())
                     .bindNull(PARAM_DELETED_AT, Types.TIMESTAMP)
+                    .execute();
+        }
+        // The likes row is reused and soft-deleted by undo/unmatch; the ledger row is what the daily quota counts.
+        try (var update = handle.createUpdate(SQL_RECORD_QUOTA_USE)) {
+            update.bind(PARAM_ID, UUID.randomUUID())
+                    .bind(PARAM_WHO_LIKES, like.whoLikes())
+                    .bind(PARAM_DIRECTION, like.direction().name())
+                    .bind(PARAM_CREATED_AT, like.createdAt())
                     .execute();
         }
     }
@@ -662,7 +675,15 @@ public final class JdbiMatchmakingStorage implements OperationalInteractionStora
         Match match = updatedMatch.get();
         int matchRows = bindMatchTransition(handle.createUpdate(SQL_UPDATE_MATCH_TRANSITION), match)
                 .execute();
-        return matchRows == 1;
+        // Zero rows means we lost a race with another block of the same pair: the match is already
+        // BLOCKED, which is the outcome this caller wanted, so treat it as done rather than a failure.
+        return matchRows == 1
+                || handle.createQuery(SQL_ACTIVE_MATCH_STATE)
+                        .bind(PARAM_ID, match.getId())
+                        .mapTo(String.class)
+                        .findOne()
+                        .map(MatchState.BLOCKED.name()::equals)
+                        .orElse(false);
     }
 
     private static void persistBlockedConversation(Handle handle, Optional<Conversation> archivedConversation) {
@@ -929,31 +950,30 @@ public final class JdbiMatchmakingStorage implements OperationalInteractionStora
             """)
         int countMutualLikes(@Bind("userId") UUID userId);
 
+        // Daily quota is read from the append-only ledger, not from likes: undo and unmatch soft-delete likes rows,
+        // and a refund there would let users swipe past the limit by undoing.
         @SqlQuery("""
-            SELECT COUNT(*) FROM likes
-            WHERE who_likes = :userId
+            SELECT COUNT(*) FROM swipe_quota_uses
+            WHERE user_id = :userId
               AND direction = 'LIKE'
-              AND created_at >= :startOfDay
-              AND deleted_at IS NULL
+              AND used_at >= :startOfDay
             """)
         int countLikesToday(@Bind("userId") UUID userId, @Bind("startOfDay") Instant startOfDay);
 
         @SqlQuery("""
-            SELECT COUNT(*) FROM likes
-            WHERE who_likes = :userId
+            SELECT COUNT(*) FROM swipe_quota_uses
+            WHERE user_id = :userId
               AND direction = 'SUPER_LIKE'
-              AND created_at >= :startOfDay
-              AND deleted_at IS NULL
+              AND used_at >= :startOfDay
             """)
         int countSuperLikesToday(@Bind("userId") UUID userId, @Bind("startOfDay") Instant startOfDay);
 
         @SqlQuery("""
-                SELECT COUNT(*) FROM likes
-                WHERE who_likes = :userId
-                  AND direction = 'PASS'
-                  AND created_at >= :startOfDay
-              AND deleted_at IS NULL
-                """)
+            SELECT COUNT(*) FROM swipe_quota_uses
+            WHERE user_id = :userId
+              AND direction = 'PASS'
+              AND used_at >= :startOfDay
+            """)
         int countPassesToday(@Bind("userId") UUID userId, @Bind("startOfDay") Instant startOfDay);
 
         @SqlUpdate("UPDATE likes SET deleted_at = :now WHERE id = :likeId AND deleted_at IS NULL")
@@ -1122,7 +1142,27 @@ public final class JdbiMatchmakingStorage implements OperationalInteractionStora
         }
     }
 
+    /**
+     * States a match may be in right now for a transition to {@code target} to be valid. The UPDATE is
+     * guarded with this, so a stale in-memory copy cannot overwrite a state another request already
+     * changed (for example un-blocking a blocked match by unmatching it).
+     */
+    private static List<String> allowedSourceStates(MatchState target) {
+        return switch (target) {
+            case FRIENDS -> List.of(MatchState.ACTIVE.name());
+            case UNMATCHED, GRACEFUL_EXIT -> List.of(MatchState.ACTIVE.name(), MatchState.FRIENDS.name());
+            case BLOCKED ->
+                List.of(
+                        MatchState.ACTIVE.name(),
+                        MatchState.FRIENDS.name(),
+                        MatchState.UNMATCHED.name(),
+                        MatchState.GRACEFUL_EXIT.name());
+            case ACTIVE -> List.of(MatchState.FRIENDS.name(), MatchState.UNMATCHED.name());
+        };
+    }
+
     private static Update bindMatchTransition(Update update, Match match) {
+        update.bindList("fromStates", allowedSourceStates(match.getState()));
         update.bind(PARAM_ID, match.getId())
                 .bind(PARAM_STATE, match.getState().name())
                 .bind(PARAM_UPDATED_AT, match.getUpdatedAt());
