@@ -19,21 +19,29 @@ The script will:
 7. Verify `GET /api/health` from `localhost` and from the LAN IP.
 8. Print the Flutter configuration shape and required header name without exposing the secret.
 
+To reach the backend from phones **off your home network** over a stable HTTPS URL
+(release builds block cleartext HTTP), use the Tailscale Funnel path instead:
+`docs/guides/public-funnel-runbook.md`.
+
 Press **Ctrl+C** to stop the REST server. PostgreSQL remains running.
 Run `.\scripts/stop_local_postgres.ps1` when you want to stop PostgreSQL.
 
 ## Required environment variables
 
 Copy `.env.example` to `.env` for local database settings. The startup script reads
-`DATING_APP_REST_SHARED_SECRET` from its process environment (or `-SharedSecret`);
-do not put a real LAN secret in a tracked file.
+`DATING_APP_REST_SHARED_SECRET` from its process environment, then `-SharedSecret`, then the
+file `%LOCALAPPDATA%\DateProgram\rest-shared-secret.txt` (create it once with
+`scripts\new_rest_shared_secret.ps1`). The server reads this variable with `System.getenv`, so a
+value placed in `.env` is **not** picked up. Do not put a real LAN secret in a tracked file.
 
 | Variable | Purpose | Dev default |
 |---|---|---|
 | `DATING_APP_DB_PASSWORD` | PostgreSQL password | local helper's development-only default |
 | `DATING_APP_DB_URL` | JDBC URL | `jdbc:postgresql://localhost:55432/datingapp` |
 | `DATING_APP_AUTH_CLERK_ISSUER` | Clerk Frontend API URL, e.g. `https://<name>.clerk.accounts.dev`. **Required**: the REST server refuses to start without it | *(empty)* |
-| `DATING_APP_REST_SHARED_SECRET` | LAN shared secret | supply a fresh random value for each LAN session |
+| `DATING_APP_REST_SHARED_SECRET` | LAN shared secret (process environment only, never `.env`) | the secret file above, or a random value per session |
+| `DATING_APP_PHOTO_PUBLIC_BASE_URL` | Base URL used in photo URLs; the start script sets it from `-PublicUrl` | *(derived from the request)* |
+| `DATING_APP_REST_CLIENT_IP_HEADER` | Header a local tunnel uses for the real client IP (rate limiting) | *(unset: peer address)* |
 | `DATING_APP_REST_ALLOWED_ORIGINS` | CORS origins (Flutter web only) | *(empty)* |
 
 The Clerk issuer is a public URL, so it can live in `.env`. The server needs no
@@ -103,7 +111,7 @@ Test-NetConnection -ComputerName <LAN-IP> -Port 7070
 After the script prints the LAN URL, configure Flutter in the same PowerShell session, using the locally held secret:
 
 ```powershell
-flutter run --dart-define=API_BASE_URL=http://<LAN-IP>:7070 --dart-define=API_SHARED_SECRET=$env:DATING_APP_REST_SHARED_SECRET
+flutter run --dart-define=DATING_APP_API_BASE_URL=http://<LAN-IP>:7070 --dart-define=DATING_APP_SHARED_SECRET=$env:DATING_APP_REST_SHARED_SECRET
 ```
 
 All non-health requests must include the header:
@@ -112,7 +120,9 @@ All non-health requests must include the header:
 X-DatingApp-Shared-Secret: <the same locally configured shared secret>
 ```
 
-Requests under `/api/users/...` also need `Authorization: Bearer <Clerk session token>`.
+Every other `/api/` route (`/api/users/...`, `/api/conversations/...`, `/api/location/...`) also needs
+`Authorization: Bearer <Clerk session token>`; only `/api/health` and `POST /api/auth/session`
+(which verifies the token itself) are exempt.
 Sign in with Clerk first, then call `POST /api/auth/session` once to get the local
 user id. See `docs/api/API-SPECIFICATION.md`.
 

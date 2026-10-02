@@ -5,7 +5,11 @@
 .DESCRIPTION
     Starts/checks local PostgreSQL, compiles if needed, builds the runtime classpath,
     detects the laptop LAN IP, starts the REST API server on 0.0.0.0:7070, verifies
-    /api/health from localhost and LAN, and prints the Flutter base URL + header names.
+    /api/health from localhost and LAN, and prints the Flutter base URL + variable names.
+
+    The bind is always 0.0.0.0 with a mandatory shared secret. Never switch it to loopback behind
+    a same-machine tunnel: a loopback bind disables the shared-secret check, and a tunnel
+    connects from 127.0.0.1, so internet requests would pass the localhost guard.
 
     Press Ctrl+C to stop the REST server. PostgreSQL is left running.
     Run .\scripts/stop_local_postgres.ps1 to stop PostgreSQL.
@@ -14,8 +18,28 @@
     REST API server port. Default: 7070.
 
 .PARAMETER SharedSecret
-    LAN shared secret for non-loopback requests. Overrides DATING_APP_REST_SHARED_SECRET
-    env var if explicitly provided. A secret must be supplied; no shared secret is built in.
+    LAN shared secret for non-loopback requests. Resolution order: -SharedSecret, then the
+    DATING_APP_REST_SHARED_SECRET environment variable, then the file
+    %LOCALAPPDATA%\DateProgram\rest-shared-secret.txt (create it once with
+    scripts\new_rest_shared_secret.ps1). A secret must be supplied; none is built in, and the
+    value is never printed.
+
+.PARAMETER PublicUrl
+    Public HTTPS base URL that phones use (for example https://<machine>.<tailnet>.ts.net).
+    Sets DATING_APP_PHOTO_PUBLIC_BASE_URL for the server process so photo URLs in API responses
+    start with https:// instead of the http:// scheme the server sees behind a TLS-terminating
+    tunnel. Must be https:// with no path.
+
+.PARAMETER ClientIpHeader
+    Name of the header the local tunnel uses to pass the real client address. Sets
+    DATING_APP_REST_CLIENT_IP_HEADER so the rate limiter charges each client separately. It is
+    honored only for requests whose socket peer is loopback. Leave unset until the header has
+    been verified (docs/guides/public-funnel-runbook.md); falls back to the existing
+    DATING_APP_REST_CLIENT_IP_HEADER variable.
+
+.PARAMETER LogDirectory
+    When set, the server's stdout and stderr are written to backend.out.log and
+    backend.err.log in this directory (recreated on every start) instead of the console.
 
 .PARAMETER AllowedOrigins
     CORS allowed origins (comma-separated or multiple values). Falls back to
@@ -28,7 +52,10 @@ param(
     [int]$Port = 7070,
     [string]$SharedSecret,
     [string[]]$AllowedOrigins = @(),
-    [int]$HealthCheckTimeoutSeconds = 15
+    [int]$HealthCheckTimeoutSeconds = 15,
+    [string]$PublicUrl,
+    [string]$ClientIpHeader,
+    [string]$LogDirectory
 )
 
 $ErrorActionPreference = 'Stop'
@@ -37,16 +64,36 @@ Set-StrictMode -Version Latest
 Set-Location (Split-Path -Parent $PSScriptRoot)
 
 # ── Resolve effective settings ──────────────────────────────────────────
+$secretFile = Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'DateProgram\rest-shared-secret.txt'
+
 $effectiveSharedSecret = if ($PSBoundParameters.ContainsKey('SharedSecret')) {
     $SharedSecret
 } elseif ($env:DATING_APP_REST_SHARED_SECRET) {
     $env:DATING_APP_REST_SHARED_SECRET
+} elseif (Test-Path -LiteralPath $secretFile) {
+    (Get-Content -LiteralPath $secretFile -Raw).Trim()
 } else {
     $null
 }
 
 if ([string]::IsNullOrWhiteSpace($effectiveSharedSecret)) {
-    throw '[CONFIG] Set DATING_APP_REST_SHARED_SECRET in the process environment or pass -SharedSecret. Generate a fresh random value for each LAN session.'
+    throw "[CONFIG] No LAN shared secret found. Pass -SharedSecret, set DATING_APP_REST_SHARED_SECRET, or create the secret file once with scripts\new_rest_shared_secret.ps1 (expected at $secretFile)."
+}
+
+$effectivePublicUrl = $null
+if (-not [string]::IsNullOrWhiteSpace($PublicUrl)) {
+    $effectivePublicUrl = $PublicUrl.Trim().TrimEnd('/')
+    if ($effectivePublicUrl -notmatch '^https://[A-Za-z0-9.-]+(:\d+)?$') {
+        throw "[CONFIG] -PublicUrl must be an https:// base URL with no path, for example https://machine.tailnet.ts.net. Got: $effectivePublicUrl"
+    }
+}
+
+$effectiveClientIpHeader = if (-not [string]::IsNullOrWhiteSpace($ClientIpHeader)) {
+    $ClientIpHeader.Trim()
+} elseif ($env:DATING_APP_REST_CLIENT_IP_HEADER) {
+    $env:DATING_APP_REST_CLIENT_IP_HEADER
+} else {
+    $null
 }
 
 $effectiveAllowedOrigins = if ($AllowedOrigins.Count -gt 0) {
@@ -236,16 +283,48 @@ if ($effectiveAllowedOrigins) {
 # ── 6. Start REST server ────────────────────────────────────────────────
 Write-Output "[REST] Starting REST API server on 0.0.0.0:$Port ..."
 Write-Output '[REST] LAN shared-secret protection is configured.'
+if ($effectivePublicUrl) {
+    Write-Output "[REST] Photo URLs will use the public base URL $effectivePublicUrl."
+}
+if ($effectiveClientIpHeader) {
+    Write-Output "[REST] Rate limiting keys on the $effectiveClientIpHeader header for loopback peers."
+}
 
-$previousSharedSecret = $env:DATING_APP_REST_SHARED_SECRET
+$startProcessArgs = @{
+    FilePath     = 'java'
+    ArgumentList = $javaArgs
+    PassThru     = $true
+    NoNewWindow  = $true
+}
+if ($LogDirectory) {
+    New-Item -ItemType Directory -Force -Path $LogDirectory | Out-Null
+    $startProcessArgs['RedirectStandardOutput'] = Join-Path $LogDirectory 'backend.out.log'
+    $startProcessArgs['RedirectStandardError'] = Join-Path $LogDirectory 'backend.err.log'
+    Write-Output "[REST] Server output goes to $LogDirectory."
+}
+
+# Child processes inherit the environment at launch; set the values just for that moment.
+$childEnvironment = @{
+    DATING_APP_REST_SHARED_SECRET = $effectiveSharedSecret
+}
+if ($effectivePublicUrl) {
+    $childEnvironment['DATING_APP_PHOTO_PUBLIC_BASE_URL'] = $effectivePublicUrl
+}
+if ($effectiveClientIpHeader) {
+    $childEnvironment['DATING_APP_REST_CLIENT_IP_HEADER'] = $effectiveClientIpHeader
+}
+$previousEnvironment = @{}
+foreach ($name in $childEnvironment.Keys) {
+    $previousEnvironment[$name] = [Environment]::GetEnvironmentVariable($name, 'Process')
+}
 try {
-    $env:DATING_APP_REST_SHARED_SECRET = $effectiveSharedSecret
-    $proc = Start-Process -FilePath 'java' -ArgumentList $javaArgs -PassThru -NoNewWindow
+    foreach ($name in $childEnvironment.Keys) {
+        [Environment]::SetEnvironmentVariable($name, $childEnvironment[$name], 'Process')
+    }
+    $proc = Start-Process @startProcessArgs
 } finally {
-    if ($null -eq $previousSharedSecret) {
-        Remove-Item Env:DATING_APP_REST_SHARED_SECRET -ErrorAction SilentlyContinue
-    } else {
-        $env:DATING_APP_REST_SHARED_SECRET = $previousSharedSecret
+    foreach ($name in $childEnvironment.Keys) {
+        [Environment]::SetEnvironmentVariable($name, $previousEnvironment[$name], 'Process')
     }
 }
 
@@ -273,6 +352,17 @@ if ($healthLan) {
     }
 }
 
+if ($effectivePublicUrl) {
+    $healthPublic = "$effectivePublicUrl/api/health"
+    Write-Output "[VERIFY] Checking $healthPublic ..."
+    $publicOk = Test-HealthEndpoint -Url $healthPublic -TimeoutSeconds $HealthCheckTimeoutSeconds
+    if ($publicOk) {
+        Write-Output '[VERIFY] Public HTTPS health OK (200).'
+    } else {
+        Write-Warning "[VERIFY] $healthPublic did not answer 200 yet. Check the tunnel (tailscale funnel status). Public DNS can take up to 10 minutes on a first setup."
+    }
+}
+
 # ── 8. Print Flutter instructions ───────────────────────────────────────
 Write-Output ''
 Write-Output '========================================'
@@ -286,12 +376,14 @@ Write-Output ''
 Write-Output '  Required header for non-health requests:'
 Write-Output '    X-DatingApp-Shared-Secret: <your locally configured shared secret>'
 Write-Output ''
-if ($lanIp) {
-    Write-Output '  Configure Flutter locally with these values (do not commit the shared secret):'
-    Write-Output "    --dart-define=API_BASE_URL=http://$($lanIp):$Port"
-    Write-Output '    --dart-define=API_SHARED_SECRET=<the same locally configured shared secret>'
-    Write-Output ''
+Write-Output '  Configure Flutter locally with these values (do not commit the shared secret):'
+if ($effectivePublicUrl) {
+    Write-Output "    --dart-define=DATING_APP_API_BASE_URL=$effectivePublicUrl"
+} elseif ($lanIp) {
+    Write-Output "    --dart-define=DATING_APP_API_BASE_URL=http://$($lanIp):$Port"
 }
+Write-Output '    --dart-define=DATING_APP_SHARED_SECRET=<the same locally configured shared secret>'
+Write-Output ''
 Write-Output '  Press Ctrl+C to stop the REST server.'
 Write-Output '  PostgreSQL will remain running.'
 Write-Output '  Run .\scripts/stop_local_postgres.ps1 to stop PostgreSQL.'

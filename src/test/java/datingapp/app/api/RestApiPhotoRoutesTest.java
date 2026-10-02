@@ -122,6 +122,45 @@ class RestApiPhotoRoutesTest {
     }
 
     @Test
+    @DisplayName("a configured https public base URL is used for photo URLs even though the request arrived over http")
+    void configuredHttpsPublicBaseUrlIsUsedForPhotoUrls() throws Exception {
+        TestStorages.Users userStorage = new TestStorages.Users();
+        TestStorages.Communications communicationStorage = new TestStorages.Communications();
+        TestStorages.Interactions interactionStorage = new TestStorages.Interactions(communicationStorage);
+        User alice = activeUser(UUID.randomUUID(), "Alice", "alice@example.com");
+        userStorage.save(alice);
+
+        String publicBaseUrl = "https://machine.tailnet-example.ts.net";
+        AppConfig config = AppConfig.builder()
+                .photoStorageRoot(tempDir.resolve("photos").toString())
+                .photoPublicBaseUrl(publicBaseUrl + "/")
+                .maxPhotoUploadBytes(1024 * 1024)
+                .build();
+        ServiceRegistry services = RestApiTestFixture.builder(userStorage, interactionStorage, communicationStorage)
+                .config(config)
+                .build();
+
+        server = new RestApiServer(services, 0);
+        server.start();
+        int port = server.getApp().port();
+
+        HttpResponse<String> uploadResponse =
+                uploadPhoto(services, port, alice.getId(), alice.getEmail(), pngBytes(0x2255CC), "tunnel.png");
+        assertEquals(201, uploadResponse.statusCode(), uploadResponse.body());
+        JsonNode uploadJson = MAPPER.readTree(uploadResponse.body());
+        String expectedPrefix = publicBaseUrl + "/photos/" + alice.getId() + "/";
+        assertTrue(uploadJson.get("photo").get("url").asText().startsWith(expectedPrefix), uploadResponse.body());
+        assertTrue(uploadJson.get("primaryPhotoUrl").asText().startsWith(expectedPrefix), uploadResponse.body());
+
+        HttpResponse<String> userResponse =
+                authorizedGet(services, port, "/api/users/" + alice.getId(), alice.getId(), alice.getEmail());
+        assertEquals(200, userResponse.statusCode(), userResponse.body());
+        JsonNode userJson = MAPPER.readTree(userResponse.body());
+        assertTrue(userJson.get("primaryPhotoUrl").asText().startsWith(expectedPrefix), userResponse.body());
+        userJson.get("photoUrls").forEach(url -> assertTrue(url.asText().startsWith("https://"), url.asText()));
+    }
+
+    @Test
     @DisplayName("photo upload requires authentication and a matching bearer subject")
     void photoUploadRequiresAuthenticationAndMatchingBearerSubject() throws Exception {
         TestStorages.Users userStorage = new TestStorages.Users();

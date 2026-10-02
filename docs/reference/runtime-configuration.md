@@ -47,16 +47,32 @@ not a guarantee:
 - Once wide, every non-health request must carry
   `X-DatingApp-Shared-Secret` (`RestApiRequestGuards`), compared in
   constant time. `GET /api/health` stays unauthenticated.
-- Plain HTTP, no TLS. CORS allowlist via
+- The server speaks plain HTTP; HTTPS comes from a tunnel in front of it
+  (`docs/guides/public-funnel-runbook.md`). CORS allowlist via
   `DATING_APP_REST_ALLOWED_ORIGINS` (browser clients only).
-- Rate limiting is per `ip + method`, 240 requests/minute by default
+- Never bind loopback behind a same-machine tunnel: the loopback bind drops the shared
+  secret, and the tunnel's connections arrive from `127.0.0.1`.
+- Every `/api/` route except `GET /api/health` and `POST /api/auth/session` requires a
+  verified Clerk token (`/api/location/*` included); the shared secret is checked first.
+- Rate limiting is per `client ip + method`, 240 requests/minute by default
   (`DEFAULT_RATE_LIMIT_REQUESTS`, `DEFAULT_RATE_LIMIT_WINDOW`);
   exceeding it returns `429 TOO_MANY_REQUESTS` with
-  `X-RateLimit-Limit` / `X-RateLimit-Used` headers.
+  `X-RateLimit-Limit` / `X-RateLimit-Used` headers. The client ip is the socket peer,
+  unless `DATING_APP_REST_CLIENT_IP_HEADER` (or `--client-ip-header=`) names a header from a
+  tunnel running on this machine; that header is honored **only** when the socket peer is
+  loopback, so a LAN client cannot choose its own bucket. A missing, non-numeric or
+  hostname value falls back to the peer; for a comma-separated list the last entry is used.
+- `DATING_APP_REST_SHARED_SECRET` and `DATING_APP_REST_CLIENT_IP_HEADER` are read from the
+  process environment only (`System.getenv`), not from `.env`.
+- `DATING_APP_PHOTO_PUBLIC_BASE_URL` (read through `.env` too) fixes the scheme and host in
+  photo URLs; without it they are built from the request, which is `http://` behind a
+  TLS-terminating tunnel.
 - Phone-alpha LAN path: `scripts/start_phone_alpha_backend.ps1`
   binds `0.0.0.0:7070`, health-checks loopback **and** LAN, prints
-  Flutter `--dart-define=API_BASE_URL` / `API_SHARED_SECRET`.
-  See `docs/guides/lan-backend-startup.md`.
+  Flutter `--dart-define=DATING_APP_API_BASE_URL` / `DATING_APP_SHARED_SECRET`.
+  See `docs/guides/lan-backend-startup.md`. With `-PublicUrl` it also sets the photo base
+  URL and checks the public health endpoint; `scripts/start_public_backend.ps1` is the
+  one-command public path.
 
 ### Authentication model (Clerk session tokens, verified offline)
 

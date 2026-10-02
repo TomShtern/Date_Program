@@ -898,8 +898,26 @@ class RestApiPhaseTwoRoutesTest {
         int port = server.getApp().port();
         HttpClient client = HttpClient.newHttpClient();
 
+        for (String unauthenticatedPath :
+                List.of("/api/location/countries", "/api/location/cities?countryCode=IL&query=tel")) {
+            HttpResponse<String> rejected = client.send(
+                    HttpRequest.newBuilder(URI.create("http://localhost:" + port + unauthenticatedPath))
+                            .GET()
+                            .build(),
+                    HttpResponse.BodyHandlers.ofString());
+            assertEquals(401, rejected.statusCode(), unauthenticatedPath);
+        }
+        HttpResponse<String> unauthenticatedResolve = client.send(
+                HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/location/resolve"))
+                        .header("Content-Type", "application/json")
+                        .POST(HttpRequest.BodyPublishers.ofString("{\"countryCode\":\"IL\"}"))
+                        .build(),
+                HttpResponse.BodyHandlers.ofString());
+        assertEquals(401, unauthenticatedResolve.statusCode());
+
         HttpResponse<String> countriesResponse = client.send(
                 HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/location/countries"))
+                        .header(AUTHORIZATION_HEADER, bearerToken(services, aliceId))
                         .GET()
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
@@ -910,6 +928,7 @@ class RestApiPhaseTwoRoutesTest {
         HttpResponse<String> citiesResponse = client.send(
                 HttpRequest.newBuilder(URI.create(
                                 "http://localhost:" + port + "/api/location/cities?countryCode=IL&query=tel"))
+                        .header(AUTHORIZATION_HEADER, bearerToken(services, aliceId))
                         .GET()
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
@@ -919,6 +938,7 @@ class RestApiPhaseTwoRoutesTest {
 
         HttpResponse<String> resolveResponse = client.send(
                 HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/location/resolve"))
+                        .header(AUTHORIZATION_HEADER, bearerToken(services, aliceId))
                         .header("Content-Type", "application/json")
                         .POST(HttpRequest.BodyPublishers.ofString("""
                                 {

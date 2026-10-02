@@ -42,8 +42,9 @@ allowed CORS origin list; a blank host falls back to loopback.
 
 ### Auth: Clerk session tokens
 
-Clerk owns sign-in; the backend only verifies. Every `/api/users/{id}/...` call
-carries `Authorization: Bearer <Clerk session token>`, and the first call after
+Clerk owns sign-in; the backend only verifies. Every `/api/` call except `/api/health`
+(`/api/users/...`, `/api/conversations/...`, `/api/location/...`) carries
+`Authorization: Bearer <Clerk session token>`, and the first call after
 sign-in is `POST /api/auth/session`, which creates the local profile and returns
 its `id`. Two things to keep straight:
 
@@ -65,9 +66,16 @@ The old signup/login/refresh/logout/`me` routes are gone. The full contract is i
 the Flutter `dart-define` values:
 
 ```
---dart-define=API_BASE_URL=http://<lan-ip>:<port>
---dart-define=API_SHARED_SECRET=<secret>
+--dart-define=DATING_APP_API_BASE_URL=http://<lan-ip>:<port>
+--dart-define=DATING_APP_SHARED_SECRET=<secret>
 ```
+
+The public path (stable HTTPS URL for release builds) is Tailscale Funnel on this machine:
+`scripts/start_public_backend.ps1`, runbook in `docs/guides/public-funnel-runbook.md`. The
+bind stays `0.0.0.0` with the secret: Funnel connects from `127.0.0.1`, and a loopback bind
+would drop the secret check. `-PublicUrl` sets the photo base URL so photo links are `https://`.
+The shared secret is read from the process environment or
+`%LOCALAPPDATA%\DateProgram\rest-shared-secret.txt`, never from `.env`.
 
 **Never echo, commit or paste a real shared secret** into documents, logs, test
 fixtures, screenshots or a bug report. Once the bind is wide, that secret is the

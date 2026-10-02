@@ -16,6 +16,7 @@ If a page here disagrees with it, the page is wrong.
 - [CI and PostgreSQL](guides/ci-and-postgresql.md)
 - [PostgreSQL PowerShell guide](guides/postgresql-powershell.md)
 - [LAN backend startup](guides/lan-backend-startup.md)
+- [Public HTTPS backend via Tailscale Funnel](guides/public-funnel-runbook.md)
 - [Runtime configuration](reference/runtime-configuration.md)
 
 ## API

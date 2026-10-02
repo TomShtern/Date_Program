@@ -178,6 +178,7 @@ public class RestApiServer {
     private static final int DEFAULT_CORS_MAX_AGE_SECONDS = 3600;
     private static final String ENV_REST_ALLOWED_ORIGINS = "DATING_APP_REST_ALLOWED_ORIGINS";
     private static final String ENV_REST_SHARED_SECRET = "DATING_APP_REST_SHARED_SECRET";
+    private static final String ENV_REST_CLIENT_IP_HEADER = "DATING_APP_REST_CLIENT_IP_HEADER";
     private static final Pattern STATIC_PHOTO_FILE_NAME_PATTERN = Pattern.compile("^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$");
     /**
      * Pagination query-parameter names shared by match and future list endpoints.
@@ -210,6 +211,7 @@ public class RestApiServer {
     private final Set<String> allowedCorsOrigins;
     private final String host;
     private final String lanSharedSecret;
+    private final String clientIpHeader;
     private final boolean restrictToLoopbackClients;
     private final int port;
     private Javalin app;
@@ -231,6 +233,16 @@ public class RestApiServer {
 
     RestApiServer(
             ServiceRegistry services, String host, int port, String lanSharedSecret, Set<String> allowedCorsOrigins) {
+        this(services, host, port, lanSharedSecret, allowedCorsOrigins, null);
+    }
+
+    RestApiServer(
+            ServiceRegistry services,
+            String host,
+            int port,
+            String lanSharedSecret,
+            Set<String> allowedCorsOrigins,
+            String clientIpHeader) {
         this.matchingUseCases = services.getMatchingUseCases();
         this.messagingUseCases = services.getMessagingUseCases();
         this.profileUseCases = services.getProfileUseCases();
@@ -249,11 +261,14 @@ public class RestApiServer {
         this.restrictToLoopbackClients = RestApiRequestGuards.isLoopbackAddress(this.host);
         this.lanSharedSecret = normalizeSharedSecret(lanSharedSecret);
         this.allowedCorsOrigins = normalizeAllowedCorsOrigins(allowedCorsOrigins);
+        this.clientIpHeader = normalizeSharedSecret(clientIpHeader);
         this.requestGuards = new RestApiRequestGuards(
                 identityPolicy,
                 DEFAULT_RATE_LIMIT_WINDOW,
                 DEFAULT_RATE_LIMIT_REQUESTS,
-                this.restrictToLoopbackClients ? null : this.lanSharedSecret);
+                this.restrictToLoopbackClients ? null : this.lanSharedSecret,
+                this.clientIpHeader,
+                System::nanoTime);
         this.requestContext = new RestApiRequestContext(this.authUseCases);
         this.port = port;
         this.photoStorage = new RestApiPhotoStorage(services.getConfig());
@@ -307,6 +322,11 @@ public class RestApiServer {
                     app.port(),
                     allowedCorsOrigins.isEmpty() ? "" : " and CORS origins " + allowedCorsOrigins);
         }
+        if (clientIpHeader != null && logger.isInfoEnabled()) {
+            logger.info(
+                    "Rate limiting keys on the {} header when the request arrives from a loopback peer",
+                    clientIpHeader);
+        }
     }
 
     /** Stops the HTTP server. */
@@ -329,8 +349,8 @@ public class RestApiServer {
         // TRANSPORT NOTE: Loopback mode remains intentionally unauthenticated for
         // local IPC use. Non-loopback/LAN mode now requires the configured shared
         // secret header, and browser clients additionally rely on explicit CORS
-        // allowlisting. Every /api/users route, reads included, requires a verified
-        // acting user so block and visibility checks always run.
+        // allowlisting. Every /api/users and /api/location route, reads included,
+        // requires a verified acting user so block and visibility checks always run.
         // ────────────────────────────────────────────────────────────────────
         registerHealthRoutes();
         registerAuthRoutes();
@@ -1844,7 +1864,12 @@ public class RestApiServer {
         }
         StartupOptions options = parseStartupOptions(args);
         RestApiServer server = new RestApiServer(
-                services, options.host(), options.port(), options.lanSharedSecret(), options.allowedCorsOrigins());
+                services,
+                options.host(),
+                options.port(),
+                options.lanSharedSecret(),
+                options.allowedCorsOrigins(),
+                options.clientIpHeader());
         server.start();
 
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
@@ -1856,6 +1881,7 @@ public class RestApiServer {
     private static StartupOptions parseStartupOptions(String[] args) {
         String sharedSecret = normalizeSharedSecret(System.getenv(ENV_REST_SHARED_SECRET));
         LinkedHashSet<String> allowedOrigins = parseAllowedOrigins(System.getenv(ENV_REST_ALLOWED_ORIGINS));
+        String clientIpHeader = normalizeSharedSecret(System.getenv(ENV_REST_CLIENT_IP_HEADER));
         String host = LOCALHOST_HOST;
         int port = DEFAULT_PORT;
         for (String arg : args) {
@@ -1874,6 +1900,10 @@ public class RestApiServer {
                 sharedSecret = normalizeSharedSecret(arg.substring("--shared-secret=".length()));
                 continue;
             }
+            if (arg.startsWith("--client-ip-header=")) {
+                clientIpHeader = normalizeSharedSecret(arg.substring("--client-ip-header=".length()));
+                continue;
+            }
             if (arg.startsWith("--allowed-origins=")) {
                 allowedOrigins.addAll(parseAllowedOrigins(arg.substring("--allowed-origins=".length())));
                 continue;
@@ -1884,10 +1914,11 @@ public class RestApiServer {
             }
             throw new IllegalArgumentException("Unknown REST API server argument: " + arg);
         }
-        return new StartupOptions(normalizeHost(host), port, sharedSecret, Set.copyOf(allowedOrigins));
+        return new StartupOptions(normalizeHost(host), port, sharedSecret, Set.copyOf(allowedOrigins), clientIpHeader);
     }
 
     private record ResolvedProfileLocation(Double latitude, Double longitude) {}
 
-    private record StartupOptions(String host, int port, String lanSharedSecret, Set<String> allowedCorsOrigins) {}
+    private record StartupOptions(
+            String host, int port, String lanSharedSecret, Set<String> allowedCorsOrigins, String clientIpHeader) {}
 }

@@ -37,6 +37,7 @@ If any markdown guidance and the code disagree, trust:
 - Treat `.\scripts/start_local_postgres.ps1` as more than a bare startup helper: it is the repo-owned local bootstrap path for PostgreSQL observability (`pg_stat_statements`, `compute_query_id`) and the local `datingapp` role defaults in the target database.
 - For PostgreSQL runtime work, prefer an already-running local PostgreSQL instance first; use Docker only as a disposable fallback when no local server is available.
 - For phone-alpha backend LAN testing, prefer `.\scripts/start_phone_alpha_backend.ps1` over manual classpath/JVM startup; it runs PostgreSQL preflight (starting local PostgreSQL if needed), auto-compiles stale classes, builds the runtime classpath, verifies `/api/health` on localhost and LAN, and prints the Flutter `dart-define` values.
+- For a stable public HTTPS URL (Flutter release builds block cleartext HTTP), use `.\scripts/start_public_backend.ps1 -PublicUrl <https url>` (Tailscale Funnel on the laptop). Never bind the server to loopback behind the tunnel; steps and checks are in `docs/guides/public-funnel-runbook.md`.
 
 ## Editing discipline
 

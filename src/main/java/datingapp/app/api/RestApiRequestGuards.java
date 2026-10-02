@@ -10,9 +10,11 @@ import java.net.InetAddress;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Duration;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 import java.util.function.LongSupplier;
+import java.util.regex.Pattern;
 
 final class RestApiRequestGuards {
 
@@ -20,14 +22,18 @@ final class RestApiRequestGuards {
     private static final String HEALTH_ROUTE = "/api/health";
     private static final String AUTH_ROUTE_PREFIX = "/api/auth/";
     static final String CONVERSATION_ROUTE_PREFIX = "/api/conversations/";
-    private static final String LOCATION_RESOLVE_ROUTE = "/api/location/resolve";
+    private static final String LOCATION_ROUTE_PREFIX = "/api/location/";
     static final String USERS_ROUTE_PREFIX = "/api/users/";
     private static final String USERS_LIST_ROUTE = "/api/users";
     private static final String LOCALHOST_ONLY_MESSAGE = "REST API is restricted to localhost requests";
     private static final String INVALID_LAN_SHARED_SECRET_MESSAGE = "Missing or invalid LAN shared secret";
+    private static final Pattern CLIENT_IP_HEADER_NAME = Pattern.compile("[A-Za-z0-9-]{1,64}");
+    private static final Pattern IPV4_LITERAL = Pattern.compile("\\d{1,3}(\\.\\d{1,3}){3}");
+    private static final Pattern IPV6_LITERAL = Pattern.compile("[0-9A-Fa-f:.]{2,45}");
     private final RestApiIdentityPolicy identityPolicy;
     private final LocalRateLimiter rateLimiter;
     private final String lanSharedSecret;
+    private final String clientIpHeader;
 
     RestApiRequestGuards(RestApiIdentityPolicy identityPolicy, Duration window, int maxRequests) {
         this(identityPolicy, window, maxRequests, null, System::nanoTime);
@@ -49,9 +55,25 @@ final class RestApiRequestGuards {
             int maxRequests,
             String lanSharedSecret,
             LongSupplier monotonicTicker) {
+        this(identityPolicy, window, maxRequests, lanSharedSecret, null, monotonicTicker);
+    }
+
+    /**
+     * @param clientIpHeader name of a header set by a trusted reverse proxy that runs on this machine (for example a
+     *     tunnel) and carries the real client address; {@code null} or blank disables it. The header is honored only
+     *     when the socket peer is itself a loopback address.
+     */
+    RestApiRequestGuards(
+            RestApiIdentityPolicy identityPolicy,
+            Duration window,
+            int maxRequests,
+            String lanSharedSecret,
+            String clientIpHeader,
+            LongSupplier monotonicTicker) {
         this.identityPolicy = identityPolicy;
         this.rateLimiter = new LocalRateLimiter(window, maxRequests, monotonicTicker);
         this.lanSharedSecret = lanSharedSecret == null ? null : lanSharedSecret.trim();
+        this.clientIpHeader = normalizeClientIpHeader(clientIpHeader);
     }
 
     void registerRequestGuards(Javalin app, Consumer<Context> localhostOnlyGuard) {
@@ -94,12 +116,57 @@ final class RestApiRequestGuards {
         if (HEALTH_ROUTE.equals(ctx.path()) || ctx.method() == HandlerType.OPTIONS) {
             return;
         }
-        String key = ctx.ip() + '|' + ctx.method();
+        String key = clientIp(ctx) + '|' + ctx.method();
         RateLimitDecision decision = rateLimiter.tryAcquire(key);
         if (decision.allowed()) {
             return;
         }
         throw new ApiTooManyRequestsException("Local API rate limit exceeded", decision.status());
+    }
+
+    /**
+     * The address the rate limiter charges a request to. Without a configured proxy header this is the socket peer.
+     * With one, the header is trusted only when the peer is loopback: the bind is wide, so any LAN client could
+     * otherwise send the header itself and pick its own bucket. A missing or malformed value falls back to the peer.
+     */
+    String clientIp(Context ctx) {
+        String peer = ctx.ip();
+        if (clientIpHeader == null || !isLoopbackAddress(peer)) {
+            return peer;
+        }
+        String forwarded = ctx.header(clientIpHeader);
+        if (forwarded == null || forwarded.isBlank()) {
+            return peer;
+        }
+        // The nearest proxy appends last, so the last entry is the only one a client cannot have written.
+        String candidate = forwarded.substring(forwarded.lastIndexOf(',') + 1).trim();
+        return normalizeIpLiteral(candidate).orElse(peer);
+    }
+
+    private static Optional<String> normalizeIpLiteral(String candidate) {
+        // Only numeric literals reach InetAddress.getByName, so this can never trigger a DNS lookup.
+        boolean ipv4 = IPV4_LITERAL.matcher(candidate).matches();
+        boolean ipv6 =
+                candidate.indexOf(':') >= 0 && IPV6_LITERAL.matcher(candidate).matches();
+        if (!ipv4 && !ipv6) {
+            return Optional.empty();
+        }
+        try {
+            return Optional.of(InetAddress.getByName(candidate).getHostAddress());
+        } catch (Exception _) {
+            return Optional.empty();
+        }
+    }
+
+    private static String normalizeClientIpHeader(String headerName) {
+        if (headerName == null || headerName.isBlank()) {
+            return null;
+        }
+        String trimmed = headerName.trim();
+        if (!CLIENT_IP_HEADER_NAME.matcher(trimmed).matches()) {
+            throw new IllegalArgumentException("Invalid client IP header name: " + trimmed);
+        }
+        return trimmed;
     }
 
     void enforceMutatingRouteIdentity(Context ctx) {
@@ -114,12 +181,16 @@ final class RestApiRequestGuards {
             return false;
         }
         String path = ctx.path();
-        if (HEALTH_ROUTE.equals(path) || LOCATION_RESOLVE_ROUTE.equals(path)) {
+        if (HEALTH_ROUTE.equals(path)) {
             return false;
         }
         if (path.startsWith(AUTH_ROUTE_PREFIX)) {
             // Auth routes verify the Clerk token themselves; there is no local acting user yet on first sign-in.
             return false;
+        }
+        if (path.startsWith(LOCATION_ROUTE_PREFIX)) {
+            // Reference and geocoding data, but the API is public-facing: only a signed-in user may call it.
+            return true;
         }
         if (path.startsWith(CONVERSATION_ROUTE_PREFIX)) {
             return true;
