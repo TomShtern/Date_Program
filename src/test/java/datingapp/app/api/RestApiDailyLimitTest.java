@@ -1,6 +1,7 @@
 package datingapp.app.api;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
@@ -38,8 +39,8 @@ class RestApiDailyLimitTest {
     }
 
     @Test
-    @DisplayName("user at like limit receives 409")
-    void userAtLikeLimitReceives409() throws Exception {
+    @DisplayName("user at like limit receives 429")
+    void userAtLikeLimitReceives429() throws Exception {
         TestStorages.Users userStorage = new TestStorages.Users();
         TestStorages.Interactions interactionStorage = new TestStorages.Interactions();
         TestStorages.Communications communicationStorage = new TestStorages.Communications();
@@ -76,7 +77,7 @@ class RestApiDailyLimitTest {
         int port = server.getApp().port();
         HttpClient client = HttpClient.newHttpClient();
 
-        // Fourth like should fail with 409
+        // Fourth like should fail with 429 and a RATE_LIMITED code
         UUID otherUserId = UUID.randomUUID();
         User otherUser = activeUser(otherUserId, "Other");
         userStorage.save(otherUser);
@@ -91,12 +92,13 @@ class RestApiDailyLimitTest {
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
 
-        assertEquals(409, response.statusCode());
+        assertEquals(429, response.statusCode());
+        assertTrue(response.body().contains("RATE_LIMITED"), response.body());
     }
 
     @Test
-    @DisplayName("user at pass limit receives 409")
-    void userAtPassLimitReceives409() throws Exception {
+    @DisplayName("user at pass limit receives 429")
+    void userAtPassLimitReceives429() throws Exception {
         TestStorages.Users userStorage = new TestStorages.Users();
         TestStorages.Interactions interactionStorage = new TestStorages.Interactions();
         TestStorages.Communications communicationStorage = new TestStorages.Communications();
@@ -133,7 +135,7 @@ class RestApiDailyLimitTest {
         int port = server.getApp().port();
         HttpClient client = HttpClient.newHttpClient();
 
-        // Fourth pass should fail with 409
+        // Fourth pass should fail with 429 and a RATE_LIMITED code
         UUID otherUserId = UUID.randomUUID();
         User otherUser = activeUser(otherUserId, "Other");
         userStorage.save(otherUser);
@@ -148,7 +150,8 @@ class RestApiDailyLimitTest {
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
 
-        assertEquals(409, response.statusCode());
+        assertEquals(429, response.statusCode());
+        assertTrue(response.body().contains("RATE_LIMITED"), response.body());
     }
 
     @Test
@@ -206,6 +209,53 @@ class RestApiDailyLimitTest {
 
         // All 50 likes should succeed
         assertEquals(50, successCount);
+    }
+
+    @Test
+    @DisplayName("super-like is recorded once, then the daily super-like limit answers 429")
+    void superLikeIsRecordedThenLimitedWith429() throws Exception {
+        TestStorages.Users userStorage = new TestStorages.Users();
+        TestStorages.Interactions interactionStorage = new TestStorages.Interactions();
+        TestStorages.Communications communicationStorage = new TestStorages.Communications();
+        AppConfig customConfig = AppConfig.builder().dailySuperLikeLimit(1).build();
+
+        ServiceRegistry services = createServices(customConfig, userStorage, interactionStorage, communicationStorage);
+
+        UUID aliceId = UUID.randomUUID();
+        UUID bobId = UUID.randomUUID();
+        UUID carolId = UUID.randomUUID();
+        userStorage.save(activeUser(aliceId, "Alice"));
+        userStorage.save(activeUser(bobId, "Bob"));
+        userStorage.save(activeUser(carolId, "Carol"));
+
+        server = new RestApiServer(services, 0);
+        server.start();
+        int port = server.getApp().port();
+        HttpClient client = HttpClient.newHttpClient();
+        String token = RestApiTestFixture.bearerToken(services, aliceId, aliceId + "@example.com");
+
+        HttpResponse<String> first = client.send(
+                HttpRequest.newBuilder(URI.create(
+                                "http://localhost:" + port + "/api/users/" + aliceId + "/super-like/" + bobId))
+                        .header(AUTHORIZATION_HEADER, token)
+                        .POST(HttpRequest.BodyPublishers.noBody())
+                        .build(),
+                HttpResponse.BodyHandlers.ofString());
+        assertEquals(200, first.statusCode(), first.body());
+        assertEquals(
+                datingapp.core.connection.ConnectionModels.Like.Direction.SUPER_LIKE,
+                interactionStorage.getLike(aliceId, bobId).orElseThrow().direction());
+
+        HttpResponse<String> second = client.send(
+                HttpRequest.newBuilder(URI.create(
+                                "http://localhost:" + port + "/api/users/" + aliceId + "/super-like/" + carolId))
+                        .header(AUTHORIZATION_HEADER, token)
+                        .POST(HttpRequest.BodyPublishers.noBody())
+                        .build(),
+                HttpResponse.BodyHandlers.ofString());
+        assertEquals(429, second.statusCode(), second.body());
+        assertTrue(second.body().contains("RATE_LIMITED"), second.body());
+        assertTrue(interactionStorage.getLike(aliceId, carolId).isEmpty());
     }
 
     private static ServiceRegistry createServices(

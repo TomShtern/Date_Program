@@ -206,7 +206,8 @@ final class RestApiUserDtos {
             String primaryPhotoUrl,
             List<String> photoUrls,
             String approximateLocation,
-            String summaryLine) {
+            String summaryLine,
+            boolean superLike) {
         PendingLikerDto {
             photoUrls = photoUrls == null ? List.of() : List.copyOf(photoUrls);
         }
@@ -234,7 +235,8 @@ final class RestApiUserDtos {
                     personPrimaryPhotoUrl(user, photoUrlResolver),
                     personPhotoUrls(user, photoUrlResolver),
                     approximateLocation,
-                    personSummaryLine(user));
+                    personSummaryLine(user),
+                    pendingLiker.superLike());
         }
     }
 

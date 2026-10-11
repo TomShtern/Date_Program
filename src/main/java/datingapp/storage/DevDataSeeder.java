@@ -1,5 +1,6 @@
 package datingapp.storage;
 
+import datingapp.core.Snapshots;
 import datingapp.core.connection.ConnectionModels.Conversation;
 import datingapp.core.connection.ConnectionModels.Message;
 import datingapp.core.model.Match;
@@ -76,6 +77,11 @@ public final class DevDataSeeder {
             Set<Interest> interests,
             PacePreferences pace) {
 
+        public SeedUserDefinition {
+            interestedIn = Snapshots.setOf(interestedIn);
+            interests = Snapshots.setOf(interests);
+        }
+
         /** Fluent builder for SeedUserDefinition. */
         public static Builder builder(UUID id, String name, LocalDate birthDate, Gender gender) {
             return new Builder(id, name, birthDate, gender);
@@ -110,7 +116,7 @@ public final class DevDataSeeder {
             }
 
             public Builder interestedIn(Set<Gender> val) {
-                this.interestedIn = val;
+                this.interestedIn = Snapshots.setOf(val);
                 return this;
             }
 
@@ -167,7 +173,7 @@ public final class DevDataSeeder {
             }
 
             public Builder interests(Set<Interest> val) {
-                this.interests = val;
+                this.interests = Snapshots.setOf(val);
                 return this;
             }
 

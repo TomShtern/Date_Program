@@ -337,8 +337,8 @@ class MessagingUseCasesTest {
     }
 
     @Test
-    @DisplayName("deleteConversation removes conversation and messages")
-    void deleteConversationRemovesConversationAndMessages() {
+    @DisplayName("deleteConversation hides the conversation for the caller only and keeps its messages")
+    void deleteConversationHidesConversationForCallerOnly() {
         var sendResult = useCases.sendMessage(
                 new SendMessageCommand(UserContext.cli(sender.getId()), recipient.getId(), "Delete conversation"));
         assertTrue(sendResult.success());
@@ -348,8 +348,10 @@ class MessagingUseCasesTest {
                 new DeleteConversationCommand(UserContext.cli(sender.getId()), conversationId));
 
         assertTrue(deleteResult.success());
-        assertTrue(communicationStorage.getConversation(conversationId).isEmpty());
-        assertTrue(communicationStorage.getMessages(conversationId, 50, 0).isEmpty());
+        var conversation = communicationStorage.getConversation(conversationId).orElseThrow();
+        assertFalse(conversation.isVisibleTo(sender.getId()));
+        assertTrue(conversation.isVisibleTo(recipient.getId()));
+        assertEquals(1, communicationStorage.getMessages(conversationId, 50, 0).size());
     }
 
     @Test

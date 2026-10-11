@@ -557,7 +557,12 @@ public final class JdbiUserStorage implements OperationalUserStorage {
         @SqlUpdate("DELETE FROM users WHERE id = :id")
         void delete(@Bind("id") UUID id);
 
-        @SqlUpdate("DELETE FROM users WHERE deleted_at IS NOT NULL AND deleted_at < :threshold")
+        // Report-referenced accounts are skipped: deleting them would cascade away the reports that
+        // JdbiAccountCleanupStorage keeps (anonymised) when it purges.
+        @SqlUpdate("DELETE FROM users WHERE deleted_at IS NOT NULL AND deleted_at < :threshold"
+                + " AND purged_at IS NULL"
+                + " AND NOT EXISTS (SELECT 1 FROM reports r"
+                + " WHERE r.reporter_id = users.id OR r.reported_user_id = users.id)")
         int purgeDeletedBefore(@Bind("threshold") Instant threshold);
 
         @SqlQuery("""
@@ -618,6 +623,10 @@ public final class JdbiUserStorage implements OperationalUserStorage {
                             JdbiTypeCodecs.SqlRowReaders.readEnum(rs, "verification_method", VerificationMethod.class))
                     .verificationCode(rs.getString("verification_code"))
                     .verificationSentAt(JdbiTypeCodecs.SqlRowReaders.readInstant(rs, "verification_sent_at"))
+                    .verificationAttemptCount(Objects.requireNonNullElse(
+                            JdbiTypeCodecs.SqlRowReaders.readInteger(rs, "verification_attempt_count"), 0))
+                    .verificationLockedUntil(JdbiTypeCodecs.SqlRowReaders.readInstant(rs, "verification_locked_until"))
+                    .verificationLastSentAt(JdbiTypeCodecs.SqlRowReaders.readInstant(rs, "verification_last_sent_at"))
                     .verifiedAt(JdbiTypeCodecs.SqlRowReaders.readInstant(rs, "verified_at"))
                     .pacePreferences(readPacePreferences(rs))
                     .deletedAt(JdbiTypeCodecs.SqlRowReaders.readInstant(rs, DELETED_AT_COLUMN))
@@ -667,11 +676,11 @@ public final class JdbiUserStorage implements OperationalUserStorage {
         @Override
         public ProfileNote map(ResultSet rs, StatementContext ctx) throws SQLException {
             return new ProfileNote(
-                    JdbiTypeCodecs.SqlRowReaders.readUuid(rs, AUTHOR_ID_COLUMN),
-                    JdbiTypeCodecs.SqlRowReaders.readUuid(rs, SUBJECT_ID_COLUMN),
-                    rs.getString(CONTENT_BIND),
-                    JdbiTypeCodecs.SqlRowReaders.readInstant(rs, CREATED_AT_COLUMN),
-                    JdbiTypeCodecs.SqlRowReaders.readInstant(rs, UPDATED_AT_COLUMN));
+                    JdbiTypeCodecs.SqlRowReaders.readRequiredUuid(rs, AUTHOR_ID_COLUMN),
+                    JdbiTypeCodecs.SqlRowReaders.readRequiredUuid(rs, SUBJECT_ID_COLUMN),
+                    JdbiTypeCodecs.SqlRowReaders.readRequiredString(rs, CONTENT_BIND),
+                    JdbiTypeCodecs.SqlRowReaders.readRequiredInstant(rs, CREATED_AT_COLUMN),
+                    JdbiTypeCodecs.SqlRowReaders.readRequiredInstant(rs, UPDATED_AT_COLUMN));
         }
     }
 
@@ -816,6 +825,18 @@ public final class JdbiUserStorage implements OperationalUserStorage {
             return user.getVerificationSentAt();
         }
 
+        public Integer getVerificationAttemptCount() {
+            return user.getVerificationAttemptCount();
+        }
+
+        public Instant getVerificationLockedUntil() {
+            return user.getVerificationLockedUntil();
+        }
+
+        public Instant getVerificationLastSentAt() {
+            return user.getVerificationLastSentAt();
+        }
+
         public Instant getVerifiedAt() {
             return user.getVerifiedAt();
         }
@@ -883,6 +904,9 @@ public final class JdbiUserStorage implements OperationalUserStorage {
                         new SqlDialectSupport.ColumnBinding("verification_method", "verificationMethod"),
                         new SqlDialectSupport.ColumnBinding("verification_code", "verificationCode"),
                         new SqlDialectSupport.ColumnBinding("verification_sent_at", "verificationSentAt"),
+                        new SqlDialectSupport.ColumnBinding("verification_attempt_count", "verificationAttemptCount"),
+                        new SqlDialectSupport.ColumnBinding("verification_locked_until", "verificationLockedUntil"),
+                        new SqlDialectSupport.ColumnBinding("verification_last_sent_at", "verificationLastSentAt"),
                         new SqlDialectSupport.ColumnBinding("verified_at", "verifiedAt"),
                         new SqlDialectSupport.ColumnBinding("pace_messaging_frequency", "paceMessagingFrequency"),
                         new SqlDialectSupport.ColumnBinding("pace_time_to_first_date", "paceTimeToFirstDate"),

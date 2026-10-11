@@ -110,6 +110,15 @@ public final class JdbiConnectionStorage implements OperationalCommunicationStor
 
                         ORDER BY _sort_time DESC, id DESC
                         """;
+    private static final String SQL_VISIBLE_CONVERSATIONS_BY_ARCHIVE_STATE_PREFIX =
+            "SELECT v.* FROM (" + SQL_VISIBLE_CONVERSATIONS_FOR_USER + ") v WHERE CASE WHEN v.user_a = :userId "
+                    + "THEN v.user_a_archived_at ELSE v.user_b_archived_at END ";
+    private static final String SQL_VISIBLE_CONVERSATIONS_PAGE_SUFFIX =
+            " ORDER BY v._sort_time DESC, v.id DESC LIMIT :limit OFFSET :offset";
+    private static final String SQL_ARCHIVED_CONVERSATIONS_FOR_USER =
+            SQL_VISIBLE_CONVERSATIONS_BY_ARCHIVE_STATE_PREFIX + "IS NOT NULL" + SQL_VISIBLE_CONVERSATIONS_PAGE_SUFFIX;
+    private static final String SQL_UNARCHIVED_CONVERSATIONS_FOR_USER =
+            SQL_VISIBLE_CONVERSATIONS_BY_ARCHIVE_STATE_PREFIX + "IS NULL" + SQL_VISIBLE_CONVERSATIONS_PAGE_SUFFIX;
 
     private final Jdbi jdbi;
     private final MessagingDao messagingDao;
@@ -142,6 +151,16 @@ public final class JdbiConnectionStorage implements OperationalCommunicationStor
     }
 
     @Override
+    public List<Conversation> getConversationsFor(UUID userId, ArchiveFilter filter, int limit, int offset) {
+        Objects.requireNonNull(filter, "filter cannot be null");
+        return switch (filter) {
+            case ALL -> messagingDao.getConversationsFor(userId, limit, offset);
+            case ARCHIVED -> messagingDao.getArchivedConversationsFor(userId, limit, offset);
+            case NOT_ARCHIVED -> messagingDao.getUnarchivedConversationsFor(userId, limit, offset);
+        };
+    }
+
+    @Override
     public List<Conversation> getAllConversationsFor(UUID userId) {
         return messagingDao.getAllConversationsFor(userId);
     }
@@ -164,6 +183,16 @@ public final class JdbiConnectionStorage implements OperationalCommunicationStor
     @Override
     public void setConversationVisibility(String conversationId, UUID userId, boolean visible) {
         messagingDao.setConversationVisibility(conversationId, userId, visible);
+    }
+
+    @Override
+    public void unarchiveConversation(String conversationId, UUID userId) {
+        messagingDao.unarchiveConversation(conversationId, userId);
+    }
+
+    @Override
+    public boolean restoreConversation(String conversationId) {
+        return messagingDao.restoreConversation(conversationId);
     }
 
     @Override
@@ -487,6 +516,14 @@ public final class JdbiConnectionStorage implements OperationalCommunicationStor
         List<Conversation> getConversationsFor(
                 @Bind("userId") UUID userId, @Bind("limit") int limit, @Bind("offset") int offset);
 
+        @SqlQuery(SQL_ARCHIVED_CONVERSATIONS_FOR_USER)
+        List<Conversation> getArchivedConversationsFor(
+                @Bind("userId") UUID userId, @Bind("limit") int limit, @Bind("offset") int offset);
+
+        @SqlQuery(SQL_UNARCHIVED_CONVERSATIONS_FOR_USER)
+        List<Conversation> getUnarchivedConversationsFor(
+                @Bind("userId") UUID userId, @Bind("limit") int limit, @Bind("offset") int offset);
+
         @SqlQuery(SQL_VISIBLE_CONVERSATIONS_FOR_USER)
         List<Conversation> getAllConversationsFor(@Bind("userId") UUID userId);
 
@@ -534,6 +571,23 @@ public final class JdbiConnectionStorage implements OperationalCommunicationStor
                 @Bind("conversationId") String conversationId,
                 @Bind("userId") UUID userId,
                 @Bind("visible") boolean visible);
+
+        @SqlUpdate("""
+                UPDATE conversations
+                SET archived_at_a = CASE WHEN user_a = :userId THEN NULL ELSE archived_at_a END,
+                    archive_reason_a = CASE WHEN user_a = :userId THEN NULL ELSE archive_reason_a END,
+                    archived_at_b = CASE WHEN user_b = :userId THEN NULL ELSE archived_at_b END,
+                    archive_reason_b = CASE WHEN user_b = :userId THEN NULL ELSE archive_reason_b END
+                WHERE id = :conversationId AND (user_a = :userId OR user_b = :userId) AND deleted_at IS NULL
+                """)
+        void unarchiveConversation(@Bind("conversationId") String conversationId, @Bind("userId") UUID userId);
+
+        @SqlUpdate("""
+                UPDATE conversations
+                SET deleted_at = NULL, visible_to_user_a = TRUE, visible_to_user_b = TRUE
+                WHERE id = :conversationId
+                """)
+        boolean restoreConversation(@Bind("conversationId") String conversationId);
 
         default void deleteConversation(String conversationId) {
             deleteConversationInternal(conversationId, AppClock.now());
@@ -774,10 +828,10 @@ public final class JdbiConnectionStorage implements OperationalCommunicationStor
 
         @Override
         public Conversation map(ResultSet rs, StatementContext ctx) throws SQLException {
-            String id = rs.getString("id");
-            UUID userA = JdbiTypeCodecs.SqlRowReaders.readUuid(rs, "user_a");
-            UUID userB = JdbiTypeCodecs.SqlRowReaders.readUuid(rs, "user_b");
-            Instant createdAt = JdbiTypeCodecs.SqlRowReaders.readInstant(rs, COL_CREATED_AT);
+            String id = JdbiTypeCodecs.SqlRowReaders.readRequiredString(rs, "id");
+            UUID userA = JdbiTypeCodecs.SqlRowReaders.readRequiredUuid(rs, "user_a");
+            UUID userB = JdbiTypeCodecs.SqlRowReaders.readRequiredUuid(rs, "user_b");
+            Instant createdAt = JdbiTypeCodecs.SqlRowReaders.readRequiredInstant(rs, COL_CREATED_AT);
             Instant lastMessageAt = JdbiTypeCodecs.SqlRowReaders.readInstant(rs, "last_message_at");
             Instant userAReadAt = JdbiTypeCodecs.SqlRowReaders.readInstant(rs, "user_a_last_read_at");
             Instant userBReadAt = JdbiTypeCodecs.SqlRowReaders.readInstant(rs, "user_b_last_read_at");
@@ -810,11 +864,11 @@ public final class JdbiConnectionStorage implements OperationalCommunicationStor
     public static class MessageMapper implements RowMapper<Message> {
         @Override
         public Message map(ResultSet rs, StatementContext ctx) throws SQLException {
-            var id = JdbiTypeCodecs.SqlRowReaders.readUuid(rs, "id");
-            var conversationId = rs.getString(COLUMN_CONVERSATION_ID);
-            var senderId = JdbiTypeCodecs.SqlRowReaders.readUuid(rs, "sender_id");
-            var content = rs.getString("content");
-            var createdAt = JdbiTypeCodecs.SqlRowReaders.readInstant(rs, ConversationMapper.COL_CREATED_AT);
+            var id = JdbiTypeCodecs.SqlRowReaders.readRequiredUuid(rs, "id");
+            var conversationId = JdbiTypeCodecs.SqlRowReaders.readRequiredString(rs, COLUMN_CONVERSATION_ID);
+            var senderId = JdbiTypeCodecs.SqlRowReaders.readRequiredUuid(rs, "sender_id");
+            var content = JdbiTypeCodecs.SqlRowReaders.readRequiredString(rs, "content");
+            var createdAt = JdbiTypeCodecs.SqlRowReaders.readRequiredInstant(rs, ConversationMapper.COL_CREATED_AT);
             return new Message(id, conversationId, senderId, content, createdAt);
         }
     }
@@ -822,11 +876,11 @@ public final class JdbiConnectionStorage implements OperationalCommunicationStor
     public static class FriendRequestMapper implements RowMapper<FriendRequest> {
         @Override
         public FriendRequest map(ResultSet rs, StatementContext ctx) throws SQLException {
-            var id = JdbiTypeCodecs.SqlRowReaders.readUuid(rs, "id");
-            var fromUserId = JdbiTypeCodecs.SqlRowReaders.readUuid(rs, "from_user_id");
-            var toUserId = JdbiTypeCodecs.SqlRowReaders.readUuid(rs, "to_user_id");
-            var createdAt = JdbiTypeCodecs.SqlRowReaders.readInstant(rs, ConversationMapper.COL_CREATED_AT);
-            var status = JdbiTypeCodecs.SqlRowReaders.readEnum(rs, "status", Status.class);
+            var id = JdbiTypeCodecs.SqlRowReaders.readRequiredUuid(rs, "id");
+            var fromUserId = JdbiTypeCodecs.SqlRowReaders.readRequiredUuid(rs, "from_user_id");
+            var toUserId = JdbiTypeCodecs.SqlRowReaders.readRequiredUuid(rs, "to_user_id");
+            var createdAt = JdbiTypeCodecs.SqlRowReaders.readRequiredInstant(rs, ConversationMapper.COL_CREATED_AT);
+            var status = JdbiTypeCodecs.SqlRowReaders.readRequiredEnum(rs, "status", Status.class);
             var respondedAt = JdbiTypeCodecs.SqlRowReaders.readInstant(rs, "responded_at");
 
             return new FriendRequest(id, fromUserId, toUserId, createdAt, status, respondedAt);
@@ -836,12 +890,12 @@ public final class JdbiConnectionStorage implements OperationalCommunicationStor
     public static class NotificationMapper implements RowMapper<Notification> {
         @Override
         public Notification map(ResultSet rs, StatementContext ctx) throws SQLException {
-            var id = JdbiTypeCodecs.SqlRowReaders.readUuid(rs, "id");
-            var userId = JdbiTypeCodecs.SqlRowReaders.readUuid(rs, "user_id");
-            var type = JdbiTypeCodecs.SqlRowReaders.readEnum(rs, "type", Type.class);
-            var title = rs.getString("title");
-            var message = rs.getString("message");
-            var createdAt = JdbiTypeCodecs.SqlRowReaders.readInstant(rs, ConversationMapper.COL_CREATED_AT);
+            var id = JdbiTypeCodecs.SqlRowReaders.readRequiredUuid(rs, "id");
+            var userId = JdbiTypeCodecs.SqlRowReaders.readRequiredUuid(rs, "user_id");
+            var type = JdbiTypeCodecs.SqlRowReaders.readRequiredEnum(rs, "type", Type.class);
+            var title = JdbiTypeCodecs.SqlRowReaders.readRequiredString(rs, "title");
+            var message = JdbiTypeCodecs.SqlRowReaders.readRequiredString(rs, "message");
+            var createdAt = JdbiTypeCodecs.SqlRowReaders.readRequiredInstant(rs, ConversationMapper.COL_CREATED_AT);
             var isRead = rs.getBoolean("is_read");
             var data = JdbiNotificationJson.read(rs.getString("data_json"));
 

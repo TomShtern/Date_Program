@@ -1,6 +1,5 @@
 package datingapp.app.api;
 
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -97,10 +96,21 @@ class RestApiPhotoRoutesTest {
         assertEquals(photoUrl, userJson.get("primaryPhotoUrl").asText());
         assertEquals(photoUrl, userJson.get("photoUrls").get(0).asText());
 
-        HttpResponse<byte[]> staticPhotoResponse = CLIENT.send(
+        HttpResponse<byte[]> anonPhotoResponse = CLIENT.send(
                 HttpRequest.newBuilder(URI.create(photoUrl)).GET().build(), HttpResponse.BodyHandlers.ofByteArray());
+        assertEquals(401, anonPhotoResponse.statusCode());
+
+        HttpResponse<byte[]> staticPhotoResponse = CLIENT.send(
+                HttpRequest.newBuilder(URI.create(photoUrl))
+                        .header(AUTHORIZATION_HEADER, RestApiTestFixture.bearerToken(services, alice))
+                        .GET()
+                        .build(),
+                HttpResponse.BodyHandlers.ofByteArray());
         assertEquals(200, staticPhotoResponse.statusCode());
-        assertArrayEquals(imageBytes, staticPhotoResponse.body());
+        assertEquals(
+                "private, max-age=3600",
+                staticPhotoResponse.headers().firstValue("Cache-Control").orElse(""));
+        assertTrue(staticPhotoResponse.headers().firstValue("ETag").isPresent());
 
         HttpResponse<String> deleteResponse = request(
                 port,
@@ -265,8 +275,17 @@ class RestApiPhotoRoutesTest {
         server.start();
         int port = server.getApp().port();
 
+        HttpResponse<byte[]> anonResponse = CLIENT.send(
+                HttpRequest.newBuilder(URI.create(BASE_URL + port + "/photos/" + alice.getId() + "/evil$.png"))
+                        .GET()
+                        .build(),
+                HttpResponse.BodyHandlers.ofByteArray());
+        assertEquals(401, anonResponse.statusCode());
+
+        String token = RestApiTestFixture.bearerToken(services, alice);
         HttpResponse<byte[]> response = CLIENT.send(
                 HttpRequest.newBuilder(URI.create(BASE_URL + port + "/photos/" + alice.getId() + "/evil$.png"))
+                        .header(AUTHORIZATION_HEADER, token)
                         .GET()
                         .build(),
                 HttpResponse.BodyHandlers.ofByteArray());
@@ -275,6 +294,7 @@ class RestApiPhotoRoutesTest {
 
         HttpResponse<byte[]> traversalResponse = CLIENT.send(
                 HttpRequest.newBuilder(URI.create(BASE_URL + port + "/photos/" + alice.getId() + "/..%2Fsecret.png"))
+                        .header(AUTHORIZATION_HEADER, token)
                         .GET()
                         .build(),
                 HttpResponse.BodyHandlers.ofByteArray());
@@ -282,6 +302,7 @@ class RestApiPhotoRoutesTest {
 
         HttpResponse<byte[]> separatorResponse = CLIENT.send(
                 HttpRequest.newBuilder(URI.create(BASE_URL + port + "/photos/" + alice.getId() + "/evil%5Cname.png"))
+                        .header(AUTHORIZATION_HEADER, token)
                         .GET()
                         .build(),
                 HttpResponse.BodyHandlers.ofByteArray());
@@ -554,6 +575,98 @@ class RestApiPhotoRoutesTest {
         assertEquals(managedPhotoUrl, reorderJson.get("primaryPhotoUrl").asText());
         assertEquals(managedPhotoUrl, reorderJson.get("photoUrls").get(0).asText());
         assertEquals(externalUrl, reorderJson.get("photoUrls").get(1).asText());
+    }
+
+    @Test
+    @DisplayName("static photo route serves other viewers, answers 304 on a matching ETag and refuses blocked viewers")
+    void staticPhotoRouteHonoursEtagAndBlocks() throws Exception {
+        TestStorages.Users userStorage = new TestStorages.Users();
+        TestStorages.Communications communicationStorage = new TestStorages.Communications();
+        TestStorages.Interactions interactionStorage = new TestStorages.Interactions(communicationStorage);
+        User alice = activeUser(UUID.randomUUID(), "Alice", "alice@example.com");
+        User bob = activeUser(UUID.randomUUID(), "Bob", "bob@example.com");
+        userStorage.save(alice);
+        userStorage.save(bob);
+
+        ServiceRegistry services = RestApiTestFixture.builder(userStorage, interactionStorage, communicationStorage)
+                .config(photoConfig())
+                .build();
+
+        server = new RestApiServer(services, 0);
+        server.start();
+        int port = server.getApp().port();
+
+        JsonNode uploadJson = MAPPER.readTree(
+                uploadPhoto(services, port, alice.getId(), alice.getEmail(), pngBytes(0x33AA66), "alpha.png")
+                        .body());
+        String photoUrl = uploadJson.get("photo").get("url").asText();
+        String bobToken = RestApiTestFixture.bearerToken(services, bob);
+
+        HttpResponse<byte[]> viewerResponse = getPhoto(photoUrl, bobToken, null);
+        assertEquals(200, viewerResponse.statusCode());
+        String etag = viewerResponse.headers().firstValue("ETag").orElseThrow();
+
+        HttpResponse<byte[]> cachedResponse = getPhoto(photoUrl, bobToken, etag);
+        assertEquals(304, cachedResponse.statusCode());
+        assertEquals(0, cachedResponse.body().length);
+
+        HttpResponse<String> blockResponse = request(
+                port,
+                "/api/users/" + alice.getId() + "/block/" + bob.getId(),
+                "POST",
+                bearer(services, alice),
+                null,
+                null);
+        assertEquals(200, blockResponse.statusCode(), blockResponse.body());
+
+        assertEquals(403, getPhoto(photoUrl, bobToken, null).statusCode());
+        assertEquals(403, getPhoto(photoUrl, bobToken, etag).statusCode());
+        assertEquals(200, getPhoto(photoUrl, bearer(services, alice), null).statusCode());
+    }
+
+    @Test
+    @DisplayName("an owner who is not active yet sees their own photo, other viewers do not")
+    void incompleteOwnerSeesOwnPhotoButOthersDoNot() throws Exception {
+        TestStorages.Users userStorage = new TestStorages.Users();
+        TestStorages.Communications communicationStorage = new TestStorages.Communications();
+        TestStorages.Interactions interactionStorage = new TestStorages.Interactions(communicationStorage);
+        User newcomer = User.StorageBuilder.create(UUID.randomUUID(), "Newcomer", AppClock.now())
+                .state(UserState.INCOMPLETE)
+                .build();
+        User bob = activeUser(UUID.randomUUID(), "Bob", "bob@example.com");
+        userStorage.save(newcomer);
+        userStorage.save(bob);
+
+        ServiceRegistry services = RestApiTestFixture.builder(userStorage, interactionStorage, communicationStorage)
+                .config(photoConfig())
+                .build();
+
+        server = new RestApiServer(services, 0);
+        server.start();
+        int port = server.getApp().port();
+
+        HttpResponse<String> uploadResponse = uploadPhotoWithToken(
+                port, newcomer.getId(), bearer(services, newcomer), pngBytes(0x112233), "first.png");
+        assertEquals(201, uploadResponse.statusCode(), uploadResponse.body());
+        String photoUrl =
+                MAPPER.readTree(uploadResponse.body()).get("photo").get("url").asText();
+
+        assertEquals(200, getPhoto(photoUrl, bearer(services, newcomer), null).statusCode());
+        assertEquals(403, getPhoto(photoUrl, bearer(services, bob), null).statusCode());
+    }
+
+    private static String bearer(ServiceRegistry services, User user) {
+        return RestApiTestFixture.bearerToken(services, user);
+    }
+
+    private static HttpResponse<byte[]> getPhoto(String photoUrl, String bearerToken, String ifNoneMatch)
+            throws Exception {
+        HttpRequest.Builder builder =
+                HttpRequest.newBuilder(URI.create(photoUrl)).header(AUTHORIZATION_HEADER, bearerToken);
+        if (ifNoneMatch != null) {
+            builder.header("If-None-Match", ifNoneMatch);
+        }
+        return CLIENT.send(builder.GET().build(), HttpResponse.BodyHandlers.ofByteArray());
     }
 
     private AppConfig photoConfig() {

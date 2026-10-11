@@ -86,7 +86,8 @@ public final class NavigationService {
         STANDOUTS("/fxml/standouts.fxml"),
         SOCIAL("/fxml/social.fxml"),
         SAFETY("/fxml/safety.fxml"),
-        NOTES("/fxml/notes.fxml");
+        NOTES("/fxml/notes.fxml"),
+        ADMIN("/fxml/admin.fxml");
 
         private final String fxmlPath;
 
@@ -185,7 +186,7 @@ public final class NavigationService {
                     unconsumed.targetView,
                     viewType);
         }
-        navigateWithTransition(viewType, TransitionType.NONE);
+        navigateWithTransition(viewType, TransitionType.FADE);
     }
 
     /**

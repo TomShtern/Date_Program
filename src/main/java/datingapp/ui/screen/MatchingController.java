@@ -130,6 +130,7 @@ public class MatchingController extends BaseController implements Initializable 
 
     // Swipe gesture state
     private double dragStartX;
+    private double dragStartY;
     private boolean cardTransitionInProgress;
     private boolean firstCandidateRendered;
     private long candidatePhotoRequestId;
@@ -319,25 +320,31 @@ public class MatchingController extends BaseController implements Initializable 
         }
     }
 
-    /** Setup drag-to-swipe gestures on the candidate card. */
+    /** Setup drag-to-swipe gestures on the candidate card. Vertical drag-up super-likes. */
     private void setupSwipeGestures() {
         candidateCard.setOnMousePressed(e -> {
             dragStartX = e.getSceneX();
+            dragStartY = e.getSceneY();
 
             candidateCard.setCursor(Cursor.CLOSED_HAND);
         });
 
         candidateCard.setOnMouseDragged(e -> {
             double deltaX = e.getSceneX() - dragStartX;
+            double deltaY = e.getSceneY() - dragStartY;
             double rotation = deltaX * 0.04;
 
             candidateCard.setTranslateX(deltaX);
+            candidateCard.setTranslateY(Math.min(0, deltaY));
             candidateCard.setRotate(rotation);
 
             // Update overlay based on drag distance
             double progress = Math.min(Math.abs(deltaX) / DRAG_THRESHOLD, 1.0);
 
-            if (deltaX > 30) {
+            if (deltaY < -DRAG_THRESHOLD && Math.abs(deltaY) > Math.abs(deltaX)) {
+                showLikeOverlay(1.0);
+                hidePassOverlay();
+            } else if (deltaX > 30) {
                 showLikeOverlay(progress);
                 hidePassOverlay();
             } else if (deltaX < -30) {
@@ -351,8 +358,11 @@ public class MatchingController extends BaseController implements Initializable 
         candidateCard.setOnMouseReleased(e -> {
             candidateCard.setCursor(Cursor.HAND);
             double deltaX = e.getSceneX() - dragStartX;
+            double deltaY = e.getSceneY() - dragStartY;
 
-            if (Math.abs(deltaX) > DRAG_THRESHOLD) {
+            if (deltaY < -DRAG_THRESHOLD && Math.abs(deltaY) > Math.abs(deltaX)) {
+                animateCardExit(true, this::handleSuperLike);
+            } else if (Math.abs(deltaX) > DRAG_THRESHOLD) {
                 if (deltaX > 0) {
                     animateCardExit(true, this::performLike);
                 } else {
@@ -425,6 +435,7 @@ public class MatchingController extends BaseController implements Initializable 
     private void animateSnapBack() {
         TranslateTransition translate = new TranslateTransition(Duration.millis(200), candidateCard);
         translate.setToX(0);
+        translate.setToY(0);
         translate.setInterpolator(Interpolator.EASE_OUT);
 
         RotateTransition rotate = new RotateTransition(Duration.millis(200), candidateCard);
@@ -440,6 +451,7 @@ public class MatchingController extends BaseController implements Initializable 
 
     private void resetCardPosition() {
         candidateCard.setTranslateX(0);
+        candidateCard.setTranslateY(0);
         candidateCard.setRotate(0);
         candidateCard.setOpacity(1);
         candidateCard.setScaleX(1);

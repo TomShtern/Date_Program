@@ -19,9 +19,23 @@ import java.util.function.UnaryOperator;
  */
 public final class DatabaseManager {
 
-    private static final String DEFAULT_JDBC_URL = "jdbc:h2:./data/dating";
-    private static final String DEFAULT_DEV_JDBC_URL = "jdbc:h2:./data/dating-dev";
-    private static final String DEFAULT_TEST_JDBC_URL = "jdbc:h2:./data/dating-test";
+    private static final String DEFAULT_JDBC_URL = "jdbc:h2:" + userDirDataPath("dating");
+    private static final String DEFAULT_DEV_JDBC_URL = "jdbc:h2:" + userDirDataPath("dating-dev");
+    private static final String DEFAULT_TEST_JDBC_URL = "jdbc:h2:" + userDirDataPath("dating-test");
+    /**
+     * Built-in default URL still carried by {@link AppConfig} builder defaults (relative path form).
+     * A runtime config carrying this value means "no explicit override", exactly like
+     * {@link #DEFAULT_JDBC_URL}; both must be recognised so an explicitly set static URL
+     * (e.g. an in-memory test URL via {@link #setJdbcUrl(String)}) is honoured.
+     */
+    private static final String APP_CONFIG_DEFAULT_JDBC_URL =
+            AppConfig.builder().build().storage().databaseUrl();
+
+    private static String userDirDataPath(String dbName) {
+        String userDir = System.getProperty("user.dir", ".").replace('\\', '/');
+        return userDir + "/data/" + dbName;
+    }
+
     private static volatile String jdbcUrl = DEFAULT_JDBC_URL;
     private static final String DB_PASSWORD_PROPERTY = "datingapp.db.password";
     private static final String DB_PASSWORD_ENV = "DATING_APP_DB_PASSWORD";
@@ -48,7 +62,7 @@ public final class DatabaseManager {
             int maxLifetimeSeconds,
             int keepaliveTimeSeconds) {}
 
-    private static final PoolConfig DEFAULT_POOL_CONFIG = new PoolConfig(10, 2, 5, 3, 600, 1800, 0);
+    private static final PoolConfig DEFAULT_POOL_CONFIG = new PoolConfig(10, 2, 5, 3, 600, 1800, 30);
     private final AtomicReference<PoolConfig> configRef = new AtomicReference<>(DEFAULT_POOL_CONFIG);
 
     public static void setJdbcUrl(String url) {
@@ -165,6 +179,9 @@ public final class DatabaseManager {
         if (cfg.keepaliveTimeSeconds() > 0) {
             config.setKeepaliveTime(cfg.keepaliveTimeSeconds() * 1000L);
         }
+        if (dialect != DatabaseDialect.POSTGRESQL) {
+            config.setLeakDetectionThreshold(10_000L);
+        }
         dataSource.set(new HikariDataSource(config));
     }
 
@@ -175,11 +192,15 @@ public final class DatabaseManager {
         }
         if (storageState != null) {
             String runtimeJdbcUrl = storageState.storageConfig().databaseUrl();
-            if (!DEFAULT_JDBC_URL.equals(runtimeJdbcUrl)) {
+            if (!isBuiltInDefaultJdbcUrl(runtimeJdbcUrl)) {
                 return runtimeJdbcUrl;
             }
         }
         return jdbcUrl;
+    }
+
+    private static boolean isBuiltInDefaultJdbcUrl(String url) {
+        return DEFAULT_JDBC_URL.equals(url) || APP_CONFIG_DEFAULT_JDBC_URL.equals(url);
     }
 
     private String resolveUsername() {
@@ -372,7 +393,7 @@ public final class DatabaseManager {
         if (dialect == DatabaseDialect.POSTGRESQL) {
             return configuredJdbcUrl;
         }
-        if (explicitPassword != null || !DEFAULT_JDBC_URL.equals(configuredJdbcUrl)) {
+        if (explicitPassword != null || !isBuiltInDefaultJdbcUrl(configuredJdbcUrl)) {
             return configuredJdbcUrl;
         }
         if (DEV_PROFILE.equalsIgnoreCase(configuredProfile)) {
@@ -454,6 +475,7 @@ public final class DatabaseManager {
                 statement.execute("SET search_path TO public");
                 statement.execute("SET TIME ZONE 'UTC'");
                 statement.execute("SET statement_timeout TO " + safeTimeoutMillis);
+                statement.execute("SET lock_timeout TO " + Math.min(safeTimeoutMillis, 10_000));
             } else {
                 statement.execute("SET TIME ZONE 'UTC'");
                 statement.execute("SET QUERY_TIMEOUT " + safeTimeoutMillis);

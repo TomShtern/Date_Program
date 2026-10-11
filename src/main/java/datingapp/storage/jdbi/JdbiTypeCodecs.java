@@ -142,6 +142,46 @@ public final class JdbiTypeCodecs {
             return rs.wasNull() ? null : value;
         }
 
+        /**
+         * Reads a column that must be non-null per schema, failing fast with column context instead of a bare
+         * NPE deep inside a domain constructor.
+         */
+        public static String readRequiredString(ResultSet rs, String column) throws SQLException {
+            String value = rs.getString(column);
+            if (value == null) {
+                throw new SQLException("Column '" + column + "' was NULL but is required");
+            }
+            return value;
+        }
+
+        /** Reads a UUID column that must be non-null per schema. */
+        public static UUID readRequiredUuid(ResultSet rs, String column) throws SQLException {
+            UUID value = readUuid(rs, column);
+            if (value == null) {
+                throw new SQLException("Column '" + column + "' was NULL but is required");
+            }
+            return value;
+        }
+
+        /** Reads an instant column that must be non-null per schema. */
+        public static Instant readRequiredInstant(ResultSet rs, String column) throws SQLException {
+            Instant value = readInstant(rs, column);
+            if (value == null) {
+                throw new SQLException("Column '" + column + "' was NULL but is required");
+            }
+            return value;
+        }
+
+        /** Reads an enum column that must be non-null per schema. */
+        public static <E extends Enum<E>> E readRequiredEnum(ResultSet rs, String column, Class<E> enumType)
+                throws SQLException {
+            E value = readEnum(rs, column, enumType);
+            if (value == null) {
+                throw new SQLException("Column '" + column + "' was NULL but is required");
+            }
+            return value;
+        }
+
         public static List<String> readCsvAsList(ResultSet rs, String column) throws SQLException {
             String csv = rs.getString(column);
             if (csv == null || csv.isBlank()) {

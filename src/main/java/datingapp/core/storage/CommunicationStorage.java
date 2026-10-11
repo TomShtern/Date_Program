@@ -41,6 +41,50 @@ public interface CommunicationStorage {
 
     void setConversationVisibility(String conversationId, UUID userId, boolean visible);
 
+    /** Which conversations a list query keeps, judged by the listing user's own archive state. */
+    enum ArchiveFilter {
+        ALL,
+        ARCHIVED,
+        NOT_ARCHIVED
+    }
+
+    /**
+     * Lists the user's visible conversations, filtered by that user's own archive state.
+     *
+     * <p>The default implementation filters {@link #getAllConversationsFor} in memory; SQL implementations
+     * should override it so the page is cut in the database.
+     */
+    default List<Conversation> getConversationsFor(UUID userId, ArchiveFilter filter, int limit, int offset) {
+        Objects.requireNonNull(filter, "filter cannot be null");
+        if (filter == ArchiveFilter.ALL) {
+            return getConversationsFor(userId, limit, offset);
+        }
+        boolean wantArchived = filter == ArchiveFilter.ARCHIVED;
+        return getAllConversationsFor(userId).stream()
+                .filter(conversation -> conversation.isArchivedBy(userId) == wantArchived)
+                .skip(offset)
+                .limit(limit)
+                .toList();
+    }
+
+    /** Clears the archive marker for one participant only. */
+    default void unarchiveConversation(String conversationId, UUID userId) {
+        throw new UnsupportedOperationException(
+                "CommunicationStorage implementation must override unarchiveConversation(String, UUID)");
+    }
+
+    /**
+     * Brings a hidden or soft-deleted conversation back for both participants.
+     *
+     * <p>Conversation ids are deterministic per pair, so a soft-deleted row still owns the id and must be
+     * revived rather than re-inserted.
+     *
+     * @return true when a conversation row with that id exists (and is now live and visible to both)
+     */
+    default boolean restoreConversation(String conversationId) {
+        return false;
+    }
+
     /**
      * Soft-deletes a conversation by setting its {@code deleted_at} timestamp.
      *

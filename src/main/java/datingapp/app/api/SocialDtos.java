@@ -68,7 +68,14 @@ final class SocialDtos {
     }
 
     /** Response for reporting a user. */
-    static record ReportResponse(boolean success, boolean autoBanned, String errorMessage, boolean blockedByReporter) {}
+    static record ReportResponse(boolean success, boolean autoFlagged, String errorMessage, boolean blockedByReporter) {
+        /** @deprecated Jackson compat: old clients read {@code autoBanned}. */
+        @Deprecated(since = "1.1", forRemoval = true)
+        @com.fasterxml.jackson.annotation.JsonProperty("autoBanned")
+        public boolean autoBanned() {
+            return autoFlagged;
+        }
+    }
 
     /** Request body for reporting a user. */
     static record ReportUserRequest(Report.Reason reason, String description, boolean blockUser) {}

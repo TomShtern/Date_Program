@@ -35,7 +35,6 @@ public class SafetyHandler implements LoggingSupport {
     private static final Logger logger = LoggerFactory.getLogger(SafetyHandler.class);
     private static final String ERROR_MESSAGE_FORMAT = "❌ {}\n";
     private static final String NUMBERED_LIST_LOG_FORMAT = "  {}. {}";
-    private static final String EMPTY_INPUT_META = "empty";
 
     private final SocialUseCases socialUseCases;
     private final ProfileUseCases profileUseCases;
@@ -170,8 +169,9 @@ public class SafetyHandler implements LoggingSupport {
             return reasons[selectedIndex.getAsInt()];
         }
         if (!CliTextAndInput.isZeroSelection(reasonInput)) {
-            String lengthMeta = reasonInput == null ? EMPTY_INPUT_META : String.valueOf(reasonInput.length());
-            logger.debug("Invalid report reason input; length={}", lengthMeta);
+            if (logger.isDebugEnabled()) {
+                logger.debug("Invalid report reason input; length={}", reasonInput.length());
+            }
         }
         logInfo("❌ Invalid input.\n");
         return null;
@@ -277,7 +277,7 @@ public class SafetyHandler implements LoggingSupport {
         } else {
             logInfo("\n✅ Report submitted for {}.", reportedUser.getName());
         }
-        if (reportResult.userWasBanned()) {
+        if (reportResult.userWasFlagged()) {
             logInfo("⚠️  This user has been flagged for moderator review due to multiple reports.");
         }
         logInfo("");
@@ -302,8 +302,9 @@ public class SafetyHandler implements LoggingSupport {
         if (selectedIndex.isPresent()) {
             return users.get(selectedIndex.getAsInt());
         }
-        String lengthMeta = input == null ? EMPTY_INPUT_META : String.valueOf(input.length());
-        logger.debug("Invalid safety selection input; length={}", lengthMeta);
+        if (logger.isDebugEnabled()) {
+            logger.debug("Invalid safety selection input; length={}", input.length());
+        }
         logInfo(CliTextAndInput.INVALID_INPUT);
         return null;
     }
@@ -323,8 +324,9 @@ public class SafetyHandler implements LoggingSupport {
         if (selectedIndex.isPresent()) {
             return blockedUsers.get(selectedIndex.getAsInt());
         }
-        String lengthMeta = input == null ? EMPTY_INPUT_META : String.valueOf(input.length());
-        logger.debug("Invalid safety selection input; length={}", lengthMeta);
+        if (logger.isDebugEnabled()) {
+            logger.debug("Invalid unblock selection input; length={}", input.length());
+        }
         logInfo(CliTextAndInput.INVALID_INPUT);
         return null;
     }

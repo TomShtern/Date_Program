@@ -140,7 +140,7 @@ final class ProfileCompletionSupport {
 
     List<String> generateTips(User user) {
         List<String> tips = new ArrayList<>();
-        Set<Interest> interests = user.getInterests() != null ? user.getInterests() : Set.of();
+        Set<Interest> interests = user.getInterests();
         int realPhotoCount = user.getRealPhotoCount();
 
         if (user.getBio() == null || user.getBio().isBlank()) {
@@ -218,7 +218,7 @@ final class ProfileCompletionSupport {
     }
 
     private CategoryResult scoreInterests(User user) {
-        int interestCount = user.getInterests() != null ? user.getInterests().size() : 0;
+        int interestCount = user.getInterests().size();
         int earnedPoints =
                 Math.min(INTERESTS_TOTAL_POINTS, interestCount * (INTERESTS_TOTAL_POINTS / INTERESTS_FULL_COUNT));
         int score = Math.min(100, interestCount * 100 / INTERESTS_FULL_COUNT);

@@ -162,7 +162,8 @@ class SafetyViewModelTest {
                 trustSafetyService,
                 communications,
                 new InProcessAppEventBus());
-        VerificationUseCases verificationUseCases = new VerificationUseCases(users, trustSafetyService);
+        AtomicReference<String> sentCode = new AtomicReference<>();
+        VerificationUseCases verificationUseCases = capturingVerificationUseCases(users, sentCode);
 
         viewModel = new SafetyViewModel(
                 socialUseCases,
@@ -178,9 +179,8 @@ class SafetyViewModelTest {
 
         assertTrue(waitUntil(
                 () -> {
-                    User startedUser = AppSession.getInstance().getCurrentUser();
                     String status = viewModel.statusMessageProperty().get();
-                    String code = startedUser != null ? startedUser.getVerificationCode() : null;
+                    String code = sentCode.get();
                     return code != null
                             && code.length() == 6
                             && status != null
@@ -189,9 +189,12 @@ class SafetyViewModelTest {
                 },
                 5000));
 
-        User afterStart = AppSession.getInstance().getCurrentUser();
-        String generatedCode = afterStart.getVerificationCode();
+        // Only the hash is stored, so the code is read from the delivery channel.
+        String generatedCode = sentCode.get();
         assertTrue(generatedCode != null && generatedCode.length() == 6);
+        assertEquals(
+                64,
+                AppSession.getInstance().getCurrentUser().getVerificationCode().length());
         assertFalse(viewModel.statusMessageProperty().get().contains(generatedCode));
         assertFalse(viewModel.statusMessageProperty().get().contains("[SIMULATED]"));
 
@@ -232,7 +235,8 @@ class SafetyViewModelTest {
         TrustSafetyService trustSafetyService = TrustSafetyService.builder(
                         trustSafetyStorage, interactions, users, config, communications)
                 .build();
-        VerificationUseCases verificationUseCases = new VerificationUseCases(users, trustSafetyService);
+        AtomicReference<String> sentCode = new AtomicReference<>();
+        VerificationUseCases verificationUseCases = capturingVerificationUseCases(users, sentCode);
 
         viewModel = new SafetyViewModel(
                 SocialUseCases.forTrustSafetyOnly(trustSafetyService),
@@ -248,9 +252,8 @@ class SafetyViewModelTest {
 
         assertTrue(waitUntil(
                 () -> {
-                    User startedUser = AppSession.getInstance().getCurrentUser();
                     String status = viewModel.statusMessageProperty().get();
-                    String code = startedUser != null ? startedUser.getVerificationCode() : null;
+                    String code = sentCode.get();
                     return code != null && code.length() == 6 && status != null && status.contains(code);
                 },
                 5000));
@@ -319,7 +322,7 @@ class SafetyViewModelTest {
 
         User currentUser = createUser("AsyncConfirm", Gender.FEMALE, EnumSet.of(Gender.MALE));
         currentUser.setEmail("async-confirm@example.com");
-        currentUser.startVerification(VerificationMethod.EMAIL, "123456");
+        currentUser.startVerification(VerificationMethod.EMAIL, sha256Hex("123456"));
         users.save(currentUser);
         AppSession.getInstance().setCurrentUser(currentUser);
 
@@ -573,6 +576,18 @@ class SafetyViewModelTest {
         assertTrue(errorMessage.get().contains("synthetic confirm failure"));
     }
 
+    private static VerificationUseCases capturingVerificationUseCases(
+            TestStorages.Users users, AtomicReference<String> sentCode) {
+        return new VerificationUseCases(
+                users,
+                new java.security.SecureRandom(),
+                VerificationUseCases.DEFAULT_VERIFICATION_TTL,
+                (method, contact, code) -> sentCode.set(code),
+                VerificationUseCases.RESEND_COOLDOWN,
+                VerificationUseCases.MAX_ATTEMPTS,
+                VerificationUseCases.LOCK_DURATION);
+    }
+
     private static boolean waitUntil(BooleanSupplier condition, long timeoutMillis) throws InterruptedException {
         long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMillis);
         while (System.nanoTime() < deadline) {
@@ -624,6 +639,13 @@ class SafetyViewModelTest {
             Thread.currentThread().interrupt();
             throw new AssertionError("Interrupted while waiting to release " + operationName, exception);
         }
+    }
+
+    /** Stored verification codes are SHA-256 hex, so a seeded code has to be hashed the same way. */
+    private static String sha256Hex(String code) throws java.security.NoSuchAlgorithmException {
+        return java.util.HexFormat.of()
+                .formatHex(java.security.MessageDigest.getInstance("SHA-256")
+                        .digest(code.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
     }
 
     private static final class BlockingVerificationUseCases extends VerificationUseCases {

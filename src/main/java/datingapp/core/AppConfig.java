@@ -244,7 +244,10 @@ public record AppConfig(
             int bioAchievementLength,
             int lifestyleFieldTarget,
             int cleanupRetentionDays,
-            int softDeleteRetentionDays) {
+            int softDeleteRetentionDays,
+            VerificationConfig verification,
+            PresenceConfig presence,
+            List<String> adminClerkIds) {
         public SafetyConfig {
             AppConfigValidator.validateSafetySession(
                     autoBanThreshold, userTimeZone, sessionTimeoutMinutes, undoWindowSeconds);
@@ -262,6 +265,22 @@ public record AppConfig(
                     lifestyleFieldTarget,
                     cleanupRetentionDays,
                     softDeleteRetentionDays);
+            Objects.requireNonNull(verification, "verification cannot be null");
+            Objects.requireNonNull(presence, "presence cannot be null");
+            adminClerkIds = adminClerkIds == null ? List.of() : List.copyOf(adminClerkIds);
+        }
+    }
+
+    public static record VerificationConfig(
+            int resendCooldownSeconds, int maxAttempts, int lockMinutes, int codeTtlMinutes) {
+        public VerificationConfig {
+            AppConfigValidator.validateVerification(resendCooldownSeconds, maxAttempts, lockMinutes, codeTtlMinutes);
+        }
+    }
+
+    public static record PresenceConfig(int onlineSeconds, int awaySeconds, int typingFreshSeconds) {
+        public PresenceConfig {
+            AppConfigValidator.validatePresence(onlineSeconds, awaySeconds, typingFreshSeconds);
         }
     }
 
@@ -387,7 +406,7 @@ public record AppConfig(
         private int validationTimeoutSeconds = 3;
         private int idleTimeoutSeconds = 600;
         private int maxLifetimeSeconds = 1800;
-        private int keepaliveTimeSeconds = 0;
+        private int keepaliveTimeSeconds = 30;
         // MediaConfig fields
         private String photoStorageRoot = Path.of("data", "photos").toString();
         private String photoPublicBaseUrl = "";
@@ -408,7 +427,15 @@ public record AppConfig(
         private int bioAchievementLength = 100;
         private int lifestyleFieldTarget = 5;
         private int cleanupRetentionDays = 30;
-        private int softDeleteRetentionDays = 90;
+        private int softDeleteRetentionDays = 30;
+        private int verificationResendCooldownSeconds = 60;
+        private int verificationMaxAttempts = 5;
+        private int verificationLockMinutes = 15;
+        private int verificationCodeTtlMinutes = 15;
+        private int presenceOnlineSeconds = 120;
+        private int presenceAwaySeconds = 600;
+        private int typingFreshSeconds = 10;
+        private List<String> adminClerkIds = List.of();
         // AuthConfig fields
         private String clerkIssuer = "";
         private String clerkJwksUrl = "";
@@ -785,6 +812,51 @@ public record AppConfig(
             return this;
         }
 
+        public Builder softDeleteRetentionDays(int v) {
+            this.softDeleteRetentionDays = v;
+            return this;
+        }
+
+        public Builder verificationResendCooldownSeconds(int v) {
+            this.verificationResendCooldownSeconds = v;
+            return this;
+        }
+
+        public Builder verificationMaxAttempts(int v) {
+            this.verificationMaxAttempts = v;
+            return this;
+        }
+
+        public Builder verificationLockMinutes(int v) {
+            this.verificationLockMinutes = v;
+            return this;
+        }
+
+        public Builder verificationCodeTtlMinutes(int v) {
+            this.verificationCodeTtlMinutes = v;
+            return this;
+        }
+
+        public Builder presenceOnlineSeconds(int v) {
+            this.presenceOnlineSeconds = v;
+            return this;
+        }
+
+        public Builder presenceAwaySeconds(int v) {
+            this.presenceAwaySeconds = v;
+            return this;
+        }
+
+        public Builder typingFreshSeconds(int v) {
+            this.typingFreshSeconds = v;
+            return this;
+        }
+
+        public Builder adminClerkIds(List<String> v) {
+            this.adminClerkIds = v == null ? List.of() : List.copyOf(v);
+            return this;
+        }
+
         public Builder standoutDistanceWeight(double v) {
             this.standoutDistanceWeight = v;
             return this;
@@ -852,11 +924,6 @@ public record AppConfig(
 
         public Builder maxStandouts(int v) {
             this.maxStandouts = v;
-            return this;
-        }
-
-        public Builder softDeleteRetentionDays(int v) {
-            this.softDeleteRetentionDays = v;
             return this;
         }
 
@@ -971,7 +1038,14 @@ public record AppConfig(
                     bioAchievementLength,
                     lifestyleFieldTarget,
                     cleanupRetentionDays,
-                    softDeleteRetentionDays);
+                    softDeleteRetentionDays,
+                    new VerificationConfig(
+                            verificationResendCooldownSeconds,
+                            verificationMaxAttempts,
+                            verificationLockMinutes,
+                            verificationCodeTtlMinutes),
+                    new PresenceConfig(presenceOnlineSeconds, presenceAwaySeconds, typingFreshSeconds),
+                    adminClerkIds);
         }
 
         private MediaConfig buildMediaConfig() {

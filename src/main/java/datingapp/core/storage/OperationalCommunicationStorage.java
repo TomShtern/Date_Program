@@ -15,6 +15,12 @@ public interface OperationalCommunicationStorage extends CommunicationStorage {
     void deleteConversationWithMessages(String conversationId);
 
     @Override
+    void unarchiveConversation(String conversationId, UUID userId);
+
+    @Override
+    boolean restoreConversation(String conversationId);
+
+    @Override
     void saveFriendRequestWithNotification(FriendRequest request, Notification notification);
 
     @Override

@@ -127,19 +127,18 @@ jobs:
       - wait-for-postgresql
 
       - run-with-heartbeat:
-          step_name: Maven test suite (headless JavaFX)
+          step_name: Maven verify (tests, strict SpotBugs, coverage; headless JavaFX)
           command: >-
-            timeout 20m
+            timeout 40m
             xvfb-run -a -s "-screen 0 1920x1080x24"
             mvn ${MAVEN_CLI_OPTS}
+            -Pspotbugs-strict
             -Djava.awt.headless=true
-            test
+            -Ddatingapp.pgtest.url=jdbc:postgresql://127.0.0.1:5432/datingapp
+            -Ddatingapp.pgtest.username=datingapp
+            -Ddatingapp.pgtest.password=datingapp
+            verify
           heartbeat_seconds: 30
-
-      - run-with-heartbeat:
-          step_name: Maven verify plugins (skip tests)
-          command: mvn ${MAVEN_CLI_OPTS} -DskipTests verify
-          heartbeat_seconds: 60
 
       - save-maven-cache
 

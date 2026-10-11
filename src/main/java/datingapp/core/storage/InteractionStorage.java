@@ -43,6 +43,21 @@ public interface InteractionStorage {
 
     List<Map.Entry<UUID, Instant>> getLikeTimesForUsersWhoLiked(UUID userId);
 
+    /**
+     * The subset of {@link #getUserIdsWhoLiked} whose like was a super like.
+     *
+     * <p>The default implementation looks each like up one by one; SQL implementations should override it
+     * with a single query.
+     */
+    default Set<UUID> getUserIdsWhoSuperLiked(UUID userId) {
+        Objects.requireNonNull(userId, "userId cannot be null");
+        return getUserIdsWhoLiked(userId).stream()
+                .filter(likerId -> getLike(likerId, userId)
+                        .filter(like -> like.direction() == Like.Direction.SUPER_LIKE)
+                        .isPresent())
+                .collect(java.util.stream.Collectors.toUnmodifiableSet());
+    }
+
     int countByDirection(UUID userId, Like.Direction direction);
 
     int countReceivedByDirection(UUID userId, Like.Direction direction);

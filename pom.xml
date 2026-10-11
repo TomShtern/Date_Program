@@ -447,6 +447,22 @@
                                         </limit>
                                     </limits>
                                 </rule>
+                                <rule>
+                                    <element>PACKAGE</element>
+                                    <includes>
+                                        <include>datingapp/core/matching</include>
+                                        <include>datingapp/core/connection</include>
+                                        <include>datingapp/app/api</include>
+                                        <include>datingapp/storage/jdbi</include>
+                                    </includes>
+                                    <limits>
+                                        <limit>
+                                            <counter>LINE</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>0.70</minimum>
+                                        </limit>
+                                    </limits>
+                                </rule>
                             </rules>
                         </configuration>
                     </execution>

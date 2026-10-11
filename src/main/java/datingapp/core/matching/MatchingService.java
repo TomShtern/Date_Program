@@ -439,6 +439,7 @@ public final class MatchingService {
             }
         }
         Map<UUID, User> likerUsers = userStorage.findByIds(likerIds);
+        Set<UUID> superLikerIds = interactionStorage.getUserIdsWhoSuperLiked(currentUserId);
 
         List<PendingLiker> result = new ArrayList<>();
         for (var entry : likeTimes) {
@@ -449,7 +450,7 @@ public final class MatchingService {
             }
 
             Instant likedAt = entry.getValue();
-            result.add(new PendingLiker(liker, likedAt));
+            result.add(new PendingLiker(liker, likedAt, superLikerIds.contains(likerId)));
         }
 
         result.sort(Comparator.comparing(PendingLiker::likedAt).reversed());
@@ -460,10 +461,14 @@ public final class MatchingService {
      * Represents a user who liked the current user but hasn't been responded to
      * yet.
      */
-    public static record PendingLiker(User user, Instant likedAt) {
+    public static record PendingLiker(User user, Instant likedAt, boolean superLike) {
         public PendingLiker {
             Objects.requireNonNull(user, "user cannot be null");
             Objects.requireNonNull(likedAt, "likedAt cannot be null");
+        }
+
+        public PendingLiker(User user, Instant likedAt) {
+            this(user, likedAt, false);
         }
     }
 

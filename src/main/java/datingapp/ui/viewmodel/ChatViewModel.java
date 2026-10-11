@@ -88,8 +88,23 @@ public class ChatViewModel extends BaseViewModel {
     private TaskHandle conversationsPollingHandle;
     private TaskHandle messagesPollingHandle;
     private final AtomicInteger messageLoadToken = new AtomicInteger();
-    private boolean allowSessionUserFallback = true;
+    /** Written on the UI thread, read on background threads; volatile for cross-thread visibility. */
+    private volatile boolean allowSessionUserFallback = true;
+
     private final AtomicInteger noteLoadToken = new AtomicInteger();
+    /**
+     * Guards presence updates against stale async callbacks. Every selection change invalidates
+     * pending presence loads: callbacks capture the token and are ignored once a newer selection
+     * (or deselection) has advanced it. This also closes a cross-thread visibility race where a
+     * delayed FX-thread callback could otherwise overwrite a synchronous clear with stale data.
+     */
+    private final AtomicInteger presenceToken = new AtomicInteger();
+    /**
+     * Guards conversation-list refreshes against visible-state resets (user switch, sign-out).
+     * See {@link #applyConversationRefreshIfCurrent}.
+     */
+    private final AtomicInteger conversationsToken = new AtomicInteger();
+
     private PauseTransition profileNoteStatusDismissTransition;
 
     /** Set the error handler for send failures. */
@@ -177,20 +192,22 @@ public class ChatViewModel extends BaseViewModel {
         }
 
         UUID otherUserId = otherUser.getId();
+        int token = presenceToken.incrementAndGet();
         asyncScope.runFireAndForget("load presence", () -> {
             try {
+                presenceDataAccess.heartbeat(user.getId());
                 PresenceStatus status = presenceDataAccess.getPresence(otherUserId);
                 boolean typing = presenceDataAccess.isTyping(otherUserId);
-                asyncScope.dispatchToUi(() -> applyPresenceState(otherUserId, status, typing));
+                asyncScope.dispatchToUi(() -> applyPresenceState(otherUserId, status, typing, token));
             } catch (Exception e) {
                 logError("Failed to load presence state", e);
-                asyncScope.dispatchToUi(() -> applyPresenceState(otherUserId, PresenceStatus.UNKNOWN, false));
+                asyncScope.dispatchToUi(() -> applyPresenceState(otherUserId, PresenceStatus.UNKNOWN, false, token));
             }
         });
     }
 
-    private void applyPresenceState(UUID otherUserId, PresenceStatus status, boolean typing) {
-        if (asyncScope.isDisposed()) {
+    private void applyPresenceState(UUID otherUserId, PresenceStatus status, boolean typing, int token) {
+        if (asyncScope.isDisposed() || token != presenceToken.get()) {
             return;
         }
         ConversationPreview selected = selectedConversation.get();
@@ -202,6 +219,7 @@ public class ChatViewModel extends BaseViewModel {
     }
 
     private void clearPresenceState() {
+        presenceToken.incrementAndGet();
         presenceStatus.set(PresenceStatus.UNKNOWN);
         remoteTyping.set(false);
     }
@@ -380,6 +398,7 @@ public class ChatViewModel extends BaseViewModel {
 
     private void resetVisibleChatState() {
         messageLoadToken.incrementAndGet();
+        conversationsToken.incrementAndGet();
         selectedConversation.set(null);
         conversationItems.clear();
         activeMessageItems.clear();
@@ -411,12 +430,13 @@ public class ChatViewModel extends BaseViewModel {
             return;
         }
 
+        int token = conversationsToken.get();
         if (silent) {
             asyncScope.runLatestSilently(
                     "chat-refresh",
                     TASK_REFRESH_CONVERSATIONS,
                     () -> refreshConversationData(user),
-                    this::applyConversationRefreshData);
+                    data -> applyConversationRefreshIfCurrent(data, token));
             return;
         }
 
@@ -424,7 +444,20 @@ public class ChatViewModel extends BaseViewModel {
                 "chat-refresh",
                 TASK_REFRESH_CONVERSATIONS,
                 () -> refreshConversationData(user),
-                this::applyConversationRefreshData);
+                data -> applyConversationRefreshIfCurrent(data, token));
+    }
+
+    /**
+     * Applies a conversation refresh only when no visible-state reset happened after it was
+     * launched. {@code runLatest} suppresses superseded tasks, but a reset (user switch or
+     * sign-out) launches no replacement task, so without this guard an in-flight refresh could
+     * repopulate the cleared conversation list and unread count.
+     */
+    private void applyConversationRefreshIfCurrent(ConversationRefreshData data, int token) {
+        if (token != conversationsToken.get()) {
+            return;
+        }
+        applyConversationRefreshData(data);
     }
 
     private ConversationRefreshData refreshConversationData(User user) {
@@ -455,9 +488,10 @@ public class ChatViewModel extends BaseViewModel {
             return;
         }
 
+        int token = conversationsToken.get();
         ConversationRefreshData data = refreshConversationData(user);
         asyncScope.dispatchToUi(() -> {
-            if (asyncScope.isDisposed()) {
+            if (asyncScope.isDisposed() || token != conversationsToken.get()) {
                 return;
             }
             applyConversationRefreshData(data);
@@ -636,13 +670,14 @@ public class ChatViewModel extends BaseViewModel {
     }
 
     private void pollPresenceState(UUID otherUserId) {
+        int token = presenceToken.get();
         try {
             PresenceStatus status = presenceDataAccess.getPresence(otherUserId);
             boolean typing = presenceDataAccess.isTyping(otherUserId);
-            asyncScope.dispatchToUi(() -> applyPresenceState(otherUserId, status, typing));
+            asyncScope.dispatchToUi(() -> applyPresenceState(otherUserId, status, typing, token));
         } catch (Exception e) {
             logError("Failed to load presence state", e);
-            asyncScope.dispatchToUi(() -> applyPresenceState(otherUserId, PresenceStatus.UNKNOWN, false));
+            asyncScope.dispatchToUi(() -> applyPresenceState(otherUserId, PresenceStatus.UNKNOWN, false, token));
         }
     }
 

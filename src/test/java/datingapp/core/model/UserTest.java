@@ -113,6 +113,23 @@ class UserTest {
     }
 
     @Test
+    @DisplayName("Clearing review returns a complete profile to ACTIVE and an unfinished one to INCOMPLETE")
+    void clearReviewRestoresTheStateTheProfileHasEarned() {
+        User complete = createCompleteUser("Reviewed");
+        complete.activate();
+        complete.flagForReview();
+        assertEquals(UserState.UNDER_REVIEW, complete.getState());
+        assertThrows(IllegalStateException.class, complete::activate);
+        complete.clearReview();
+        assertEquals(UserState.ACTIVE, complete.getState());
+
+        User unfinished = new User(UUID.randomUUID(), "Unfinished");
+        unfinished.flagForReview();
+        unfinished.clearReview();
+        assertEquals(UserState.INCOMPLETE, unfinished.getState());
+    }
+
+    @Test
     @DisplayName("Age is calculated correctly from birth date")
     void ageIsCalculatedCorrectly() {
         User user = new User(UUID.randomUUID(), "Eve");

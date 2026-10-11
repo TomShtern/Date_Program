@@ -43,31 +43,11 @@ final class NormalizedProfileRepository {
         saveUserInterestedIn(handle, userId, enumNames(user.getInterestedIn()));
 
         Dealbreakers dealbreakers = user.getDealbreakers();
-        saveDealbreaker(
-                handle,
-                userId,
-                USER_DB_SMOKING,
-                dealbreakers != null ? enumNames(dealbreakers.acceptableSmoking()) : Set.of());
-        saveDealbreaker(
-                handle,
-                userId,
-                USER_DB_DRINKING,
-                dealbreakers != null ? enumNames(dealbreakers.acceptableDrinking()) : Set.of());
-        saveDealbreaker(
-                handle,
-                userId,
-                USER_DB_WANTS_KIDS,
-                dealbreakers != null ? enumNames(dealbreakers.acceptableKidsStance()) : Set.of());
-        saveDealbreaker(
-                handle,
-                userId,
-                USER_DB_LOOKING_FOR,
-                dealbreakers != null ? enumNames(dealbreakers.acceptableLookingFor()) : Set.of());
-        saveDealbreaker(
-                handle,
-                userId,
-                USER_DB_EDUCATION,
-                dealbreakers != null ? enumNames(dealbreakers.acceptableEducation()) : Set.of());
+        saveDealbreaker(handle, userId, USER_DB_SMOKING, enumNames(dealbreakers.acceptableSmoking()));
+        saveDealbreaker(handle, userId, USER_DB_DRINKING, enumNames(dealbreakers.acceptableDrinking()));
+        saveDealbreaker(handle, userId, USER_DB_WANTS_KIDS, enumNames(dealbreakers.acceptableKidsStance()));
+        saveDealbreaker(handle, userId, USER_DB_LOOKING_FOR, enumNames(dealbreakers.acceptableLookingFor()));
+        saveDealbreaker(handle, userId, USER_DB_EDUCATION, enumNames(dealbreakers.acceptableEducation()));
     }
 
     void saveUserPhotos(UUID userId, List<String> urls) {

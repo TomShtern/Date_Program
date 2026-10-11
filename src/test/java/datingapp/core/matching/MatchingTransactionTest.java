@@ -90,7 +90,9 @@ class MatchingTransactionTest {
         var result = useCases.processSwipe(swipeCommand(alice, bob));
 
         assertFalse(result.success());
-        assertEquals("Daily like limit reached.", result.error().message());
+        assertTrue(
+                result.error().message().startsWith("Daily like limit reached."),
+                result.error().message());
         assertTrue(interactionStorage.getLike(alice.getId(), bob.getId()).isEmpty());
         assertTrue(interactionStorage
                 .get(Match.generateId(alice.getId(), bob.getId()))

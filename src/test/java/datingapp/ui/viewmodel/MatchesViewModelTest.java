@@ -240,7 +240,7 @@ class MatchesViewModelTest {
         failingViewModel.initialize();
 
         assertTrue(failingViewModel.loadFailedProperty().get());
-        assertTrue(failingViewModel.loadFailureMessageProperty().get().contains("match load failed"));
+        assertTrue(failingViewModel.loadFailureMessageProperty().get().contains("Failed to"));
         assertTrue(failingViewModel.getMatches().isEmpty());
     }
 
@@ -262,7 +262,6 @@ class MatchesViewModelTest {
         assertTrue(latch.await(5, TimeUnit.SECONDS));
         assertTrue(failingViewModel.loadFailedProperty().get());
         assertTrue(routedMessage.get().contains("Failed to refresh matches"));
-        assertTrue(routedMessage.get().contains("match load failed"));
     }
 
     @Test

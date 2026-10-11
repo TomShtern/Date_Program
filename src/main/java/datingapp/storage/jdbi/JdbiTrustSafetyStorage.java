@@ -270,10 +270,10 @@ public final class JdbiTrustSafetyStorage implements TrustSafetyStorage {
         @Override
         public Block map(ResultSet rs, StatementContext ctx) throws SQLException {
             return new Block(
-                    JdbiTypeCodecs.SqlRowReaders.readUuid(rs, "id"),
-                    JdbiTypeCodecs.SqlRowReaders.readUuid(rs, "blocker_id"),
-                    JdbiTypeCodecs.SqlRowReaders.readUuid(rs, "blocked_id"),
-                    JdbiTypeCodecs.SqlRowReaders.readInstant(rs, "created_at"));
+                    JdbiTypeCodecs.SqlRowReaders.readRequiredUuid(rs, "id"),
+                    JdbiTypeCodecs.SqlRowReaders.readRequiredUuid(rs, "blocker_id"),
+                    JdbiTypeCodecs.SqlRowReaders.readRequiredUuid(rs, "blocked_id"),
+                    JdbiTypeCodecs.SqlRowReaders.readRequiredInstant(rs, "created_at"));
         }
     }
 
@@ -282,12 +282,12 @@ public final class JdbiTrustSafetyStorage implements TrustSafetyStorage {
         @Override
         public Report map(ResultSet rs, StatementContext ctx) throws SQLException {
             return new Report(
-                    JdbiTypeCodecs.SqlRowReaders.readUuid(rs, "id"),
-                    JdbiTypeCodecs.SqlRowReaders.readUuid(rs, "reporter_id"),
-                    JdbiTypeCodecs.SqlRowReaders.readUuid(rs, "reported_user_id"),
-                    JdbiTypeCodecs.SqlRowReaders.readEnum(rs, "reason", Reason.class),
+                    JdbiTypeCodecs.SqlRowReaders.readRequiredUuid(rs, "id"),
+                    JdbiTypeCodecs.SqlRowReaders.readRequiredUuid(rs, "reporter_id"),
+                    JdbiTypeCodecs.SqlRowReaders.readRequiredUuid(rs, "reported_user_id"),
+                    JdbiTypeCodecs.SqlRowReaders.readRequiredEnum(rs, "reason", Reason.class),
                     rs.getString("description"),
-                    JdbiTypeCodecs.SqlRowReaders.readInstant(rs, "created_at"));
+                    JdbiTypeCodecs.SqlRowReaders.readRequiredInstant(rs, "created_at"));
         }
     }
 }

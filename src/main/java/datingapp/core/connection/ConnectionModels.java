@@ -298,6 +298,25 @@ public final class ConnectionModels {
             }
         }
 
+        public void unarchive(UUID userId) {
+            if (userA.equals(userId)) {
+                this.userAArchivedAt = null;
+                this.userAArchiveReason = null;
+            } else if (userB.equals(userId)) {
+                this.userBArchivedAt = null;
+                this.userBArchiveReason = null;
+            } else {
+                throw new IllegalArgumentException("User is not part of this conversation");
+            }
+        }
+
+        public boolean isArchivedBy(UUID userId) {
+            if (userA.equals(userId)) {
+                return userAArchivedAt != null;
+            }
+            return userB.equals(userId) && userBArchivedAt != null;
+        }
+
         public void setVisibility(UUID userId, boolean visible) {
             if (userA.equals(userId)) {
                 this.visibleToUserA = visible;

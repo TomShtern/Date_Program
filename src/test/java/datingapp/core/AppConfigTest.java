@@ -69,7 +69,7 @@ class AppConfigTest {
                     3, defaults.storage().validationTimeoutSeconds(), "Default validation timeout should be 3 seconds");
             assertEquals(600, defaults.storage().idleTimeoutSeconds(), "Default idle timeout should be 600 seconds");
             assertEquals(1800, defaults.storage().maxLifetimeSeconds(), "Default max lifetime should be 1800 seconds");
-            assertEquals(0, defaults.storage().keepaliveTimeSeconds(), "Default keepalive should be disabled");
+            assertEquals(30, defaults.storage().keepaliveTimeSeconds(), "Default keepalive should be 30 seconds");
         }
 
         private void assertDefaultValidationConfig(AppConfig defaults) {

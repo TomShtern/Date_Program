@@ -81,9 +81,9 @@ class TrustSafetyServiceAuditTest {
                     service.report(reporter.getId(), reported.getId(), Report.Reason.SPAM, description, true);
 
             assertTrue(result.success());
-            assertFalse(result.userWasBanned());
+            assertFalse(result.userWasFlagged());
 
-            // AUTO_BAN here indicates the threshold check was audited; outcome should be FAILURE below threshold.
+            // AUTO_FLAG here indicates the threshold check was audited; outcome should be FAILURE below threshold.
             List<String> outcomes = appender.list.stream()
                     .map(event -> event.getKeyValuePairs().stream()
                             .filter(pair -> pair.key.equals("outcome"))
@@ -106,7 +106,7 @@ class TrustSafetyServiceAuditTest {
             assertEquals(
                     List.of(
                             ModerationAuditEvent.Action.REPORT.name(),
-                            ModerationAuditEvent.Action.AUTO_BAN.name(),
+                            ModerationAuditEvent.Action.AUTO_FLAG.name(),
                             ModerationAuditEvent.Action.BLOCK.name()),
                     actions);
 
@@ -203,10 +203,10 @@ class TrustSafetyServiceAuditTest {
                     service.report(reporter.getId(), reported.getId(), Report.Reason.HARASSMENT, null, false);
 
             assertTrue(result.success());
-            assertTrue(result.userWasBanned());
+            assertTrue(result.userWasFlagged());
             assertTrue(appender.list.stream().anyMatch(event -> event.getKeyValuePairs().stream()
                     .anyMatch(pair -> pair.key.equals("action")
-                            && pair.value.toString().equals(ModerationAuditEvent.Action.AUTO_BAN.name()))));
+                            && pair.value.toString().equals(ModerationAuditEvent.Action.AUTO_FLAG.name()))));
         } finally {
             logger.detachAppender(appender);
             logger.setLevel(previousLevel);
@@ -278,7 +278,7 @@ class TrustSafetyServiceAuditTest {
                 reporter.getId(), reported.getId(), Report.Reason.SPAM, "follow-up block should fail", true);
 
         assertTrue(result.success());
-        assertFalse(result.userWasBanned());
+        assertFalse(result.userWasFlagged());
         assertTrue(trustSafetyStorage.hasReported(reporter.getId(), reported.getId()));
         assertFalse(trustSafetyStorage.isBlocked(reporter.getId(), reported.getId()));
     }

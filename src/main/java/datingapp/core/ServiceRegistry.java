@@ -21,8 +21,11 @@ import datingapp.core.matching.RecommendationService;
 import datingapp.core.matching.StandoutService;
 import datingapp.core.matching.TrustSafetyService;
 import datingapp.core.matching.UndoService;
+import datingapp.core.media.LocalDiskPhotoStore;
 import datingapp.core.metrics.AchievementService;
 import datingapp.core.metrics.ActivityMetricsService;
+import datingapp.core.presence.InMemoryPresenceStorage;
+import datingapp.core.presence.PresenceService;
 import datingapp.core.profile.ProfileService;
 import datingapp.core.profile.ValidationService;
 import datingapp.core.storage.AccountCleanupStorage;
@@ -31,6 +34,8 @@ import datingapp.core.storage.CommunicationStorage;
 import datingapp.core.storage.InteractionStorage;
 import datingapp.core.storage.TrustSafetyStorage;
 import datingapp.core.storage.UserStorage;
+import datingapp.core.verification.LocalLogVerificationSender;
+import datingapp.core.verification.VerificationSender;
 import datingapp.core.workflow.ProfileActivationPolicy;
 import datingapp.core.workflow.RelationshipWorkflowPolicy;
 import datingapp.location.FallbackGeocodingService;
@@ -38,10 +43,15 @@ import datingapp.location.GeocodingService;
 import datingapp.location.LocalGeocodingService;
 import datingapp.location.LocationService;
 import datingapp.location.NominatimGeocodingService;
+import java.nio.file.Path;
 import java.util.Objects;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @SuppressWarnings("java:S6539")
 public final class ServiceRegistry {
+
+    private static final Logger logger = LoggerFactory.getLogger(ServiceRegistry.class);
 
     private final AppConfig config;
 
@@ -76,6 +86,7 @@ public final class ServiceRegistry {
     private final AppEventBus eventBus;
     private final ProfileActivationPolicy activationPolicy;
     private final RelationshipWorkflowPolicy workflowPolicy;
+    private final PresenceService presenceService;
 
     private final MessagingUseCases messagingUseCases;
     private final MatchingUseCases matchingUseCases;
@@ -116,6 +127,7 @@ public final class ServiceRegistry {
         this.standoutService = Objects.requireNonNull(builder.standoutService, "standoutService cannot be null");
         this.undoService = Objects.requireNonNull(builder.undoService, "undoService cannot be null");
         this.connectionService = Objects.requireNonNull(builder.connectionService, "connectionService cannot be null");
+        this.connectionService.setBlockedChecker(this.trustSafetyService::isBlocked);
         this.validationService = Objects.requireNonNull(builder.validationService, "validationService cannot be null");
         this.locationService = builder.locationService != null
                 ? Objects.requireNonNull(builder.locationService, "locationService cannot be null")
@@ -129,6 +141,10 @@ public final class ServiceRegistry {
         this.eventBus = Objects.requireNonNull(builder.eventBus, "eventBus cannot be null");
         this.activationPolicy = Objects.requireNonNull(builder.activationPolicy, "activationPolicy cannot be null");
         this.workflowPolicy = Objects.requireNonNull(builder.workflowPolicy, "workflowPolicy cannot be null");
+        this.presenceService = builder.presenceService != null
+                ? Objects.requireNonNull(builder.presenceService, "presenceService cannot be null")
+                : new PresenceService(
+                        new InMemoryPresenceStorage(), this.config.safety().presence());
         this.profileMutationUseCases = builder.profileMutationUseCases != null
                 ? Objects.requireNonNull(builder.profileMutationUseCases, "profileMutationUseCases cannot be null")
                 : new ProfileMutationUseCases(
@@ -139,6 +155,16 @@ public final class ServiceRegistry {
                         this.activationPolicy,
                         this.eventBus,
                         this.accountCleanupStorage);
+        try {
+            this.profileMutationUseCases.setPhotoStore(new LocalDiskPhotoStore(
+                    Path.of(this.config.media().photoStorageRoot()),
+                    this.config.media().maxPhotoUploadBytes()));
+        } catch (Exception e) {
+            // Photo cleanup stays disabled when media config is unavailable (e.g. minimal tests).
+            if (logger.isWarnEnabled()) {
+                logger.warn("Photo store wiring skipped; account deletion will not clean up photos", e);
+            }
+        }
         this.profileInsightsUseCases = builder.profileInsightsUseCases != null
                 ? Objects.requireNonNull(builder.profileInsightsUseCases, "profileInsightsUseCases cannot be null")
                 : new ProfileInsightsUseCases(this.achievementService, this.activityMetricsService);
@@ -176,7 +202,10 @@ public final class ServiceRegistry {
                 this.profileMutationUseCases,
                 this.profileNotesUseCases,
                 this.profileInsightsUseCases);
-        this.verificationUseCases = new VerificationUseCases(this.userStorage, this.trustSafetyService);
+        this.verificationUseCases = new VerificationUseCases(
+                this.userStorage,
+                this.config,
+                builder.verificationSender != null ? builder.verificationSender : new LocalLogVerificationSender());
         this.socialUseCases = new SocialUseCases(
                 this.connectionService, this.trustSafetyService, this.communicationStorage, this.eventBus);
         this.authUseCases = Objects.requireNonNull(builder.authUseCases, "authUseCases cannot be null");
@@ -214,6 +243,19 @@ public final class ServiceRegistry {
         private ProfileActivationPolicy activationPolicy = new ProfileActivationPolicy();
         private RelationshipWorkflowPolicy workflowPolicy = new RelationshipWorkflowPolicy();
         private AuthUseCases authUseCases;
+        private PresenceService presenceService;
+        private VerificationSender verificationSender;
+
+        public Builder presenceService(PresenceService presenceService) {
+            this.presenceService = presenceService;
+            return this;
+        }
+
+        /** Delivery channel for verification codes; defaults to the local log sender. */
+        public Builder verificationSender(VerificationSender verificationSender) {
+            this.verificationSender = verificationSender;
+            return this;
+        }
 
         private Builder() {}
 
@@ -377,6 +419,10 @@ public final class ServiceRegistry {
         }
     }
 
+    public AccountCleanupStorage getAccountCleanupStorage() {
+        return accountCleanupStorage;
+    }
+
     public AppConfig getConfig() {
         return config;
     }
@@ -463,6 +509,10 @@ public final class ServiceRegistry {
 
     public AchievementService getAchievementService() {
         return achievementService;
+    }
+
+    public PresenceService getPresenceService() {
+        return presenceService;
     }
 
     public ProfileMutationUseCases getProfileMutationUseCases() {

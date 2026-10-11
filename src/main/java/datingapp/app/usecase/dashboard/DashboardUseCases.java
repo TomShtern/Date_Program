@@ -85,7 +85,7 @@ public final class DashboardUseCases {
                             connectionService.getUnreadNotificationCount(user.getId())),
                     computeProfileNudge(user)));
         } catch (Exception e) {
-            return UseCaseResult.failure(UseCaseError.internal("Failed to load dashboard summary: " + e.getMessage()));
+            return UseCaseResult.failure(UseCaseError.internalFailure("load dashboard summary", e));
         }
     }
 
@@ -98,8 +98,7 @@ public final class DashboardUseCases {
             recommendationService.markDailyPickViewed(command.context().userId());
             return UseCaseResult.success(null);
         } catch (Exception e) {
-            return UseCaseResult.failure(
-                    UseCaseError.internal("Failed to update daily pick status: " + e.getMessage()));
+            return UseCaseResult.failure(UseCaseError.internalFailure("update daily pick status", e));
         }
     }
 

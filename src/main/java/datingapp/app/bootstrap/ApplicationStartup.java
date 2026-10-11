@@ -60,6 +60,9 @@ public final class ApplicationStartup {
     private static final String CONFIG_OVERRIDE_PROPERTY = "datingapp.config";
     private static final String CONFIG_OVERRIDE_ENV = ENV_PREFIX + "CONFIG";
     private static final String SEED_DATA_ENV_VAR = ENV_PREFIX + "SEED_DATA";
+    /** When {@code true}, the deleted-account purge only logs how many accounts it would purge. */
+    private static final String PURGE_DRY_RUN_ENV_VAR = ENV_PREFIX + "PURGE_DRY_RUN";
+
     private static final Set<String> KNOWN_CONFIG_KEYS = knownConfigKeys();
 
     /**
@@ -304,6 +307,15 @@ public final class ApplicationStartup {
         applyEnvInt(envLookup, "DB_MAX_LIFETIME_SECONDS", builder::maxLifetimeSeconds);
         applyEnvInt(envLookup, "DB_KEEPALIVE_TIME_SECONDS", builder::keepaliveTimeSeconds);
         applyEnvInt(envLookup, "CLEANUP_RETENTION_DAYS", builder::cleanupRetentionDays);
+        applyEnvInt(envLookup, "SOFT_DELETE_RETENTION_DAYS", builder::softDeleteRetentionDays);
+        applyEnvInt(envLookup, "VERIFICATION_RESEND_COOLDOWN_SECONDS", builder::verificationResendCooldownSeconds);
+        applyEnvInt(envLookup, "VERIFICATION_MAX_ATTEMPTS", builder::verificationMaxAttempts);
+        applyEnvInt(envLookup, "VERIFICATION_LOCK_MINUTES", builder::verificationLockMinutes);
+        applyEnvInt(envLookup, "VERIFICATION_CODE_TTL_MINUTES", builder::verificationCodeTtlMinutes);
+        applyEnvInt(envLookup, "PRESENCE_ONLINE_SECONDS", builder::presenceOnlineSeconds);
+        applyEnvInt(envLookup, "PRESENCE_AWAY_SECONDS", builder::presenceAwaySeconds);
+        applyEnvInt(envLookup, "TYPING_FRESH_SECONDS", builder::typingFreshSeconds);
+        applyEnvStringList(envLookup, "ADMIN_CLERK_IDS", builder::adminClerkIds);
         applyEnvInt(envLookup, "MIN_AGE", builder::minAge);
         applyEnvInt(envLookup, "MAX_AGE", builder::maxAge);
         applyEnvInt(envLookup, "AUTH_CLOCK_SKEW_SECONDS", builder::clockSkewSeconds);
@@ -365,6 +377,17 @@ public final class ApplicationStartup {
         String value = envLookup.apply(ENV_PREFIX + suffix);
         if (value != null && !value.isBlank()) {
             setter.accept(value);
+        }
+    }
+
+    private static void applyEnvStringList(
+            UnaryOperator<String> envLookup, String suffix, java.util.function.Consumer<List<String>> setter) {
+        String value = envLookup.apply(ENV_PREFIX + suffix);
+        if (value != null && !value.isBlank()) {
+            setter.accept(Arrays.stream(value.split(","))
+                    .map(String::trim)
+                    .filter(part -> !part.isEmpty())
+                    .toList());
         }
     }
 
@@ -539,8 +562,23 @@ public final class ApplicationStartup {
     }
 
     private static CleanupScheduler startCleanupScheduler(ServiceRegistry serviceRegistry) {
-        CleanupScheduler scheduler =
-                new CleanupScheduler(Duration.ofHours(24), serviceRegistry.getActivityMetricsService()::runCleanup);
+        boolean purgeDryRun = "true".equalsIgnoreCase(environmentLookup().apply(PURGE_DRY_RUN_ENV_VAR));
+        PurgeDeletedAccountsWorker purgeWorker = new PurgeDeletedAccountsWorker(
+                serviceRegistry.getAccountCleanupStorage(), serviceRegistry.getConfig(), purgeDryRun);
+        CleanupScheduler scheduler = new CleanupScheduler(Duration.ofHours(24), () -> {
+            var result = serviceRegistry.getActivityMetricsService().runCleanup();
+            try {
+                purgeWorker.run();
+            } catch (Exception e) {
+                LoggerFactory.getLogger(ApplicationStartup.class).warn("Deleted-account purge failed", e);
+            }
+            try {
+                serviceRegistry.getPresenceService().purgeStale();
+            } catch (Exception e) {
+                LoggerFactory.getLogger(ApplicationStartup.class).warn("Stale presence cleanup failed", e);
+            }
+            return result;
+        });
         scheduler.start();
         return scheduler;
     }

@@ -1,8 +1,12 @@
 package datingapp.storage.jdbi;
 
 import datingapp.core.storage.AuthStorage;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.sql.SQLException;
 import java.time.Instant;
+import java.util.HexFormat;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -58,5 +62,25 @@ public final class JdbiAuthStorage implements AuthStorage {
         jdbi.useHandle(handle -> handle.createUpdate("DELETE FROM clerk_identities WHERE user_id = :userId")
                 .bind(BIND_USER_ID, userId)
                 .execute());
+    }
+
+    @Override
+    public boolean consumeDepartureFlag(String clerkUserId) {
+        return jdbi.withHandle(
+                        handle -> handle.createUpdate("DELETE FROM departed_account_flags WHERE clerk_id_hash = :hash")
+                                .bind("hash", hashClerkId(clerkUserId))
+                                .execute())
+                > 0;
+    }
+
+    /** SHA-256 hex of a Clerk user id: the only form in which a deleted account's Clerk id is kept. */
+    static String hashClerkId(String clerkUserId) {
+        try {
+            return HexFormat.of()
+                    .formatHex(
+                            MessageDigest.getInstance("SHA-256").digest(clerkUserId.getBytes(StandardCharsets.UTF_8)));
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 is not available", e);
+        }
     }
 }

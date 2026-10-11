@@ -23,6 +23,7 @@ final class RestApiIdentityPolicy {
     private static final String USER_ROUTE_MESSAGE = "Acting user does not match requested user route";
     private static final String CONVERSATION_MESSAGE = "User is not part of this conversation";
     private static final String INVALID_BEARER_MESSAGE = "Missing or invalid bearer token";
+    private static final String PRESENCE_SUFFIX = "/presence";
 
     private final AuthUseCases authUseCases;
 
@@ -112,7 +113,7 @@ final class RestApiIdentityPolicy {
         if (!ctx.pathParamMap().containsKey(paramName)) {
             return;
         }
-        if (isDirectUserReadRoute(ctx, paramName)) {
+        if (isDirectUserReadRoute(ctx, paramName) || isPresenceReadRoute(ctx, paramName)) {
             return;
         }
         Optional<UUID> actingUserId = resolveActingUserId(ctx);
@@ -132,6 +133,19 @@ final class RestApiIdentityPolicy {
         String path = ctx.path();
         return path.startsWith(RestApiRequestGuards.USERS_ROUTE_PREFIX)
                 && path.indexOf('/', RestApiRequestGuards.USERS_ROUTE_PREFIX.length()) < 0;
+    }
+
+    /**
+     * {@code GET /api/users/{id}/presence} is read about another user, so the path id is the target, not
+     * the caller. The handler decides who may read it; a request with no caller is still rejected there.
+     */
+    private boolean isPresenceReadRoute(Context ctx, String paramName) {
+        if (!"id".equals(paramName) || ctx.method() != HandlerType.GET) {
+            return false;
+        }
+        String path = ctx.path();
+        return path.startsWith(RestApiRequestGuards.USERS_ROUTE_PREFIX)
+                && path.equals(RestApiRequestGuards.USERS_ROUTE_PREFIX + ctx.pathParam(paramName) + PRESENCE_SUFFIX);
     }
 
     ConversationParticipants parseConversationParticipants(String conversationId) {

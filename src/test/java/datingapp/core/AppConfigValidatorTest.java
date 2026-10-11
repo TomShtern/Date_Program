@@ -392,14 +392,51 @@ class AppConfigValidatorTest {
         ZoneId utc = ZoneId.of("UTC");
         assertThrows(
                 IllegalArgumentException.class,
-                () -> new AppConfig.SafetyConfig(0, utc, 30, 60, 1, 5, 10, 25, 50, 20, 0.35, 0.65, 100, 4, 30, 90));
+                () -> new AppConfig.SafetyConfig(
+                        0,
+                        utc,
+                        30,
+                        60,
+                        1,
+                        5,
+                        10,
+                        25,
+                        50,
+                        20,
+                        0.35,
+                        0.65,
+                        100,
+                        4,
+                        30,
+                        90,
+                        new AppConfig.VerificationConfig(60, 5, 15, 10),
+                        new AppConfig.PresenceConfig(120, 600, 10),
+                        java.util.List.of()));
     }
 
     @Test
     @DisplayName("validateSafety accepts valid safety parameters")
     void validateSafetyAcceptsValidValues() {
         ZoneId utc = ZoneId.of("UTC");
-        assertDoesNotThrow(
-                () -> new AppConfig.SafetyConfig(3, utc, 30, 60, 1, 5, 10, 25, 50, 20, 0.35, 0.65, 100, 4, 30, 90));
+        assertDoesNotThrow(() -> new AppConfig.SafetyConfig(
+                3,
+                utc,
+                30,
+                60,
+                1,
+                5,
+                10,
+                25,
+                50,
+                20,
+                0.35,
+                0.65,
+                100,
+                4,
+                30,
+                90,
+                new AppConfig.VerificationConfig(60, 5, 15, 10),
+                new AppConfig.PresenceConfig(120, 600, 10),
+                java.util.List.of()));
     }
 }

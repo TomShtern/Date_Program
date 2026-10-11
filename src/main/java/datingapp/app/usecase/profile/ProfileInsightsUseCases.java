@@ -42,7 +42,7 @@ public class ProfileInsightsUseCases {
                     achievementService.getUnlocked(query.context().userId());
             return UseCaseResult.success(new AchievementSnapshot(unlocked, newlyUnlocked));
         } catch (Exception e) {
-            return UseCaseResult.failure(UseCaseError.internal("Failed to load achievements: " + e.getMessage()));
+            return UseCaseResult.failure(UseCaseError.internalFailure("load achievements", e));
         }
     }
 
@@ -56,7 +56,7 @@ public class ProfileInsightsUseCases {
         try {
             return UseCaseResult.success(getOrComputeStats(query.context().userId()));
         } catch (Exception e) {
-            return UseCaseResult.failure(UseCaseError.internal("Failed to load user statistics: " + e.getMessage()));
+            return UseCaseResult.failure(UseCaseError.internalFailure("load user statistics", e));
         }
     }
 
@@ -76,7 +76,7 @@ public class ProfileInsightsUseCases {
                     .getCurrentSession(query.context().userId())
                     .map(ProfileInsightsUseCases::toCurrentSessionSnapshot)));
         } catch (Exception e) {
-            return UseCaseResult.failure(UseCaseError.internal("Failed to load session summary: " + e.getMessage()));
+            return UseCaseResult.failure(UseCaseError.internalFailure("load session summary", e));
         }
     }
 
@@ -92,7 +92,7 @@ public class ProfileInsightsUseCases {
             return UseCaseResult.success(List.copyOf(
                     activityMetricsService.getSessionHistory(query.context().userId(), query.limit())));
         } catch (Exception e) {
-            return UseCaseResult.failure(UseCaseError.internal("Failed to load session history: " + e.getMessage()));
+            return UseCaseResult.failure(UseCaseError.internalFailure("load session history", e));
         }
     }
 

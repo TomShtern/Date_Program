@@ -518,7 +518,11 @@ class RestApiPhaseTwoRoutesTest {
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
         assertEquals(204, deleteConversationResponse.statusCode());
-        assertTrue(communicationStorage.getConversation(conversationId).isEmpty());
+        // Delete is per user: the row stays for the other participant, hidden from the caller.
+        var hiddenConversation =
+                communicationStorage.getConversation(conversationId).orElseThrow();
+        assertFalse(hiddenConversation.isVisibleTo(aliceId));
+        assertTrue(hiddenConversation.isVisibleTo(bobId));
 
         HttpResponse<String> archiveMatchResponse = client.send(
                 HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/users/" + aliceId + "/matches/"

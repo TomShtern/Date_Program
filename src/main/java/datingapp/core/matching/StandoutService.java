@@ -2,6 +2,7 @@ package datingapp.core.matching;
 
 import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
+import datingapp.core.Snapshots;
 import datingapp.core.model.User;
 import datingapp.core.profile.ProfileService;
 import datingapp.core.storage.UserStorage;
@@ -264,6 +265,10 @@ public class StandoutService {
     }
 
     public record Result(List<Standout> standouts, int totalCandidates, boolean fromCache, String message) {
+        public Result {
+            standouts = Snapshots.listOf(standouts);
+        }
+
         public boolean isEmpty() {
             return standouts == null || standouts.isEmpty();
         }

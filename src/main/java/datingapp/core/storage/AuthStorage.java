@@ -18,4 +18,11 @@ public interface AuthStorage {
     boolean linkClerkId(String clerkUserId, UUID userId, Instant createdAt);
 
     void deleteIdentityForUser(UUID userId);
+
+    /**
+     * Removes the "left while reported" flag for a Clerk user, if one exists.
+     *
+     * @return {@code true} if a flag existed, meaning this Clerk user's new profile must start under review
+     */
+    boolean consumeDepartureFlag(String clerkUserId);
 }

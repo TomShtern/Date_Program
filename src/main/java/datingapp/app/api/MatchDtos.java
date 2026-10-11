@@ -3,9 +3,11 @@ package datingapp.app.api;
 import datingapp.app.api.RestApiUserDtos.UserSummary;
 import datingapp.app.usecase.matching.MatchingUseCases.MatchQualitySnapshot;
 import datingapp.app.usecase.matching.MatchingUseCases.UndoOutcome;
+import datingapp.core.matching.DailyLimitService.DailyStatus;
 import datingapp.core.model.Match;
 import datingapp.core.model.User;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -76,6 +78,30 @@ final class MatchDtos {
 
     /** Response for like action. */
     static record LikeResponse(boolean isMatch, String message, MatchSummary match) {}
+
+    /**
+     * One swipe kind's daily quota. {@code remaining} is null when {@code unlimited} is true, so the client
+     * never has to interpret a sentinel number.
+     */
+    static record DailyQuotaDto(int used, Integer remaining, boolean unlimited) {
+        static DailyQuotaDto of(int used, int remaining) {
+            boolean unlimited = remaining < 0;
+            return new DailyQuotaDto(used, unlimited ? null : remaining, unlimited);
+        }
+    }
+
+    /** Today's swipe quotas and the instant they reset. */
+    static record DailyStatusResponse(
+            LocalDate date, Instant resetsAt, DailyQuotaDto likes, DailyQuotaDto superLikes, DailyQuotaDto passes) {
+        static DailyStatusResponse from(DailyStatus status) {
+            return new DailyStatusResponse(
+                    status.date(),
+                    status.resetsAt(),
+                    DailyQuotaDto.of(status.likesUsed(), status.likesRemaining()),
+                    DailyQuotaDto.of(status.superLikesUsed(), status.superLikesRemaining()),
+                    DailyQuotaDto.of(status.passesUsed(), status.passesRemaining()));
+        }
+    }
 
     /** Response for pass action. */
     static record PassResponse(String message) {}

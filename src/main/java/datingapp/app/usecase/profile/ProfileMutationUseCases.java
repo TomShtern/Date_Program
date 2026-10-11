@@ -8,6 +8,7 @@ import datingapp.app.usecase.common.UseCaseResult;
 import datingapp.app.usecase.common.UserContext;
 import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
+import datingapp.core.Snapshots;
 import datingapp.core.metrics.AchievementService;
 import datingapp.core.metrics.EngagementDomain.Achievement.UserAchievement;
 import datingapp.core.model.User;
@@ -37,6 +38,12 @@ public final class ProfileMutationUseCases {
     private static final String USER_STORAGE_REQUIRED = "UserStorage is required";
     private static final String USER_NOT_FOUND = "User not found";
 
+    /** Stable conflict codes for the pause/resume routes. */
+    public static final String REASON_PROFILE_NOT_ACTIVE = "PROFILE_NOT_ACTIVE";
+
+    public static final String REASON_PROFILE_NOT_PAUSED = "PROFILE_NOT_PAUSED";
+    public static final String REASON_PROFILE_INCOMPLETE = "PROFILE_INCOMPLETE";
+
     private final UserStorage userStorage;
     private final ValidationService validationService;
     private final AchievementService achievementService;
@@ -44,6 +51,7 @@ public final class ProfileMutationUseCases {
     private final AppConfig config;
     private final ProfileActivationPolicy activationPolicy;
     private final AppEventBus eventBus;
+    private volatile datingapp.core.media.PhotoStore photoStore;
 
     public ProfileMutationUseCases(
             UserStorage userStorage,
@@ -71,6 +79,11 @@ public final class ProfileMutationUseCases {
         this.config = Objects.requireNonNull(config, "config cannot be null");
         this.activationPolicy = Objects.requireNonNull(activationPolicy, "activationPolicy cannot be null");
         this.eventBus = Objects.requireNonNull(eventBus, "eventBus cannot be null");
+    }
+
+    /** Wires photo file cleanup for GDPR deletion. Optional; no-op when unset (e.g. tests). */
+    public void setPhotoStore(datingapp.core.media.PhotoStore photoStore) {
+        this.photoStore = photoStore;
     }
 
     public UseCaseResult<CreateUserResult> createUser(CreateUserCommand command) {
@@ -108,7 +121,7 @@ public final class ProfileMutationUseCases {
             userStorage.save(user);
             return UseCaseResult.success(new CreateUserResult(user));
         } catch (Exception e) {
-            return UseCaseResult.failure(UseCaseError.internal("Failed to create user: " + e.getMessage()));
+            return UseCaseResult.failure(UseCaseError.internalFailure("create user", e));
         }
     }
 
@@ -144,12 +157,13 @@ public final class ProfileMutationUseCases {
 
     private UseCaseResult<ProfileSaveResult> executeProfileSave(User user, String logMessage) {
         sanitizeProfileText(user);
-        var activation = activationPolicy.tryActivate(user);
-        boolean activated = activation.activated();
+        // A paused profile stays paused across edits; only resumeProfile brings it back.
+        boolean activated = user.getState() != User.UserState.PAUSED
+                && activationPolicy.tryActivate(user).activated();
         try {
             userStorage.save(user);
         } catch (Exception e) {
-            return UseCaseResult.failure(UseCaseError.internal("Failed to save profile: " + e.getMessage()));
+            return UseCaseResult.failure(UseCaseError.internalFailure("save profile", e));
         }
 
         if (logger.isInfoEnabled()) {
@@ -213,7 +227,7 @@ public final class ProfileMutationUseCases {
             userStorage.save(user);
             return UseCaseResult.success(user);
         } catch (Exception e) {
-            return UseCaseResult.failure(UseCaseError.internal("Failed to update preferences: " + e.getMessage()));
+            return UseCaseResult.failure(UseCaseError.internalFailure("update preferences", e));
         }
     }
 
@@ -236,10 +250,69 @@ public final class ProfileMutationUseCases {
             applyProfilePreferenceFields(user, command);
             applyProfileLifestyleFields(user, command);
         } catch (IllegalArgumentException | IllegalStateException e) {
-            return UseCaseResult.failure(UseCaseError.validation(e.getMessage()));
+            return UseCaseResult.failure(UseCaseError.validation(stableProfileUpdateMessage(e.getMessage())));
         }
 
         return saveProfile(new SaveProfileCommand(command.context(), user));
+    }
+
+    /** Hides the caller's own profile from discovery. Only an ACTIVE profile can be paused. */
+    public UseCaseResult<User> pauseProfile(PauseProfileCommand command) {
+        if (command == null || command.context() == null) {
+            return UseCaseResult.failure(UseCaseError.validation(CONTEXT_REQUIRED));
+        }
+        if (userStorage == null) {
+            return UseCaseResult.failure(UseCaseError.dependency(USER_STORAGE_REQUIRED));
+        }
+        User user = userStorage.get(command.context().userId()).orElse(null);
+        if (user == null) {
+            return UseCaseResult.failure(UseCaseError.notFound(USER_NOT_FOUND));
+        }
+        if (user.getState() != User.UserState.ACTIVE) {
+            return UseCaseResult.failure(
+                    UseCaseError.conflict(REASON_PROFILE_NOT_ACTIVE, "Only an active profile can be paused"));
+        }
+        try {
+            user.pause();
+            userStorage.save(user);
+            return UseCaseResult.success(user);
+        } catch (Exception e) {
+            return UseCaseResult.failure(UseCaseError.internalFailure("pause profile", e));
+        }
+    }
+
+    /** Puts the caller's own paused profile back into discovery. The profile must still be complete. */
+    public UseCaseResult<User> resumeProfile(ResumeProfileCommand command) {
+        if (command == null || command.context() == null) {
+            return UseCaseResult.failure(UseCaseError.validation(CONTEXT_REQUIRED));
+        }
+        if (userStorage == null) {
+            return UseCaseResult.failure(UseCaseError.dependency(USER_STORAGE_REQUIRED));
+        }
+        User user = userStorage.get(command.context().userId()).orElse(null);
+        if (user == null) {
+            return UseCaseResult.failure(UseCaseError.notFound(USER_NOT_FOUND));
+        }
+        if (user.getState() == User.UserState.INCOMPLETE) {
+            return UseCaseResult.failure(incompleteProfile());
+        }
+        if (user.getState() != User.UserState.PAUSED) {
+            return UseCaseResult.failure(
+                    UseCaseError.conflict(REASON_PROFILE_NOT_PAUSED, "Only a paused profile can be resumed"));
+        }
+        try {
+            if (!activationPolicy.tryActivate(user).activated()) {
+                return UseCaseResult.failure(incompleteProfile());
+            }
+            userStorage.save(user);
+            return UseCaseResult.success(user);
+        } catch (Exception e) {
+            return UseCaseResult.failure(UseCaseError.internalFailure("resume profile", e));
+        }
+    }
+
+    private static UseCaseError incompleteProfile() {
+        return UseCaseError.conflict(REASON_PROFILE_INCOMPLETE, "Complete the profile before resuming it");
     }
 
     /**
@@ -278,6 +351,18 @@ public final class ProfileMutationUseCases {
             } else {
                 userStorage.save(deletedUser);
             }
+            if (photoStore != null) {
+                try {
+                    photoStore.deleteAllForUser(command.context().userId());
+                } catch (Exception e) {
+                    if (logger.isWarnEnabled()) {
+                        logger.warn(
+                                "Photo cleanup failed for deleted user {}",
+                                command.context().userId(),
+                                e);
+                    }
+                }
+            }
             // Intentional: mutate the caller-visible original so any downstream
             // request-local logic sees the deleted state. Persistence already
             // occurred on deletedUser above.
@@ -292,7 +377,7 @@ public final class ProfileMutationUseCases {
                     logger);
             return UseCaseResult.success(null);
         } catch (Exception e) {
-            return UseCaseResult.failure(UseCaseError.internal("Failed to delete account: " + e.getMessage()));
+            return UseCaseResult.failure(UseCaseError.internalFailure("delete account", e));
         }
     }
 
@@ -402,8 +487,7 @@ public final class ProfileMutationUseCases {
         if (user.getState() == User.UserState.ACTIVE) {
             user.pause();
         }
-        user.setEmail(null);
-        user.setPhone(null);
+        user.scrubForDeletion();
     }
 
     private static void sanitizeProfileText(User user) {
@@ -424,6 +508,56 @@ public final class ProfileMutationUseCases {
         }
     }
 
+    /**
+     * Maps storage/validation internals to a stable user-facing message. Raw exception text
+     * stays server-side (logged via {@code internalFailure} paths); the API surface only
+     * exposes one of a small set of stable profile-update failures.
+     */
+    public static String stableProfileUpdateMessage(String detail) {
+        if (detail == null || detail.isBlank()) {
+            return "Invalid profile update.";
+        }
+        String normalized = detail.trim();
+        String lower = normalized.toLowerCase(java.util.Locale.ROOT);
+        if (lower.contains("name")) {
+            return "Invalid name.";
+        }
+        if (lower.contains("bio")) {
+            return "Invalid bio.";
+        }
+        if (lower.contains("min age")
+                || lower.contains("max age")
+                || lower.contains("minage")
+                || lower.contains("maxage")
+                || lower.contains("age range")) {
+            return "Invalid age range.";
+        }
+        if (lower.contains("birth") || lower.contains("age")) {
+            return "Invalid birth date.";
+        }
+        if (lower.contains("gender") || lower.contains("interested")) {
+            return "Invalid gender preference.";
+        }
+        if (lower.contains("location") || lower.contains("latitude") || lower.contains("longitude")) {
+            return "Invalid location.";
+        }
+        if (lower.contains("distance")) {
+            return "Invalid distance preference.";
+        }
+        if (lower.contains("photo")) {
+            return "Invalid photo.";
+        }
+        if (lower.contains("interest")
+                || lower.contains("lifestyle")
+                || lower.contains("education")
+                || lower.contains("height")
+                || lower.contains("dealbreaker")
+                || lower.contains("pace")) {
+            return "Invalid profile preferences.";
+        }
+        return "Invalid profile update.";
+    }
+
     public static record SaveProfileCommand(UserContext context, User user) {}
 
     public static record ProfileSaveResult(User user, boolean activated, List<UserAchievement> newlyUnlocked) {
@@ -433,7 +567,11 @@ public final class ProfileMutationUseCases {
     }
 
     public static record UpdateDiscoveryPreferencesCommand(
-            UserContext context, int minAge, int maxAge, int maxDistanceKm, Set<Gender> interestedIn) {}
+            UserContext context, int minAge, int maxAge, int maxDistanceKm, Set<Gender> interestedIn) {
+        public UpdateDiscoveryPreferencesCommand {
+            interestedIn = Snapshots.setOf(interestedIn);
+        }
+    }
 
     public static record UpdateProfileCommand(
             UserContext context,
@@ -455,9 +593,18 @@ public final class ProfileMutationUseCases {
             Lifestyle.Education education,
             Set<datingapp.core.profile.MatchPreferences.Interest> interests,
             Dealbreakers dealbreakers,
-            PacePreferences pacePreferences) {}
+            PacePreferences pacePreferences) {
+        public UpdateProfileCommand {
+            interestedIn = Snapshots.setOf(interestedIn);
+            interests = Snapshots.setOf(interests);
+        }
+    }
 
     public static record DeleteAccountCommand(UserContext context, AppEvent.DeletionReason reason) {}
+
+    public static record PauseProfileCommand(UserContext context) {}
+
+    public static record ResumeProfileCommand(UserContext context) {}
 
     public static record CreateUserCommand(String name, Integer age, Gender gender, Gender interestedIn) {}
 

@@ -2,7 +2,6 @@ package datingapp.storage;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import datingapp.app.bootstrap.ApplicationStartup;
 import datingapp.core.AppConfig;
@@ -10,6 +9,7 @@ import datingapp.core.ServiceRegistry;
 import datingapp.core.connection.ConnectionModels.Like;
 import datingapp.core.matching.MatchingService.RecordLikeOutcome;
 import datingapp.core.testutil.TestUserFactory;
+import datingapp.support.LivePostgresqlTestConfig;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -47,11 +47,15 @@ class PostgresqlConcurrentMutualLikeTest {
 
     @BeforeEach
     void setUp() {
-        assumeTrue(isConfigured(), "requires datingapp.pgtest.* system properties");
+        LivePostgresqlTestConfig.assumeConfigured();
         ApplicationStartup.reset();
         DatabaseManager.resetInstance();
         System.clearProperty(DB_PROFILE_PROPERTY);
-        System.setProperty(DB_PASSWORD_PROPERTY, System.getProperty(PASSWORD_PROPERTY));
+        var pg = LivePostgresqlTestConfig.requireConfig();
+        System.setProperty(URL_PROPERTY, pg.jdbcUrl());
+        System.setProperty(USERNAME_PROPERTY, pg.username());
+        System.setProperty(PASSWORD_PROPERTY, pg.password());
+        System.setProperty(DB_PASSWORD_PROPERTY, pg.password());
         createdUserIds.clear();
         servicesUnderTest = null;
     }
@@ -65,6 +69,9 @@ class PostgresqlConcurrentMutualLikeTest {
         servicesUnderTest = null;
         ApplicationStartup.reset();
         DatabaseManager.resetInstance();
+        System.clearProperty(URL_PROPERTY);
+        System.clearProperty(USERNAME_PROPERTY);
+        System.clearProperty(PASSWORD_PROPERTY);
         System.clearProperty(DB_PASSWORD_PROPERTY);
     }
 
@@ -119,15 +126,5 @@ class PostgresqlConcurrentMutualLikeTest {
         assertTrue(services.getInteractionStorage()
                 .get(datingapp.core.model.Match.generateId(a.getId(), b.getId()))
                 .isPresent());
-    }
-
-    private static boolean isConfigured() {
-        return isNonBlank(System.getProperty(URL_PROPERTY))
-                && isNonBlank(System.getProperty(USERNAME_PROPERTY))
-                && isNonBlank(System.getProperty(PASSWORD_PROPERTY));
-    }
-
-    private static boolean isNonBlank(String value) {
-        return value != null && !value.isBlank();
     }
 }

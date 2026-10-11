@@ -94,15 +94,27 @@ class ConnectionServiceTest {
     @Test
     @DisplayName("canMessage returns false when the recipient is no longer active")
     void canMessageReturnsFalseWhenRecipientIsNoLongerActive() {
-        recipient.pause();
+        recipient.ban();
 
         assertFalse(service.canMessage(sender.getId(), recipient.getId()));
     }
 
     @Test
+    @DisplayName("a paused user keeps their conversations: messaging works in both directions")
+    void pausedUserCanStillMessageAndBeMessaged() {
+        recipient.pause();
+
+        assertTrue(service.canMessage(sender.getId(), recipient.getId()));
+        assertTrue(service.sendMessage(sender.getId(), recipient.getId(), "Still here?")
+                .success());
+        assertTrue(service.sendMessage(recipient.getId(), sender.getId(), "Yes, just paused")
+                .success());
+    }
+
+    @Test
     @DisplayName("getOrCreateConversation rejects an inactive recipient even when the match still exists")
     void getOrCreateConversationRejectsInactiveRecipientEvenWhenMatchStillExists() {
-        recipient.pause();
+        recipient.ban();
         UUID senderId = sender.getId();
         UUID recipientId = recipient.getId();
 
@@ -211,6 +223,18 @@ class ConnectionServiceTest {
 
     private void archiveConversationAsOutsider(String conversationId) {
         service.archiveConversation(conversationId, outsider.getId(), MatchArchiveReason.BLOCK);
+    }
+
+    @Test
+    @DisplayName("messaging is refused when the block check itself fails")
+    void messagingFailsClosedWhenBlockCheckThrows() {
+        service.setBlockedChecker((userA, userB) -> {
+            throw new IllegalStateException("simulated block lookup failure");
+        });
+
+        assertFalse(service.canMessage(sender.getId(), recipient.getId()));
+        assertFalse(
+                service.sendMessage(sender.getId(), recipient.getId(), "Hello").success());
     }
 
     private void deleteConversationAsOutsider(String conversationId) {

@@ -126,13 +126,13 @@ class DatabaseManagerConfigurationTest {
     @Test
     @DisplayName("dev profile should rewrite the implicit default file database path")
     void devProfileRewritesImplicitDefaultFileDatabasePath() {
-        assertEquals("jdbc:h2:./data/dating-dev", invokeEffectiveJdbcUrl("jdbc:h2:./data/dating", "dev", null));
+        assertEquals(expectedDataUrl("dating-dev"), invokeEffectiveJdbcUrl("jdbc:h2:./data/dating", "dev", null));
     }
 
     @Test
     @DisplayName("test profile should rewrite the implicit default file database path")
     void testProfileRewritesImplicitDefaultFileDatabasePath() {
-        assertEquals("jdbc:h2:./data/dating-test", invokeEffectiveJdbcUrl("jdbc:h2:./data/dating", "test", null));
+        assertEquals(expectedDataUrl("dating-test"), invokeEffectiveJdbcUrl("jdbc:h2:./data/dating", "test", null));
     }
 
     @Test
@@ -201,7 +201,11 @@ class DatabaseManagerConfigurationTest {
         applySessionQueryTimeout.invoke(manager, connection);
 
         assertEquals(
-                List.of("SET search_path TO public", "SET TIME ZONE 'UTC'", "SET statement_timeout TO 42000"),
+                List.of(
+                        "SET search_path TO public",
+                        "SET TIME ZONE 'UTC'",
+                        "SET statement_timeout TO 42000",
+                        "SET lock_timeout TO 10000"),
                 executedSql);
     }
 
@@ -277,7 +281,7 @@ class DatabaseManagerConfigurationTest {
 
         DatabaseManager.resetInstance();
 
-        assertEquals("jdbc:h2:./data/dating", currentJdbcUrl());
+        assertEquals(expectedDataUrl("dating"), currentJdbcUrl());
     }
 
     @Test
@@ -327,6 +331,10 @@ class DatabaseManagerConfigurationTest {
 
     private static String invokeEffectiveJdbcUrl(String jdbcUrl, String profile, String explicitPassword) {
         return DatabaseManager.resolveJdbcUrl(jdbcUrl, profile, explicitPassword);
+    }
+
+    private static String expectedDataUrl(String dbName) {
+        return "jdbc:h2:" + System.getProperty("user.dir", ".").replace('\\', '/') + "/data/" + dbName;
     }
 
     private static String invokeResolvedPassword(String explicitPassword, String profile, String jdbcUrl) {

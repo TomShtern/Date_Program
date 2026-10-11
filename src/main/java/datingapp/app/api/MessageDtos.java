@@ -8,9 +8,14 @@ import java.util.UUID;
 final class MessageDtos {
     private MessageDtos() {}
 
-    /** Conversation summary for API responses. */
+    /** Conversation summary for API responses. {@code archived} is the requesting user's own archive state. */
     static record ConversationSummary(
-            String id, UUID otherUserId, String otherUserName, int messageCount, Instant lastMessageAt) {}
+            String id,
+            UUID otherUserId,
+            String otherUserName,
+            int messageCount,
+            Instant lastMessageAt,
+            boolean archived) {}
 
     /** Message DTO for API responses. */
     static record MessageDto(UUID id, String conversationId, UUID senderId, String content, Instant sentAt) {

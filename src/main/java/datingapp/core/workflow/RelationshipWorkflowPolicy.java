@@ -97,16 +97,21 @@ public final class RelationshipWorkflowPolicy {
     }
 
     public MessageSendDecision evaluateMessageSend(Match match, User sender, User recipient) {
-        if (sender == null || sender.getState() != UserState.ACTIVE) {
+        if (!canHoldConversations(sender)) {
             return MessageSendDecision.deny(MessageSendDeniedReason.SENDER_NOT_ACTIVE);
         }
-        if (recipient == null || recipient.getState() != UserState.ACTIVE) {
+        if (!canHoldConversations(recipient)) {
             return MessageSendDecision.deny(MessageSendDeniedReason.RECIPIENT_NOT_ACTIVE);
         }
         if (match == null || !match.canMessage()) {
             return MessageSendDecision.deny(MessageSendDeniedReason.MATCH_NOT_MESSAGEABLE);
         }
         return MessageSendDecision.allow();
+    }
+
+    /** Pausing only hides a profile from discovery; a paused user keeps chatting with existing matches. */
+    private static boolean canHoldConversations(User user) {
+        return user != null && (user.getState() == UserState.ACTIVE || user.getState() == UserState.PAUSED);
     }
 
     /** Returns the set of states reachable from the given state. */

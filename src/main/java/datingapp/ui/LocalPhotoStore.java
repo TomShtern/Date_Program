@@ -1,7 +1,9 @@
 package datingapp.ui;
 
 import com.drew.imaging.ImageMetadataReader;
+import com.drew.imaging.ImageProcessingException;
 import com.drew.metadata.Metadata;
+import com.drew.metadata.MetadataException;
 import com.drew.metadata.exif.ExifDirectoryBase;
 import com.drew.metadata.exif.ExifIFD0Directory;
 import java.awt.Graphics2D;
@@ -152,7 +154,7 @@ public final class LocalPhotoStore {
             Path path = Path.of(uri).normalize();
             Path normalizedRoot = photoDirectory.toAbsolutePath().normalize();
             return path.startsWith(normalizedRoot) ? path : null;
-        } catch (Exception _) {
+        } catch (RuntimeException _) {
             return null;
         }
     }
@@ -282,7 +284,7 @@ public final class LocalPhotoStore {
                     case 8 -> 270;
                     default -> 0;
                 };
-            } catch (Exception _) {
+            } catch (ImageProcessingException | IOException | MetadataException | RuntimeException _) {
                 return 0;
             }
         }

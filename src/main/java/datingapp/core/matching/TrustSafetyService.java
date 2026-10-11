@@ -46,7 +46,7 @@ public final class TrustSafetyService {
     private final AppConfig config;
     private final CommunicationStorage communicationStorage; // nullable
     private final RelationshipWorkflowPolicy workflowPolicy;
-    private final ModerationAuditLogger moderationAuditLogger = new ModerationAuditLogger();
+    private final ModerationAuditLogger moderationAuditLogger;
     private CandidateFinder candidateFinder;
 
     public static Builder builder() {
@@ -89,6 +89,7 @@ public final class TrustSafetyService {
         this.config = Objects.requireNonNull(resolvedBuilder.config, "config cannot be null");
         this.communicationStorage = resolvedBuilder.communicationStorage;
         this.workflowPolicy = Objects.requireNonNull(resolvedBuilder.workflowPolicy, "workflowPolicy cannot be null");
+        this.moderationAuditLogger = new ModerationAuditLogger(resolvedBuilder.moderationAuditStorage);
     }
 
     public static final class Builder {
@@ -98,6 +99,7 @@ public final class TrustSafetyService {
         private AppConfig config;
         private CommunicationStorage communicationStorage;
         private RelationshipWorkflowPolicy workflowPolicy = new RelationshipWorkflowPolicy();
+        private ModerationAuditStorage moderationAuditStorage = ModerationAuditStorage.noOp();
 
         private Builder() {}
 
@@ -128,6 +130,12 @@ public final class TrustSafetyService {
 
         public Builder workflowPolicy(RelationshipWorkflowPolicy workflowPolicy) {
             this.workflowPolicy = workflowPolicy;
+            return this;
+        }
+
+        public Builder moderationAuditStorage(ModerationAuditStorage moderationAuditStorage) {
+            this.moderationAuditStorage =
+                    Objects.requireNonNull(moderationAuditStorage, "moderationAuditStorage cannot be null");
             return this;
         }
 
@@ -173,11 +181,11 @@ public final class TrustSafetyService {
                         AUDIT_KEY_DESCRIPTION_LENGTH,
                         description == null ? null : description.length()));
 
-        boolean autoBanned = applyAutoBanIfThreshold(reportedUserId);
+        boolean autoFlagged = applyAutoFlagIfThreshold(reportedUserId, reason);
 
         applyRequestedBlockAfterReport(reporterId, reportedUserId, blockUser);
 
-        return new ReportResult(true, autoBanned, null);
+        return new ReportResult(true, autoFlagged, null);
     }
 
     private Optional<ReportResult> validateReportRequest(
@@ -320,12 +328,14 @@ public final class TrustSafetyService {
      * is not banned automatically: {@code UNDER_REVIEW} removes it from discovery and
      * swiping, and a human decides the ban. Returns true only when this call flagged it.
      */
-    private boolean applyAutoBanIfThreshold(UUID reportedUserId) {
+    private boolean applyAutoFlagIfThreshold(UUID reportedUserId, Report.Reason reason) {
+        int threshold = thresholdFor(reason);
+        boolean escalated = isEscalatedReason(reason);
         return userStorage.withUserLock(reportedUserId, lockedUsers -> {
             int reportCount = trustSafetyStorage.countReportsAgainst(reportedUserId);
-            if (reportCount < config.safety().autoBanThreshold()) {
+            if (reportCount < threshold) {
                 auditModeration(
-                        ModerationAuditEvent.Action.AUTO_BAN,
+                        ModerationAuditEvent.Action.AUTO_FLAG,
                         ModerationAuditEvent.Outcome.FAILURE,
                         null,
                         reportedUserId,
@@ -333,7 +343,7 @@ public final class TrustSafetyService {
                                 AUDIT_KEY_REPORT_COUNT,
                                 reportCount,
                                 AUDIT_KEY_THRESHOLD,
-                                config.safety().autoBanThreshold(),
+                                threshold,
                                 AUDIT_KEY_MODERATION_REASON_CODE,
                                 "below_threshold"));
                 return false;
@@ -347,7 +357,7 @@ public final class TrustSafetyService {
                     || latestReported.getState() == UserState.BANNED
                     || latestReported.getState() == UserState.UNDER_REVIEW) {
                 auditModeration(
-                        ModerationAuditEvent.Action.AUTO_BAN,
+                        ModerationAuditEvent.Action.AUTO_FLAG,
                         ModerationAuditEvent.Outcome.FAILURE,
                         null,
                         reportedUserId,
@@ -355,7 +365,7 @@ public final class TrustSafetyService {
                                 AUDIT_KEY_REPORT_COUNT,
                                 reportCount,
                                 AUDIT_KEY_THRESHOLD,
-                                config.safety().autoBanThreshold(),
+                                threshold,
                                 AUDIT_KEY_MODERATION_REASON_CODE,
                                 latestReported == null
                                         ? "user_missing"
@@ -369,7 +379,7 @@ public final class TrustSafetyService {
             try {
                 lockedUsers.save(latestReported);
                 auditModeration(
-                        ModerationAuditEvent.Action.AUTO_BAN,
+                        ModerationAuditEvent.Action.AUTO_FLAG,
                         ModerationAuditEvent.Outcome.SUCCESS,
                         null,
                         reportedUserId,
@@ -377,9 +387,11 @@ public final class TrustSafetyService {
                                 AUDIT_KEY_REPORT_COUNT,
                                 reportCount,
                                 AUDIT_KEY_THRESHOLD,
-                                config.safety().autoBanThreshold(),
+                                threshold,
                                 AUDIT_KEY_BAN_PERSISTED,
-                                true));
+                                true,
+                                "escalated",
+                                escalated));
                 return true;
             } catch (RuntimeException exception) {
                 logger.error(
@@ -388,7 +400,7 @@ public final class TrustSafetyService {
                         reportCount,
                         exception);
                 auditModeration(
-                        ModerationAuditEvent.Action.AUTO_BAN,
+                        ModerationAuditEvent.Action.AUTO_FLAG,
                         ModerationAuditEvent.Outcome.FAILURE,
                         null,
                         reportedUserId,
@@ -396,12 +408,20 @@ public final class TrustSafetyService {
                                 AUDIT_KEY_REPORT_COUNT,
                                 reportCount,
                                 AUDIT_KEY_THRESHOLD,
-                                config.safety().autoBanThreshold(),
+                                threshold,
                                 AUDIT_KEY_MODERATION_REASON_CODE,
                                 "save_failed"));
                 return false;
             }
         });
+    }
+
+    private int thresholdFor(Report.Reason reason) {
+        return isEscalatedReason(reason) ? 1 : config.safety().autoBanThreshold();
+    }
+
+    private static boolean isEscalatedReason(Report.Reason reason) {
+        return reason == Report.Reason.UNDERAGE || reason == Report.Reason.HARASSMENT;
     }
 
     private static boolean isDuplicateKeyViolation(RuntimeException exception) {
@@ -668,8 +688,64 @@ public final class TrustSafetyService {
         return trustSafetyStorage.isBlocked(userA, userB);
     }
 
+    /** Counts reports filed against a user. */
+    public int countReportsAgainst(UUID userId) {
+        Objects.requireNonNull(userId, "userId cannot be null");
+        return trustSafetyStorage.countReportsAgainst(userId);
+    }
+
+    /** Admin: bans the target user. Idempotent. */
+    public void adminBan(UUID adminId, UUID targetId) {
+        Objects.requireNonNull(adminId, "adminId cannot be null");
+        Objects.requireNonNull(targetId, "targetId cannot be null");
+        userStorage.withUserLock(targetId, locked -> {
+            User user = locked.get(targetId).orElseThrow(() -> new IllegalArgumentException("User not found"));
+            User copy = copyUser(user);
+            copy.ban();
+            locked.save(copy);
+            return null;
+        });
+        auditModeration(
+                ModerationAuditEvent.Action.BLOCK,
+                ModerationAuditEvent.Outcome.SUCCESS,
+                adminId,
+                targetId,
+                contextOf(AUDIT_KEY_MODERATION_REASON_CODE, "admin_ban"));
+    }
+
+    /** Admin: dismisses review; the user returns to ACTIVE, or INCOMPLETE if the profile is unfinished. */
+    public void adminDismiss(UUID adminId, UUID targetId) {
+        Objects.requireNonNull(adminId, "adminId cannot be null");
+        Objects.requireNonNull(targetId, "targetId cannot be null");
+        userStorage.withUserLock(targetId, locked -> {
+            User user = locked.get(targetId).orElseThrow(() -> new IllegalArgumentException("User not found"));
+            User copy = copyUser(user);
+            copy.clearReview();
+            locked.save(copy);
+            return null;
+        });
+        auditModeration(
+                ModerationAuditEvent.Action.UNBLOCK,
+                ModerationAuditEvent.Outcome.SUCCESS,
+                adminId,
+                targetId,
+                contextOf(AUDIT_KEY_MODERATION_REASON_CODE, "admin_dismiss"));
+    }
+
+    /** Admin: upholds review (keeps UNDER_REVIEW). Audited no-op when already decided. */
+    public void adminUphold(UUID adminId, UUID targetId) {
+        Objects.requireNonNull(adminId, "adminId cannot be null");
+        Objects.requireNonNull(targetId, "targetId cannot be null");
+        auditModeration(
+                ModerationAuditEvent.Action.REPORT,
+                ModerationAuditEvent.Outcome.SUCCESS,
+                adminId,
+                targetId,
+                contextOf(AUDIT_KEY_MODERATION_REASON_CODE, "admin_uphold"));
+    }
+
     /** Result of a report action, including moderation outcome. */
-    public static record ReportResult(boolean success, boolean userWasBanned, String errorMessage) {
+    public static record ReportResult(boolean success, boolean userWasFlagged, String errorMessage) {
 
         public ReportResult {
             if (success && errorMessage != null) {
@@ -678,9 +754,15 @@ public final class TrustSafetyService {
             if (!success && (errorMessage == null || errorMessage.isBlank())) {
                 throw new IllegalArgumentException("errorMessage is required on failure");
             }
-            if (!success && userWasBanned) {
-                throw new IllegalArgumentException("userWasBanned cannot be true on failure");
+            if (!success && userWasFlagged) {
+                throw new IllegalArgumentException("userWasFlagged cannot be true on failure");
             }
+        }
+
+        /** @deprecated Use {@link #userWasFlagged()}; kept for one release. */
+        @Deprecated(since = "1.1", forRemoval = true)
+        public boolean userWasBanned() {
+            return userWasFlagged;
         }
     }
 

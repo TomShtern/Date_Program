@@ -113,7 +113,7 @@ public class SocialUseCases {
             TrustSafetyService.BlockResult result =
                     trustSafetyService.block(command.context().userId(), command.targetUserId());
             if (!result.success()) {
-                return UseCaseResult.failure(UseCaseError.conflict(result.errorMessage()));
+                return UseCaseResult.failure(UseCaseError.conflict(stableBlockMessage(result.errorMessage())));
             }
             logModerationAction("block", command.context().userId(), command.targetUserId(), null);
             EventPublishing.publishOrWarn(
@@ -181,7 +181,7 @@ public class SocialUseCases {
                     command.description(),
                     command.blockUser());
             if (!result.success()) {
-                return UseCaseResult.failure(UseCaseError.conflict(result.errorMessage()));
+                return UseCaseResult.failure(UseCaseError.conflict(stableReportMessage(result.errorMessage())));
             }
             logModerationAction(
                     "report",
@@ -195,7 +195,7 @@ public class SocialUseCases {
                             command.targetUserId(),
                             command.reason().name(),
                             command.blockUser(),
-                            result.userWasBanned(),
+                            result.userWasFlagged(),
                             AppClock.now()),
                     "Failed to publish user reported event",
                     logger);
@@ -216,7 +216,7 @@ public class SocialUseCases {
             ConnectionService.TransitionResult result =
                     connectionService.unmatch(command.context().userId(), command.targetUserId());
             if (!result.success()) {
-                return UseCaseResult.failure(UseCaseError.conflict(result.errorMessage()));
+                return UseCaseResult.failure(UseCaseError.conflict(stableRelationshipMessage(result.errorMessage())));
             }
             publishRelationshipTransitionEvent(
                     command.context().userId(),
@@ -240,7 +240,7 @@ public class SocialUseCases {
             ConnectionService.TransitionResult result =
                     connectionService.requestFriendZone(command.context().userId(), command.targetUserId());
             if (!result.success()) {
-                return UseCaseResult.failure(UseCaseError.conflict(result.errorMessage()));
+                return UseCaseResult.failure(UseCaseError.conflict(stableRelationshipMessage(result.errorMessage())));
             }
             publishRelationshipTransitionEvent(
                     command.context().userId(),
@@ -264,7 +264,7 @@ public class SocialUseCases {
             ConnectionService.TransitionResult result =
                     connectionService.gracefulExit(command.context().userId(), command.targetUserId());
             if (!result.success()) {
-                return UseCaseResult.failure(UseCaseError.conflict(result.errorMessage()));
+                return UseCaseResult.failure(UseCaseError.conflict(stableRelationshipMessage(result.errorMessage())));
             }
             publishRelationshipTransitionEvent(
                     command.context().userId(),
@@ -310,7 +310,7 @@ public class SocialUseCases {
                                     command.requestId(), command.context().userId());
                     };
             if (!result.success()) {
-                return UseCaseResult.failure(UseCaseError.conflict(result.errorMessage()));
+                return UseCaseResult.failure(UseCaseError.conflict(stableRelationshipMessage(result.errorMessage())));
             }
             if (command.action() == FriendRequestAction.ACCEPT && result.friendRequest() != null) {
                 var req = result.friendRequest();
@@ -387,7 +387,70 @@ public class SocialUseCases {
     }
 
     private static <T> UseCaseResult<T> internalFailure(String action, Exception error) {
-        return UseCaseResult.failure(UseCaseError.internal("Failed to " + action + ": " + error.getMessage()));
+        return UseCaseResult.failure(UseCaseError.internalFailure(action, error));
+    }
+
+    /**
+     * Maps block-service internals to a stable user-facing message. Raw storage details
+     * stay server-side; the API surface only exposes whether the block target was invalid
+     * or the request was malformed.
+     */
+    public static String stableBlockMessage(String detail) {
+        if (detail == null || detail.isBlank()) {
+            return "Cannot block user.";
+        }
+        String lower = detail.trim().toLowerCase(java.util.Locale.ROOT);
+        if (lower.contains("yourself") || lower.contains("self")) {
+            return "Cannot block yourself.";
+        }
+        if (lower.contains("not found") || lower.contains("inactive") || lower.contains("active")) {
+            return "Block target is not available.";
+        }
+        return "Cannot block user.";
+    }
+
+    /**
+     * Maps report-service internals to a stable user-facing message. Raw storage details
+     * stay server-side; the API surface only exposes whether the report target was invalid
+     * or the request was malformed.
+     */
+    public static String stableReportMessage(String detail) {
+        if (detail == null || detail.isBlank()) {
+            return "Cannot report user.";
+        }
+        String lower = detail.trim().toLowerCase(java.util.Locale.ROOT);
+        if (lower.contains("yourself") || lower.contains("self")) {
+            return "Cannot report yourself.";
+        }
+        if (lower.contains("not found") || lower.contains("inactive") || lower.contains("active")) {
+            return "Report target is not available.";
+        }
+        if (lower.contains("reason") || lower.contains("description")) {
+            return "Invalid report.";
+        }
+        if (lower.contains("already") || lower.contains("duplicate")) {
+            return "User already reported.";
+        }
+        return "Cannot report user.";
+    }
+
+    /**
+     * Maps relationship-transition internals to a stable user-facing message. Raw
+     * storage/state details stay server-side; the API surface only exposes whether the
+     * transition was unavailable or the request was malformed.
+     */
+    public static String stableRelationshipMessage(String detail) {
+        if (detail == null || detail.isBlank()) {
+            return "Cannot update relationship.";
+        }
+        String lower = detail.trim().toLowerCase(java.util.Locale.ROOT);
+        if (lower.contains("not found")) {
+            return "Relationship not found.";
+        }
+        if (lower.contains("transition") || lower.contains("state") || lower.contains("already")) {
+            return "Relationship cannot be updated in its current state.";
+        }
+        return "Cannot update relationship.";
     }
 
     private void logModerationAction(String action, UUID actorId, UUID targetUserId, String reason) {
@@ -424,13 +487,25 @@ public class SocialUseCases {
     public static record ReportCommand(
             UserContext context, UUID targetUserId, Report.Reason reason, String description, boolean blockUser) {}
 
-    public static record ReportOutcome(boolean autoBanned, boolean blockedByReporter) {
+    public static record ReportOutcome(boolean autoFlagged, boolean blockedByReporter) {
         static ReportOutcome from(TrustSafetyService.ReportResult result, boolean blockedByReporter) {
-            return new ReportOutcome(result.userWasBanned(), blockedByReporter);
+            return new ReportOutcome(result.userWasFlagged(), blockedByReporter);
         }
 
+        public boolean userWasFlagged() {
+            return autoFlagged;
+        }
+
+        /** @deprecated Use {@link #autoFlagged()}; kept for one release. */
+        @Deprecated(since = "1.1", forRemoval = true)
+        public boolean autoBanned() {
+            return autoFlagged;
+        }
+
+        /** @deprecated Use {@link #userWasFlagged()}; kept for one release. */
+        @Deprecated(since = "1.1", forRemoval = true)
         public boolean userWasBanned() {
-            return autoBanned;
+            return autoFlagged;
         }
     }
 

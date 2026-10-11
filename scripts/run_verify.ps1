@@ -18,8 +18,8 @@ try {
         Write-Host "  Hint: Run .\scripts/check_postgresql_runtime_env.ps1 to diagnose the environment."
     }
     else {
-        Write-Host 'Running Maven quality gate: mvn spotless:apply verify'
-        & mvn @('spotless:apply', 'verify')
+        Write-Host 'Running Maven quality gate: mvn spotless:check verify -Pspotbugs-strict'
+        & mvn @('spotless:check', 'verify', '-Pspotbugs-strict')
         $overallExitCode = $LASTEXITCODE
         $verifyStopwatch.Stop()
 

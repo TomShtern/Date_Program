@@ -64,6 +64,14 @@ public final class AuthUseCases {
         return Optional.of(new AuthIdentity(user.getId(), claims.email()));
     }
 
+    /** Local user id linked to a Clerk user id, or empty when blank or not linked. */
+    public Optional<UUID> findUserIdByClerkId(String clerkUserId) {
+        if (clerkUserId == null || clerkUserId.isBlank()) {
+            return Optional.empty();
+        }
+        return authStorage.findUserIdByClerkId(clerkUserId.trim());
+    }
+
     /**
      * Finds or creates the local profile for the Clerk user behind {@code token}. A new profile is {@code INCOMPLETE}:
      * it has no email and no birth date until the profile update supplies them.
@@ -92,6 +100,11 @@ public final class AuthUseCases {
                     .build();
             userStorage.save(user);
             if (authStorage.linkClerkId(claims.subject(), user.getId(), now)) {
+                if (authStorage.consumeDepartureFlag(claims.subject())) {
+                    // This Clerk user deleted an account while reported: the new profile waits for a moderator.
+                    user.flagForReview();
+                    userStorage.save(user);
+                }
                 return UseCaseResult.success(new ProvisionedSession(AuthUser.from(user, claims.email()), true));
             }
             // Another server process linked this Clerk id first. Use its profile; our row stays an unused INCOMPLETE

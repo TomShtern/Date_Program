@@ -383,6 +383,11 @@ public final class JdbiMatchmakingStorage implements OperationalInteractionStora
     }
 
     @Override
+    public Set<UUID> getUserIdsWhoSuperLiked(UUID userId) {
+        return likeDao.getUserIdsWhoSuperLiked(userId);
+    }
+
+    @Override
     public int countByDirection(UUID userId, Like.Direction direction) {
         return likeDao.countByDirection(userId, direction);
     }
@@ -913,6 +918,14 @@ public final class JdbiMatchmakingStorage implements OperationalInteractionStora
         Set<UUID> getUserIdsWhoLiked(@Bind("userId") UUID userId);
 
         @SqlQuery("""
+                SELECT who_likes FROM likes
+            WHERE who_got_liked = :userId
+              AND direction = 'SUPER_LIKE'
+              AND deleted_at IS NULL
+                """)
+        Set<UUID> getUserIdsWhoSuperLiked(@Bind("userId") UUID userId);
+
+        @SqlQuery("""
                 SELECT who_likes, created_at FROM likes
             WHERE who_got_liked = :userId
               AND direction IN ('LIKE', 'SUPER_LIKE')
@@ -1097,11 +1110,11 @@ public final class JdbiMatchmakingStorage implements OperationalInteractionStora
     public static class LikeMapper implements RowMapper<Like> {
         @Override
         public Like map(ResultSet rs, StatementContext ctx) throws SQLException {
-            var id = JdbiTypeCodecs.SqlRowReaders.readUuid(rs, PARAM_ID);
-            var whoLikes = JdbiTypeCodecs.SqlRowReaders.readUuid(rs, COLUMN_WHO_LIKES);
-            var whoGotLiked = JdbiTypeCodecs.SqlRowReaders.readUuid(rs, COLUMN_WHO_GOT_LIKED);
-            var direction = JdbiTypeCodecs.SqlRowReaders.readEnum(rs, PARAM_DIRECTION, Like.Direction.class);
-            var createdAt = JdbiTypeCodecs.SqlRowReaders.readInstant(rs, COLUMN_CREATED_AT);
+            var id = JdbiTypeCodecs.SqlRowReaders.readRequiredUuid(rs, PARAM_ID);
+            var whoLikes = JdbiTypeCodecs.SqlRowReaders.readRequiredUuid(rs, COLUMN_WHO_LIKES);
+            var whoGotLiked = JdbiTypeCodecs.SqlRowReaders.readRequiredUuid(rs, COLUMN_WHO_GOT_LIKED);
+            var direction = JdbiTypeCodecs.SqlRowReaders.readRequiredEnum(rs, PARAM_DIRECTION, Like.Direction.class);
+            var createdAt = JdbiTypeCodecs.SqlRowReaders.readRequiredInstant(rs, COLUMN_CREATED_AT);
 
             return new Like(id, whoLikes, whoGotLiked, direction, createdAt);
         }
@@ -1111,12 +1124,12 @@ public final class JdbiMatchmakingStorage implements OperationalInteractionStora
         @Override
         public Match map(ResultSet rs, StatementContext ctx) throws SQLException {
             return new Match(
-                    rs.getString("id"),
-                    JdbiTypeCodecs.SqlRowReaders.readUuid(rs, "user_a"),
-                    JdbiTypeCodecs.SqlRowReaders.readUuid(rs, "user_b"),
-                    JdbiTypeCodecs.SqlRowReaders.readInstant(rs, COLUMN_CREATED_AT),
-                    JdbiTypeCodecs.SqlRowReaders.readInstant(rs, "updated_at"),
-                    JdbiTypeCodecs.SqlRowReaders.readEnum(rs, PARAM_STATE, MatchState.class),
+                    JdbiTypeCodecs.SqlRowReaders.readRequiredString(rs, "id"),
+                    JdbiTypeCodecs.SqlRowReaders.readRequiredUuid(rs, "user_a"),
+                    JdbiTypeCodecs.SqlRowReaders.readRequiredUuid(rs, "user_b"),
+                    JdbiTypeCodecs.SqlRowReaders.readRequiredInstant(rs, COLUMN_CREATED_AT),
+                    JdbiTypeCodecs.SqlRowReaders.readRequiredInstant(rs, "updated_at"),
+                    JdbiTypeCodecs.SqlRowReaders.readRequiredEnum(rs, PARAM_STATE, MatchState.class),
                     JdbiTypeCodecs.SqlRowReaders.readInstant(rs, "ended_at"),
                     JdbiTypeCodecs.SqlRowReaders.readUuid(rs, "ended_by"),
                     JdbiTypeCodecs.SqlRowReaders.readEnum(rs, "end_reason", MatchArchiveReason.class),
@@ -1127,14 +1140,15 @@ public final class JdbiMatchmakingStorage implements OperationalInteractionStora
     public static class UndoStateMapper implements RowMapper<Undo> {
         @Override
         public Undo map(ResultSet rs, StatementContext ctx) throws SQLException {
-            UUID userId = JdbiTypeCodecs.SqlRowReaders.readUuid(rs, COLUMN_USER_ID);
-            UUID likeId = JdbiTypeCodecs.SqlRowReaders.readUuid(rs, "like_id");
-            UUID whoLikes = JdbiTypeCodecs.SqlRowReaders.readUuid(rs, COLUMN_WHO_LIKES);
-            UUID whoGotLiked = JdbiTypeCodecs.SqlRowReaders.readUuid(rs, COLUMN_WHO_GOT_LIKED);
-            Like.Direction direction = Like.Direction.valueOf(rs.getString(PARAM_DIRECTION));
-            Instant likeCreatedAt = JdbiTypeCodecs.SqlRowReaders.readInstant(rs, "like_created_at");
+            UUID userId = JdbiTypeCodecs.SqlRowReaders.readRequiredUuid(rs, COLUMN_USER_ID);
+            UUID likeId = JdbiTypeCodecs.SqlRowReaders.readRequiredUuid(rs, "like_id");
+            UUID whoLikes = JdbiTypeCodecs.SqlRowReaders.readRequiredUuid(rs, COLUMN_WHO_LIKES);
+            UUID whoGotLiked = JdbiTypeCodecs.SqlRowReaders.readRequiredUuid(rs, COLUMN_WHO_GOT_LIKED);
+            Like.Direction direction =
+                    Like.Direction.valueOf(JdbiTypeCodecs.SqlRowReaders.readRequiredString(rs, PARAM_DIRECTION));
+            Instant likeCreatedAt = JdbiTypeCodecs.SqlRowReaders.readRequiredInstant(rs, "like_created_at");
             String matchId = rs.getString("match_id");
-            Instant expiresAt = JdbiTypeCodecs.SqlRowReaders.readInstant(rs, "expires_at");
+            Instant expiresAt = JdbiTypeCodecs.SqlRowReaders.readRequiredInstant(rs, "expires_at");
 
             ConnectionModels.Like like =
                     new ConnectionModels.Like(likeId, whoLikes, whoGotLiked, direction, likeCreatedAt);

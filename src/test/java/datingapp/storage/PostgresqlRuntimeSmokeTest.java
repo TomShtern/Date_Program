@@ -2,7 +2,6 @@ package datingapp.storage;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import datingapp.app.bootstrap.ApplicationStartup;
 import datingapp.core.AppConfig;
@@ -10,6 +9,7 @@ import datingapp.core.ServiceRegistry;
 import datingapp.core.connection.ConnectionModels.Like;
 import datingapp.core.metrics.SwipeState.Session;
 import datingapp.core.testutil.TestUserFactory;
+import datingapp.support.LivePostgresqlTestConfig;
 import java.time.Instant;
 import java.util.LinkedHashSet;
 import java.util.Set;
@@ -35,11 +35,15 @@ class PostgresqlRuntimeSmokeTest {
 
     @BeforeEach
     void setUp() {
-        assumeTrue(isConfigured(), "PostgreSQL smoke test requires datingapp.pgtest.* system properties");
+        LivePostgresqlTestConfig.assumeConfigured();
         ApplicationStartup.reset();
         DatabaseManager.resetInstance();
         System.clearProperty(DB_PROFILE_PROPERTY);
-        System.setProperty(DB_PASSWORD_PROPERTY, System.getProperty(PASSWORD_PROPERTY));
+        var pg = LivePostgresqlTestConfig.requireConfig();
+        System.setProperty(URL_PROPERTY, pg.jdbcUrl());
+        System.setProperty(USERNAME_PROPERTY, pg.username());
+        System.setProperty(PASSWORD_PROPERTY, pg.password());
+        System.setProperty(DB_PASSWORD_PROPERTY, pg.password());
         createdUserIds.clear();
         servicesUnderTest = null;
     }
@@ -134,15 +138,5 @@ class PostgresqlRuntimeSmokeTest {
         createdUserIds.forEach(userId -> servicesUnderTest.getUserStorage().delete(userId));
         createdUserIds.clear();
         servicesUnderTest = null;
-    }
-
-    private static boolean isConfigured() {
-        return isNonBlank(System.getProperty(URL_PROPERTY))
-                && isNonBlank(System.getProperty(USERNAME_PROPERTY))
-                && isNonBlank(System.getProperty(PASSWORD_PROPERTY));
-    }
-
-    private static boolean isNonBlank(String value) {
-        return value != null && !value.isBlank();
     }
 }

@@ -1,7 +1,10 @@
 # CLAUDE.md
 
-Java 25 (preview) + JavaFX 25.0.2 + Maven desktop dating app, with a Javalin REST
-server that backs a separate Flutter frontend. Windows 11, PowerShell 7.
+Java 25 (preview) + Maven **backend** for a dating app: a Javalin REST server
+that backs a separate Flutter frontend, which is the only user-facing UI. The
+JavaFX 25.0.2 desktop code is still in the tree and must keep compiling and
+passing its tests (it holds the moderation admin panel), but gets no new feature
+work. Windows 11, PowerShell 7.
 
 **Source of truth is the code** — `src/main/java`, `src/test/java`, `pom.xml`.
 When a document and the source disagree, the source wins and the document gets
@@ -67,7 +70,8 @@ mvn spotless:apply verify        # Maven-only quality gate
 
 Java release `25` with preview enabled; Surefire JVMs carry preview/native-access
 flags. `verify` runs Spotless (Palantir Java Format), PMD, SpotBugs (report) and
-a JaCoCo line coverage gate with minimum `0.60`. Checkstyle runs in `validate`.
+a JaCoCo line coverage gate with minimum `0.60`. `run_verify.ps1` and CircleCI add
+`-Pspotbugs-strict`, which turns SpotBugs findings into build failures. Checkstyle runs in `validate`.
 JaCoCo excludes `datingapp/ui/**`, `datingapp/app/cli/**`, `datingapp/Main.class`.
 
 ## Keep out of new work

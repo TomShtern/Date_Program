@@ -68,6 +68,24 @@ class AuthUseCasesTest {
     }
 
     @Test
+    @DisplayName("a Clerk user who left while reported gets a new profile that starts under review, once")
+    void departureFlagStartsNewProfileUnderReview() {
+        authStorage.flagDeparture(CLERK_ID);
+
+        var flagged = useCases.provisionSession(token(CLERK_ID));
+
+        assertTrue(flagged.success());
+        User created = userStorage.get(flagged.data().user().id()).orElseThrow();
+        assertEquals(UserState.UNDER_REVIEW, created.getState());
+        // The profile can still sign in and be edited; it just cannot go live until a moderator clears it.
+        assertTrue(useCases.authenticateAccessToken(token(CLERK_ID)).isPresent());
+        assertFalse(authStorage.consumeDepartureFlag(CLERK_ID));
+
+        created.clearReview();
+        assertEquals(UserState.INCOMPLETE, created.getState(), "an unfinished profile must not become ACTIVE");
+    }
+
+    @Test
     @DisplayName("different Clerk users get different profiles")
     void differentClerkUsersGetDifferentProfiles() {
         UUID alpha = useCases.provisionSession(token("user_a")).data().user().id();

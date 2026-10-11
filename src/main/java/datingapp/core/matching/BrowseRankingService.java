@@ -69,7 +69,7 @@ public class BrowseRankingService {
         double lifestyleScore = calculator.calculateLifestyleScore(seeker, candidate);
         double paceScore = calculator.calculatePaceScore(seeker.getPacePreferences(), candidate.getPacePreferences());
         var completeness = profileService.calculate(candidate);
-        double completenessScore = completeness == null ? 0.0 : completeness.score() / 100.0;
+        double completenessScore = completeness.score() / 100.0;
         double activityScore = calculator.calculateActivityScore(candidate);
 
         WeightedScore weightedScore = WeightedScore.empty()

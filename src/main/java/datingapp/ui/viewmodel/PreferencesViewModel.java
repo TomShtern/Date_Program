@@ -35,6 +35,7 @@ public class PreferencesViewModel extends BaseViewModel {
     public static enum GenderPreference {
         MEN,
         WOMEN,
+        OTHER,
         EVERYONE
     }
 
@@ -72,7 +73,7 @@ public class PreferencesViewModel extends BaseViewModel {
             return PreferencesSnapshot.empty(storedThemeMode);
         }
 
-        Set<Gender> interested = user.getInterestedIn() != null ? user.getInterestedIn() : Set.of();
+        Set<Gender> interested = user.getInterestedIn();
         GenderPreference genderPreference = mapInterestedIn(interested);
         return new PreferencesSnapshot(
                 user, user.getMinAge(), user.getMaxAge(), user.getMaxDistanceKm(), genderPreference, storedThemeMode);
@@ -110,6 +111,9 @@ public class PreferencesViewModel extends BaseViewModel {
         }
         if (interested.contains(Gender.FEMALE)) {
             return GenderPreference.WOMEN;
+        }
+        if (interested.contains(Gender.OTHER)) {
+            return GenderPreference.OTHER;
         }
         return GenderPreference.EVERYONE;
     }
@@ -163,6 +167,7 @@ public class PreferencesViewModel extends BaseViewModel {
         switch (preference) {
             case MEN -> newInterests.add(Gender.MALE);
             case WOMEN -> newInterests.add(Gender.FEMALE);
+            case OTHER -> newInterests.add(Gender.OTHER);
             case EVERYONE -> {
                 newInterests.add(Gender.MALE);
                 newInterests.add(Gender.FEMALE);

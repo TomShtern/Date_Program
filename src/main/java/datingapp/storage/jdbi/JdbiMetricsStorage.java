@@ -613,9 +613,9 @@ public final class JdbiMetricsStorage implements AnalyticsStorage, Standout.Stor
         @Override
         public UserStats map(ResultSet rs, StatementContext ctx) throws SQLException {
             return new UserStats(
-                    JdbiTypeCodecs.SqlRowReaders.readUuid(rs, "id"),
-                    JdbiTypeCodecs.SqlRowReaders.readUuid(rs, USER_ID_COLUMN),
-                    JdbiTypeCodecs.SqlRowReaders.readInstant(rs, "computed_at"),
+                    JdbiTypeCodecs.SqlRowReaders.readRequiredUuid(rs, "id"),
+                    JdbiTypeCodecs.SqlRowReaders.readRequiredUuid(rs, USER_ID_COLUMN),
+                    JdbiTypeCodecs.SqlRowReaders.readRequiredInstant(rs, "computed_at"),
                     rs.getInt("total_swipes_given"),
                     rs.getInt("likes_given"),
                     rs.getInt("passes_given"),
@@ -641,8 +641,8 @@ public final class JdbiMetricsStorage implements AnalyticsStorage, Standout.Stor
         @Override
         public PlatformStats map(ResultSet rs, StatementContext ctx) throws SQLException {
             return new PlatformStats(
-                    JdbiTypeCodecs.SqlRowReaders.readUuid(rs, "id"),
-                    JdbiTypeCodecs.SqlRowReaders.readInstant(rs, "computed_at"),
+                    JdbiTypeCodecs.SqlRowReaders.readRequiredUuid(rs, "id"),
+                    JdbiTypeCodecs.SqlRowReaders.readRequiredInstant(rs, "computed_at"),
                     rs.getInt("total_active_users"),
                     rs.getDouble("avg_likes_received"),
                     rs.getDouble("avg_likes_given"),
@@ -654,10 +654,10 @@ public final class JdbiMetricsStorage implements AnalyticsStorage, Standout.Stor
     public static class UserAchievementMapper implements RowMapper<UserAchievement> {
         @Override
         public UserAchievement map(ResultSet rs, StatementContext ctx) throws SQLException {
-            var id = JdbiTypeCodecs.SqlRowReaders.readUuid(rs, "id");
-            var userId = JdbiTypeCodecs.SqlRowReaders.readUuid(rs, USER_ID_COLUMN);
-            var achievement = JdbiTypeCodecs.SqlRowReaders.readEnum(rs, ACHIEVEMENT_COLUMN, Achievement.class);
-            var unlockedAt = JdbiTypeCodecs.SqlRowReaders.readInstant(rs, "unlocked_at");
+            var id = JdbiTypeCodecs.SqlRowReaders.readRequiredUuid(rs, "id");
+            var userId = JdbiTypeCodecs.SqlRowReaders.readRequiredUuid(rs, USER_ID_COLUMN);
+            var achievement = JdbiTypeCodecs.SqlRowReaders.readRequiredEnum(rs, ACHIEVEMENT_COLUMN, Achievement.class);
+            var unlockedAt = JdbiTypeCodecs.SqlRowReaders.readRequiredInstant(rs, "unlocked_at");
             return UserAchievement.of(id, userId, achievement, unlockedAt);
         }
     }
@@ -665,10 +665,10 @@ public final class JdbiMetricsStorage implements AnalyticsStorage, Standout.Stor
     public static class SwipeSessionMapper implements RowMapper<Session> {
         @Override
         public Session map(ResultSet rs, StatementContext ctx) throws SQLException {
-            UUID id = JdbiTypeCodecs.SqlRowReaders.readUuid(rs, "id");
-            UUID userId = JdbiTypeCodecs.SqlRowReaders.readUuid(rs, USER_ID_COLUMN);
-            var startedAt = JdbiTypeCodecs.SqlRowReaders.readInstant(rs, STARTED_AT_COLUMN);
-            var lastActivityAt = JdbiTypeCodecs.SqlRowReaders.readInstant(rs, "last_activity_at");
+            UUID id = JdbiTypeCodecs.SqlRowReaders.readRequiredUuid(rs, "id");
+            UUID userId = JdbiTypeCodecs.SqlRowReaders.readRequiredUuid(rs, USER_ID_COLUMN);
+            var startedAt = JdbiTypeCodecs.SqlRowReaders.readRequiredInstant(rs, STARTED_AT_COLUMN);
+            var lastActivityAt = JdbiTypeCodecs.SqlRowReaders.readRequiredInstant(rs, "last_activity_at");
             var endedAt = JdbiTypeCodecs.SqlRowReaders.readInstant(rs, ENDED_AT_COLUMN);
             String stateStr = rs.getString(STATE_COLUMN);
             Session.SessionState state = parseSessionState(stateStr);
@@ -711,14 +711,14 @@ public final class JdbiMetricsStorage implements AnalyticsStorage, Standout.Stor
                 featuredDate = AppClock.today();
             }
             return Standout.fromDatabase(
-                    JdbiTypeCodecs.SqlRowReaders.readUuid(rs, "id"),
-                    JdbiTypeCodecs.SqlRowReaders.readUuid(rs, SEEKER_ID_COLUMN),
-                    JdbiTypeCodecs.SqlRowReaders.readUuid(rs, STANDOUT_USER_ID_COLUMN),
+                    JdbiTypeCodecs.SqlRowReaders.readRequiredUuid(rs, "id"),
+                    JdbiTypeCodecs.SqlRowReaders.readRequiredUuid(rs, SEEKER_ID_COLUMN),
+                    JdbiTypeCodecs.SqlRowReaders.readRequiredUuid(rs, STANDOUT_USER_ID_COLUMN),
                     featuredDate,
                     rs.getInt("rank"),
                     rs.getInt(SCORE_COLUMN),
-                    rs.getString(REASON_COLUMN),
-                    JdbiTypeCodecs.SqlRowReaders.readInstant(rs, CREATED_AT_COLUMN),
+                    JdbiTypeCodecs.SqlRowReaders.readRequiredString(rs, REASON_COLUMN),
+                    JdbiTypeCodecs.SqlRowReaders.readRequiredInstant(rs, CREATED_AT_COLUMN),
                     interactedAt);
         }
     }

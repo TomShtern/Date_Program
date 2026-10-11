@@ -53,7 +53,7 @@ public class ProfileNotesUseCases {
             return UseCaseResult.success(List.copyOf(
                     userStorage.getProfileNotesByAuthor(query.context().userId())));
         } catch (Exception e) {
-            return UseCaseResult.failure(UseCaseError.internal("Failed to load profile notes: " + e.getMessage()));
+            return UseCaseResult.failure(UseCaseError.internalFailure("load profile notes", e));
         }
     }
 
@@ -71,7 +71,7 @@ public class ProfileNotesUseCases {
                     .map(UseCaseResult::success)
                     .orElseGet(() -> UseCaseResult.failure(UseCaseError.notFound("Profile note not found")));
         } catch (Exception e) {
-            return UseCaseResult.failure(UseCaseError.internal("Failed to load profile note: " + e.getMessage()));
+            return UseCaseResult.failure(UseCaseError.internalFailure("load profile note", e));
         }
     }
 
@@ -85,6 +85,9 @@ public class ProfileNotesUseCases {
         }
         if (userStorage.get(command.subjectId()).isEmpty()) {
             return UseCaseResult.failure(UseCaseError.notFound("Subject user not found"));
+        }
+        if (command.content() == null) {
+            return UseCaseResult.failure(UseCaseError.validation("content cannot be null"));
         }
 
         try {
@@ -108,11 +111,10 @@ public class ProfileNotesUseCases {
                             + command.context().userId(),
                     logger);
             return UseCaseResult.success(note);
-        } catch (IllegalArgumentException | NullPointerException e) {
-            String msg = e.getMessage() != null ? e.getMessage() : "Invalid profile note input";
-            return UseCaseResult.failure(UseCaseError.validation(msg));
+        } catch (IllegalArgumentException e) {
+            return UseCaseResult.failure(UseCaseError.validation(stableNoteMessage(e.getMessage())));
         } catch (Exception e) {
-            return UseCaseResult.failure(UseCaseError.internal("Failed to save profile note: " + e.getMessage()));
+            return UseCaseResult.failure(UseCaseError.internalFailure("save profile note", e));
         }
     }
 
@@ -137,7 +139,7 @@ public class ProfileNotesUseCases {
                     logger);
             return UseCaseResult.success(null);
         } catch (Exception e) {
-            return UseCaseResult.failure(UseCaseError.internal("Failed to delete profile note: " + e.getMessage()));
+            return UseCaseResult.failure(UseCaseError.internalFailure("delete profile note", e));
         }
     }
 
@@ -169,6 +171,25 @@ public class ProfileNotesUseCases {
             return Optional.of(UseCaseError.validation(PROFILE_NOTE_TOO_LONG.formatted(maxProfileNoteLength)));
         }
         return Optional.empty();
+    }
+
+    /**
+     * Maps profile-note internals to a stable user-facing message. Raw storage/validation
+     * details stay server-side; the API surface only exposes whether the note content was
+     * invalid.
+     */
+    public static String stableNoteMessage(String detail) {
+        if (detail == null || detail.isBlank()) {
+            return "Invalid profile note.";
+        }
+        String lower = detail.trim().toLowerCase(java.util.Locale.ROOT);
+        if (lower.contains("length") || lower.contains("too long") || lower.contains("content")) {
+            return "Invalid profile note content.";
+        }
+        if (lower.contains("author") || lower.contains("subject")) {
+            return "Invalid profile note author or subject.";
+        }
+        return "Invalid profile note.";
     }
 
     public static record ProfileNotesQuery(UserContext context) {}

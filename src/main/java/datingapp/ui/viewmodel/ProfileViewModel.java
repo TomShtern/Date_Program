@@ -264,15 +264,10 @@ public class ProfileViewModel extends BaseViewModel {
         maxAge.set(String.valueOf(user.getMaxAge()));
         maxDistance.set(String.valueOf(user.getMaxDistanceKm()));
 
-        // Dealbreakers
+        // Dealbreakers (User.getDealbreakers never returns null; defaults to none)
         Dealbreakers db = user.getDealbreakers();
-        if (db != null) {
-            dealbreakers.set(db);
-            updateDealbreakersStatus(db);
-        } else {
-            dealbreakers.set(Dealbreakers.none());
-            dealbreakersStatus.set(NONE_SET_LABEL);
-        }
+        dealbreakers.set(db);
+        updateDealbreakersStatus(db);
 
         loadPacePreferences(user.getPacePreferences());
 

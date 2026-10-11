@@ -1,7 +1,7 @@
 package datingapp.ui.viewmodel;
 
 import datingapp.core.ServiceRegistry;
-import datingapp.ui.viewmodel.UiDataAdapters.MetricsUiPresenceDataAccess;
+import datingapp.ui.viewmodel.UiDataAdapters.PresenceServiceUiPresenceDataAccess;
 import datingapp.ui.viewmodel.UiDataAdapters.StorageUiSocialDataAccess;
 import datingapp.ui.viewmodel.UiDataAdapters.StorageUiUserStore;
 import datingapp.ui.viewmodel.UiDataAdapters.UiPresenceDataAccess;
@@ -20,7 +20,7 @@ import java.util.Objects;
  * <ul>
  *   <li>{@link StorageUiUserStore} - for user data access</li>
  *   <li>{@link UseCaseUiProfileNoteDataAccess} - for private profile-note access</li>
- *   <li>{@link MetricsUiPresenceDataAccess} - for chat presence/activity state</li>
+ *   <li>{@link PresenceServiceUiPresenceDataAccess} - for chat presence/activity state</li>
  *   <li>{@link StorageUiSocialDataAccess} - for social data access</li>
  * </ul>
  *
@@ -78,7 +78,7 @@ final class UiAdapterCache {
     synchronized UiPresenceDataAccess presence(ServiceRegistry services) {
         Objects.requireNonNull(services, SERVICES_CANNOT_BE_NULL);
         if (presence == null) {
-            presence = new MetricsUiPresenceDataAccess(services.getActivityMetricsService(), services.getConfig());
+            presence = new PresenceServiceUiPresenceDataAccess(services.getPresenceService());
         }
         return presence;
     }

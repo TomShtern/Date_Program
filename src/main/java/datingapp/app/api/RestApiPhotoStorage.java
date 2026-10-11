@@ -7,28 +7,23 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardOpenOption;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.regex.Pattern;
 
 final class RestApiPhotoStorage {
     private static final String PHOTOS_ROUTE_PREFIX = "/photos/";
     private static final int COPY_BUFFER_BYTES = 8 * 1024;
-    private static final Pattern SAFE_MANAGED_FILE_NAME = Pattern.compile("^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$");
 
-    private final Path storageRoot;
+    private final datingapp.core.media.LocalDiskPhotoStore delegate;
     private final String configuredPublicBaseUrl;
     private final long maxPhotoUploadBytes;
 
     RestApiPhotoStorage(AppConfig config) {
-        this.storageRoot =
-                Path.of(config.media().photoStorageRoot()).toAbsolutePath().normalize();
+        this.delegate = new datingapp.core.media.LocalDiskPhotoStore(
+                Path.of(config.media().photoStorageRoot()), config.media().maxPhotoUploadBytes());
         this.configuredPublicBaseUrl = normalizeBaseUrl(config.media().photoPublicBaseUrl());
         this.maxPhotoUploadBytes = config.media().maxPhotoUploadBytes();
     }
@@ -37,37 +32,25 @@ final class RestApiPhotoStorage {
         if (uploadedFile == null) {
             throw new IllegalArgumentException("Missing multipart file field 'photo'");
         }
-        String contentType = normalizeContentType(uploadedFile.contentType());
-        String extension = extensionForContentType(contentType);
         byte[] bytes;
         try (InputStream content = uploadedFile.content()) {
             bytes = readLimited(content);
         }
-        String photoId = UUID.randomUUID().toString();
-        String fileName = photoId + "." + extension;
-        Path userDirectory = userDirectory(userId);
-        Files.createDirectories(userDirectory);
-        Files.write(userDirectory.resolve(fileName), bytes, StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE);
-        return new ManagedPhoto(photoId, storedPath(userId, fileName));
+        datingapp.core.media.PhotoStore.ManagedPhoto stored = delegate.store(userId, uploadedFile.contentType(), bytes);
+        return new ManagedPhoto(stored.id(), stored.storedPath());
     }
 
     Optional<PhotoContent> loadPhoto(UUID userId, String fileName) throws IOException {
-        if (!isSafeManagedFileName(fileName)) {
-            return Optional.empty();
-        }
-        Path photoPath = resolveManagedPath(userId, fileName);
-        if (!Files.isRegularFile(photoPath)) {
-            return Optional.empty();
-        }
-        return Optional.of(new PhotoContent(Files.readAllBytes(photoPath), contentTypeFromFileName(fileName)));
+        Optional<datingapp.core.media.PhotoStore.PhotoContent> content = delegate.load(userId, fileName);
+        return content.map(c -> new PhotoContent(c.bytes(), c.contentType()));
     }
 
     void deleteManagedPhoto(String storedPath) throws IOException {
-        Optional<Path> managedPath = managedPathFromStoredPath(storedPath);
-        if (managedPath.isEmpty()) {
-            return;
-        }
-        Files.deleteIfExists(managedPath.get());
+        delegate.delete(storedPath);
+    }
+
+    void deleteAllForUser(UUID userId) throws IOException {
+        delegate.deleteAllForUser(userId);
     }
 
     String toPublicUrl(Context ctx, String storedPath) {
@@ -170,45 +153,6 @@ final class RestApiPhotoStorage {
         return scheme + "://" + ctx.req().getServerName() + (defaultPort ? "" : ":" + port);
     }
 
-    private Path userDirectory(UUID userId) {
-        return storageRoot.resolve(userId.toString()).normalize();
-    }
-
-    private Path resolveManagedPath(UUID userId, String fileName) {
-        Path baseDirectory = userDirectory(userId);
-        Path candidate = baseDirectory.resolve(fileName).normalize();
-        if (!candidate.startsWith(baseDirectory)) {
-            throw new IllegalArgumentException("Invalid photo path");
-        }
-        return candidate;
-    }
-
-    private static boolean isSafeManagedFileName(String fileName) {
-        if (fileName == null || fileName.isBlank()) {
-            return false;
-        }
-        if (fileName.contains("..")
-                || fileName.contains("/")
-                || fileName.contains("\\")
-                || fileName.indexOf('\0') >= 0) {
-            return false;
-        }
-        return SAFE_MANAGED_FILE_NAME.matcher(fileName).matches();
-    }
-
-    private Optional<Path> managedPathFromStoredPath(String storedPath) {
-        if (!isManagedPhotoPath(storedPath)) {
-            return Optional.empty();
-        }
-        String normalized = normalizeManagedPhotoPath(storedPath);
-        String relativePath = normalized.substring(PHOTOS_ROUTE_PREFIX.length());
-        Path candidate = storageRoot.resolve(relativePath).normalize();
-        if (!candidate.startsWith(storageRoot)) {
-            throw new IllegalArgumentException("Invalid managed photo path");
-        }
-        return Optional.of(candidate);
-    }
-
     private static boolean isManagedPhotoPath(String storedPath) {
         if (storedPath == null || storedPath.isBlank()) {
             return false;
@@ -226,36 +170,6 @@ final class RestApiPhotoStorage {
             return pathStart >= 0 ? storedPath.substring(pathStart) : storedPath;
         }
         return storedPath.startsWith("/") ? storedPath : "/" + storedPath;
-    }
-
-    private static String storedPath(UUID userId, String fileName) {
-        return PHOTOS_ROUTE_PREFIX + userId + "/" + fileName;
-    }
-
-    private static String normalizeContentType(String contentType) {
-        if (contentType == null || contentType.isBlank()) {
-            throw new IllegalArgumentException("Photo content type is required");
-        }
-        return contentType.toLowerCase(Locale.ROOT).trim();
-    }
-
-    private static String extensionForContentType(String contentType) {
-        return switch (contentType) {
-            case "image/jpeg", "image/jpg" -> "jpg";
-            case "image/png" -> "png";
-            default -> throw new IllegalArgumentException("Unsupported photo content type: " + contentType);
-        };
-    }
-
-    private static String contentTypeFromFileName(String fileName) {
-        String lowerCaseName = fileName.toLowerCase(Locale.ROOT);
-        if (lowerCaseName.endsWith(".png")) {
-            return "image/png";
-        }
-        if (lowerCaseName.endsWith(".jpg") || lowerCaseName.endsWith(".jpeg")) {
-            return "image/jpeg";
-        }
-        return "application/octet-stream";
     }
 
     private static String normalizeBaseUrl(String photoPublicBaseUrl) {

@@ -50,6 +50,15 @@ class RestApiVerificationRoutesTest {
     @Test
     @DisplayName("verification start and confirm routes succeed for a valid code")
     void verificationStartAndConfirmRoutesSucceedForValidCode() throws Exception {
+        System.setProperty("datingapp.showVerificationCode", "true");
+        try {
+            verificationStartAndConfirmRoundTrip();
+        } finally {
+            System.clearProperty("datingapp.showVerificationCode");
+        }
+    }
+
+    private void verificationStartAndConfirmRoundTrip() throws Exception {
         TestStorages.Users userStorage = new TestStorages.Users();
         TestStorages.Communications communicationStorage = new TestStorages.Communications();
         TestStorages.Interactions interactionStorage = new TestStorages.Interactions(communicationStorage);

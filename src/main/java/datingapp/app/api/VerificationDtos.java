@@ -19,7 +19,15 @@ final class VerificationDtos {
             String contact =
                     method == null ? null : method == User.VerificationMethod.PHONE ? user.getPhone() : user.getEmail();
             return new StartVerificationResponse(
-                    user.getId(), method != null ? method.name() : null, contact, result.generatedCode());
+                    user.getId(),
+                    method != null ? method.name() : null,
+                    contact,
+                    showVerificationCode() ? result.generatedCode() : null);
+        }
+
+        private static boolean showVerificationCode() {
+            return Boolean.parseBoolean(System.getProperty("datingapp.showVerificationCode", "false"))
+                    || Boolean.parseBoolean(System.getenv("DATINGAPP_SHOW_VERIFICATION_CODE"));
         }
     }
 

@@ -9,6 +9,7 @@ import datingapp.app.api.LocationDtos.LocationCountryDto;
 import datingapp.app.api.LocationDtos.LocationResolveRequest;
 import datingapp.app.api.LocationDtos.LocationResolveResponse;
 import datingapp.app.api.MatchDtos.BrowseCandidatesResponse;
+import datingapp.app.api.MatchDtos.DailyStatusResponse;
 import datingapp.app.api.MatchDtos.LikeResponse;
 import datingapp.app.api.MatchDtos.MatchQualityDto;
 import datingapp.app.api.MatchDtos.MatchSummary;
@@ -64,6 +65,7 @@ import datingapp.app.usecase.common.UserContext;
 import datingapp.app.usecase.matching.MatchingUseCases;
 import datingapp.app.usecase.matching.MatchingUseCases.ArchiveMatchCommand;
 import datingapp.app.usecase.matching.MatchingUseCases.BrowseCandidatesCommand;
+import datingapp.app.usecase.matching.MatchingUseCases.DailyStatusQuery;
 import datingapp.app.usecase.matching.MatchingUseCases.ListPagedMatchesQuery;
 import datingapp.app.usecase.matching.MatchingUseCases.MatchQualityByIdQuery;
 import datingapp.app.usecase.matching.MatchingUseCases.PendingLikersQuery;
@@ -77,12 +79,16 @@ import datingapp.app.usecase.messaging.MessagingUseCases.DeleteConversationComma
 import datingapp.app.usecase.messaging.MessagingUseCases.DeleteMessageCommand;
 import datingapp.app.usecase.messaging.MessagingUseCases.ListConversationsQuery;
 import datingapp.app.usecase.messaging.MessagingUseCases.LoadConversationQuery;
+import datingapp.app.usecase.messaging.MessagingUseCases.PresenceReadQuery;
 import datingapp.app.usecase.messaging.MessagingUseCases.SendMessageCommand;
+import datingapp.app.usecase.messaging.MessagingUseCases.UnarchiveConversationCommand;
 import datingapp.app.usecase.profile.ProfileInsightsUseCases;
 import datingapp.app.usecase.profile.ProfileInsightsUseCases.AchievementsQuery;
 import datingapp.app.usecase.profile.ProfileInsightsUseCases.StatsQuery;
 import datingapp.app.usecase.profile.ProfileMutationUseCases;
 import datingapp.app.usecase.profile.ProfileMutationUseCases.DeleteAccountCommand;
+import datingapp.app.usecase.profile.ProfileMutationUseCases.PauseProfileCommand;
+import datingapp.app.usecase.profile.ProfileMutationUseCases.ResumeProfileCommand;
 import datingapp.app.usecase.profile.ProfileMutationUseCases.UpdateProfileCommand;
 import datingapp.app.usecase.profile.ProfileNotesUseCases;
 import datingapp.app.usecase.profile.ProfileUseCases;
@@ -106,6 +112,7 @@ import datingapp.core.matching.TrustSafetyService;
 import datingapp.core.model.Match;
 import datingapp.core.model.User;
 import datingapp.core.model.User.UserState;
+import datingapp.core.storage.CommunicationStorage.ArchiveFilter;
 import datingapp.core.storage.UserStorage;
 import datingapp.core.workflow.ProfileActivationPolicy;
 import datingapp.location.LocationService;
@@ -201,6 +208,7 @@ public class RestApiServer {
     private final SocialUseCases socialUseCases;
     private final AuthUseCases authUseCases;
     private final TrustSafetyService trustSafetyService;
+    private final datingapp.core.presence.PresenceService presenceService;
     private final LocationService locationService;
     private final ZoneId userTimeZone;
     private final ProfileActivationPolicy activationPolicy;
@@ -212,6 +220,7 @@ public class RestApiServer {
     private final String lanSharedSecret;
     private final boolean restrictToLoopbackClients;
     private final int port;
+    private final List<String> adminClerkIds;
     private Javalin app;
 
     /** Creates a server with the given services on the default port. */
@@ -241,6 +250,7 @@ public class RestApiServer {
         this.socialUseCases = services.getSocialUseCases();
         this.authUseCases = services.getAuthUseCases();
         this.trustSafetyService = services.getTrustSafetyService();
+        this.presenceService = services.getPresenceService();
         this.locationService = services.getLocationService();
         this.userTimeZone = services.getConfig().safety().userTimeZone();
         this.activationPolicy = services.getActivationPolicy();
@@ -258,6 +268,7 @@ public class RestApiServer {
         this.port = port;
         this.photoStorage = new RestApiPhotoStorage(services.getConfig());
         this.userStorage = services.getUserStorage();
+        this.adminClerkIds = services.getConfig().safety().adminClerkIds();
     }
 
     /** Starts the HTTP server. */
@@ -341,6 +352,7 @@ public class RestApiServer {
         registerSocialRoutes();
         registerMessagingRoutes();
         registerProfileNoteRoutes();
+        registerAdminRoutes();
     }
 
     private void registerHealthRoutes() {
@@ -358,6 +370,8 @@ public class RestApiServer {
         app.get("/api/users/{viewerId}/presentation-context/{targetId}", this::getPresentationContext);
         app.get("/api/users/{id}/browse", this::browseCandidates);
         app.put("/api/users/{id}/profile", this::updateProfile);
+        app.post("/api/users/{id}/pause", this::pauseProfile);
+        app.post("/api/users/{id}/resume", this::resumeProfile);
         app.get("/api/users/{id}/candidates", this::getCandidates);
         app.delete("/api/users/{id}", this::deleteUser);
     }
@@ -378,10 +392,12 @@ public class RestApiServer {
     private void registerMatchingRoutes() {
         app.get("/api/users/{id}/matches", this::getMatches);
         app.get("/api/users/{id}/pending-likers", this::getPendingLikers);
+        app.get("/api/users/{id}/daily-status", this::getDailyStatus);
         app.get("/api/users/{id}/standouts", this::getStandouts);
         app.get("/api/users/{id}/match-quality/{matchId}", this::getMatchQuality);
         app.post("/api/users/{id}/like/{targetId}", this::likeUser);
         app.post("/api/users/{id}/pass/{targetId}", this::passUser);
+        app.post("/api/users/{id}/super-like/{targetId}", this::superLikeUser);
         app.post("/api/users/{id}/matches/{matchId}/archive", this::archiveMatch);
         app.post("/api/users/{id}/undo", this::undoSwipe);
         app.get("/api/users/{id}/stats", this::getStats);
@@ -407,9 +423,13 @@ public class RestApiServer {
     }
 
     private void registerMessagingRoutes() {
+        app.post("/api/users/{id}/heartbeat", this::postHeartbeat);
+        app.post("/api/users/{id}/typing", this::postTyping);
+        app.get("/api/users/{id}/presence", this::getPresence);
         app.get("/api/users/{id}/conversations", this::getConversations);
         app.delete("/api/users/{id}/conversations/{conversationId}", this::deleteConversation);
         app.post("/api/users/{id}/conversations/{conversationId}/archive", this::archiveConversation);
+        app.post("/api/users/{id}/conversations/{conversationId}/unarchive", this::unarchiveConversation);
         app.get("/api/conversations/{conversationId}/messages", this::getMessages);
         app.delete("/api/conversations/{conversationId}/messages/{messageId}", this::deleteMessage);
         app.post("/api/conversations/{conversationId}/messages", this::sendMessage);
@@ -422,8 +442,165 @@ public class RestApiServer {
         app.delete("/api/users/{authorId}/notes/{subjectId}", this::deleteProfileNote);
     }
 
+    private void registerAdminRoutes() {
+        app.get("/api/admin/reports", this::listAdminReports);
+        app.post("/api/admin/reports/{targetId}/uphold", this::adminUpholdReport);
+        app.post("/api/admin/reports/{targetId}/dismiss", this::adminDismissReport);
+        app.post("/api/admin/reports/{targetId}/ban", this::adminBanReport);
+    }
+
+    void listAdminReports(Context ctx) {
+        UUID adminId = requireAdmin(ctx);
+        if (adminId == null) {
+            return;
+        }
+        var pending = profileUseCases.listUsers();
+        if (!pending.success()) {
+            handleUseCaseFailure(ctx, pending.error());
+            return;
+        }
+        var reports = new ArrayList<AdminReportDto>();
+        for (User user : pending.data()) {
+            if (user.getState() != UserState.UNDER_REVIEW) {
+                continue;
+            }
+            int count;
+            try {
+                count = trustSafetyService.countReportsAgainst(user.getId());
+            } catch (Exception e) {
+                handleUseCaseFailure(
+                        ctx, datingapp.app.usecase.common.UseCaseError.internalFailure("list admin reports", e));
+                return;
+            }
+            reports.add(new AdminReportDto(user.getId(), user.getName(), count));
+        }
+        ctx.json(new AdminReportsResponse(reports));
+    }
+
+    void adminUpholdReport(Context ctx) {
+        UUID adminId = requireAdmin(ctx);
+        if (adminId == null) {
+            return;
+        }
+        UUID targetId = parseUuid(ctx.pathParam("targetId"));
+        if (loadExistingUser(ctx, targetId).isEmpty()) {
+            return;
+        }
+        try {
+            trustSafetyService.adminUphold(adminId, targetId);
+        } catch (IllegalArgumentException e) {
+            ctx.status(404).json(new ErrorResponse("NOT_FOUND", e.getMessage()));
+            return;
+        }
+        ctx.json(new AdminActionResponse(true, "upheld"));
+    }
+
+    void adminDismissReport(Context ctx) {
+        UUID adminId = requireAdmin(ctx);
+        if (adminId == null) {
+            return;
+        }
+        UUID targetId = parseUuid(ctx.pathParam("targetId"));
+        if (loadExistingUser(ctx, targetId).isEmpty()) {
+            return;
+        }
+        try {
+            trustSafetyService.adminDismiss(adminId, targetId);
+        } catch (IllegalArgumentException e) {
+            ctx.status(404).json(new ErrorResponse("NOT_FOUND", e.getMessage()));
+            return;
+        }
+        ctx.json(new AdminActionResponse(true, "dismissed"));
+    }
+
+    void adminBanReport(Context ctx) {
+        UUID adminId = requireAdmin(ctx);
+        if (adminId == null) {
+            return;
+        }
+        UUID targetId = parseUuid(ctx.pathParam("targetId"));
+        if (loadExistingUser(ctx, targetId).isEmpty()) {
+            return;
+        }
+        try {
+            trustSafetyService.adminBan(adminId, targetId);
+        } catch (IllegalArgumentException e) {
+            ctx.status(404).json(new ErrorResponse("NOT_FOUND", e.getMessage()));
+            return;
+        }
+        ctx.json(new AdminActionResponse(true, "banned"));
+    }
+
+    private UUID requireAdmin(Context ctx) {
+        UUID actingUser;
+        try {
+            actingUser = identityPolicy.requireActingUserId(ctx);
+        } catch (RuntimeException e) {
+            ctx.status(401).json(new ErrorResponse(UNAUTHORIZED, "Authentication required"));
+            return null;
+        }
+        if (!isAdminUser(actingUser)) {
+            ctx.status(403).json(new ErrorResponse(FORBIDDEN, "Admin access required"));
+            return null;
+        }
+        return actingUser;
+    }
+
+    private boolean isAdminUser(UUID userId) {
+        String raw = System.getenv("DATINGAPP_ADMIN_IDS");
+        if (raw == null || raw.isBlank()) {
+            raw = System.getProperty("datingapp.adminIds", "");
+        }
+        if (raw != null && !raw.isBlank()) {
+            return matchesAdminId(userId, raw);
+        }
+        return adminClerkIds.stream().anyMatch(clerkId -> authUseCases
+                .findUserIdByClerkId(clerkId)
+                .filter(userId::equals)
+                .isPresent());
+    }
+
+    private static boolean matchesAdminId(UUID userId, String raw) {
+        if (raw == null || raw.isBlank()) {
+            return false;
+        }
+        for (String part : raw.split(",")) {
+            try {
+                if (userId.equals(UUID.fromString(part.trim()))) {
+                    return true;
+                }
+            } catch (IllegalArgumentException ignored) {
+                // ignore malformed entries
+            }
+        }
+        return false;
+    }
+
+    record AdminReportDto(UUID userId, String name, int reportCount) {}
+
+    record AdminReportsResponse(List<AdminReportDto> reports) {
+        AdminReportsResponse {
+            reports = reports == null ? List.of() : List.copyOf(reports);
+        }
+    }
+
+    record AdminActionResponse(boolean success, String action) {}
+
     private void registerStaticPhotoRoute() {
         app.get("/photos/*", ctx -> {
+            try {
+                requestGuards.enforceRateLimit(ctx);
+            } catch (RuntimeException e) {
+                ctx.status(429).json(new ErrorResponse("RATE_LIMITED", "Local API rate limit exceeded"));
+                return;
+            }
+            UUID viewerId;
+            try {
+                viewerId = identityPolicy.requireActingUserId(ctx);
+            } catch (RuntimeException e) {
+                ctx.status(401).json(new ErrorResponse(UNAUTHORIZED, "Authentication required"));
+                return;
+            }
             String routePath = ctx.path();
             int slashAfterPhotos = routePath.indexOf('/', 1);
             if (slashAfterPhotos < 0) {
@@ -452,12 +629,37 @@ public class RestApiServer {
                 ctx.status(404);
                 return;
             }
+            Optional<User> owner = loadExistingUser(ctx, userId);
+            if (owner.isEmpty()) {
+                return;
+            }
+            if (!viewerId.equals(userId)) {
+                Optional<User> viewer = loadExistingUser(ctx, viewerId);
+                if (viewer.isEmpty()) {
+                    return;
+                }
+                try {
+                    ensureViewerCanReadUserProfile(viewer.get(), owner.get());
+                } catch (RuntimeException e) {
+                    ctx.status(403).json(new ErrorResponse(FORBIDDEN, e.getMessage()));
+                    return;
+                }
+            }
             var content = photoStorage.loadPhoto(userId, fileName);
             if (content.isEmpty()) {
                 ctx.status(404);
                 return;
             }
-            ctx.contentType(content.get().contentType()).result(content.get().bytes());
+            byte[] bytes = content.get().bytes();
+            String etag = "\"" + Integer.toHexString(java.util.Arrays.hashCode(bytes)) + "-" + bytes.length + "\"";
+            String ifNoneMatch = ctx.header("If-None-Match");
+            if (etag.equals(ifNoneMatch)) {
+                ctx.status(304);
+                return;
+            }
+            ctx.header("Cache-Control", "private, max-age=3600");
+            ctx.header("ETag", etag);
+            ctx.contentType(content.get().contentType()).result(bytes);
         });
     }
 
@@ -655,6 +857,41 @@ public class RestApiServer {
                 result.get().activated(),
                 userTimeZone,
                 locationLabel(result.get().user()),
+                activationPolicy));
+    }
+
+    void pauseProfile(Context ctx) {
+        UUID userId = parseUuid(ctx.pathParam("id"));
+        if (loadExistingUser(ctx, userId).isEmpty()) {
+            return;
+        }
+        respondWithOwnProfile(
+                ctx,
+                profileMutationUseCases.pauseProfile(new PauseProfileCommand(UserContext.api(userId))),
+                "Pause profile returned no data");
+    }
+
+    void resumeProfile(Context ctx) {
+        UUID userId = parseUuid(ctx.pathParam("id"));
+        if (loadExistingUser(ctx, userId).isEmpty()) {
+            return;
+        }
+        respondWithOwnProfile(
+                ctx,
+                profileMutationUseCases.resumeProfile(new ResumeProfileCommand(UserContext.api(userId))),
+                "Resume profile returned no data");
+    }
+
+    private void respondWithOwnProfile(Context ctx, UseCaseResult<User> result, String missingDataMessage) {
+        Optional<User> user = requiredDataOrHandleFailure(ctx, result, missingDataMessage);
+        if (user.isEmpty()) {
+            return;
+        }
+        ctx.json(UserDetail.from(
+                user.get(),
+                userTimeZone,
+                locationLabel(user.get()),
+                storedPath -> photoStorage.toPublicUrl(ctx, storedPath),
                 activationPolicy));
     }
 
@@ -986,6 +1223,40 @@ public class RestApiServer {
         ctx.json(new PassResponse("Passed"));
     }
 
+    void superLikeUser(Context ctx) {
+        UUID userId = parseUuid(ctx.pathParam("id"));
+        UUID targetId = parseUuid(ctx.pathParam(PATH_TARGET_ID));
+        Optional<User> currentUser = loadExistingUser(ctx, userId);
+        Optional<User> targetUser = loadExistingUser(ctx, targetId);
+        if (currentUser.isEmpty() || targetUser.isEmpty()) {
+            return;
+        }
+
+        Optional<MatchingUseCases.RecordLikeResult> result = requiredDataOrHandleFailure(
+                ctx,
+                matchingUseCases.recordLike(new RecordLikeCommand(
+                        UserContext.api(userId),
+                        targetId,
+                        datingapp.core.connection.ConnectionModels.Like.Direction.SUPER_LIKE,
+                        true)),
+                "Super-like result returned no data");
+        if (result.isEmpty()) {
+            return;
+        }
+        Optional<Match> match = result.get().match();
+        if (match.isPresent()) {
+            ctx.status(201);
+            ctx.json(new LikeResponse(
+                    true,
+                    "It's a match!",
+                    MatchSummary.from(
+                            match.get(), userId, Map.of(targetUser.get().getId(), targetUser.get()))));
+        } else {
+            ctx.status(200);
+            ctx.json(new LikeResponse(false, "Super-like recorded", null));
+        }
+    }
+
     void undoSwipe(Context ctx) {
         UUID userId = parseUuid(ctx.pathParam("id"));
         if (!ensureUsersExist(ctx, userId)) {
@@ -1000,6 +1271,22 @@ public class RestApiServer {
             return;
         }
         ctx.json(UndoResponse.from(result.get()));
+    }
+
+    void getDailyStatus(Context ctx) {
+        UUID userId = parseUuid(ctx.pathParam("id"));
+        if (!ensureUsersExist(ctx, userId)) {
+            return;
+        }
+
+        var result = requiredDataOrHandleFailure(
+                ctx,
+                matchingUseCases.getDailyQuota(new DailyStatusQuery(UserContext.api(userId))),
+                "Daily status returned no data");
+        if (result.isEmpty()) {
+            return;
+        }
+        ctx.json(DailyStatusResponse.from(result.get()));
     }
 
     void getPendingLikers(Context ctx) {
@@ -1289,7 +1576,7 @@ public class RestApiServer {
             return;
         }
         ctx.json(new ReportResponse(
-                true, result.data().autoBanned(), null, result.data().blockedByReporter()));
+                true, result.data().autoFlagged(), null, result.data().blockedByReporter()));
     }
 
     void startVerification(Context ctx) {
@@ -1326,6 +1613,79 @@ public class RestApiServer {
 
     // ── Messaging Handlers ──────────────────────────────────────────────
 
+    void postHeartbeat(Context ctx) {
+        UUID userId = parseUuid(ctx.pathParam("id"));
+        if (loadExistingUser(ctx, userId).isEmpty()) {
+            return;
+        }
+        try {
+            identityPolicy.requireActingUserId(ctx);
+        } catch (RuntimeException e) {
+            ctx.status(401).json(new ErrorResponse(UNAUTHORIZED, "Authentication required"));
+            return;
+        }
+        presenceService.heartbeat(userId);
+        ctx.json(new AdminActionResponse(true, "heartbeat"));
+    }
+
+    void postTyping(Context ctx) {
+        UUID userId = parseUuid(ctx.pathParam("id"));
+        if (loadExistingUser(ctx, userId).isEmpty()) {
+            return;
+        }
+        try {
+            identityPolicy.requireActingUserId(ctx);
+        } catch (RuntimeException e) {
+            ctx.status(401).json(new ErrorResponse(UNAUTHORIZED, "Authentication required"));
+            return;
+        }
+        String conversationId = ctx.queryParam("conversationId");
+        if (conversationId == null || conversationId.isBlank()) {
+            TypingRequest body = null;
+            try {
+                body = ctx.bodyAsClass(TypingRequest.class);
+            } catch (Exception ignored) {
+                body = null;
+            }
+            conversationId = body == null ? null : body.conversationId();
+        }
+        presenceService.setTyping(userId, conversationId);
+        ctx.json(new AdminActionResponse(true, "typing"));
+    }
+
+    void getPresence(Context ctx) {
+        UUID userId = parseUuid(ctx.pathParam("id"));
+        if (loadExistingUser(ctx, userId).isEmpty()) {
+            return;
+        }
+        UUID viewerId;
+        try {
+            viewerId = identityPolicy.requireActingUserId(ctx);
+        } catch (RuntimeException e) {
+            ctx.status(401).json(new ErrorResponse(UNAUTHORIZED, "Authentication required"));
+            return;
+        }
+        String conversationId = ctx.queryParam("conversationId");
+        if (conversationId != null && conversationId.isBlank()) {
+            conversationId = null;
+        }
+        var authorization = messagingUseCases.authorizePresenceRead(
+                new PresenceReadQuery(UserContext.api(viewerId), userId, conversationId));
+        if (!authorization.success()) {
+            handleUseCaseFailure(ctx, authorization.error());
+            return;
+        }
+        var service = presenceService;
+        ctx.json(new PresenceResponse(
+                service.getStatus(userId).name(),
+                service.isTyping(userId, conversationId),
+                datingapp.core.AppClock.now().toString()));
+    }
+
+    record TypingRequest(String conversationId) {}
+
+    record PresenceResponse(String status, boolean typing, String checkedAt) {}
+
     void getConversations(Context ctx) {
         UUID userId = parseUuid(ctx.pathParam("id"));
         var p = parsePagination(ctx, DEFAULT_MESSAGE_LIMIT);
@@ -1333,7 +1693,7 @@ public class RestApiServer {
             return;
         }
         var listResult = messagingUseCases.listConversations(
-                new ListConversationsQuery(UserContext.api(userId), p.limit(), p.offset()));
+                new ListConversationsQuery(UserContext.api(userId), p.limit(), p.offset(), parseArchiveFilter(ctx)));
         if (!listResult.success()) {
             handleUseCaseFailure(ctx, listResult.error());
             return;
@@ -1351,9 +1711,38 @@ public class RestApiServer {
         Map<String, Integer> messageCounts = countResult.data();
 
         List<ConversationSummary> conversations = previews.stream()
-                .map(preview -> toConversationSummary(preview, messageCounts))
+                .map(preview -> toConversationSummary(preview, messageCounts, userId))
                 .toList();
         ctx.json(conversations);
+    }
+
+    /** Optional {@code archived=true|false} narrows the list; leaving it out returns every conversation. */
+    private static ArchiveFilter parseArchiveFilter(Context ctx) {
+        String raw = ctx.queryParam("archived");
+        if (raw == null || raw.isBlank()) {
+            return ArchiveFilter.ALL;
+        }
+        return switch (raw.trim().toLowerCase(java.util.Locale.ROOT)) {
+            case "true" -> ArchiveFilter.ARCHIVED;
+            case "false" -> ArchiveFilter.NOT_ARCHIVED;
+            default -> throw new IllegalArgumentException("archived must be true or false");
+        };
+    }
+
+    void unarchiveConversation(Context ctx) {
+        UUID userId = parseUuid(ctx.pathParam("id"));
+        String conversationId = ctx.pathParam(PATH_CONVERSATION_ID);
+        if (loadExistingUser(ctx, userId).isEmpty()) {
+            return;
+        }
+
+        var result = messagingUseCases.unarchiveConversation(
+                new UnarchiveConversationCommand(UserContext.api(userId), conversationId));
+        if (!result.success()) {
+            handleUseCaseFailure(ctx, result.error());
+            return;
+        }
+        ctx.status(204);
     }
 
     void deleteConversation(Context ctx) {
@@ -1631,7 +2020,7 @@ public class RestApiServer {
     }
 
     private ConversationSummary toConversationSummary(
-            ConnectionService.ConversationPreview preview, Map<String, Integer> messageCounts) {
+            ConnectionService.ConversationPreview preview, Map<String, Integer> messageCounts, UUID viewerId) {
         Conversation conversation = preview.conversation();
         User otherUser = preview.otherUser();
         int messageCount = messageCounts.getOrDefault(conversation.getId(), 0);
@@ -1640,7 +2029,8 @@ public class RestApiServer {
                 otherUser.getId(),
                 otherUser.getName(),
                 messageCount,
-                conversation.getLastMessageAt());
+                conversation.getLastMessageAt(),
+                conversation.isArchivedBy(viewerId));
     }
 
     private UUID extractRecipientFromConversation(String conversationId, UUID senderId) {
@@ -1752,7 +2142,15 @@ public class RestApiServer {
             }
             case CONFLICT -> {
                 ctx.status(409);
-                ctx.json(new ErrorResponse(CONFLICT, error.message()));
+                ctx.json(new ErrorResponse(error.reason() != null ? error.reason() : CONFLICT, error.message()));
+            }
+            case RATE_LIMITED -> {
+                ctx.status(429);
+                ctx.json(new ErrorResponse("RATE_LIMITED", error.message()));
+            }
+            case GONE -> {
+                ctx.status(410);
+                ctx.json(new ErrorResponse("GONE", error.message()));
             }
             default -> {
                 ctx.status(500);

@@ -146,6 +146,9 @@ public class User {
     private String verificationCode;
     private Instant verificationSentAt;
     private Instant verifiedAt;
+    private int verificationAttemptCount;
+    private Instant verificationLockedUntil;
+    private Instant verificationLastSentAt;
 
     private PacePreferences pacePreferences;
 
@@ -349,6 +352,21 @@ public class User {
 
         public StorageBuilder verificationSentAt(Instant sentAt) {
             user.verificationSentAt = sentAt;
+            return this;
+        }
+
+        public StorageBuilder verificationAttemptCount(int attemptCount) {
+            user.verificationAttemptCount = Math.max(0, attemptCount);
+            return this;
+        }
+
+        public StorageBuilder verificationLockedUntil(Instant lockedUntil) {
+            user.verificationLockedUntil = lockedUntil;
+            return this;
+        }
+
+        public StorageBuilder verificationLastSentAt(Instant lastSentAt) {
+            user.verificationLastSentAt = lastSentAt;
             return this;
         }
 
@@ -561,6 +579,18 @@ public class User {
         return verificationSentAt;
     }
 
+    public int getVerificationAttemptCount() {
+        return verificationAttemptCount;
+    }
+
+    public Instant getVerificationLockedUntil() {
+        return verificationLockedUntil;
+    }
+
+    public Instant getVerificationLastSentAt() {
+        return verificationLastSentAt;
+    }
+
     public Instant getVerifiedAt() {
         return verifiedAt;
     }
@@ -604,7 +634,10 @@ public class User {
     public void startVerification(VerificationMethod method, String verificationCode) {
         this.verificationMethod = Objects.requireNonNull(method, "method cannot be null");
         this.verificationCode = Objects.requireNonNull(verificationCode, "verificationCode cannot be null");
-        this.verificationSentAt = AppClock.now();
+        Instant now = AppClock.now();
+        this.verificationSentAt = now;
+        this.verificationLastSentAt = now;
+        this.verificationAttemptCount = 0;
         touch();
     }
 
@@ -612,12 +645,32 @@ public class User {
         this.isVerified = true;
         this.verifiedAt = AppClock.now();
         this.verificationCode = null;
+        this.verificationAttemptCount = 0;
+        this.verificationLockedUntil = null;
         touch();
     }
 
     public void clearVerificationAttempt() {
         this.verificationCode = null;
         this.verificationSentAt = null;
+        this.verificationAttemptCount = 0;
+        this.verificationLockedUntil = null;
+        touch();
+    }
+
+    public void recordVerificationAttempt() {
+        this.verificationAttemptCount = Math.max(0, verificationAttemptCount) + 1;
+        touch();
+    }
+
+    public void resetVerificationAttempts() {
+        this.verificationAttemptCount = 0;
+        this.verificationLockedUntil = null;
+        touch();
+    }
+
+    public void lockVerificationUntil(Instant lockedUntil) {
+        this.verificationLockedUntil = Objects.requireNonNull(lockedUntil, "lockedUntil cannot be null");
         touch();
     }
 
@@ -824,6 +877,47 @@ public class User {
     }
 
     /**
+     * Clears moderator review. A complete profile returns to ACTIVE; one that was flagged before it was finished
+     * returns to INCOMPLETE so it activates through the normal path. No-op unless under review.
+     */
+    public void clearReview() {
+        if (state != UserState.UNDER_REVIEW) {
+            return;
+        }
+        this.state = isComplete() ? UserState.ACTIVE : UserState.INCOMPLETE;
+        touch();
+    }
+
+    /** GDPR scrub: removes all directly identifying and content PII in-memory. */
+    public void scrubForDeletion() {
+        this.name = "Deleted User";
+        this.bio = null;
+        this.birthDate = null;
+        this.lat = 0.0;
+        this.lon = 0.0;
+        this.hasLocationSet = false;
+        this.photoUrls = new ArrayList<>();
+        this.interests = EnumSet.noneOf(Interest.class);
+        this.smoking = null;
+        this.drinking = null;
+        this.wantsKids = null;
+        this.lookingFor = null;
+        this.education = null;
+        this.heightCm = null;
+        this.dealbreakers = null;
+        this.pacePreferences = null;
+        this.email = null;
+        this.phone = null;
+        this.verificationMethod = null;
+        this.verificationCode = null;
+        this.verificationSentAt = null;
+        this.verificationAttemptCount = 0;
+        this.verificationLockedUntil = null;
+        this.verificationLastSentAt = null;
+        touch();
+    }
+
+    /**
      * Checks if the user profile is complete. A complete profile has all required
      * fields filled.
      */
@@ -969,6 +1063,9 @@ public class User {
                 .verificationMethod(verificationMethod)
                 .verificationCode(verificationCode)
                 .verificationSentAt(verificationSentAt)
+                .verificationAttemptCount(verificationAttemptCount)
+                .verificationLockedUntil(verificationLockedUntil)
+                .verificationLastSentAt(verificationLastSentAt)
                 .verifiedAt(verifiedAt)
                 .pacePreferences(pacePreferences)
                 .deletedAt(deletedAt)

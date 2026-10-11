@@ -117,7 +117,7 @@ class TrustSafetyServiceTest {
                         activeReporter.getId(), reportedUser.getId(), Report.Reason.SPAM, "Sent spam messages", true);
 
                 assertTrue(result.success(), "Report should succeed");
-                assertFalse(result.userWasBanned(), "First report should not trigger ban");
+                assertFalse(result.userWasFlagged(), "First report should not trigger ban");
                 assertNull(result.errorMessage(), "No error message on success");
             }
 
@@ -170,7 +170,7 @@ class TrustSafetyServiceTest {
                 var result = trustSafetyService.report(
                         reporter3.getId(), reportedUser.getId(), Report.Reason.SPAM, null, true);
 
-                assertTrue(result.userWasBanned(), "Third report should flag the account");
+                assertTrue(result.userWasFlagged(), "Third report should flag the account");
                 assertEquals(
                         UserState.UNDER_REVIEW,
                         userStorage.get(reportedUser.getId()).orElseThrow().getState(),
@@ -192,8 +192,8 @@ class TrustSafetyServiceTest {
                 var second =
                         customService.report(reporter2.getId(), reportedUser.getId(), Report.Reason.SPAM, null, true);
 
-                assertTrue(first.userWasBanned());
-                assertFalse(second.userWasBanned(), "Already under review: the second report must not re-flag");
+                assertTrue(first.userWasFlagged());
+                assertFalse(second.userWasFlagged(), "Already under review: the second report must not re-flag");
                 assertEquals(
                         UserState.UNDER_REVIEW,
                         userStorage.get(reportedUser.getId()).orElseThrow().getState());
@@ -223,7 +223,7 @@ class TrustSafetyServiceTest {
                 var result =
                         customService.report(reporter2.getId(), reportedUser.getId(), Report.Reason.SPAM, null, true);
 
-                assertTrue(result.userWasBanned(), "Should flag at custom threshold of 2");
+                assertTrue(result.userWasFlagged(), "Should flag at custom threshold of 2");
             }
 
             @Test
@@ -243,7 +243,7 @@ class TrustSafetyServiceTest {
                         reporter3.getId(), reportedUser.getId(), Report.Reason.SPAM, null, true);
 
                 assertTrue(result.success(), "The report itself should still succeed");
-                assertFalse(result.userWasBanned(), "A failed save must not be reported as a successful flag");
+                assertFalse(result.userWasFlagged(), "A failed save must not be reported as a successful flag");
                 assertEquals(
                         UserState.ACTIVE,
                         userStorage.get(reportedUser.getId()).orElseThrow().getState(),
@@ -279,7 +279,7 @@ class TrustSafetyServiceTest {
                 var result = trustSafetyService.report(
                         reporter3.getId(), reportedUser.getId(), Report.Reason.SPAM, null, true);
 
-                assertTrue(result.userWasBanned(), "Third report should flag the account");
+                assertTrue(result.userWasFlagged(), "Third report should flag the account");
                 assertEquals(
                         lockCountBeforeBan + 1,
                         userStorage.getLockInvocationCount(),

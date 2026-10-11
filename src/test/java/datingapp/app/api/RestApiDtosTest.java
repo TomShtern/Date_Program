@@ -250,6 +250,49 @@ class RestApiDtosTest {
         @Test
         @DisplayName("StartVerificationResponse exposes the dev verification code")
         void startVerificationResponseExposesTheDevVerificationCode() {
+            System.setProperty("datingapp.showVerificationCode", "true");
+            try {
+                User user = buildTestUser();
+                user.setEmail("verified@example.com");
+                user.startVerification(VerificationMethod.EMAIL, "123456");
+
+                StartVerificationResponse response = StartVerificationResponse.from(
+                        new VerificationUseCases.StartVerificationResult(user, "123456"));
+
+                assertEquals(user.getId(), response.userId());
+                assertEquals("EMAIL", response.method());
+                assertEquals("verified@example.com", response.contact());
+                assertEquals("123456", response.devVerificationCode());
+            } finally {
+                System.clearProperty("datingapp.showVerificationCode");
+            }
+        }
+
+        @Test
+        @DisplayName("StartVerificationResponse omits contact when verification method is absent")
+        void startVerificationResponseOmitsContactWhenVerificationMethodIsAbsent() {
+            System.setProperty("datingapp.showVerificationCode", "true");
+            try {
+                User user = buildTestUser();
+                user.setEmail("verified@example.com");
+
+                StartVerificationResponse response = StartVerificationResponse.from(
+                        new VerificationUseCases.StartVerificationResult(user, "123456"));
+
+                assertEquals(user.getId(), response.userId());
+                assertNull(response.method());
+                assertNull(response.contact());
+                assertEquals("123456", response.devVerificationCode());
+            } finally {
+                System.clearProperty("datingapp.showVerificationCode");
+            }
+        }
+
+        @Test
+        @DisplayName("StartVerificationResponse hides the dev verification code by default")
+        void startVerificationResponseHidesTheDevVerificationCodeByDefault() {
+            System.clearProperty("datingapp.showVerificationCode");
+
             User user = buildTestUser();
             user.setEmail("verified@example.com");
             user.startVerification(VerificationMethod.EMAIL, "123456");
@@ -257,25 +300,7 @@ class RestApiDtosTest {
             StartVerificationResponse response =
                     StartVerificationResponse.from(new VerificationUseCases.StartVerificationResult(user, "123456"));
 
-            assertEquals(user.getId(), response.userId());
-            assertEquals("EMAIL", response.method());
-            assertEquals("verified@example.com", response.contact());
-            assertEquals("123456", response.devVerificationCode());
-        }
-
-        @Test
-        @DisplayName("StartVerificationResponse omits contact when verification method is absent")
-        void startVerificationResponseOmitsContactWhenVerificationMethodIsAbsent() {
-            User user = buildTestUser();
-            user.setEmail("verified@example.com");
-
-            StartVerificationResponse response =
-                    StartVerificationResponse.from(new VerificationUseCases.StartVerificationResult(user, "123456"));
-
-            assertEquals(user.getId(), response.userId());
-            assertNull(response.method());
-            assertNull(response.contact());
-            assertEquals("123456", response.devVerificationCode());
+            assertNull(response.devVerificationCode());
         }
 
         @Test
@@ -306,6 +331,18 @@ class RestApiDtosTest {
             assertEquals(1, dto.newlyUnlockedCount());
             assertEquals("First Spark", dto.unlocked().getFirst().achievementName());
         }
+    }
+
+    @Test
+    @DisplayName("ReportResponse still serializes the deprecated autoBanned alias")
+    void reportResponseSerializesAutoBannedAlias() throws Exception {
+        var json = new com.fasterxml.jackson.databind.ObjectMapper()
+                .readTree(new com.fasterxml.jackson.databind.ObjectMapper()
+                        .writeValueAsString(new SocialDtos.ReportResponse(true, true, null, false)));
+
+        assertTrue(json.has("autoBanned"), json.toString());
+        assertTrue(json.get("autoBanned").asBoolean());
+        assertTrue(json.get("autoFlagged").asBoolean());
     }
 
     private static User buildTestUser() {

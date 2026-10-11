@@ -74,7 +74,7 @@ class TrustSafetyServiceSecurityTest {
         TrustSafetyService.ReportResult duplicate =
                 service.report(reporter.getId(), reported.getId(), Report.Reason.HARASSMENT, "desc", false);
         assertFalse(duplicate.success());
-        assertFalse(duplicate.userWasBanned());
+        assertFalse(duplicate.userWasFlagged());
         assertEquals("Already reported this user", duplicate.errorMessage());
         assertEquals(1, trustSafetyStorage.countReportsAgainst(reported.getId()));
     }

@@ -79,17 +79,21 @@ final class StatsDtos {
         }
     }
 
-    /** Achievement snapshot DTO. */
+    /** Achievement snapshot DTO. Counts are always derived from the lists. */
     static record AchievementSnapshotDto(
             List<AchievementUnlockedDto> unlocked,
             List<AchievementUnlockedDto> newlyUnlocked,
             int unlockedCount,
             int newlyUnlockedCount) {
-        AchievementSnapshotDto {
-            unlocked = unlocked == null ? List.of() : List.copyOf(unlocked);
-            newlyUnlocked = newlyUnlocked == null ? List.of() : List.copyOf(newlyUnlocked);
-            unlockedCount = unlocked.size();
-            newlyUnlockedCount = newlyUnlocked.size();
+        AchievementSnapshotDto(
+                List<AchievementUnlockedDto> unlocked,
+                List<AchievementUnlockedDto> newlyUnlocked,
+                int unlockedCount,
+                int newlyUnlockedCount) {
+            this.unlocked = unlocked == null ? List.of() : List.copyOf(unlocked);
+            this.newlyUnlocked = newlyUnlocked == null ? List.of() : List.copyOf(newlyUnlocked);
+            this.unlockedCount = this.unlocked.size();
+            this.newlyUnlockedCount = this.newlyUnlocked.size();
         }
 
         static AchievementSnapshotDto from(

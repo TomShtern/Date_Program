@@ -18,6 +18,7 @@ import datingapp.core.matching.DailyLimitService;
 import datingapp.core.matching.DailyPickService;
 import datingapp.core.matching.MatchQualityService;
 import datingapp.core.matching.MatchingService;
+import datingapp.core.matching.ModerationAuditStorage;
 import datingapp.core.matching.RecommendationService;
 import datingapp.core.matching.Standout;
 import datingapp.core.matching.StandoutService;
@@ -26,6 +27,8 @@ import datingapp.core.matching.UndoService;
 import datingapp.core.metrics.AchievementService;
 import datingapp.core.metrics.ActivityMetricsService;
 import datingapp.core.metrics.SwipeState.Undo;
+import datingapp.core.presence.PresenceService;
+import datingapp.core.presence.PresenceStorage;
 import datingapp.core.profile.ProfileService;
 import datingapp.core.profile.ValidationService;
 import datingapp.core.storage.AccountCleanupStorage;
@@ -43,6 +46,8 @@ import datingapp.storage.jdbi.JdbiAuthStorage;
 import datingapp.storage.jdbi.JdbiConnectionStorage;
 import datingapp.storage.jdbi.JdbiMatchmakingStorage;
 import datingapp.storage.jdbi.JdbiMetricsStorage;
+import datingapp.storage.jdbi.JdbiModerationAuditStorage;
+import datingapp.storage.jdbi.JdbiPresenceStorage;
 import datingapp.storage.jdbi.JdbiTrustSafetyStorage;
 import datingapp.storage.jdbi.JdbiTypeCodecs;
 import datingapp.storage.jdbi.JdbiUserStorage;
@@ -129,8 +134,10 @@ public final class StorageFactory {
         OperationalCommunicationStorage communicationStorage = new JdbiConnectionStorage(jdbi);
         JdbiMetricsStorage metricsStorage = new JdbiMetricsStorage(jdbi, dialect);
         TrustSafetyStorage trustSafetyStorage = new JdbiTrustSafetyStorage(jdbi);
+        ModerationAuditStorage moderationAuditStorage = new JdbiModerationAuditStorage(jdbi);
         AccountCleanupStorage accountCleanupStorage = new JdbiAccountCleanupStorage(jdbi);
         AuthStorage authStorage = new JdbiAuthStorage(jdbi);
+        PresenceStorage presenceStorage = new JdbiPresenceStorage(jdbi, dialect);
 
         return new PersistenceComponents(
                 userStorage,
@@ -141,7 +148,9 @@ public final class StorageFactory {
                 accountCleanupStorage,
                 authStorage,
                 matchmakingStorage.undoStorage(),
-                metricsStorage);
+                metricsStorage,
+                moderationAuditStorage,
+                presenceStorage);
     }
 
     private static DomainServices createDomainServices(AppConfig config, PersistenceComponents persistence) {
@@ -205,6 +214,7 @@ public final class StorageFactory {
                         persistence.userStorage(),
                         config,
                         persistence.communicationStorage())
+                .moderationAuditStorage(persistence.moderationAuditStorage())
                 .build();
         trustSafetyService.setCandidateFinder(candidateFinder);
 
@@ -270,6 +280,8 @@ public final class StorageFactory {
                 .locationService(domain.locationService())
                 .eventBus(domain.eventBus())
                 .authUseCases(domain.authUseCases())
+                .presenceService(new PresenceService(
+                        persistence.presenceStorage(), config.safety().presence()))
                 .activationPolicy(new ProfileActivationPolicy())
                 .workflowPolicy(new RelationshipWorkflowPolicy())
                 .build();
@@ -284,7 +296,9 @@ public final class StorageFactory {
             AccountCleanupStorage accountCleanupStorage,
             AuthStorage authStorage,
             Undo.Storage undoStorage,
-            Standout.Storage standoutStorage) {}
+            Standout.Storage standoutStorage,
+            ModerationAuditStorage moderationAuditStorage,
+            PresenceStorage presenceStorage) {}
 
     private record DomainServices(
             CandidateFinder candidateFinder,

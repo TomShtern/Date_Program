@@ -134,6 +134,16 @@ public final class UiDataAdapters {
         /** Returns whether the specified user is currently typing. */
         boolean isTyping(UUID userId);
 
+        /** Records a local heartbeat. No-op unless live presence is wired. */
+        default void heartbeat(UUID userId) {
+            // No-op default: only live-presence implementations record heartbeats.
+        }
+
+        /** Records local typing state. No-op unless live presence is wired. */
+        default void setTyping(UUID userId, String conversationId) {
+            // No-op default: only live-presence implementations track typing state.
+        }
+
         /** Returns whether live presence indicators are supported in this runtime. */
         default boolean isSupported() {
             return true;
@@ -406,6 +416,47 @@ public final class UiDataAdapters {
                 return DEFAULT_ONLINE_THRESHOLD;
             }
             return sessionTimeout.compareTo(DEFAULT_ONLINE_THRESHOLD) < 0 ? sessionTimeout : DEFAULT_ONLINE_THRESHOLD;
+        }
+    }
+
+    /** Presence adapter backed by the heartbeat {@link datingapp.core.presence.PresenceService}. */
+    public static final class PresenceServiceUiPresenceDataAccess implements UiPresenceDataAccess {
+
+        private final datingapp.core.presence.PresenceService presenceService;
+
+        public PresenceServiceUiPresenceDataAccess(datingapp.core.presence.PresenceService presenceService) {
+            this.presenceService = Objects.requireNonNull(presenceService, "presenceService cannot be null");
+        }
+
+        public PresenceServiceUiPresenceDataAccess(
+                datingapp.core.presence.PresenceService presenceService, AppConfig config) {
+            this.presenceService = Objects.requireNonNull(presenceService, "presenceService cannot be null");
+            Objects.requireNonNull(config, "config cannot be null");
+        }
+
+        @Override
+        public PresenceStatus getPresence(UUID userId) {
+            return switch (presenceService.getStatus(userId)) {
+                case ONLINE -> PresenceStatus.ONLINE;
+                case AWAY -> PresenceStatus.AWAY;
+                case OFFLINE -> PresenceStatus.OFFLINE;
+                case UNKNOWN -> PresenceStatus.UNKNOWN;
+            };
+        }
+
+        @Override
+        public boolean isTyping(UUID userId) {
+            return presenceService.isTyping(userId);
+        }
+
+        @Override
+        public void heartbeat(UUID userId) {
+            presenceService.heartbeat(userId);
+        }
+
+        @Override
+        public void setTyping(UUID userId, String conversationId) {
+            presenceService.setTyping(userId, conversationId);
         }
     }
 }

@@ -64,9 +64,12 @@ public final class Main {
                             .waitFor();
                 } catch (InterruptedException _) {
                     Thread.currentThread().interrupt(); // Restore interrupt flag
-                } catch (Exception _) {
-                    // Best-effort: console codepage not critical for app functionality
-                    assert true; // PMD: non-empty catch block
+                } catch (Exception codepageError) {
+                    // Best-effort: console codepage not critical for app functionality.
+                    // Local logger: the static logger field is declared after this block on
+                    // purpose so codepage setup runs before Logback initializes.
+                    Logger bootLogger = LoggerFactory.getLogger(Main.class);
+                    LoggingSupport.logDebug(bootLogger, "Console codepage setup skipped: {}", codepageError.toString());
                 }
             }
         }
@@ -80,7 +83,7 @@ public final class Main {
     }
 
     public static void main(String[] args) {
-        try (Scanner scanner = new Scanner(System.in)) {
+        try (Scanner scanner = new Scanner(System.in, StandardCharsets.UTF_8)) {
             runWithShutdown(
                     () -> {
                         ServiceRegistry services = ApplicationStartup.initialize();

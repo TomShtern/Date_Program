@@ -138,6 +138,7 @@ public class MatchesController extends BaseController implements Initializable {
     private final Map<Section, Map<String, VBox>> cardCacheBySection = new EnumMap<>(Section.class);
     private final Map<Section, Map<String, Object>> cardDataBySection = new EnumMap<>(Section.class);
     private final Map<String, Animation> newMatchBadgeAnimations = new HashMap<>();
+    private datingapp.ui.viewmodel.UiDataAdapters.UiPresenceDataAccess presenceDataAccess;
 
     public MatchesController(MatchesViewModel viewModel) {
         this.viewModel = viewModel;
@@ -145,6 +146,11 @@ public class MatchesController extends BaseController implements Initializable {
             cardCacheBySection.put(section, new LinkedHashMap<>());
             cardDataBySection.put(section, new LinkedHashMap<>());
         }
+    }
+
+    /** Wires the shared presence adapter (production factory calls this; unset means offline). */
+    public void setPresenceDataAccess(datingapp.ui.viewmodel.UiDataAdapters.UiPresenceDataAccess presenceDataAccess) {
+        this.presenceDataAccess = presenceDataAccess;
     }
 
     @Override
@@ -397,6 +403,22 @@ public class MatchesController extends BaseController implements Initializable {
     }
 
     /** Populate the FlowPane with the current section's cards. */
+    private String statusClassFor(UUID userId) {
+        if (presenceDataAccess == null) {
+            return "status-offline";
+        }
+        try {
+            return switch (presenceDataAccess.getPresence(userId)) {
+                case ONLINE -> "status-online";
+                case AWAY -> "status-away";
+                case OFFLINE -> "status-offline";
+                case UNKNOWN -> "status-offline";
+            };
+        } catch (Exception e) {
+            return "status-offline";
+        }
+    }
+
     private void populateCards() {
         if (getActiveCardsCount() == 0) {
             matchesFlow.getChildren().clear();
@@ -570,11 +592,11 @@ public class MatchesController extends BaseController implements Initializable {
         avatarIcon.setIconColor(Color.web("#10b981"));
         avatarIcon.getStyleClass().add("match-avatar-icon");
 
-        // FUTURE(presence-tracking): Replace with live status once UserPresenceService is implemented.
-        // Currently always shows "Offline". Tracked in: VALID_ISSUES_2026-02-18.md#ORG-05
         Region statusDot = new Region();
         statusDot.getStyleClass().add("status-dot");
-        statusDot.getStyleClass().add("status-offline");
+        String presenceClass = statusClassFor(match.userId());
+        statusDot.getStyleClass().add(presenceClass);
+        statusDot.setAccessibleText("Presence: " + presenceClass);
         StackPane.setAlignment(statusDot, Pos.BOTTOM_RIGHT);
         statusDot.setTranslateX(4);
         statusDot.setTranslateY(4);

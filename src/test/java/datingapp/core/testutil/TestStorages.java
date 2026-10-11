@@ -240,6 +240,18 @@ public final class TestStorages {
         public synchronized void deleteIdentityForUser(UUID userId) {
             userIdsByClerkId.values().removeIf(userId::equals);
         }
+
+        private final java.util.Set<String> departureFlags = ConcurrentHashMap.newKeySet();
+
+        /** Test hook: marks a Clerk user as having left while reported. */
+        public void flagDeparture(String clerkUserId) {
+            departureFlags.add(clerkUserId);
+        }
+
+        @Override
+        public boolean consumeDepartureFlag(String clerkUserId) {
+            return departureFlags.remove(clerkUserId);
+        }
     }
 
     public static class Interactions implements OperationalInteractionStorage {
@@ -674,13 +686,7 @@ public final class TestStorages {
 
         @Override
         public List<Conversation> getConversationsFor(UUID userId, int limit, int offset) {
-            return conversations.values().stream()
-                    .filter(conversation -> conversation.involves(userId))
-                    .sorted(Comparator.comparing((Conversation conversation) -> {
-                                Instant last = conversation.getLastMessageAt();
-                                return last != null ? last : conversation.getCreatedAt();
-                            })
-                            .reversed())
+            return getAllConversationsFor(userId).stream()
                     .skip(offset)
                     .limit(limit)
                     .toList();
@@ -689,7 +695,7 @@ public final class TestStorages {
         @Override
         public List<Conversation> getAllConversationsFor(UUID userId) {
             return conversations.values().stream()
-                    .filter(conversation -> conversation.involves(userId))
+                    .filter(conversation -> conversation.involves(userId) && conversation.isVisibleTo(userId))
                     .sorted(Comparator.comparing((Conversation conversation) -> {
                                 Instant last = conversation.getLastMessageAt();
                                 return last != null ? last : conversation.getCreatedAt();
@@ -728,6 +734,25 @@ public final class TestStorages {
             if (conversation != null && conversation.involves(userId)) {
                 conversation.setVisibility(userId, visible);
             }
+        }
+
+        @Override
+        public void unarchiveConversation(String conversationId, UUID userId) {
+            Conversation conversation = conversations.get(conversationId);
+            if (conversation != null && conversation.involves(userId)) {
+                conversation.unarchive(userId);
+            }
+        }
+
+        @Override
+        public boolean restoreConversation(String conversationId) {
+            Conversation conversation = conversations.get(conversationId);
+            if (conversation == null) {
+                return false;
+            }
+            conversation.setVisibility(conversation.getUserA(), true);
+            conversation.setVisibility(conversation.getUserB(), true);
+            return true;
         }
 
         @Override

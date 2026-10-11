@@ -2,6 +2,8 @@ package datingapp.storage.schema;
 
 import java.sql.SQLException;
 import java.sql.Statement;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Current fresh-install schema: creates the full SQL contract that new databases should land on
@@ -12,6 +14,8 @@ import java.sql.Statement;
  * the clean baseline for fresh installs.
  */
 public final class SchemaInitializer {
+
+    private static final Logger logger = LoggerFactory.getLogger(SchemaInitializer.class);
 
     static final String FLOAT64_SQL_TYPE = "DOUBLE PRECISION";
     static final int PAIR_ID_LENGTH = 73;
@@ -46,6 +50,7 @@ public final class SchemaInitializer {
         // Core tables (order matters — users first due to FK references)
         createUsersTable(stmt);
         createAuthSchema(stmt);
+        createDepartedAccountFlagsSchema(stmt);
         createLikesTable(stmt);
         createMatchesTable(stmt);
         createSwipeSessionsTable(stmt);
@@ -61,6 +66,7 @@ public final class SchemaInitializer {
         createMessagingSchema(stmt);
         createSocialSchema(stmt);
         createModerationSchema(stmt);
+        createPresenceSchema(stmt);
         createProfileSchema(stmt);
         createStandoutsSchema(stmt);
         createUndoStateSchema(stmt);
@@ -107,14 +113,18 @@ public final class SchemaInitializer {
                     phone VARCHAR(50),
                     is_verified BOOLEAN,
                     verification_method VARCHAR(10),
-                    verification_code VARCHAR(10),
+                    verification_code VARCHAR(64),
                     verification_sent_at TIMESTAMP WITH TIME ZONE,
+                    verification_attempt_count INT DEFAULT 0,
+                    verification_locked_until TIMESTAMP WITH TIME ZONE,
+                    verification_last_sent_at TIMESTAMP WITH TIME ZONE,
                     verified_at TIMESTAMP WITH TIME ZONE,
                     pace_messaging_frequency VARCHAR(30),
                     pace_time_to_first_date VARCHAR(30),
                     pace_communication_style VARCHAR(30),
                     pace_depth_preference VARCHAR(30),
                     deleted_at TIMESTAMP WITH TIME ZONE,
+                    purged_at TIMESTAMP WITH TIME ZONE,
                     CONSTRAINT ck_users_state_values CHECK (
                         state IN ('INCOMPLETE', 'ACTIVE', 'PAUSED', 'UNDER_REVIEW', 'BANNED')
                     ),
@@ -201,6 +211,19 @@ public final class SchemaInitializer {
                     CONSTRAINT fk_clerk_identities_user FOREIGN KEY (user_id)
                         REFERENCES users(id) ON DELETE CASCADE,
                     CONSTRAINT ck_clerk_identities_id_nonblank CHECK (TRIM(clerk_user_id) <> '')
+                )
+                """);
+    }
+
+    /**
+     * Remembers, by SHA-256 of the Clerk user id, that an account was deleted while reported or under review. The
+     * next profile for that Clerk user starts under review. No FK: the row must outlive the deleted user.
+     */
+    static void createDepartedAccountFlagsSchema(Statement stmt) throws SQLException {
+        stmt.execute("""
+                CREATE TABLE IF NOT EXISTS departed_account_flags (
+                    clerk_id_hash VARCHAR(64) PRIMARY KEY,
+                    flagged_at TIMESTAMP WITH TIME ZONE NOT NULL
                 )
                 """);
     }
@@ -552,6 +575,35 @@ public final class SchemaInitializer {
                 """);
 
         stmt.execute("CREATE INDEX IF NOT EXISTS idx_reports_reported ON reports(reported_user_id)");
+
+        stmt.execute("""
+                CREATE TABLE IF NOT EXISTS moderation_audit (
+                    id UUID PRIMARY KEY,
+                    actor_id UUID,
+                    target_id UUID,
+                    action VARCHAR(30) NOT NULL,
+                    outcome VARCHAR(20) NOT NULL,
+                    reason VARCHAR(50),
+                    context_json VARCHAR(2000),
+                    created_at TIMESTAMP WITH TIME ZONE NOT NULL
+                )
+                """);
+        stmt.execute("CREATE INDEX IF NOT EXISTS idx_moderation_audit_target ON moderation_audit(target_id)");
+        stmt.execute("CREATE INDEX IF NOT EXISTS idx_moderation_audit_created ON moderation_audit(created_at)");
+    }
+
+    /** Creates the heartbeat presence table. */
+    static void createPresenceSchema(Statement stmt) throws SQLException {
+        stmt.execute("""
+                CREATE TABLE IF NOT EXISTS presence_heartbeat (
+                    user_id UUID PRIMARY KEY,
+                    last_seen TIMESTAMP WITH TIME ZONE NOT NULL,
+                    is_typing_in VARCHAR(200),
+                    updated_at TIMESTAMP WITH TIME ZONE NOT NULL,
+                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+                )
+                """);
+        stmt.execute("CREATE INDEX IF NOT EXISTS idx_presence_updated ON presence_heartbeat(updated_at)");
     }
 
     /** Creates profile-related tables (profile_notes, profile_views). */
@@ -829,6 +881,15 @@ public final class SchemaInitializer {
         try {
             stmt.execute(preferredSql);
         } catch (SQLException preferredFailure) {
+            // Partial-index (e.g. "WHERE x IS NOT NULL") not supported here — H2 always lands on this
+            // path because it lacks PostgreSQL partial indexes. Fall back to the plain index so the
+            // schema still converges, but warn so the performance regression is visible.
+            if (logger.isWarnEnabled()) {
+                logger.warn(
+                        "Partial index unsupported by this dialect; falling back to a full index: {}",
+                        fallbackSql,
+                        preferredFailure);
+            }
             try {
                 stmt.execute(fallbackSql);
             } catch (SQLException fallbackFailure) {

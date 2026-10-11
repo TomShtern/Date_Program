@@ -331,6 +331,22 @@ final class AppConfigValidator {
         requireNonNegative("softDeleteRetentionDays", softDeleteRetentionDays);
     }
 
+    static void validateVerification(int resendCooldownSeconds, int maxAttempts, int lockMinutes, int codeTtlMinutes) {
+        requireNonNegative("verificationResendCooldownSeconds", resendCooldownSeconds);
+        requirePositive("verificationMaxAttempts", maxAttempts);
+        requireNonNegative("verificationLockMinutes", lockMinutes);
+        requirePositive("verificationCodeTtlMinutes", codeTtlMinutes);
+    }
+
+    static void validatePresence(int onlineSeconds, int awaySeconds, int typingFreshSeconds) {
+        requirePositive("presenceOnlineSeconds", onlineSeconds);
+        requirePositive("presenceAwaySeconds", awaySeconds);
+        requirePositive("typingFreshSeconds", typingFreshSeconds);
+        if (onlineSeconds > awaySeconds) {
+            throw new IllegalArgumentException("presenceOnlineSeconds must be <= presenceAwaySeconds");
+        }
+    }
+
     private static void requireNonNegative(String name, int value) {
         if (value < 0) {
             throw new IllegalArgumentException(name + " must be non-negative");

@@ -198,7 +198,17 @@ public final class MigrationRunner {
             new VersionedMigration(
                     21,
                     "Add UNDER_REVIEW user state, swipe_quota_uses ledger, and candidate-query indexes",
-                    MigrationRunner::applyV21));
+                    MigrationRunner::applyV21),
+            new VersionedMigration(
+                    22,
+                    "Add verification attempt-count, lockout and resend timestamps to users",
+                    MigrationRunner::applyV22),
+            new VersionedMigration(23, "Add persistent moderation_audit table", MigrationRunner::applyV23),
+            new VersionedMigration(24, "Add presence_heartbeat table", MigrationRunner::applyV24),
+            new VersionedMigration(
+                    25,
+                    "Store verification codes hashed, add users.purged_at and departed_account_flags",
+                    MigrationRunner::applyV25));
 
     // ═══════════════════════════════════════════════════════════════
     // Public entry point
@@ -247,6 +257,11 @@ public final class MigrationRunner {
             }
             migration.action().apply(stmt);
             recordSchemaVersion(stmt, migration.version(), migration.description());
+            // Per-version commit so a partial failure resumes at the next version instead of
+            // replaying the whole chain. No-op when the caller already manages transactions.
+            if (!stmt.getConnection().getAutoCommit()) {
+                stmt.getConnection().commit();
+            }
             if (LOG.isInfoEnabled()) {
                 LOG.info("Migration V{} applied successfully", migration.version());
             }
@@ -718,6 +733,30 @@ public final class MigrationRunner {
                 && hasColumn(stmt, "likes", "created_at")) {
             SchemaInitializer.createCandidateQueryIndexes(stmt);
         }
+    }
+
+    private static void applyV22(Statement stmt) throws SQLException {
+        stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_attempt_count INT DEFAULT 0");
+        stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_locked_until TIMESTAMP WITH TIME ZONE");
+        stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_last_sent_at TIMESTAMP WITH TIME ZONE");
+    }
+
+    private static void applyV23(Statement stmt) throws SQLException {
+        SchemaInitializer.createModerationSchema(stmt);
+    }
+
+    private static void applyV24(Statement stmt) throws SQLException {
+        SchemaInitializer.createPresenceSchema(stmt);
+    }
+
+    private static void applyV25(Statement stmt) throws SQLException {
+        // Codes are stored as SHA-256 hex from here on; in-flight plaintext codes are dropped, not converted.
+        if (hasColumn(stmt, TABLE_USERS, "VERIFICATION_CODE")) {
+            stmt.execute("UPDATE users SET verification_code = NULL WHERE verification_code IS NOT NULL");
+            stmt.execute("ALTER TABLE users ALTER COLUMN verification_code SET DATA TYPE VARCHAR(64)");
+        }
+        stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS purged_at TIMESTAMP WITH TIME ZONE");
+        SchemaInitializer.createDepartedAccountFlagsSchema(stmt);
     }
 
     private static void rebuildConversationActivityIndexes(Statement stmt) throws SQLException {
@@ -1484,6 +1523,9 @@ public final class MigrationRunner {
         try {
             stmt.execute(partialSql);
         } catch (SQLException partialFailure) {
+            // H2 does not support partial-index WHERE clauses, so the non-partial fallback is
+            // always taken on H2. The fallback preserves the indexed columns without the predicate.
+            LOG.warn("Partial index not supported, using non-partial fallback: {}", fallbackSql);
             try {
                 stmt.execute(fallbackSql);
             } catch (SQLException fallbackFailure) {

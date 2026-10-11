@@ -1,6 +1,7 @@
 package datingapp.core.matching;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import ch.qos.logback.classic.Level;
@@ -8,6 +9,7 @@ import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -65,6 +67,48 @@ class ModerationAuditLoggerTest {
             logger.detachAppender(appender);
             logger.setLevel(previousLevel);
             appender.stop();
+        }
+    }
+
+    @Test
+    @DisplayName("persists the event to durable storage when configured")
+    void persistsToDurableStorage() {
+        RecordingStorage storage = new RecordingStorage();
+        ModerationAuditLogger auditLogger = new ModerationAuditLogger(storage);
+        ModerationAuditEvent event = sampleEvent();
+
+        auditLogger.log(event);
+
+        assertEquals(1, storage.appended.size());
+        assertSame(event, storage.appended.get(0));
+    }
+
+    @Test
+    @DisplayName("swallows storage failures so moderation actions never break")
+    void swallowsStorageFailures() {
+        ModerationAuditLogger auditLogger = new ModerationAuditLogger(event -> {
+            throw new IllegalStateException("audit table unavailable");
+        });
+
+        auditLogger.log(sampleEvent());
+    }
+
+    private static ModerationAuditEvent sampleEvent() {
+        return new ModerationAuditEvent(
+                Instant.parse("2026-03-24T10:15:30Z"),
+                UUID.fromString("11111111-1111-1111-1111-111111111111"),
+                UUID.fromString("22222222-2222-2222-2222-222222222222"),
+                ModerationAuditEvent.Action.REPORT,
+                ModerationAuditEvent.Outcome.SUCCESS,
+                Map.of("moderation_reason_code", "SPAM"));
+    }
+
+    private static final class RecordingStorage implements ModerationAuditStorage {
+        private final List<ModerationAuditEvent> appended = new ArrayList<>();
+
+        @Override
+        public void append(ModerationAuditEvent event) {
+            appended.add(event);
         }
     }
 }

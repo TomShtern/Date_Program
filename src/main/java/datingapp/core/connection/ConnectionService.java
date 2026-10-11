@@ -2,6 +2,7 @@ package datingapp.core.connection;
 
 import datingapp.core.AppClock;
 import datingapp.core.AppConfig;
+import datingapp.core.Snapshots;
 import datingapp.core.connection.ConnectionModels.Conversation;
 import datingapp.core.connection.ConnectionModels.FriendRequest;
 import datingapp.core.connection.ConnectionModels.Message;
@@ -10,6 +11,7 @@ import datingapp.core.model.Match;
 import datingapp.core.model.Match.MatchArchiveReason;
 import datingapp.core.model.User;
 import datingapp.core.profile.SanitizerUtils;
+import datingapp.core.storage.CommunicationStorage.ArchiveFilter;
 import datingapp.core.storage.OperationalCommunicationStorage;
 import datingapp.core.storage.OperationalInteractionStorage;
 import datingapp.core.storage.UserStorage;
@@ -45,6 +47,7 @@ public class ConnectionService {
     private final OperationalInteractionStorage interactionStorage;
     private final UserStorage userStorage;
     private final RelationshipWorkflowPolicy workflowPolicy;
+    private volatile java.util.function.BiPredicate<UUID, UUID> blockedChecker = (a, b) -> false;
 
     /** Compatibility constructor for tests. */
     public ConnectionService(
@@ -69,7 +72,27 @@ public class ConnectionService {
         this.workflowPolicy = Objects.requireNonNull(workflowPolicy, "workflowPolicy cannot be null");
     }
 
+    /** Wires explicit block checks without a storage dependency in core. */
+    public void setBlockedChecker(java.util.function.BiPredicate<UUID, UUID> blockedChecker) {
+        this.blockedChecker = Objects.requireNonNull(blockedChecker, "blockedChecker cannot be null");
+    }
+
+    private boolean isBlockedPair(UUID userA, UUID userB) {
+        try {
+            return blockedChecker.test(userA, userB);
+        } catch (Exception e) {
+            if (logger.isWarnEnabled()) {
+                logger.warn("Blocked check failed for {} and {}", userA, userB, e);
+            }
+            // Fail closed: an unknown block state must not let a blocked pair message or read presence.
+            return true;
+        }
+    }
+
     public SendResult sendMessage(UUID senderId, UUID recipientId, String content) {
+        if (isBlockedPair(senderId, recipientId)) {
+            return SendResult.failure("Cannot message: user is blocked", SendResult.ErrorCode.NO_ACTIVE_MATCH);
+        }
         User sender = userStorage.get(senderId).orElse(null);
         User recipient = userStorage.get(recipientId).orElse(null);
         String matchId = Match.generateId(senderId, recipientId);
@@ -102,7 +125,7 @@ public class ConnectionService {
 
         String conversationId = Conversation.generateId(senderId, recipientId);
         boolean createdConversation = false;
-        if (communicationStorage.getConversation(conversationId).isEmpty()) {
+        if (!reviveConversationIfHidden(conversationId)) {
             Conversation newConvo = Conversation.create(senderId, recipientId);
             try {
                 communicationStorage.saveConversation(newConvo);
@@ -193,13 +216,17 @@ public class ConnectionService {
     }
 
     public List<ConversationPreview> getConversations(UUID userId, int limit, int offset) {
+        return getConversations(userId, ArchiveFilter.ALL, limit, offset);
+    }
+
+    public List<ConversationPreview> getConversations(UUID userId, ArchiveFilter filter, int limit, int offset) {
         if (limit < 1 || limit > config.validation().messageMaxPageSize()) {
             return List.of();
         }
         if (offset < 0) {
             return List.of();
         }
-        List<Conversation> conversations = communicationStorage.getConversationsFor(userId, limit, offset);
+        List<Conversation> conversations = communicationStorage.getConversationsFor(userId, filter, limit, offset);
         if (conversations.isEmpty()) {
             return List.of();
         }
@@ -242,7 +269,12 @@ public class ConnectionService {
     }
 
     public List<ConversationSummaryEntry> getConversationsWithMessageCounts(UUID userId, int limit, int offset) {
-        List<ConversationPreview> previews = getConversations(userId, limit, offset);
+        return getConversationsWithMessageCounts(userId, ArchiveFilter.ALL, limit, offset);
+    }
+
+    public List<ConversationSummaryEntry> getConversationsWithMessageCounts(
+            UUID userId, ArchiveFilter filter, int limit, int offset) {
+        List<ConversationPreview> previews = getConversations(userId, filter, limit, offset);
         if (previews.isEmpty()) {
             return List.of();
         }
@@ -372,6 +404,9 @@ public class ConnectionService {
     public boolean canMessage(UUID userA, UUID userB) {
         Objects.requireNonNull(userA, "userA cannot be null");
         Objects.requireNonNull(userB, "userB cannot be null");
+        if (isBlockedPair(userA, userB)) {
+            return false;
+        }
         String matchId = Match.generateId(userA, userB);
         Match match = interactionStorage.get(matchId).orElse(null);
         User sender = userStorage.get(userA).orElse(null);
@@ -390,11 +425,31 @@ public class ConnectionService {
             throw new IllegalArgumentException(NO_ACTIVE_MATCH);
         }
 
-        return communicationStorage.getConversation(conversationId).orElseGet(() -> {
-            Conversation newConvo = Conversation.create(userA, userB);
-            communicationStorage.saveConversation(newConvo);
-            return newConvo;
-        });
+        if (reviveConversationIfHidden(conversationId)) {
+            Optional<Conversation> revived = communicationStorage.getConversation(conversationId);
+            if (revived.isPresent()) {
+                return revived.get();
+            }
+        }
+        Conversation newConvo = Conversation.create(userA, userB);
+        communicationStorage.saveConversation(newConvo);
+        return newConvo;
+    }
+
+    /**
+     * Makes an existing conversation row usable again before a write.
+     *
+     * <p>Conversation ids are deterministic per pair, so a row one side deleted (hidden) or an old
+     * soft-deleted row still owns the id and has to be revived instead of inserted a second time.
+     *
+     * @return true when a row for this id exists and is now live and visible to both participants
+     */
+    private boolean reviveConversationIfHidden(String conversationId) {
+        boolean alreadyVisibleToBoth = communicationStorage
+                .getConversation(conversationId)
+                .filter(conversation -> conversation.isVisibleToUserA() && conversation.isVisibleToUserB())
+                .isPresent();
+        return alreadyVisibleToBoth || communicationStorage.restoreConversation(conversationId);
     }
 
     public void archiveConversation(String conversationId, UUID userId, MatchArchiveReason reason) {
@@ -406,12 +461,24 @@ public class ConnectionService {
         communicationStorage.archiveConversation(conversationId, userId, reason);
     }
 
+    public void unarchiveConversation(String conversationId, UUID userId) {
+        Objects.requireNonNull(conversationId, CONVERSATION_ID_REQUIRED);
+        Objects.requireNonNull(userId, USER_ID_REQUIRED);
+
+        requireAuthorizedConversation(userId, conversationId);
+        communicationStorage.unarchiveConversation(conversationId, userId);
+    }
+
+    /**
+     * Removes the conversation from this user's list only. The other participant keeps it, and the next
+     * message from either side brings it back with its history.
+     */
     public void deleteConversation(UUID userId, String conversationId) {
         Objects.requireNonNull(userId, USER_ID_REQUIRED);
         Objects.requireNonNull(conversationId, CONVERSATION_ID_REQUIRED);
 
         requireAuthorizedConversation(userId, conversationId);
-        communicationStorage.deleteConversationWithMessages(conversationId);
+        communicationStorage.setConversationVisibility(conversationId, userId, false);
     }
 
     public void deleteMessage(UUID userId, String conversationId, UUID messageId) {
@@ -689,6 +756,7 @@ public class ConnectionService {
     /** Result of loading messages. */
     public static record MessageLoadResult(boolean success, List<Message> messages, String errorMessage) {
         public MessageLoadResult {
+            messages = Snapshots.listOf(messages);
             if (success) {
                 Objects.requireNonNull(messages, "messages cannot be null when success is true");
                 if (errorMessage != null) {

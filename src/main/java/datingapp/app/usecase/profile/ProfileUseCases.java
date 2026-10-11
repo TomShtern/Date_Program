@@ -2,6 +2,7 @@ package datingapp.app.usecase.profile;
 
 import datingapp.app.usecase.common.UseCaseError;
 import datingapp.app.usecase.common.UseCaseResult;
+import datingapp.core.Snapshots;
 import datingapp.core.metrics.SwipeState.Session;
 import datingapp.core.model.ProfileNote;
 import datingapp.core.model.User;
@@ -63,7 +64,7 @@ public class ProfileUseCases {
         try {
             return UseCaseResult.success(userStorage.findAll());
         } catch (Exception e) {
-            return UseCaseResult.failure(UseCaseError.internal("Failed to list users: " + e.getMessage()));
+            return UseCaseResult.failure(UseCaseError.internalFailure("list users", e));
         }
     }
 
@@ -77,7 +78,7 @@ public class ProfileUseCases {
                     .map(UseCaseResult::success)
                     .orElseGet(() -> UseCaseResult.failure(UseCaseError.notFound(USER_NOT_FOUND)));
         } catch (Exception e) {
-            return UseCaseResult.failure(UseCaseError.internal("Failed to load user: " + e.getMessage()));
+            return UseCaseResult.failure(UseCaseError.internalFailure("load user", e));
         }
     }
 
@@ -113,7 +114,7 @@ public class ProfileUseCases {
             }
             return UseCaseResult.success(Collections.unmodifiableMap(stableUsers));
         } catch (Exception e) {
-            return UseCaseResult.failure(UseCaseError.internal("Failed to load users: " + e.getMessage()));
+            return UseCaseResult.failure(UseCaseError.internalFailure("load users", e));
         }
     }
 
@@ -143,8 +144,7 @@ public class ProfileUseCases {
         try {
             return UseCaseResult.success(profileService.calculate(user));
         } catch (Exception e) {
-            return UseCaseResult.failure(
-                    UseCaseError.internal("Failed to calculate profile completion: " + e.getMessage()));
+            return UseCaseResult.failure(UseCaseError.internalFailure("calculate profile completion", e));
         }
     }
 
@@ -155,8 +155,7 @@ public class ProfileUseCases {
         try {
             return UseCaseResult.success(profileService.generatePreview(user));
         } catch (Exception e) {
-            return UseCaseResult.failure(
-                    UseCaseError.internal("Failed to generate profile preview: " + e.getMessage()));
+            return UseCaseResult.failure(UseCaseError.internalFailure("generate profile preview", e));
         }
     }
 
@@ -196,5 +195,9 @@ public class ProfileUseCases {
         return validationService;
     }
 
-    public static record GetUsersByIdsQuery(List<UUID> userIds) {}
+    public static record GetUsersByIdsQuery(List<UUID> userIds) {
+        public GetUsersByIdsQuery {
+            userIds = Snapshots.listOf(userIds);
+        }
+    }
 }

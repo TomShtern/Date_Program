@@ -45,7 +45,8 @@ public record ModerationAuditEvent(
             "match_updated",
             "description_provided",
             "description_length",
-            "max_description_length");
+            "max_description_length",
+            "escalated");
 
     private static final Map<String, String> CONTEXT_KEY_ALIASES = Map.ofEntries(
             Map.entry("reason", "moderation_reason_code"),
@@ -65,6 +66,9 @@ public record ModerationAuditEvent(
         REPORT,
         BLOCK,
         UNBLOCK,
+        AUTO_FLAG,
+        /** @deprecated Kept for reading historic audit rows; new code emits {@code AUTO_FLAG}. */
+        @Deprecated(since = "1.1", forRemoval = true)
         AUTO_BAN
     }
 

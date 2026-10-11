@@ -9,6 +9,7 @@ import datingapp.ui.UiPreferencesStore;
 import datingapp.ui.UiThemeService;
 import datingapp.ui.async.JavaFxUiThreadDispatcher;
 import datingapp.ui.async.UiThreadDispatcher;
+import datingapp.ui.screen.AdminController;
 import datingapp.ui.screen.ChatController;
 import datingapp.ui.screen.DashboardController;
 import datingapp.ui.screen.LoginController;
@@ -118,7 +119,11 @@ public class ViewModelFactory {
                 MatchingController.class,
                 () -> new MatchingController(
                         getMatchingViewModel(), services.getConfig().safety().userTimeZone()));
-        map.put(MatchesController.class, () -> new MatchesController(getMatchesViewModel()));
+        map.put(MatchesController.class, () -> {
+            MatchesController controller = new MatchesController(getMatchesViewModel());
+            controller.setPresenceDataAccess(getUiPresenceDataAccess());
+            return controller;
+        });
         map.put(
                 ChatController.class,
                 () -> new ChatController(
@@ -132,6 +137,7 @@ public class ViewModelFactory {
                         getSocialViewModel(), services.getConfig().safety().userTimeZone()));
         map.put(SafetyController.class, () -> new SafetyController(getSafetyViewModel()));
         map.put(NotesController.class, () -> new NotesController(getNotesViewModel()));
+        map.put(AdminController.class, () -> new AdminController(getAdminViewModel()));
         return Collections.unmodifiableMap(map);
     }
 
@@ -304,6 +310,12 @@ public class ViewModelFactory {
                         session,
                         services.getConfig().safety().userTimeZone(),
                         uiDispatcher));
+    }
+
+    public AdminViewModel getAdminViewModel() {
+        return getViewModel(
+                AdminViewModel.class,
+                () -> new AdminViewModel(services.getTrustSafetyService(), services.getProfileUseCases(), session));
     }
 
     /**

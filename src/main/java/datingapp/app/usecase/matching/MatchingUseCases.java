@@ -6,6 +6,7 @@ import datingapp.app.usecase.common.UseCaseError;
 import datingapp.app.usecase.common.UseCaseResult;
 import datingapp.app.usecase.common.UserContext;
 import datingapp.core.AppClock;
+import datingapp.core.Snapshots;
 import datingapp.core.connection.ConnectionModels.Like;
 import datingapp.core.matching.CandidateFinder;
 import datingapp.core.matching.DailyLimitService;
@@ -259,10 +260,15 @@ public class MatchingUseCases {
             return UseCaseResult.success(
                     new BrowseCandidatesResult(rankedCandidates, dailyPick, dailyPickViewed, false));
         } catch (Exception e) {
-            return UseCaseResult.failure(UseCaseError.internal("Failed to browse candidates: " + e.getMessage()));
+            return UseCaseResult.failure(UseCaseError.internalFailure("browse candidates", e));
         }
     }
 
+    /**
+     * @deprecated Use {@link #recordLike(RecordLikeCommand)} — the single guarded swipe path. Kept for
+     *     one release for phone-alpha compat; delegates to {@code recordLike}.
+     */
+    @Deprecated(since = "1.1", forRemoval = true)
     public UseCaseResult<SwipeOutcome> processSwipe(ProcessSwipeCommand command) {
         if (command == null
                 || command.context() == null
@@ -282,35 +288,34 @@ public class MatchingUseCases {
         if (Objects.equals(command.currentUser().getId(), command.candidate().getId())) {
             return UseCaseResult.failure(UseCaseError.validation("Cannot swipe on yourself"));
         }
+        Like.Direction direction = command.superLike()
+                ? Like.Direction.SUPER_LIKE
+                : command.liked() ? Like.Direction.LIKE : Like.Direction.PASS;
         try {
-            MatchingService.SwipeResult result = matchingService.processSwipe(
-                    command.currentUser(), command.candidate(), command.liked(), command.superLike());
-            if (!result.success()) {
-                return UseCaseResult.failure(UseCaseError.conflict(result.message()));
+            if (interactionStorage
+                    .getLike(command.currentUser().getId(), command.candidate().getId())
+                    .isPresent()) {
+                return UseCaseResult.success(new SwipeOutcome(false, null, null, "Already swiped."));
             }
-            if (command.markDailyPickViewed() && result.like() != null) {
+        } catch (Exception e) {
+            return UseCaseResult.failure(UseCaseError.internalFailure(command.context(), "process swipe", e));
+        }
+        var likeResult = recordLike(
+                new RecordLikeCommand(command.context(), command.candidate().getId(), direction, true));
+        if (!likeResult.success()) {
+            return UseCaseResult.failure(likeResult.error());
+        }
+        try {
+            if (command.markDailyPickViewed()) {
                 dailyPickService.markDailyPickViewed(command.context().userId());
             }
-            if (result.like() != null) {
-                eventBus.publish(new AppEvent.SwipeRecorded(
-                        command.context().userId(),
-                        command.candidate().getId(),
-                        result.like().direction(),
-                        result.matched(),
-                        AppClock.now()));
-                if (result.matched()) {
-                    Match m = result.match();
-                    Objects.requireNonNull(m, "match cannot be null when matched() is true");
-                    eventBus.publish(new AppEvent.MatchCreated(
-                            m.getId(), result.like().whoLikes(), result.like().whoGotLiked(), AppClock.now()));
-                }
-            }
-            return UseCaseResult.success(SwipeOutcome.from(result));
         } catch (Exception e) {
-            String errorMessage =
-                    e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
-            return UseCaseResult.failure(UseCaseError.internal("Failed to process swipe: " + errorMessage));
+            return UseCaseResult.failure(UseCaseError.internalFailure(command.context(), "process swipe", e));
         }
+        RecordLikeResult data = likeResult.data();
+        boolean matched = data.match().isPresent();
+        String message = matched ? "It's a match!" : "Swipe recorded";
+        return UseCaseResult.success(new SwipeOutcome(matched, data.match().orElse(null), data.like(), message));
     }
 
     public UseCaseResult<UndoOutcome> undoSwipe(UndoSwipeCommand command) {
@@ -325,7 +330,7 @@ public class MatchingUseCases {
             userStorage.executeWithUserLock(userId, () -> outcome.set(undoSwipeWithinLock(userId)));
             return outcome.get();
         } catch (Exception e) {
-            return UseCaseResult.failure(UseCaseError.internal("Failed to undo swipe: " + e.getMessage()));
+            return UseCaseResult.failure(UseCaseError.internalFailure("undo swipe", e));
         }
     }
 
@@ -355,7 +360,7 @@ public class MatchingUseCases {
             Map<UUID, User> usersById = userStorage.findByIds(otherIds);
             return UseCaseResult.success(new ActiveMatchesResult(matches, usersById));
         } catch (Exception e) {
-            return UseCaseResult.failure(UseCaseError.internal("Failed to list active matches: " + e.getMessage()));
+            return UseCaseResult.failure(UseCaseError.internalFailure("list active matches", e));
         }
     }
 
@@ -379,7 +384,7 @@ public class MatchingUseCases {
             Map<UUID, User> usersById = userStorage.findByIds(otherIds);
             return UseCaseResult.success(new PagedMatchesResult(page, usersById));
         } catch (Exception e) {
-            return UseCaseResult.failure(UseCaseError.internal("Failed to list matches: " + e.getMessage()));
+            return UseCaseResult.failure(UseCaseError.internalFailure("list matches", e));
         }
     }
 
@@ -391,7 +396,7 @@ public class MatchingUseCases {
             return UseCaseResult.success(
                     matchingService.findPendingLikersWithTimes(query.context().userId()));
         } catch (Exception e) {
-            return UseCaseResult.failure(UseCaseError.internal("Failed to load pending likers: " + e.getMessage()));
+            return UseCaseResult.failure(UseCaseError.internalFailure("load pending likers", e));
         }
     }
 
@@ -413,7 +418,7 @@ public class MatchingUseCases {
                     .toList();
             return UseCaseResult.success(sentLikes);
         } catch (Exception e) {
-            return UseCaseResult.failure(UseCaseError.internal("Failed to load sent likes: " + e.getMessage()));
+            return UseCaseResult.failure(UseCaseError.internalFailure("load sent likes", e));
         }
     }
 
@@ -426,7 +431,7 @@ public class MatchingUseCases {
             Map<UUID, User> users = standoutService.resolveUsers(result.standouts());
             return UseCaseResult.success(new StandoutsResult(result, users));
         } catch (Exception e) {
-            return UseCaseResult.failure(UseCaseError.internal("Failed to load standouts: " + e.getMessage()));
+            return UseCaseResult.failure(UseCaseError.internalFailure("load standouts", e));
         }
     }
 
@@ -438,8 +443,7 @@ public class MatchingUseCases {
             standoutService.markInteracted(command.context().userId(), command.standoutUserId());
             return UseCaseResult.success(null);
         } catch (Exception e) {
-            return UseCaseResult.failure(
-                    UseCaseError.internal("Failed to mark standout interaction: " + e.getMessage()));
+            return UseCaseResult.failure(UseCaseError.internalFailure("mark standout interaction", e));
         }
     }
 
@@ -450,29 +454,42 @@ public class MatchingUseCases {
                 || command.direction() == null) {
             return UseCaseResult.failure(UseCaseError.validation("Context, target user and direction are required"));
         }
-        boolean existingSwipe = interactionStorage
-                .getLike(command.context().userId(), command.targetUserId())
-                .isPresent();
-        if (command.enforceDailyLimit()
-                && !existingSwipe
-                && command.direction() == Like.Direction.LIKE
-                && !dailyLimitService.canLike(command.context().userId())) {
-            return UseCaseResult.failure(UseCaseError.conflict("Daily like limit reached"));
-        }
-        if (command.enforceDailyLimit()
-                && !existingSwipe
-                && command.direction() == Like.Direction.SUPER_LIKE
-                && !dailyLimitService.canSuperLike(command.context().userId())) {
-            return UseCaseResult.failure(UseCaseError.conflict("Daily super-like limit reached"));
-        }
-        if (command.enforceDailyLimit()
-                && !existingSwipe
-                && command.direction() == Like.Direction.PASS
-                && !dailyLimitService.canPass(command.context().userId())) {
-            return UseCaseResult.failure(UseCaseError.conflict("Daily pass limit reached"));
-        }
 
         try {
+            boolean existingSwipe = interactionStorage
+                    .getLike(command.context().userId(), command.targetUserId())
+                    .isPresent();
+            if (command.enforceDailyLimit() && !existingSwipe) {
+                boolean limited =
+                        switch (command.direction()) {
+                            case LIKE ->
+                                !dailyLimitService.canLike(command.context().userId());
+                            case SUPER_LIKE ->
+                                !dailyLimitService.canSuperLike(
+                                        command.context().userId());
+                            case PASS ->
+                                !dailyLimitService.canPass(command.context().userId());
+                        };
+                if (limited) {
+                    String resetsAt = "";
+                    try {
+                        resetsAt = " Resets at "
+                                + dailyLimitService
+                                        .getStatus(command.context().userId())
+                                        .resetsAt()
+                                + ".";
+                    } catch (Exception ignored) {
+                        resetsAt = "";
+                    }
+                    String label =
+                            switch (command.direction()) {
+                                case LIKE -> "Daily like limit reached.";
+                                case SUPER_LIKE -> "Daily super-like limit reached.";
+                                case PASS -> "Daily pass limit reached.";
+                            };
+                    return UseCaseResult.failure(UseCaseError.rateLimited(label + resetsAt));
+                }
+            }
             Like like = Like.create(command.context().userId(), command.targetUserId(), command.direction());
             MatchingService.RecordLikeOutcome outcome = matchingService.recordLike(like);
             if (outcome.rejected()) {
@@ -496,7 +513,7 @@ public class MatchingUseCases {
             Optional<Match> match = outcome.match();
             return UseCaseResult.success(new RecordLikeResult(recordedLike, match));
         } catch (Exception e) {
-            return UseCaseResult.failure(UseCaseError.internal("Failed to record like interaction: " + e.getMessage()));
+            return UseCaseResult.failure(UseCaseError.internalFailure("record like interaction", e));
         }
     }
 
@@ -517,7 +534,7 @@ public class MatchingUseCases {
             }
             return UseCaseResult.success(null);
         } catch (Exception e) {
-            return UseCaseResult.failure(UseCaseError.internal("Failed to remove like: " + e.getMessage()));
+            return UseCaseResult.failure(UseCaseError.internalFailure("remove like", e));
         }
     }
 
@@ -533,7 +550,7 @@ public class MatchingUseCases {
             }
             return UseCaseResult.success(MatchQualitySnapshot.from(quality.get()));
         } catch (Exception e) {
-            return UseCaseResult.failure(UseCaseError.internal("Failed to compute match quality: " + e.getMessage()));
+            return UseCaseResult.failure(UseCaseError.internalFailure("compute match quality", e));
         }
     }
 
@@ -574,8 +591,30 @@ public class MatchingUseCases {
         } catch (IllegalArgumentException e) {
             return UseCaseResult.failure(UseCaseError.validation(e.getMessage()));
         } catch (Exception e) {
-            return UseCaseResult.failure(UseCaseError.internal("Failed to archive match: " + e.getMessage()));
+            return UseCaseResult.failure(UseCaseError.internalFailure("archive match", e));
         }
+    }
+
+    /**
+     * Maps match-transition internals to a stable user-facing message. Raw storage/state
+     * details stay server-side; the API surface only exposes whether the match transition
+     * was invalid or the request was malformed.
+     */
+    public static String stableArchiveMatchMessage(String detail) {
+        if (detail == null || detail.isBlank()) {
+            return "Cannot archive match.";
+        }
+        String lower = detail.trim().toLowerCase(java.util.Locale.ROOT);
+        if (lower.contains("not belong")
+                || lower.contains("not involv")
+                || lower.contains("not found")
+                || lower.contains("forbidden")) {
+            return "Match does not belong to current user.";
+        }
+        if (lower.contains("transition") || lower.contains("state") || lower.contains("already")) {
+            return "Match cannot be archived in its current state.";
+        }
+        return "Cannot archive match.";
     }
 
     public UseCaseResult<DailyStatusResult> getDailyStatus(DailyStatusQuery query) {
@@ -589,7 +628,20 @@ public class MatchingUseCases {
             return UseCaseResult.success(new DailyStatusResult(
                     status.likesUsed(), status.likesRemaining(), status.hasUnlimitedLikes(), timeUntilReset));
         } catch (Exception e) {
-            return UseCaseResult.failure(UseCaseError.internal("Failed to get daily status: " + e.getMessage()));
+            return UseCaseResult.failure(UseCaseError.internalFailure("get daily status", e));
+        }
+    }
+
+    /** The full per-kind quota picture (likes, super likes, passes) for today, with the reset instant. */
+    public UseCaseResult<DailyLimitService.DailyStatus> getDailyQuota(DailyStatusQuery query) {
+        if (query == null || query.context() == null) {
+            return UseCaseResult.failure(UseCaseError.validation(CONTEXT_REQUIRED));
+        }
+        try {
+            return UseCaseResult.success(
+                    dailyLimitService.getStatus(query.context().userId()));
+        } catch (Exception e) {
+            return UseCaseResult.failure(UseCaseError.internalFailure("get daily quota", e));
         }
     }
 
@@ -603,14 +655,18 @@ public class MatchingUseCases {
             int secondsRemaining = canUndo ? undoService.getSecondsRemaining(userId) : 0;
             return UseCaseResult.success(new UndoAvailabilityResult(canUndo, secondsRemaining));
         } catch (Exception e) {
-            return UseCaseResult.failure(UseCaseError.internal("Failed to get undo availability: " + e.getMessage()));
+            return UseCaseResult.failure(UseCaseError.internalFailure("get undo availability", e));
         }
     }
 
     public static record BrowseCandidatesCommand(UserContext context, User currentUser) {}
 
     public static record BrowseCandidatesResult(
-            List<User> candidates, Optional<DailyPick> dailyPick, boolean dailyPickViewed, boolean locationMissing) {}
+            List<User> candidates, Optional<DailyPick> dailyPick, boolean dailyPickViewed, boolean locationMissing) {
+        public BrowseCandidatesResult {
+            candidates = Snapshots.listOf(candidates);
+        }
+    }
 
     public static record ProcessSwipeCommand(
             UserContext context,
@@ -636,9 +692,18 @@ public class MatchingUseCases {
 
     public static record ListActiveMatchesQuery(UserContext context) {}
 
-    public static record ActiveMatchesResult(List<Match> matches, Map<UUID, User> usersById) {}
+    public static record ActiveMatchesResult(List<Match> matches, Map<UUID, User> usersById) {
+        public ActiveMatchesResult {
+            matches = Snapshots.listOf(matches);
+            usersById = Snapshots.mapOf(usersById);
+        }
+    }
 
-    public static record PagedMatchesResult(PageData<Match> page, Map<UUID, User> usersById) {}
+    public static record PagedMatchesResult(PageData<Match> page, Map<UUID, User> usersById) {
+        public PagedMatchesResult {
+            usersById = Snapshots.mapOf(usersById);
+        }
+    }
 
     public static record PendingLikersQuery(UserContext context) {}
 
@@ -648,7 +713,11 @@ public class MatchingUseCases {
 
     public static record StandoutsQuery(UserContext context, User currentUser) {}
 
-    public static record StandoutsResult(StandoutService.Result result, Map<UUID, User> usersById) {}
+    public static record StandoutsResult(StandoutService.Result result, Map<UUID, User> usersById) {
+        public StandoutsResult {
+            usersById = Snapshots.mapOf(usersById);
+        }
+    }
 
     public static record StandoutInteractionCommand(UserContext context, UUID standoutUserId) {}
 

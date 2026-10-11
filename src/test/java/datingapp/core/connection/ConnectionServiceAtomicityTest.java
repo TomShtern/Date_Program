@@ -59,7 +59,7 @@ class ConnectionServiceAtomicityTest {
     }
 
     @Test
-    @DisplayName("deleteConversation leaves no partial state when message deletion fails")
+    @DisplayName("deleteConversation leaves the conversation and its messages intact when the hide fails")
     void deleteConversationLeavesNoPartialStateWhenAtomicDeleteFails() {
         UUID userA = UUID.randomUUID();
         UUID userB = UUID.randomUUID();
@@ -167,7 +167,7 @@ class ConnectionServiceAtomicityTest {
 
     private static final class FailingDeleteCommunications extends TestStorages.Communications {
         @Override
-        public void deleteConversationWithMessages(String conversationId) {
+        public void setConversationVisibility(String conversationId, UUID userId, boolean visible) {
             throw new RuntimeException("simulated conversation delete failure");
         }
     }

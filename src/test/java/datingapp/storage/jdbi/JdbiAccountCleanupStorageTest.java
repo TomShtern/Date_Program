@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import datingapp.app.usecase.auth.AuthUseCases;
 import datingapp.core.AppClock;
 import datingapp.core.connection.ConnectionModels.Conversation;
 import datingapp.core.connection.ConnectionModels.Like;
@@ -20,6 +21,7 @@ import datingapp.core.storage.AuthStorage;
 import datingapp.core.storage.CommunicationStorage;
 import datingapp.core.storage.InteractionStorage;
 import datingapp.core.storage.UserStorage;
+import datingapp.core.testutil.TestAccessTokenVerifier;
 import datingapp.core.testutil.TestUserFactory;
 import datingapp.storage.DatabaseManager;
 import datingapp.storage.schema.MigrationRunner;
@@ -264,6 +266,131 @@ class JdbiAccountCleanupStorageTest {
         assertEquals(
                 survivingUser.getId(),
                 authStorage.findUserIdByClerkId(SURVIVING_CLERK_ID).orElseThrow());
+    }
+
+    @Test
+    @DisplayName("purge removes the graph but keeps reports, anonymised, behind a purged user row")
+    void purgeKeepsAnonymisedReportsAndRemovesTheRest() {
+        Instant deletedAt = AppClock.now().minusSeconds(40L * 24 * 3600);
+        accountCleanupStorage.softDeleteAccount(deletedUser, deletedAt);
+        Instant cutoff = AppClock.now().minusSeconds(30L * 24 * 3600);
+
+        assertEquals(1, accountCleanupStorage.countPurgeCandidates(cutoff));
+        assertEquals(1, accountCleanupStorage.purgeDeletedBefore(cutoff));
+
+        assertEquals(0, countRows("likes", "who_likes = :id OR who_got_liked = :id", deletedUser.getId()));
+        assertEquals(0, countRows("matches", "user_a = :id OR user_b = :id", deletedUser.getId()));
+        assertEquals(0, countRows("conversations", "user_a = :id OR user_b = :id", deletedUser.getId()));
+        assertEquals(0, countRows("messages", "sender_id = :id", deletedUser.getId()));
+        assertEquals(0, countRows("blocks", "blocker_id = :id OR blocked_id = :id", deletedUser.getId()));
+        assertEquals(0, countRows("profile_notes", "author_id = :id OR subject_id = :id", deletedUser.getId()));
+
+        // The report survives with its free text removed, anchored by the scrubbed user row.
+        assertEquals(1, countRows("reports", "reporter_id = :id", deletedUser.getId()));
+        assertEquals(0, countRows("reports", "reporter_id = :id AND description IS NOT NULL", deletedUser.getId()));
+        assertEquals(1, countRows("users", "id = :id AND purged_at IS NOT NULL", deletedUser.getId()));
+        assertEquals(1, countRows("users", "id = :id AND name = 'Deleted User'", deletedUser.getId()));
+        assertNull(rawEmail(deletedUser.getId()));
+
+        // A second run finds nothing, and the generic user purge must not cascade the report away either.
+        assertEquals(0, accountCleanupStorage.countPurgeCandidates(cutoff));
+        assertEquals(0, accountCleanupStorage.purgeDeletedBefore(cutoff));
+        assertEquals(0, userStorage.purgeDeletedBefore(cutoff));
+        assertEquals(1, countRows("reports", "reporter_id = :id", deletedUser.getId()));
+        assertEquals(1, countRows("users", "id = :id", survivingUser.getId()));
+    }
+
+    @Test
+    @DisplayName("purge deletes the user row outright when no report mentions the account")
+    void purgeDeletesUnreportedAccountCompletely() {
+        jdbi.useHandle(handle -> handle.execute("DELETE FROM reports"));
+        Instant deletedAt = AppClock.now().minusSeconds(40L * 24 * 3600);
+        accountCleanupStorage.softDeleteAccount(deletedUser, deletedAt);
+
+        Instant tooEarly = deletedAt.minusSeconds(60);
+        assertEquals(0, accountCleanupStorage.purgeDeletedBefore(tooEarly));
+        assertEquals(1, countRows("users", "id = :id", deletedUser.getId()));
+
+        assertEquals(1, accountCleanupStorage.purgeDeletedBefore(AppClock.now()));
+        assertEquals(0, countRows("users", "id = :id", deletedUser.getId()));
+        assertEquals(1, countRows("users", "id = :id", survivingUser.getId()));
+    }
+
+    @Test
+    @DisplayName("generic user purge skips accounts that a report still mentions")
+    void genericUserPurgeSkipsReportedAccounts() {
+        accountCleanupStorage.softDeleteAccount(deletedUser, AppClock.now().minusSeconds(40L * 24 * 3600));
+
+        assertEquals(0, userStorage.purgeDeletedBefore(AppClock.now()));
+
+        assertEquals(1, countRows("users", "id = :id", deletedUser.getId()));
+        assertEquals(1, countRows("reports", "reporter_id = :id", deletedUser.getId()));
+    }
+
+    @Test
+    @DisplayName("an account deleted while reported makes the same Clerk user's next profile start under review")
+    void reportedAccountCarriesReviewFlagToNextProfile() {
+        fileReport(survivingUser.getId(), deletedUser.getId());
+        accountCleanupStorage.softDeleteAccount(deletedUser, AppClock.now());
+
+        assertEquals(1, countAll("departed_account_flags"));
+        int rawClerkIdRows = jdbi.withHandle(
+                handle -> handle.createQuery("SELECT COUNT(*) FROM departed_account_flags WHERE clerk_id_hash = :raw")
+                        .bind("raw", DELETED_CLERK_ID)
+                        .mapTo(int.class)
+                        .one());
+        assertEquals(0, rawClerkIdRows, "the Clerk id must be stored hashed");
+
+        AuthUseCases authUseCases = new AuthUseCases(userStorage, authStorage, new TestAccessTokenVerifier());
+        var session = authUseCases.provisionSession(TestAccessTokenVerifier.tokenFor(DELETED_CLERK_ID));
+
+        assertTrue(session.success());
+        assertTrue(session.data().created());
+        User reborn = userStorage.get(session.data().user().id()).orElseThrow();
+        assertEquals(User.UserState.UNDER_REVIEW, reborn.getState());
+        assertEquals(0, countAll("departed_account_flags"), "the flag is used once");
+    }
+
+    @Test
+    @DisplayName("an account deleted with a clean record leaves no flag and the next profile starts normally")
+    void cleanAccountLeavesNoFlag() {
+        accountCleanupStorage.softDeleteAccount(deletedUser, AppClock.now());
+
+        assertEquals(0, countAll("departed_account_flags"));
+
+        AuthUseCases authUseCases = new AuthUseCases(userStorage, authStorage, new TestAccessTokenVerifier());
+        var session = authUseCases.provisionSession(TestAccessTokenVerifier.tokenFor(DELETED_CLERK_ID));
+
+        User reborn = userStorage.get(session.data().user().id()).orElseThrow();
+        assertEquals(User.UserState.INCOMPLETE, reborn.getState());
+    }
+
+    private void fileReport(UUID reporterId, UUID reportedId) {
+        Report report = Report.create(reporterId, reportedId, Reason.SPAM, "Flag carry-over report");
+        jdbi.useHandle(handle -> handle.createUpdate("""
+                INSERT INTO reports (id, reporter_id, reported_user_id, reason, description, created_at)
+                VALUES (:id, :reporterId, :reportedUserId, :reason, :description, :createdAt)
+                """)
+                .bind("id", report.id())
+                .bind("reporterId", report.reporterId())
+                .bind("reportedUserId", report.reportedUserId())
+                .bind("reason", report.reason().name())
+                .bind("description", report.description())
+                .bind("createdAt", Timestamp.from(report.createdAt()))
+                .execute());
+    }
+
+    private int countRows(String table, String where, UUID id) {
+        return jdbi.withHandle(handle -> handle.createQuery("SELECT COUNT(*) FROM " + table + " WHERE " + where)
+                .bind("id", id)
+                .mapTo(int.class)
+                .one());
+    }
+
+    private int countAll(String table) {
+        return jdbi.withHandle(handle -> handle.createQuery("SELECT COUNT(*) FROM " + table)
+                .mapTo(int.class)
+                .one());
     }
 
     private Instant rawDeletedAt(String sql, UUID id) {

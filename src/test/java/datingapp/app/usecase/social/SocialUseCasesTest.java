@@ -390,7 +390,7 @@ class SocialUseCasesTest {
         assertEquals(userB.getId(), published.get().reportedUserId());
         assertEquals(Report.Reason.HARASSMENT.name(), published.get().reason());
         assertTrue(published.get().blockedUser());
-        assertFalse(published.get().validated());
+        assertTrue(published.get().validated());
     }
 
     @Test

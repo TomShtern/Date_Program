@@ -7,12 +7,14 @@ import datingapp.app.usecase.common.UseCaseError;
 import datingapp.app.usecase.common.UseCaseResult;
 import datingapp.app.usecase.common.UserContext;
 import datingapp.core.AppClock;
+import datingapp.core.Snapshots;
 import datingapp.core.connection.ConnectionModels.Conversation;
 import datingapp.core.connection.ConnectionModels.Message;
 import datingapp.core.connection.ConnectionService;
 import datingapp.core.connection.ConnectionService.ConversationPreview;
 import datingapp.core.model.Match.MatchArchiveReason;
 import datingapp.core.profile.ValidationService;
+import datingapp.core.storage.CommunicationStorage.ArchiveFilter;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -27,6 +29,7 @@ public class MessagingUseCases {
     private static final Logger logger = LoggerFactory.getLogger(MessagingUseCases.class);
     private static final int DEFAULT_LIMIT = 50;
     private static final String CONTEXT_REQUIRED = "Context is required";
+    private static final String PRESENCE_FORBIDDEN = "Presence is only available for a current match";
 
     private final ConnectionService connectionService;
     private final ValidationService validationService;
@@ -51,7 +54,7 @@ public class MessagingUseCases {
         int offset = normalizeOffset(query.offset());
         try {
             List<ConversationPreview> previews =
-                    connectionService.getConversations(query.context().userId(), limit, offset);
+                    connectionService.getConversations(query.context().userId(), query.archiveFilter(), limit, offset);
             int totalUnread =
                     previews.stream().mapToInt(ConversationPreview::unreadCount).sum();
             return UseCaseResult.success(new ConversationListResult(previews, totalUnread));
@@ -120,8 +123,9 @@ public class MessagingUseCases {
         }
 
         return switch (errorMessage) {
-            case "Invalid limit", "Invalid offset" -> UseCaseError.validation(errorMessage);
-            case "Conversation not found or unauthorized" -> UseCaseError.notFound(errorMessage);
+            case "Invalid limit", "Invalid offset" -> UseCaseError.validation("Invalid conversation page.");
+            case "Conversation not found or unauthorized" ->
+                UseCaseError.notFound("Conversation not found or unauthorized.");
             default -> UseCaseError.conflict(errorMessage);
         };
     }
@@ -143,7 +147,7 @@ public class MessagingUseCases {
             result =
                     connectionService.sendMessage(command.context().userId(), command.recipientId(), command.content());
             if (!result.success()) {
-                return UseCaseResult.failure(UseCaseError.conflict(result.errorMessage()));
+                return UseCaseResult.failure(UseCaseError.conflict(stableSendMessage(result.errorMessage())));
             }
         } catch (Exception e) {
             return internalFailure("send message", e);
@@ -151,6 +155,31 @@ public class MessagingUseCases {
 
         publishMessageSentEvent(command, result);
         return UseCaseResult.success(result);
+    }
+
+    /**
+     * Maps message-send internals to a stable user-facing message. Raw storage/match
+     * details stay server-side; the API surface only exposes whether messaging is
+     * unavailable, blocked, or the content was invalid.
+     */
+    public static String stableSendMessage(String detail) {
+        if (detail == null || detail.isBlank()) {
+            return "Cannot send message.";
+        }
+        String lower = detail.trim().toLowerCase(java.util.Locale.ROOT);
+        if (lower.contains("block")) {
+            return "Cannot message: user is blocked.";
+        }
+        if (lower.contains("no active match") || lower.contains("no longer messageable") || lower.contains("match")) {
+            return "Cannot message: no active match.";
+        }
+        if (lower.contains("inactive") || lower.contains("not found")) {
+            return "Message recipient is not available.";
+        }
+        if (lower.contains("empty") || lower.contains("too long") || lower.contains("content")) {
+            return "Invalid message content.";
+        }
+        return "Cannot send message.";
     }
 
     /**
@@ -215,7 +244,7 @@ public class MessagingUseCases {
             connectionService.deleteConversation(command.context().userId(), command.conversationId());
             return UseCaseResult.success(null);
         } catch (IllegalArgumentException e) {
-            return validationFailure(e.getMessage());
+            return validationFailure(stableConversationMessage(e.getMessage()));
         } catch (Exception e) {
             return internalFailure("delete conversation", e);
         }
@@ -239,9 +268,52 @@ public class MessagingUseCases {
                     logger);
             return UseCaseResult.success(null);
         } catch (IllegalArgumentException e) {
-            return validationFailure(e.getMessage());
+            return validationFailure(stableConversationMessage(e.getMessage()));
         } catch (Exception e) {
             return internalFailure("archive conversation", e);
+        }
+    }
+
+    public UseCaseResult<Void> unarchiveConversation(UnarchiveConversationCommand command) {
+        if (command == null || command.context() == null || command.conversationId() == null) {
+            return validationFailure("Context and conversationId are required");
+        }
+        try {
+            connectionService.unarchiveConversation(
+                    command.conversationId(), command.context().userId());
+            return UseCaseResult.success(null);
+        } catch (IllegalArgumentException e) {
+            return validationFailure(stableConversationMessage(e.getMessage()));
+        } catch (Exception e) {
+            return internalFailure("unarchive conversation", e);
+        }
+    }
+
+    /**
+     * Decides whether the caller may read another user's presence: only while the pair can currently
+     * message each other (live match, neither blocked the other). Reading your own presence is always
+     * allowed. A supplied conversation id must be the conversation of exactly these two users.
+     */
+    public UseCaseResult<Void> authorizePresenceRead(PresenceReadQuery query) {
+        if (query == null || query.context() == null || query.targetUserId() == null) {
+            return validationFailure("Context and target user are required");
+        }
+        UUID viewerId = query.context().userId();
+        UUID targetUserId = query.targetUserId();
+        try {
+            if (viewerId.equals(targetUserId)) {
+                return UseCaseResult.success(null);
+            }
+            if (query.conversationId() != null
+                    && !query.conversationId().equals(Conversation.generateId(viewerId, targetUserId))) {
+                return UseCaseResult.failure(UseCaseError.forbidden(PRESENCE_FORBIDDEN));
+            }
+            if (!connectionService.canMessage(viewerId, targetUserId)) {
+                return UseCaseResult.failure(UseCaseError.forbidden(PRESENCE_FORBIDDEN));
+            }
+            return UseCaseResult.success(null);
+        } catch (Exception e) {
+            return internalFailure("authorize presence read", e);
         }
     }
 
@@ -256,10 +328,35 @@ public class MessagingUseCases {
             connectionService.deleteMessage(command.context().userId(), command.conversationId(), command.messageId());
             return UseCaseResult.success(null);
         } catch (IllegalArgumentException e) {
-            return validationFailure(e.getMessage());
+            return validationFailure(stableConversationMessage(e.getMessage()));
         } catch (Exception e) {
             return internalFailure("delete message", e);
         }
+    }
+
+    /**
+     * Maps conversation/message internals to a stable user-facing message. Raw storage
+     * details stay server-side; the API surface only exposes whether the target was
+     * missing/unauthorized or the request was malformed.
+     */
+    public static String stableConversationMessage(String detail) {
+        if (detail == null || detail.isBlank()) {
+            return "Invalid conversation request.";
+        }
+        String lower = detail.trim().toLowerCase(java.util.Locale.ROOT);
+        if (lower.contains("not found") || lower.contains("unauthorized") || lower.contains("forbidden")) {
+            return "Conversation not found or unauthorized.";
+        }
+        if (lower.contains("not belong")
+                || lower.contains("not involv")
+                || lower.contains("not participant")
+                || lower.contains("not member")) {
+            return "Conversation does not belong to current user.";
+        }
+        if (lower.contains("message") && (lower.contains("not found") || lower.contains("missing"))) {
+            return "Message not found.";
+        }
+        return "Invalid conversation request.";
     }
 
     private static int normalizeLimit(int limit) {
@@ -275,12 +372,25 @@ public class MessagingUseCases {
     }
 
     private static <T> UseCaseResult<T> internalFailure(String action, Exception error) {
-        return UseCaseResult.failure(UseCaseError.internal("Failed to " + action + ": " + error.getMessage()));
+        return UseCaseResult.failure(UseCaseError.internalFailure(action, error));
     }
 
-    public static record ListConversationsQuery(UserContext context, int limit, int offset) {}
+    public static record ListConversationsQuery(
+            UserContext context, int limit, int offset, ArchiveFilter archiveFilter) {
+        public ListConversationsQuery {
+            archiveFilter = archiveFilter == null ? ArchiveFilter.ALL : archiveFilter;
+        }
 
-    public static record ConversationListResult(List<ConversationPreview> conversations, int totalUnreadCount) {}
+        public ListConversationsQuery(UserContext context, int limit, int offset) {
+            this(context, limit, offset, ArchiveFilter.ALL);
+        }
+    }
+
+    public static record ConversationListResult(List<ConversationPreview> conversations, int totalUnreadCount) {
+        public ConversationListResult {
+            conversations = Snapshots.listOf(conversations);
+        }
+    }
 
     public static record OpenConversationCommand(UserContext context, UUID otherUserId) {}
 
@@ -289,11 +399,19 @@ public class MessagingUseCases {
     public static record LoadConversationQuery(
             UserContext context, UUID otherUserId, int limit, int offset, boolean markAsRead) {}
 
-    public static record ConversationThread(List<Message> messages, boolean canMessage, String conversationId) {}
+    public static record ConversationThread(List<Message> messages, boolean canMessage, String conversationId) {
+        public ConversationThread {
+            messages = Snapshots.listOf(messages);
+        }
+    }
 
     public static record SendMessageCommand(UserContext context, UUID recipientId, String content) {}
 
-    public static record CountMessagesByConversationIdsQuery(UserContext context, Set<String> conversationIds) {}
+    public static record CountMessagesByConversationIdsQuery(UserContext context, Set<String> conversationIds) {
+        public CountMessagesByConversationIdsQuery {
+            conversationIds = Snapshots.setOf(conversationIds);
+        }
+    }
 
     public static record MarkConversationReadCommand(UserContext context, String conversationId) {}
 
@@ -301,6 +419,11 @@ public class MessagingUseCases {
 
     public static record ArchiveConversationCommand(
             UserContext context, String conversationId, MatchArchiveReason reason) {}
+
+    public static record UnarchiveConversationCommand(UserContext context, String conversationId) {}
+
+    /** {@code conversationId} is optional; when present it must be the pair's own conversation. */
+    public static record PresenceReadQuery(UserContext context, UUID targetUserId, String conversationId) {}
 
     public static record DeleteMessageCommand(UserContext context, String conversationId, UUID messageId) {}
 }

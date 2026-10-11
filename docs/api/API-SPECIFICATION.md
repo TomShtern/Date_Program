@@ -88,7 +88,7 @@ Common status codes:
 | 401    | Unauthorized (missing/invalid/expired token, deleted/banned user, or `NOT_PROVISIONED` when the Clerk user has no local profile yet) |
 | 403    | Forbidden (mismatched user-scoped route, spoofed sender ID, bad LAN secret) |
 | 404    | Not found |
-| 409    | Conflict (a swipe refused by a limit or gate, or a target that is not visible; see "Browse, swipe and report") |
+| 409    | Conflict (a swipe refused by a limit or gate, or a target that is not visible; see "Browse, swipe and report"). `code` is `CONFLICT` unless the route documents a specific one, such as `PROFILE_NOT_ACTIVE` in "Pause and resume" |
 | 429    | Too many requests (per-IP+method rate limit, 240/min default; `X-RateLimit-*` headers) |
 | 500    | Internal server error |
 
@@ -301,7 +301,8 @@ Every `id` returned by this endpoint is valid for use with `DELETE /api/users/{i
 
 ### GET /photos/{userId}/{filename}
 
-Serve a photo file directly. No authentication required.
+Serve a photo file. **Requires a bearer token** (verified against
+`RestApiServer.registerStaticPhotoRoute`).
 
 **Path parameters:**
 - `userId` — UUID of the photo owner.
@@ -309,12 +310,21 @@ Serve a photo file directly. No authentication required.
 
 **Responses:**
 
-- **200 OK** — image bytes with correct `Content-Type`.
+- **200 OK** — image bytes with correct `Content-Type`, plus `ETag` and
+  `Cache-Control: private, max-age=3600`.
+- **304 Not Modified** — the `If-None-Match` header equals the current `ETag`.
+- **401 Unauthorized** — no valid bearer token.
+- **403 Forbidden** — the viewer and the owner are blocked in either direction,
+  or the owner is not `ACTIVE`.
 - **404 Not Found** — invalid userId, unsafe filename, or file missing.
+- **429 Too Many Requests** — the API rate limit was hit.
 
 **Notes:**
-- This is the public URL returned by all photo mutation endpoints.
-- Flutter can cache these URLs with standard HTTP caching headers.
+- This is the URL returned by all photo mutation endpoints.
+- An owner can always load their own photos, whatever state their account is in
+  (for example while still `INCOMPLETE` during onboarding).
+- Flutter must send the `Authorization` header with image requests; a plain
+  `Image.network(url)` without headers gets 401.
 
 ---
 
@@ -335,12 +345,14 @@ Verified against `RestApiServer`, `RestApiRequestGuards`, `MatchingService`,
 
 ### Swiping
 
-`POST /api/users/{id}/like/{targetId}` and `/pass/{targetId}` return 409 when:
+`POST /api/users/{id}/like/{targetId}` and `/pass/{targetId}` return **429**
+(`RATE_LIMITED`) when the **daily like, super-like or pass limit** is reached
+(`-1` means unlimited). The count comes from an append-only ledger
+(`swipe_quota_uses`), so `POST /api/users/{id}/undo` and unmatching do **not**
+give a swipe back.
 
-- the **daily like or pass limit** is reached (`dailyLikeLimit` / `dailyPassLimit`;
-  `-1` means unlimited). The count comes from an append-only ledger
-  (`swipe_quota_uses`), so `POST /api/users/{id}/undo` and unmatching do **not**
-  give a swipe back.
+They return 409 when:
+
 - the **session gate** trips: more than `maxSwipesPerSession` swipes in one
   session, or a swipe rate above `suspiciousSwipeVelocity` per minute after at
   least 10 swipes (while `suspiciousSwipeVelocityBlockingEnabled` is on, which is
@@ -358,15 +370,146 @@ REST like/pass routes, inside the undo window.
 | Field | Meaning |
 |-------|---------|
 | `success` | The report was recorded. |
-| `autoBanned` | `true` when this report took the target to the report threshold. **The target is now flagged `UNDER_REVIEW`, not banned.** The field name is kept so clients do not break. |
+| `autoFlagged` | `true` when this report took the target to the report threshold. **The target is now flagged `UNDER_REVIEW`, not banned.** |
+| `autoBanned` | Deprecated alias of `autoFlagged`, kept so older clients do not break. |
 | `blockedByReporter` | The reporter also blocked the target. |
 | `errorMessage` | Set on failure. |
 
 - The threshold (`autoBanThreshold`, must be greater than 0) counts **distinct**
   reporters. Each reporter can report a target once.
-- `UNDER_REVIEW` is a new `UserState`. An account in it cannot activate itself.
-  There is no moderator tool to release it yet; only `BANNED` can be set from the
-  app.
+- `UNDER_REVIEW` is a `UserState`. An account in it cannot activate itself.
+- Moderators release or ban it through the admin routes: `GET /api/admin/reports`
+  lists `UNDER_REVIEW` users with their report count, and
+  `POST /api/admin/reports/{targetId}/uphold`, `/dismiss` and `/ban` act on one.
+  Callers that are not on the admin list get 403. Dismissing returns the account
+  to `ACTIVE` when its profile is complete, otherwise to `INCOMPLETE`.
+
+### Daily swipe quota
+
+`GET /api/users/{id}/daily-status` (own id only) returns today's quota:
+
+```json
+{
+  "date": "2026-10-11",
+  "resetsAt": "2026-10-11T21:00:00Z",
+  "likes": { "used": 1, "remaining": 2, "unlimited": false },
+  "superLikes": { "used": 0, "remaining": 2, "unlimited": false },
+  "passes": { "used": 0, "remaining": null, "unlimited": true }
+}
+```
+
+- `resetsAt` is an ISO-8601 instant: the start of the next day in the server's
+  configured user time zone.
+- When a kind has no limit, `unlimited` is `true` and `remaining` is `null`.
+  Read `unlimited`; never compare `remaining` to a magic number.
+- Errors: 401 (no/invalid token), 403 `FORBIDDEN` (another user's id), 404
+  `NOT_FOUND` (unknown user).
+
+### Pending likers
+
+Each entry of `GET /api/users/{id}/pending-likers` carries `superLike`: `true`
+when that person's like was a super like. The backend produces no like
+notification, so the flag lives only here.
+
+---
+
+## Pause and resume
+
+Verified against `ProfileMutationUseCases.pauseProfile` / `resumeProfile` and
+`RelationshipWorkflowPolicy`.
+
+`POST /api/users/{id}/pause` and `POST /api/users/{id}/resume` take no body, act
+on the caller's own profile only, and return **200** with the same body as
+`GET /api/users/{id}` (so `state` is `PAUSED` or `ACTIVE`).
+
+| Status | `code` | When |
+|--------|--------|------|
+| 409 | `PROFILE_NOT_ACTIVE` | pause, and the profile is not `ACTIVE` (already paused, incomplete, under review) |
+| 409 | `PROFILE_NOT_PAUSED` | resume, and the profile is not `PAUSED` |
+| 409 | `PROFILE_INCOMPLETE` | resume, and the profile is `INCOMPLETE` or is paused but no longer complete enough to activate |
+| 403 | `FORBIDDEN` | the path id is not the caller |
+| 404 | `NOT_FOUND` | unknown user |
+
+While paused, a user:
+
+- is left out of other users' browse candidates, standouts and pending likers,
+  and out of `GET /api/users`;
+- keeps their matches and conversations, and can still send and receive
+  messages in them;
+- cannot browse or swipe, and cannot block or report;
+- is not readable by others through `GET /api/users/{id}` (409, "Target user is
+  not visible"). Their own `GET /api/users/{id}` works and shows `PAUSED`.
+
+Editing a paused profile (`PUT /api/users/{id}/profile`) leaves it paused. Only
+`/resume` reactivates it.
+
+---
+
+## Conversations and presence
+
+Verified against `RestApiServer`, `MessagingUseCases`, `ConnectionService` and
+`JdbiConnectionStorage`.
+
+### Listing
+
+`GET /api/users/{id}/conversations` returns every conversation the caller has
+not deleted, archived or not. Each entry has an `archived` boolean, which is the
+**caller's own** flag:
+
+```json
+[
+  {
+    "id": "0b6f...-..._7c1e...-...",
+    "otherUserId": "7c1e...",
+    "otherUserName": "Bob",
+    "messageCount": 2,
+    "lastMessageAt": "2026-10-11T18:04:11Z",
+    "archived": false
+  }
+]
+```
+
+Optional `?archived=true` returns only archived ones, `?archived=false` only the
+rest. Any other value is 400 `BAD_REQUEST`. `limit` and `offset` apply after the
+filter.
+
+### Archive and unarchive
+
+- `POST /api/users/{id}/conversations/{conversationId}/archive` → 204.
+- `POST /api/users/{id}/conversations/{conversationId}/unarchive` → 204. No
+  body. Unarchiving a conversation that is not archived is also 204.
+- Both are per user: the other participant's list is unaffected.
+- **A new incoming message does not un-archive a conversation.** It stays
+  archived until the user unarchives it.
+- Errors: 400 `BAD_REQUEST` (the caller is not a participant, or the
+  conversation does not exist), 403 `FORBIDDEN` (path id is not the caller).
+
+Unmatching, graceful exit and blocking also set the archive flag, so `archived`
+is `true` for those conversations too.
+
+### Delete
+
+`DELETE /api/users/{id}/conversations/{conversationId}` → 204. It hides the
+conversation **for the caller only**; the other participant still sees it, and
+no messages are removed. The next message from either side makes it visible
+again for both, with its full earlier history.
+
+### Presence
+
+`GET /api/users/{id}/presence` returns:
+
+```json
+{ "status": "ONLINE", "typing": false, "checkedAt": "2026-10-11T18:04:11.512Z" }
+```
+
+`status` is one of `UNKNOWN`, `ONLINE`, `AWAY`, `OFFLINE`.
+
+- `{id}` may be the caller, or **another user the caller can currently message**:
+  an active match, with neither side having blocked the other. Anything else is
+  403 `FORBIDDEN`. A past match or an old conversation is not enough.
+- Optional `?conversationId=` scopes `typing` to one conversation. It must be
+  the conversation between the caller and `{id}`; otherwise 403 `FORBIDDEN`.
+- Other errors: 401 (no/invalid token), 404 `NOT_FOUND` (unknown `{id}`).
 
 ---
 
@@ -396,9 +539,20 @@ Verified against `ProfileMutationUseCases.deleteAccount`,
 This means:
 - A new `POST /api/auth/session` from the same Clerk user **succeeds with 201**
   and creates a fresh, empty profile (a new local `id`).
+- If the deleted account was `UNDER_REVIEW`, `BANNED` or had a report filed
+  against it, that fresh profile starts in `UNDER_REVIEW`. Only a SHA-256 hash of
+  the Clerk id is kept for this (`departed_account_flags`), and it is used once.
 - Protected routes called with the old local `id` **return 401**.
 - Deleting the Clerk account itself is a separate step. A Clerk webhook for it
   is not implemented.
+
+**Permanent erase.** `softDeleteRetentionDays` (default 30) after deletion, the
+cleanup scheduler hard-deletes the account's remaining rows
+(`JdbiAccountCleanupStorage.purgeDeletedBefore`). Reports the user filed or
+received are kept with their free-text description removed, attached to an empty
+`users` row marked `purged_at`; an account with no reports is removed entirely.
+Set `DATING_APP_PURGE_DRY_RUN=true` to log how many accounts would be erased
+without erasing them.
 
 ---
 
