@@ -24,6 +24,7 @@ import datingapp.core.matching.Standout;
 import datingapp.core.matching.StandoutService;
 import datingapp.core.matching.TrustSafetyService;
 import datingapp.core.matching.UndoService;
+import datingapp.core.media.PhotoStore;
 import datingapp.core.metrics.AchievementService;
 import datingapp.core.metrics.ActivityMetricsService;
 import datingapp.core.metrics.SwipeState.Undo;
@@ -47,6 +48,7 @@ import datingapp.storage.jdbi.JdbiConnectionStorage;
 import datingapp.storage.jdbi.JdbiMatchmakingStorage;
 import datingapp.storage.jdbi.JdbiMetricsStorage;
 import datingapp.storage.jdbi.JdbiModerationAuditStorage;
+import datingapp.storage.jdbi.JdbiPhotoStore;
 import datingapp.storage.jdbi.JdbiPresenceStorage;
 import datingapp.storage.jdbi.JdbiTrustSafetyStorage;
 import datingapp.storage.jdbi.JdbiTypeCodecs;
@@ -91,7 +93,11 @@ public final class StorageFactory {
 
         registerEventHandlers(persistence, domain);
 
-        return assembleRegistry(config, persistence, domain);
+        // Null leaves the registry on its default local-disk store.
+        PhotoStore photoStore = config.media().storesPhotosInDatabase()
+                ? new JdbiPhotoStore(jdbi, config.media().maxPhotoUploadBytes())
+                : null;
+        return assembleRegistry(config, persistence, domain, photoStore);
     }
 
     private static Jdbi createJdbi(DatabaseManager dbManager) {
@@ -254,9 +260,10 @@ public final class StorageFactory {
     }
 
     private static ServiceRegistry assembleRegistry(
-            AppConfig config, PersistenceComponents persistence, DomainServices domain) {
+            AppConfig config, PersistenceComponents persistence, DomainServices domain, PhotoStore photoStore) {
         return ServiceRegistry.builder()
                 .config(config)
+                .photoStore(photoStore)
                 .userStorage(persistence.userStorage())
                 .interactionStorage(persistence.interactionStorage())
                 .communicationStorage(persistence.communicationStorage())

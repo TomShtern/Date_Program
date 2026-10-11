@@ -323,6 +323,7 @@ public final class ApplicationStartup {
         applyEnvString(envLookup, "DB_URL", builder::databaseUrl);
         applyEnvString(envLookup, "DB_USERNAME", builder::databaseUsername);
         applyEnvString(envLookup, "PHOTO_STORAGE_ROOT", builder::photoStorageRoot);
+        applyEnvString(envLookup, "PHOTO_STORAGE_BACKEND", builder::photoStorageBackend);
         applyEnvString(envLookup, "PHOTO_PUBLIC_BASE_URL", builder::photoPublicBaseUrl);
         applyEnvLong(envLookup, "MAX_PHOTO_UPLOAD_BYTES", builder::maxPhotoUploadBytes);
         applyEnvString(envLookup, "AUTH_CLERK_ISSUER", builder::clerkIssuer);

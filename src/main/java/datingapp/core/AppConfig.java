@@ -189,11 +189,22 @@ public record AppConfig(
     // Sub-record: MediaConfig
     // ========================================================================
 
-    public static record MediaConfig(String photoStorageRoot, String photoPublicBaseUrl, long maxPhotoUploadBytes) {
+    public static record MediaConfig(
+            String photoStorageRoot, String photoStorageBackend, String photoPublicBaseUrl, long maxPhotoUploadBytes) {
+        public static final String BACKEND_DISK = "DISK";
+        public static final String BACKEND_DATABASE = "DATABASE";
+
         public MediaConfig {
-            AppConfigValidator.validateMedia(photoStorageRoot, photoPublicBaseUrl, maxPhotoUploadBytes);
+            AppConfigValidator.validateMedia(
+                    photoStorageRoot, photoStorageBackend, photoPublicBaseUrl, maxPhotoUploadBytes);
             photoStorageRoot = Path.of(photoStorageRoot.trim()).normalize().toString();
+            photoStorageBackend = photoStorageBackend.trim().toUpperCase(Locale.ROOT);
             photoPublicBaseUrl = photoPublicBaseUrl == null ? "" : photoPublicBaseUrl.trim();
+        }
+
+        /** True when photo bytes live in the database rather than under {@code photoStorageRoot}. */
+        public boolean storesPhotosInDatabase() {
+            return BACKEND_DATABASE.equals(photoStorageBackend);
         }
     }
 
@@ -409,6 +420,7 @@ public record AppConfig(
         private int keepaliveTimeSeconds = 30;
         // MediaConfig fields
         private String photoStorageRoot = Path.of("data", "photos").toString();
+        private String photoStorageBackend = MediaConfig.BACKEND_DISK;
         private String photoPublicBaseUrl = "";
         private long maxPhotoUploadBytes = 5L * 1024 * 1024;
         // SafetyConfig fields
@@ -549,6 +561,12 @@ public record AppConfig(
 
         public Builder photoStorageRoot(String v) {
             this.photoStorageRoot = v;
+            return this;
+        }
+
+        /** {@code DISK} (default) or {@code DATABASE}; use the database on hosts without a persistent disk. */
+        public Builder photoStorageBackend(String v) {
+            this.photoStorageBackend = v;
             return this;
         }
 
@@ -1049,7 +1067,7 @@ public record AppConfig(
         }
 
         private MediaConfig buildMediaConfig() {
-            return new MediaConfig(photoStorageRoot, photoPublicBaseUrl, maxPhotoUploadBytes);
+            return new MediaConfig(photoStorageRoot, photoStorageBackend, photoPublicBaseUrl, maxPhotoUploadBytes);
         }
 
         private AuthConfig buildAuthConfig() {

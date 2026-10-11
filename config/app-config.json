@@ -89,6 +89,7 @@
   "typingFreshSeconds": 10,
   "adminClerkIds": [],
   "photoStorageRoot": "data/photos",
+  "photoStorageBackend": "DISK",
   "photoPublicBaseUrl": "",
   "maxPhotoUploadBytes": 10485760
 }

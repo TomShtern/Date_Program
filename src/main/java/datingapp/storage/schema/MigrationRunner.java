@@ -208,7 +208,8 @@ public final class MigrationRunner {
             new VersionedMigration(
                     25,
                     "Store verification codes hashed, add users.purged_at and departed_account_flags",
-                    MigrationRunner::applyV25));
+                    MigrationRunner::applyV25),
+            new VersionedMigration(26, "Add photo_blobs table for database photo storage", MigrationRunner::applyV26));
 
     // ═══════════════════════════════════════════════════════════════
     // Public entry point
@@ -757,6 +758,10 @@ public final class MigrationRunner {
         }
         stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS purged_at TIMESTAMP WITH TIME ZONE");
         SchemaInitializer.createDepartedAccountFlagsSchema(stmt);
+    }
+
+    private static void applyV26(Statement stmt) throws SQLException {
+        SchemaInitializer.createPhotoBlobSchema(stmt);
     }
 
     private static void rebuildConversationActivityIndexes(Statement stmt) throws SQLException {

@@ -17,13 +17,16 @@ final class RestApiPhotoStorage {
     private static final String PHOTOS_ROUTE_PREFIX = "/photos/";
     private static final int COPY_BUFFER_BYTES = 8 * 1024;
 
-    private final datingapp.core.media.LocalDiskPhotoStore delegate;
+    private final datingapp.core.media.PhotoStore delegate;
     private final String configuredPublicBaseUrl;
     private final long maxPhotoUploadBytes;
 
-    RestApiPhotoStorage(AppConfig config) {
-        this.delegate = new datingapp.core.media.LocalDiskPhotoStore(
-                Path.of(config.media().photoStorageRoot()), config.media().maxPhotoUploadBytes());
+    RestApiPhotoStorage(AppConfig config, datingapp.core.media.PhotoStore photoStore) {
+        this.delegate = photoStore != null
+                ? photoStore
+                : new datingapp.core.media.LocalDiskPhotoStore(
+                        Path.of(config.media().photoStorageRoot()),
+                        config.media().maxPhotoUploadBytes());
         this.configuredPublicBaseUrl = normalizeBaseUrl(config.media().photoPublicBaseUrl());
         this.maxPhotoUploadBytes = config.media().maxPhotoUploadBytes();
     }

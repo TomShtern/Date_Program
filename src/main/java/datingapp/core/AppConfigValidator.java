@@ -241,8 +241,15 @@ final class AppConfigValidator {
         }
     }
 
-    static void validateMedia(String photoStorageRoot, String photoPublicBaseUrl, long maxPhotoUploadBytes) {
+    static void validateMedia(
+            String photoStorageRoot, String photoStorageBackend, String photoPublicBaseUrl, long maxPhotoUploadBytes) {
         requireNonBlank("photoStorageRoot", photoStorageRoot);
+        requireNonBlank("photoStorageBackend", photoStorageBackend);
+        String backend = photoStorageBackend.trim().toUpperCase(Locale.ROOT);
+        if (!AppConfig.MediaConfig.BACKEND_DISK.equals(backend)
+                && !AppConfig.MediaConfig.BACKEND_DATABASE.equals(backend)) {
+            throw new IllegalArgumentException("photoStorageBackend must be DISK or DATABASE");
+        }
         requirePositive("maxPhotoUploadBytes", maxPhotoUploadBytes);
         if (photoPublicBaseUrl != null
                 && !photoPublicBaseUrl.isBlank()

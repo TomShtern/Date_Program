@@ -266,7 +266,7 @@ public class RestApiServer {
                 this.restrictToLoopbackClients ? null : this.lanSharedSecret);
         this.requestContext = new RestApiRequestContext(this.authUseCases);
         this.port = port;
-        this.photoStorage = new RestApiPhotoStorage(services.getConfig());
+        this.photoStorage = new RestApiPhotoStorage(services.getConfig(), services.getPhotoStore());
         this.userStorage = services.getUserStorage();
         this.adminClerkIds = services.getConfig().safety().adminClerkIds();
     }

@@ -67,6 +67,7 @@ public final class SchemaInitializer {
         createSocialSchema(stmt);
         createModerationSchema(stmt);
         createPresenceSchema(stmt);
+        createPhotoBlobSchema(stmt);
         createProfileSchema(stmt);
         createStandoutsSchema(stmt);
         createUndoStateSchema(stmt);
@@ -604,6 +605,20 @@ public final class SchemaInitializer {
                 )
                 """);
         stmt.execute("CREATE INDEX IF NOT EXISTS idx_presence_updated ON presence_heartbeat(updated_at)");
+    }
+
+    /** Creates the table that holds photo bytes when photos are stored in the database. */
+    static void createPhotoBlobSchema(Statement stmt) throws SQLException {
+        stmt.execute("""
+                CREATE TABLE IF NOT EXISTS photo_blobs (
+                    user_id UUID NOT NULL,
+                    file_name VARCHAR(128) NOT NULL,
+                    content BYTEA NOT NULL,
+                    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+                    PRIMARY KEY (user_id, file_name),
+                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+                )
+                """);
     }
 
     /** Creates profile-related tables (profile_notes, profile_views). */

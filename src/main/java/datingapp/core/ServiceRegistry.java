@@ -22,6 +22,7 @@ import datingapp.core.matching.StandoutService;
 import datingapp.core.matching.TrustSafetyService;
 import datingapp.core.matching.UndoService;
 import datingapp.core.media.LocalDiskPhotoStore;
+import datingapp.core.media.PhotoStore;
 import datingapp.core.metrics.AchievementService;
 import datingapp.core.metrics.ActivityMetricsService;
 import datingapp.core.presence.InMemoryPresenceStorage;
@@ -87,6 +88,7 @@ public final class ServiceRegistry {
     private final ProfileActivationPolicy activationPolicy;
     private final RelationshipWorkflowPolicy workflowPolicy;
     private final PresenceService presenceService;
+    private final PhotoStore photoStore;
 
     private final MessagingUseCases messagingUseCases;
     private final MatchingUseCases matchingUseCases;
@@ -155,15 +157,22 @@ public final class ServiceRegistry {
                         this.activationPolicy,
                         this.eventBus,
                         this.accountCleanupStorage);
-        try {
-            this.profileMutationUseCases.setPhotoStore(new LocalDiskPhotoStore(
-                    Path.of(this.config.media().photoStorageRoot()),
-                    this.config.media().maxPhotoUploadBytes()));
-        } catch (Exception e) {
-            // Photo cleanup stays disabled when media config is unavailable (e.g. minimal tests).
-            if (logger.isWarnEnabled()) {
-                logger.warn("Photo store wiring skipped; account deletion will not clean up photos", e);
+        PhotoStore resolvedPhotoStore = builder.photoStore;
+        if (resolvedPhotoStore == null) {
+            try {
+                resolvedPhotoStore = new LocalDiskPhotoStore(
+                        Path.of(this.config.media().photoStorageRoot()),
+                        this.config.media().maxPhotoUploadBytes());
+            } catch (Exception e) {
+                // Photo cleanup stays disabled when media config is unavailable (e.g. minimal tests).
+                if (logger.isWarnEnabled()) {
+                    logger.warn("Photo store wiring skipped; account deletion will not clean up photos", e);
+                }
             }
+        }
+        this.photoStore = resolvedPhotoStore;
+        if (resolvedPhotoStore != null) {
+            this.profileMutationUseCases.setPhotoStore(resolvedPhotoStore);
         }
         this.profileInsightsUseCases = builder.profileInsightsUseCases != null
                 ? Objects.requireNonNull(builder.profileInsightsUseCases, "profileInsightsUseCases cannot be null")
@@ -245,6 +254,13 @@ public final class ServiceRegistry {
         private AuthUseCases authUseCases;
         private PresenceService presenceService;
         private VerificationSender verificationSender;
+        private PhotoStore photoStore;
+
+        /** Where managed photos are kept; defaults to the local-disk store under {@code photoStorageRoot}. */
+        public Builder photoStore(PhotoStore photoStore) {
+            this.photoStore = photoStore;
+            return this;
+        }
 
         public Builder presenceService(PresenceService presenceService) {
             this.presenceService = presenceService;
@@ -513,6 +529,11 @@ public final class ServiceRegistry {
 
     public PresenceService getPresenceService() {
         return presenceService;
+    }
+
+    /** The managed photo store, or {@code null} when none could be wired. */
+    public PhotoStore getPhotoStore() {
+        return photoStore;
     }
 
     public ProfileMutationUseCases getProfileMutationUseCases() {

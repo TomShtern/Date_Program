@@ -150,8 +150,10 @@ Both return `AuthUserDto`:
 
 ## Photo endpoints
 
-Photos are stored as managed filesystem paths under the configured `photoStorageRoot`.  
-The database stores internal paths like `/photos/<userId>/<filename>`.  
+Photo bytes are kept by the backend chosen with `photoStorageBackend`: `DISK` (default) writes
+them under the configured `photoStorageRoot`; `DATABASE` keeps them in the `photo_blobs` table, for
+hosts whose disk does not survive a restart. The choice does not change any route or response.  
+User records store internal paths like `/photos/<userId>/<filename>` either way.  
 API responses return **public URLs** that the Flutter client can render directly.
 
 ### POST /api/users/{id}/photos
